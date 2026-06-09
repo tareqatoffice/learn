@@ -28,28 +28,35 @@
 ## Project Structure
 
 ```
-src/
-├── modules/
-│   └── users/
-│       ├── dto/
-│       │   ├── create-user.dto.ts
-│       │   └── update-user.dto.ts
-│       ├── schemas/
-│       │   └── user.schema.ts
-│       ├── users.controller.ts
-│       ├── users.service.ts
-│       ├── users.module.ts
-│       └── users.service.spec.ts
-├── common/
-│   ├── decorators/
-│   ├── filters/
-│   ├── guards/
-│   ├── interceptors/
-│   └── pipes/
-├── config/
-│   └── configuration.ts
-├── app.module.ts
-└── main.ts
+project-root/
+├── CLAUDE.md                   # Claude Code instructions (auto-loaded)
+├── docs/
+│   ├── BEST-PRACTICES.md       # This file
+│   ├── DECISIONS.md            # Architecture decision records
+│   ├── FAQ.md                  # Common questions
+│   └── CONTRIBUTING.md        # How to propose changes
+└── src/
+    ├── modules/
+    │   └── users/
+    │       ├── dto/
+    │       │   ├── create-user.dto.ts
+    │       │   └── update-user.dto.ts
+    │       ├── schemas/
+    │       │   └── user.schema.ts
+    │       ├── users.controller.ts
+    │       ├── users.service.ts
+    │       ├── users.module.ts
+    │       └── users.service.spec.ts
+    ├── common/
+    │   ├── decorators/
+    │   ├── filters/
+    │   ├── guards/
+    │   ├── interceptors/
+    │   └── pipes/
+    ├── config/
+    │   └── configuration.ts
+    ├── app.module.ts
+    └── main.ts
 ```
 
 - One module per domain/feature. Never flatten all files into a single directory.

@@ -2,7 +2,7 @@
 
 This project follows strict backend coding standards. Before writing or reviewing any code, read and apply all guidelines in:
 
-**[Backend Best Practices](./best-practices.md)**
+**[Backend Best Practices](./docs/BEST-PRACTICES.md)**
 
 ## Quick Reference
 
@@ -31,4 +31,4 @@ This project follows strict backend coding standards. Before writing or reviewin
 - `@nestjs/passport` v11 · passport `^0.7`
 - `@nestjs/cache-manager` v3 (Keyv-based)
 
-> For PostgreSQL projects, use `best-practices-postgresql.md` instead.
+> For PostgreSQL projects, use `docs/BEST-PRACTICES-POSTGRESQL.md` instead.

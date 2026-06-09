@@ -1,6 +1,6 @@
 # Frontend Best Practices
 
-> Stack: Next.js 16 · React Query · Ant Design
+> Stack: Next.js 16 · React Query · Tailwind CSS
 
 ---
 
@@ -9,7 +9,7 @@
 1. [Project Structure](#project-structure)
 2. [Next.js Guidelines](#nextjs-guidelines) — App Router · Routing · Data Fetching · Caching & Revalidation · Metadata & SEO · Server Actions
 3. [React Query Guidelines](#react-query-guidelines)
-4. [Ant Design Guidelines](#ant-design-guidelines)
+4. [Tailwind & Component Guidelines](#tailwind--component-guidelines)
 5. [Component Standards](#component-standards)
 6. [State Management](#state-management)
 7. [TypeScript Standards](#typescript-standards)
@@ -22,7 +22,13 @@
 ## Project Structure
 
 ```
-src/
+project-root/
+├── CLAUDE.md                   # Claude Code instructions (auto-loaded)
+├── docs/
+│   ├── BEST-PRACTICES.md       # This file
+│   ├── DECISIONS.md            # Architecture decision records
+│   ├── FAQ.md                  # Common questions
+│   └── CONTRIBUTING.md        # How to propose changes
 ├── app/                        # Next.js App Router pages
 │   ├── (auth)/                 # Route groups (no URL segment)
 │   ├── (dashboard)/
@@ -201,7 +207,7 @@ export async function createItem(formData: FormData) {
 }
 ```
 
-> Never `throw` on validation failure inside a Server Action. A thrown error propagates to the nearest `error.tsx` boundary — a full-page crash screen. Return a structured result object instead so the calling component can display inline `Form.Item` errors.
+> Never `throw` on validation failure inside a Server Action. A thrown error propagates to the nearest `error.tsx` boundary — a full-page crash screen. Return a structured result object instead so the calling component can display inline field errors.
 
 ### Metadata & SEO
 
@@ -372,51 +378,135 @@ export function useCreateUser() {
 
 ---
 
-## Ant Design Guidelines
+## Tailwind & Component Guidelines
 
 ### Setup
 
-- Wrap the app in `<ConfigProvider>` at the root layout. Define the theme token once.
+**Tailwind CSS v4** is configured via CSS — no `tailwind.config.js` needed. Import it in your global stylesheet and define design tokens with `@theme`:
+
+```css
+/* app/globals.css */
+@import "tailwindcss";
+
+@theme {
+  --color-primary: oklch(0.6 0.24 259);
+  --color-primary-foreground: oklch(1 0 0);
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+}
+```
+
+**shadcn/ui** provides accessible components built on Radix UI + Tailwind. Components are copied into your codebase — you own and modify them:
+
+```bash
+npx shadcn@latest add button input dialog table form
+```
+
+Components live in `components/ui/`. Do not edit them directly — wrap them in `components/features/` instead.
+
+Install the `cn()` utility for conditional class merging:
+
+```ts
+// lib/utils.ts
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+```
+
+### Forms
+
+Use **React Hook Form** + **Zod** for all forms. Never control form state with `useState`.
+
+```tsx
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+
+const schema = z.object({ email: z.string().email() });
+type FormValues = z.infer<typeof schema>;
+
+export function CreateUserForm() {
+  const form = useForm<FormValues>({ resolver: zodResolver(schema) });
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl><Input {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit">Submit</Button>
+      </form>
+    </Form>
+  );
+}
+```
+
+> Never `throw` on validation failure inside a Server Action — it crashes to the nearest `error.tsx`. Return a structured result object so the caller can display inline field errors.
+
+### Tables
+
+Use **TanStack Table v8** for data tables. The shadcn/ui `DataTable` wraps it with Tailwind styling:
+
+```tsx
+import { useReactTable, getCoreRowModel, flexRender, type ColumnDef } from "@tanstack/react-table";
+
+const columns: ColumnDef<User>[] = [
+  { accessorKey: "name", header: "Name" },
+  { accessorKey: "email", header: "Email" },
+];
+```
+
+### Notifications
+
+Use **Sonner** for toast notifications. Add `<Toaster>` to the root layout once:
 
 ```tsx
 // app/layout.tsx
-import { ConfigProvider } from "antd";
-import { theme } from "@/lib/antdTheme";
+import { Toaster } from "sonner";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html>
       <body>
-        <ConfigProvider theme={theme}>{children}</ConfigProvider>
+        {children}
+        <Toaster position="top-right" />
       </body>
     </html>
   );
 }
 ```
 
-- Define the theme in a single file (`lib/antdTheme.ts`). Do not spread token overrides across components.
+```ts
+import { toast } from "sonner";
 
-### Component Usage
-
-- Use Ant Design components for all form controls, tables, modals, and feedback elements. Do not reimplement what AntD already provides.
-- Use `Form` + `Form.Item` for all forms. Never control form state manually with `useState`.
-
-```tsx
-<Form form={form} onFinish={handleSubmit} layout="vertical">
-  <Form.Item name="email" label="Email" rules={[{ required: true, type: "email" }]}>
-    <Input />
-  </Form.Item>
-</Form>
+toast.success("User created");
+toast.error("Something went wrong");
 ```
 
-- Use `Table` with `columns` typed as `ColumnsType<T>`. Always define a `rowKey`.
-- Use `notification` or `message` for user feedback. Never `alert()`.
+Never use `alert()` or `window.confirm()`.
 
-### Styling
+### Styling Conventions
 
-- Prefer AntD design tokens (`token.colorPrimary`, `token.borderRadius`) over hardcoded values.
-- Use CSS Modules for component-specific styles. Never use inline `style` props except for dynamic values.
-- Do not override AntD internal class names (e.g., `.ant-btn`). Use `className` with CSS Modules or token overrides via `ConfigProvider`.
+- Use `cn()` for conditional classes — never string concatenation.
+- Define custom design values in `@theme` in `globals.css`. Do not use arbitrary values (e.g. `w-[317px]`) unless they come from an exact design spec.
+- Follow mobile-first responsive design: `sm:`, `md:`, `lg:` breakpoints.
+- Use `group` and `peer` variants for parent-based and sibling-based styling.
+- Do not write custom CSS for anything Tailwind utilities already cover.
 
 ---
 
@@ -435,7 +525,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 ```tsx
 // 1. Imports (external → internal → types)
-import { Button, Skeleton } from "antd";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useUser } from "@/queries/useUser";
 import type { User } from "@/types";
 
@@ -459,7 +550,7 @@ export function UserCard({ userId, onSelect }: UserCardProps) {
   };
 
   // 7. Render
-  if (isPending) return <Skeleton />;
+  if (isPending) return <Skeleton className="h-9 w-32" />;
 
   return (
     <Button onClick={handleClick}>{displayName}</Button>
@@ -530,7 +621,7 @@ import Script from "next/script";
 
 - Wrap route segments with `error.tsx` to catch rendering errors.
 - API errors from React Query must be typed via the `useQuery<TData, TError>` generic — never with a type assertion at the call site.
-- Show user-facing errors via `notification.error()` or inline `Form.Item` validation messages.
+- Show user-facing errors via `toast.error()` (Sonner) or inline `FormMessage` for field-level validation.
 - Never swallow errors silently. At minimum, log them.
 
 ```tsx
@@ -538,7 +629,7 @@ import Script from "next/script";
 const { data, isError, error } = useUsers(filters);
 
 if (isError) {
-  return <Alert type="error" message={error.message} />;
+  return <p className="text-sm text-red-500">{error.message}</p>;
 }
 ```
 
@@ -608,7 +699,7 @@ it("submits the form and shows success message", async () => {
 });
 ```
 
-- Never test AntD internals (e.g. dropdown open state). Test what the user sees and can do.
+- Never test component library internals (e.g. dropdown open state). Test what the user sees and can do.
 
 ### E2E Tests
 

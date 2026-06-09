@@ -27,13 +27,19 @@ Key technology and pattern choices with the reasoning behind each. Understanding
 
 ---
 
-## ADR-003 — Ant Design v5
+## ADR-003 — Tailwind CSS as default styling
 
-**Decision**: Ant Design v5 as the sole component library.
+**Decision**: Tailwind CSS v4 + shadcn/ui as the default design stack. Ant Design v6 is an opt-in alternative for data-heavy admin/internal tools.
 
-**Why**: Comprehensive — covers tables, forms, modals, date pickers, and more with no gaps. Design token system (`ConfigProvider`) allows consistent theming. Strong TypeScript types (`ColumnsType<T>`, `FormInstance`).
+**Why (Tailwind default)**: Tailwind v4 is CSS-first (no config file), tree-shaken by default, and generates minimal CSS. shadcn/ui gives accessible, unstyled-by-default components that live in your codebase — no version lock. React Hook Form is lighter and more flexible than AntD Form for complex validation flows. The combination produces smaller bundles and fewer layout constraints than AntD.
 
-**Trade-off**: Larger bundle than Tailwind + Headless UI. Mitigated by tree-shaking. AntD's opinionated design system requires the "define theme once in `lib/antdTheme.ts`" rule to prevent theme drift.
+**Why (AntD alternative)**: Ant Design v6 covers complex components (DatePicker, Table with virtual scroll, Cascader) that take significant effort to replicate with primitives. For internal dashboards where bundle size is not critical and time-to-feature matters, AntD + Tailwind (for layout) is the pragmatic choice.
+
+**Trade-off (Tailwind)**: shadcn/ui components must be built and maintained by the team. No built-in DatePicker or complex Table — reach for `@tanstack/react-table` and a headless date library.
+
+**Trade-off (AntD)**: Larger bundle. Opinionated design system — requires `lib/antdTheme.ts` as the single source of truth to prevent token drift. See `BEST-PRACTICES-ANTD.md` for full setup.
+
+**v5 → v6 key breaking changes (if migrating)**: `@ant-design/icons` must also be v6; `Button.Group` / `Input.Group` → `Space.Compact`; `BackTop` → `FloatButton.BackTop`; `headStyle`/`bodyStyle` → `styles.header`/`styles.body`; `dropdownRender` → `popupRender`; `onDropdownVisibleChange` → `onOpenChange`; notification `message` → `title`, `btn` → `actions`; Modal/Drawer mask blur on by default.
 
 ---
 
