@@ -2,7 +2,7 @@
 
 > Stack: NestJS v11 · Node.js >= 20 · PostgreSQL · `@nestjs/typeorm` v11 · TypeORM `^0.3` · `@nestjs/jwt` v11 · `@nestjs/passport` v11
 
-All non-database sections (Modules, Controllers, Services, DTOs & Validation, Auth, Error Handling, Configuration, Logging, TypeScript Standards, Security) follow the same rules as the [MongoDB best practices](./best-practices.md). This file covers what differs: the **database layer** and **testing**.
+All non-database sections (Modules, Controllers, Services, DTOs & Validation, Auth, Error Handling, Configuration, Logging, TypeScript Standards, Security, Swagger / OpenAPI, Health Checks, Graceful Shutdown) follow the same rules as the [MongoDB best practices](./best-practices.md). This file covers what differs: the **database layer** and **testing**.
 
 ---
 

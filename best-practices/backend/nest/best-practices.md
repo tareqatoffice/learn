@@ -19,6 +19,9 @@
 11. [TypeScript Standards](#typescript-standards)
 12. [Testing](#testing)
 13. [Performance & Security](#performance--security)
+14. [Swagger / OpenAPI](#swagger--openapi)
+15. [Health Checks](#health-checks)
+16. [Graceful Shutdown](#graceful-shutdown)
 
 ---
 
@@ -436,9 +439,10 @@ throw new NotFoundException(`User ${id} not found`, { cause: originalError });
 export default () => ({
   port: parseInt(process.env.PORT ?? "3000", 10),
   database: {
-    host: process.env.DB_HOST,
-    port: parseInt(process.env.DB_PORT ?? "5432", 10),
-    name: process.env.DB_NAME,
+    uri: process.env.MONGODB_URI,
+  },
+  redis: {
+    url: process.env.REDIS_URL,
   },
   jwt: {
     secret: process.env.JWT_SECRET,
@@ -652,9 +656,9 @@ describe("UsersController (e2e)", () => {
 
 ### Performance
 
-- Use indexes on all columns used in `WHERE`, `JOIN`, or `ORDER BY` clauses.
+- Add indexes on all fields used in queries, sorts, or unique constraints (see Schema Definition section).
 - Paginate all list endpoints. Never return an unbounded list from the database.
-- Use `select` in TypeORM queries to fetch only required columns for list endpoints.
+- Use `.select()` in Mongoose queries to fetch only required fields for list endpoints.
 - Cache expensive, rarely-changing reads with `@nestjs/cache-manager` v3+. This version uses **Keyv** under the hood — the old `store` adapter pattern is gone. Redis setup:
 
 ```ts
@@ -662,10 +666,11 @@ describe("UsersController (e2e)", () => {
 
 CacheModule.registerAsync({
   isGlobal: true,
-  useFactory: () => ({
+  inject: [ConfigService],
+  useFactory: (config: ConfigService) => ({
     stores: [
       new Keyv({ store: new KeyvCacheableMemory({ ttl: 60_000, lruSize: 5000 }) }),
-      new KeyvRedis(process.env.REDIS_URL),
+      new KeyvRedis(config.get<string>("redis.url")),
     ],
   }),
 })
@@ -708,3 +713,133 @@ app.enableCors({ origin: allowedOrigins });
 ```
 
 > Always read CORS origins from `ConfigService`, not directly from `process.env`. If `ALLOWED_ORIGINS` is missing from `.env`, `process.env.ALLOWED_ORIGINS?.split(",")` silently returns `undefined`, which NestJS/Express treats as allowing all origins. Registering it in the config factory ensures it is validated at startup and fails fast when absent.
+
+---
+
+## Swagger / OpenAPI
+
+- Use `@nestjs/swagger` to generate interactive API documentation from decorators. It is the standard way to document NestJS APIs.
+
+```bash
+npm install @nestjs/swagger
+```
+
+```ts
+// main.ts
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+
+const config = new DocumentBuilder()
+  .setTitle("API")
+  .setDescription("API description")
+  .setVersion("1.0")
+  .addBearerAuth()
+  .build();
+
+const document = SwaggerModule.createDocument(app, config);
+SwaggerModule.setup("api/docs", app, document);
+```
+
+- Annotate DTOs with `@ApiProperty()` so request/response shapes appear in the docs.
+
+```ts
+export class CreateUserDto {
+  @ApiProperty({ example: "user@example.com" })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({ example: "securePassword123", minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  password: string;
+}
+```
+
+- Use `@ApiResponse()` on controller methods to document possible status codes:
+
+```ts
+@ApiResponse({ status: 201, description: "User created.", type: UserResponseDto })
+@ApiResponse({ status: 409, description: "Email already in use." })
+@Post()
+createUser(@Body() dto: CreateUserDto): Promise<UserResponseDto> { ... }
+```
+
+- Protect the docs endpoint in production — either disable it (`if (env !== "production")`) or guard it behind basic auth.
+- Use `@ApiBearerAuth()` on controllers or routes that require JWT so the docs UI can send the `Authorization` header.
+
+---
+
+## Health Checks
+
+- Use `@nestjs/terminus` to expose a `/health` endpoint. This is required for Kubernetes liveness/readiness probes and load balancer health checks.
+
+```bash
+npm install @nestjs/terminus
+```
+
+```ts
+// health/health.module.ts
+import { TerminusModule, MongooseHealthIndicator } from "@nestjs/terminus";
+
+@Module({
+  imports: [TerminusModule],
+  controllers: [HealthController],
+})
+export class HealthModule {}
+```
+
+```ts
+// health/health.controller.ts
+import { Controller, Get } from "@nestjs/common";
+import { HealthCheck, HealthCheckService, MongooseHealthIndicator } from "@nestjs/terminus";
+import { SkipThrottle } from "@nestjs/throttler";
+import { Public } from "@/common/decorators/public.decorator";
+
+@Public()
+@Controller("health")
+export class HealthController {
+  constructor(
+    private readonly health: HealthCheckService,
+    private readonly db: MongooseHealthIndicator,
+  ) {}
+
+  @Get()
+  @HealthCheck()
+  @SkipThrottle()
+  check() {
+    return this.health.check([
+      () => this.db.pingCheck("mongodb"),
+    ]);
+  }
+}
+```
+
+- Add additional indicators as needed: `HttpHealthIndicator` for downstream APIs, `MemoryHealthIndicator` for heap limits, `DiskHealthIndicator` for disk usage.
+- The health endpoint must be public — exclude it from JWT guard with `@Public()`.
+- Respond with `200` when healthy, `503` when any indicator fails — Terminus handles this automatically.
+
+---
+
+## Graceful Shutdown
+
+- Enable shutdown hooks so NestJS can clean up open connections (database, Redis, queues) when the process receives `SIGTERM` or `SIGINT`. Without this, Kubernetes pod termination can interrupt in-flight requests.
+
+```ts
+// main.ts
+const app = await NestFactory.create(AppModule);
+app.enableShutdownHooks();
+await app.listen(3000);
+```
+
+- Implement `OnModuleDestroy` on services that hold long-lived connections:
+
+```ts
+@Injectable()
+export class DatabaseService implements OnModuleDestroy {
+  async onModuleDestroy() {
+    await this.connection.close();
+  }
+}
+```
+
+- Set a termination grace period in Kubernetes (`terminationGracePeriodSeconds`) that is longer than your slowest request. 30 seconds is a safe default.
+- Use `SIGTERM` as the shutdown signal in Docker: `CMD ["node", "dist/main.js"]` (not `npm start`) so Node receives the signal directly, not via an npm wrapper that may not forward it.
