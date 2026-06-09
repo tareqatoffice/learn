@@ -15,9 +15,10 @@
 7. [Authentication & Authorization](#authentication--authorization)
 8. [Error Handling](#error-handling)
 9. [Configuration](#configuration)
-10. [TypeScript Standards](#typescript-standards)
-11. [Testing](#testing)
-12. [Performance & Security](#performance--security)
+10. [Logging](#logging)
+11. [TypeScript Standards](#typescript-standards)
+12. [Testing](#testing)
+13. [Performance & Security](#performance--security)
 
 ---
 
@@ -72,7 +73,18 @@ src/
 export class UsersModule {}
 ```
 
-- Register global pipes, filters, and interceptors in `main.ts` using `app.useGlobalXxx()`, not by decorating `AppModule`.
+- For global pipes, filters, guards, and interceptors that need dependency injection, register them with `APP_PIPE` / `APP_FILTER` / `APP_GUARD` / `APP_INTERCEPTOR` tokens inside a module provider — not via `app.useGlobalXxx()` in `main.ts`, which bypasses the DI container.
+
+```ts
+// Preferred — supports DI (e.g. ConfigService inside the filter)
+@Module({
+  providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],
+})
+export class AppModule {}
+
+// Only use useGlobalXxx() for things with zero dependencies
+app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+```
 
 ---
 
@@ -153,9 +165,12 @@ app.useGlobalPipes(
     whitelist: true,
     forbidNonWhitelisted: true,
     transform: true,
+    disableErrorMessages: process.env.NODE_ENV === "production",
   }),
 );
 ```
+
+> `disableErrorMessages: true` in production prevents exposing validation field names and constraints to clients.
 
 ```ts
 // dto/create-user.dto.ts
@@ -177,6 +192,17 @@ export class CreateUserDto {
 
 - `whitelist: true` strips properties not in the DTO. `forbidNonWhitelisted: true` rejects requests with unknown properties.
 - `transform: true` auto-coerces primitive types (strings to numbers, etc.) based on TS types.
+- Never use `import type { CreateUserDto }` — TypeScript erases type-only imports at runtime, destroying the metadata `ValidationPipe` needs to validate. Use a regular `import { CreateUserDto }`.
+- Use `PartialType` / `OmitType` / `PickType` from `@nestjs/mapped-types` to build update DTOs. Never duplicate property decorators manually.
+
+```ts
+// dto/update-user.dto.ts
+import { PartialType, OmitType } from "@nestjs/mapped-types";
+import { CreateUserDto } from "./create-user.dto";
+
+export class UpdateUserDto extends PartialType(OmitType(CreateUserDto, ["email"] as const)) {}
+```
+
 - Use `@Exclude()` and `@Expose()` from `class-transformer` on response DTOs to control what is serialized. Enable `ClassSerializerInterceptor` globally.
 
 ```ts
@@ -222,6 +248,16 @@ await this.dataSource.transaction(async (manager) => {
   await manager.save(user);
   await manager.save(AuditLog, { userId: user.id, action: "created" });
 });
+```
+
+- Never enable `synchronize: true` in production. It auto-aligns the schema with your entities and **can silently drop columns and data**. Use TypeORM migrations for all schema changes in non-development environments.
+
+```ts
+TypeOrmModule.forRoot({
+  synchronize: process.env.NODE_ENV === "development", // never true in production
+  migrations: ["dist/migrations/*.js"],
+  migrationsRun: true,
+})
 ```
 
 - Keep entities clean: only persistence concerns (columns, relations, indexes). No business logic in entities.
@@ -276,7 +312,14 @@ deleteUser(@Param("id", ParseUUIDPipe) id: string): Promise<void> {
 }
 ```
 
-- Apply `JwtAuthGuard` globally. Use `@Public()` decorator on routes that are intentionally unauthenticated.
+- Register `JwtAuthGuard` globally using `APP_GUARD` (not `app.useGlobalGuards()`) so it participates in DI and can read metadata. Use a `@Public()` decorator for intentionally unauthenticated routes.
+
+```ts
+// app.module.ts
+providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }]
+```
+
+- Guards should throw a specific exception (`UnauthorizedException`, `ForbiddenException`) when denying access — not just return `false`. Returning `false` produces a generic 403 with no useful message.
 
 ---
 
@@ -307,8 +350,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
 }
 ```
 
+- Register `HttpExceptionFilter` with `APP_FILTER` in `AppModule` (not `useGlobalFilters`) so it supports dependency injection (e.g. injecting a logger).
 - Log unexpected errors (5xx) with full stack traces. Do not log 4xx errors as errors — they are expected client mistakes.
 - Never leak stack traces or internal error details to API responses in production.
+- Include the error `cause` when constructing exceptions for internal logging — it is not serialized into the response:
+
+```ts
+throw new NotFoundException(`User ${id} not found`, { cause: originalError });
+```
 
 ---
 
@@ -335,14 +384,67 @@ export default () => ({
 });
 ```
 
+- Set `isGlobal: true` on `ConfigModule` so it is available across all feature modules without repeated imports:
+
+```ts
+ConfigModule.forRoot({ isGlobal: true, load: [configuration], validationSchema })
+```
+
 - Validate environment variables at startup using `Joi` or `class-validator` schema in `ConfigModule.forRoot({ validationSchema })`. Fail fast on missing required variables.
-- Inject config via `ConfigService`:
+- Use `registerAs()` to namespace related config, then inject the namespace directly for strong typing:
+
+```ts
+// config/jwt.config.ts
+export const jwtConfig = registerAs("jwt", () => ({
+  secret: process.env.JWT_SECRET,
+  expiresIn: process.env.JWT_EXPIRES_IN ?? "15m",
+}));
+
+// In service constructor:
+constructor(@Inject(jwtConfig.KEY) private readonly jwt: ConfigType<typeof jwtConfig>) {}
+```
+
+- Inject config via `ConfigService` when namespace injection is not needed:
 
 ```ts
 constructor(private readonly config: ConfigService) {}
 
 const secret = this.config.get<string>("jwt.secret");
 ```
+
+---
+
+## Logging
+
+- Use NestJS's built-in `Logger` in every service. Never use `console.log`.
+
+```ts
+import { Injectable, Logger } from "@nestjs/common";
+
+@Injectable()
+export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
+  async findById(id: string): Promise<User> {
+    this.logger.debug(`Finding user ${id}`);
+    // ...
+  }
+}
+```
+
+- In production, enable JSON logging for log aggregators (AWS CloudWatch, Datadog, ELK):
+
+```ts
+// main.ts
+const app = await NestFactory.create(AppModule, {
+  logger: new ConsoleLogger({ json: true }),
+  bufferLogs: true,
+});
+```
+
+- Use `bufferLogs: true` to capture early bootstrap log messages before the logger is set.
+- Log levels: use `error` for 5xx failures, `warn` for recoverable issues, `log` for significant business events, `debug` for development traces. Never log sensitive data (passwords, tokens, PII).
+- For advanced needs (Winston, Pino), create a custom logger that implements `LoggerService` and register it via `app.useLogger()`.
 
 ---
 
@@ -421,15 +523,31 @@ describe("UsersService", () => {
 
 ### Security
 
-- Enable `helmet` for HTTP security headers.
-- Enable `throttler` (`@nestjs/throttler`) to rate-limit public endpoints.
+- Enable `helmet` for HTTP security headers. It **must be registered before any other `app.use()` call** — middleware runs in definition order, so late registration leaves earlier routes unprotected.
+- Enable `throttler` (`@nestjs/throttler`) globally. Apply stricter per-route limits on auth endpoints (login, register, password reset) using `@Throttle()`. Skip throttling on internal or health-check routes with `@SkipThrottle()`.
+
+```ts
+// Global default — 100 req / minute
+ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }])
+
+// Stricter on auth routes
+@Throttle({ default: { ttl: 60_000, limit: 5 } })
+@Post("login")
+login(@Body() dto: LoginDto) { ... }
+
+// Skip on health check
+@SkipThrottle()
+@Get("health")
+health() { ... }
+```
+
 - Sanitize and validate all user input via `ValidationPipe`. Never trust request data.
 - Use parameterized queries or the ORM at all times. Never interpolate user input into SQL.
 - Rotate JWT secrets and never commit secrets to version control. Use environment variables or a secrets manager.
 - Set CORS policy explicitly in `main.ts`. Do not use `origin: "*"` in production.
 
 ```ts
-// main.ts
+// main.ts — helmet must come first
 import helmet from "helmet";
 
 app.use(helmet());
