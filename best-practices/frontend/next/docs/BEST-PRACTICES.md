@@ -198,7 +198,7 @@ export async function getProducts() {
 }
 ```
 
-- `revalidateTag("products")` — stale-while-revalidate (use in Server Actions or Route Handlers).
+- `revalidateTag("products", "max")` — stale-while-revalidate (use in Server Actions or Route Handlers). In Next.js 16 the cache-profile second arg drives SWR behaviour; the single-arg `revalidateTag("products")` form is deprecated and now expires immediately like `updateTag`.
 - `updateTag("products")` — immediately expires the cache, user sees their change right away (Server Actions only).
 - Prefer tag-based invalidation over `revalidatePath` — it is more precise.
 
@@ -1244,13 +1244,15 @@ import { handlers } from "@/auth";
 export const { GET, POST } = handlers;
 ```
 
-**Route protection via middleware:**
+**Route protection via `proxy.ts` (Next.js 16):**
+
+Next.js 16 renamed `middleware.ts` → `proxy.ts` and the export `middleware` → `proxy` (run `npx @next/codemod@canary middleware-to-proxy` to migrate). `proxy.ts` runs on the Node.js runtime. Auth.js v5 supports it directly — wrap `auth` and export it as `proxy`:
 
 ```ts
-// middleware.ts
+// proxy.ts
 import { auth } from "@/auth";
 
-export default auth((req) => {
+export const proxy = auth((req) => {
   const isLoggedIn = !!req.auth;
   const hasRefreshError = req.auth?.error === "RefreshAccessTokenError";
   const isAuthPage = req.nextUrl.pathname.startsWith("/login");
@@ -1265,6 +1267,8 @@ export default auth((req) => {
 
 export const config = { matcher: ["/((?!api|_next|.*\\..*).*)"] };
 ```
+
+> The legacy `middleware.ts` still works in 16 but is deprecated. Keep `proxy.ts` lightweight — routing and auth checks only, no heavy business logic.
 
 **Authenticated API calls:**
 

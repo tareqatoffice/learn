@@ -48,7 +48,7 @@ This project follows strict frontend coding standards. Before writing or reviewi
 | Accessibility | Semantic HTML, label every input, keyboard-operable. `eslint-plugin-jsx-a11y` enforced. |
 | Security headers | CSP + security headers via `headers()` in `next.config.ts`. |
 | Environment | `NEXT_PUBLIC_` prefix for client vars. Secrets in Server Components only. |
-| Auth | Auth.js v5 (NextAuth). Credentials → NestJS. JWT in encrypted session. Middleware protects routes. |
+| Auth | Auth.js v5 (NextAuth). Credentials → NestJS. JWT in encrypted session. `proxy.ts` (renamed from `middleware.ts` in Next 16) protects routes. |
 | Bot protection | Invisible Turnstile (`appearance: "interaction-only"`). Disable submit until token ready. |
 | Analytics | PostHog JS. `PostHogProvider` at root. `PostHogPageView` for App Router. `useIdentifyUser` hook. |
 | Notifications | `EventSource` with `?token=` query param. `useNotifications` hook. Mount at root layout. |

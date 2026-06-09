@@ -219,11 +219,11 @@ export class CreateUserDto {
 - `whitelist: true` strips properties not in the DTO. `forbidNonWhitelisted: true` rejects requests with unknown properties.
 - `transform: true` auto-coerces primitive types (strings to numbers, etc.) based on TS types.
 - Never use `import type { CreateUserDto }` — TypeScript erases type-only imports at runtime, destroying the metadata `ValidationPipe` needs to validate. Use a regular `import { CreateUserDto }`.
-- Use `PartialType` / `OmitType` / `PickType` from `@nestjs/mapped-types` to build update DTOs. Never duplicate property decorators manually.
+- Use `PartialType` / `OmitType` / `PickType` to build update DTOs — never duplicate property decorators manually. Import them from `@nestjs/mapped-types` in a plain app, but **when the app uses Swagger (it does — see [Swagger / OpenAPI](#swagger--openapi)) import the same helpers from `@nestjs/swagger`** so `@ApiProperty()` metadata is carried over to the derived DTO.
 
 ```ts
-// dto/update-user.dto.ts
-import { PartialType, OmitType } from "@nestjs/mapped-types";
+// dto/update-user.dto.ts — import from @nestjs/swagger since this app exposes Swagger docs
+import { PartialType, OmitType } from "@nestjs/swagger";
 import { CreateUserDto } from "./create-user.dto";
 
 export class UpdateUserDto extends PartialType(OmitType(CreateUserDto, ["email"] as const)) {}
@@ -569,14 +569,16 @@ export enum Role {
 ```
 
 - Avoid non-null assertions (`!`). Prefer explicit null checks or optional chaining.
-- In NestJS v11, `@Inject()` enforces **strict token typing** — injection tokens must be typed as `string`, `symbol`, or a class/abstract class. Raw untyped tokens will produce TypeScript errors. Use `InjectionToken<T>` or typed constants:
+- For custom-provider injection, identify tokens with a `Symbol` (or `string`) constant instead of a magic string, and recover the type at the injection site. NestJS's `InjectionToken<T>` is a **type alias** (`string | symbol | Type<T> | Abstract<T> | Function`) used in signatures — not an instantiable class, so there is no `new InjectionToken()` (that is Angular's API):
 
 ```ts
-// Use a typed token
+// Symbol token + interface — both the binding and the consumer stay type-safe
 export const USER_REPO = Symbol("USER_REPO");
 
-// Or use registerAs() which returns a typed ConfigType key
-@Inject(jwtConfig.KEY) private readonly jwt: ConfigType<typeof jwtConfig>
+@Inject(USER_REPO) private readonly userRepo: UserRepository;
+
+// For namespaced config, registerAs() exposes a typed `.KEY` + ConfigType<T>
+@Inject(jwtConfig.KEY) private readonly jwt: ConfigType<typeof jwtConfig>;
 ```
 
 ---
