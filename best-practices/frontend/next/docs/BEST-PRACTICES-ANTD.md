@@ -27,10 +27,12 @@ All rules from [`BEST-PRACTICES.md`](./BEST-PRACTICES.md) apply. This file adds 
 project-root/
 ├── CLAUDE.md                   # Claude Code instructions (auto-loaded)
 ├── docs/
-│   ├── BEST-PRACTICES-ANTD.md  # This file
+│   ├── BEST-PRACTICES.md       # Base rules — all apply here too
+│   ├── BEST-PRACTICES-ANTD.md  # This file (AntD additions & overrides)
+│   ├── CICD.md                 # CI/CD & git workflow
 │   ├── DECISIONS.md            # Architecture decision records
 │   ├── FAQ.md                  # Common questions
-│   └── CONTRIBUTING.md        # How to propose changes
+│   └── CONTRIBUTING.md         # How to propose changes
 ├── app/                        # Next.js App Router pages
 │   ├── (auth)/                 # Route groups (no URL segment)
 │   ├── (dashboard)/

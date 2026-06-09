@@ -21,8 +21,8 @@ Do not update the best practices for one-off or project-specific decisions. Thes
 1. **Open a discussion first** — raise the proposed change in a team meeting or async channel before writing.
 2. **Branch off `main`** — name the branch `docs/backend/<topic>`.
 3. **Edit the correct file**:
-   - MongoDB projects → `best-practices.md`
-   - PostgreSQL-specific changes → `best-practices-postgresql.md`
+   - MongoDB projects → `BEST-PRACTICES.md`
+   - PostgreSQL-specific changes → `BEST-PRACTICES-POSTGRESQL.md`
 4. **Update `docs/CHANGELOG.md`** — add an entry at the top with today's date, type, and a clear description.
 5. **Open a PR** — at least one other backend developer must review and approve.
 
@@ -42,9 +42,9 @@ Do not update the best practices for one-off or project-specific decisions. Thes
 
 | Trigger | Action |
 |---|---|
-| NestJS major version bump | Review full `best-practices.md` against the migration guide. Check DI, decorator, and module API changes. Update all version references in `CLAUDE.md`. |
+| NestJS major version bump | Review full `BEST-PRACTICES.md` against the migration guide. Check DI, decorator, and module API changes. Update all version references in `CLAUDE.md`. |
 | `@nestjs/mongoose` / `mongoose` major bump | Review the Database section. Schema, model, and query APIs change between Mongoose major versions. |
-| `@nestjs/typeorm` / `typeorm` major bump | Review `best-practices-postgresql.md`. Entity, migration, and repository APIs can change. |
+| `@nestjs/typeorm` / `typeorm` major bump | Review `BEST-PRACTICES-POSTGRESQL.md`. Entity, migration, and repository APIs can change. |
 | `@nestjs/cache-manager` major bump | Review the Cache section. The store adapter API broke completely between v2 and v3 (Keyv migration). |
 | Security advisory on `bcrypt`, `jsonwebtoken`, `helmet` | Update immediately, skip normal PR cycle, notify the team. |
 

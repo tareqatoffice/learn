@@ -141,4 +141,4 @@ Do not rely solely on E2E tests for guards — they are slow and difficult to co
 
 No external service to set up in CI. Tests are isolated — `dropDatabase()` in `afterEach` guarantees clean state. Fast startup (~1–2 seconds), no network latency.
 
-For PostgreSQL E2E tests, use a dedicated test database (see `best-practices-postgresql.md`) — there is no equivalent in-process PostgreSQL server suitable for production-schema tests.
+For PostgreSQL E2E tests, use a dedicated test database (see `BEST-PRACTICES-POSTGRESQL.md`) — there is no equivalent in-process PostgreSQL server suitable for production-schema tests.

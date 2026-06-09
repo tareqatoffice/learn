@@ -72,6 +72,110 @@ jobs:
 
 ---
 
+## Developer Experience — Formatting, Linting & Git Hooks
+
+One shared toolchain so every developer's diffs are identically formatted, and broken code is blocked locally before it reaches CI.
+
+### Prettier (formatting) + ESLint (correctness)
+
+Prettier owns formatting; ESLint owns code-quality rules. Run `eslint-config-prettier` so the two never fight over style.
+
+```bash
+npm install -D prettier eslint-config-prettier
+```
+
+```json
+// .prettierrc
+{
+  "semi": true,
+  "singleQuote": false,
+  "trailingComma": "all",
+  "printWidth": 100
+}
+```
+
+```
+# .prettierignore
+dist
+coverage
+node_modules
+```
+
+- Add `eslint-config-prettier` **last** in the ESLint config so it disables every stylistic rule Prettier already handles. Without it, ESLint and Prettier produce conflicting fixes.
+
+### Husky + lint-staged (pre-commit)
+
+Format and lint only the **staged** files — fast, and auto-fixes before the commit lands.
+
+```bash
+npm install -D husky lint-staged
+npx husky init
+```
+
+```json
+// package.json
+{
+  "lint-staged": {
+    "*.ts": ["eslint --fix", "prettier --write"],
+    "*.{json,md,yml,yaml}": ["prettier --write"]
+  }
+}
+```
+
+```bash
+# .husky/pre-commit
+npx lint-staged
+```
+
+> `prepare: "husky"` in `package.json` installs the hooks automatically on `npm install`, so every clone is set up with no manual step.
+
+### commitlint (commit-msg)
+
+Enforce Conventional Commits locally — the same rule the PR-title linter checks, but caught before the commit exists.
+
+```bash
+npm install -D @commitlint/cli @commitlint/config-conventional
+```
+
+```js
+// commitlint.config.js
+module.exports = { extends: ["@commitlint/config-conventional"] };
+```
+
+```bash
+# .husky/commit-msg
+npx --no -- commitlint --edit "$1"
+```
+
+### Pre-push — typecheck, test, build
+
+The heavy gate. Nothing reaches the remote (and CI) unless it type-checks, all tests pass, and the project builds.
+
+```bash
+# .husky/pre-push
+npm run typecheck
+npm run test -- --coverage --passWithNoTests
+npm run test:e2e -- --passWithNoTests
+npm run build
+```
+
+### Enforcing "every change has a test"
+
+A hook cannot prove a change is *meaningfully* tested, but coverage thresholds make undertested code fail any test run **that collects coverage**:
+
+```js
+// jest.config.js
+module.exports = {
+  coverageThreshold: {
+    global: { branches: 80, functions: 80, lines: 80, statements: 80 },
+  },
+};
+```
+
+The threshold only fires when coverage is collected, so the pre-push test step (and the CI unit-test step) must pass `--coverage` — `jest` without it ignores `coverageThreshold` entirely. Pair this with code review: a PR that adds logic without adding tests should not be approved.
+
+---
+
 ## CI Pipeline
 
 **`.github/workflows/ci.yml`**
@@ -113,7 +217,7 @@ jobs:
         run: npm run typecheck
 
       - name: Unit tests
-        run: npm run test -- --passWithNoTests
+        run: npm run test -- --coverage --passWithNoTests
         env:
           NODE_ENV: test
 
@@ -140,7 +244,10 @@ jobs:
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:e2e": "jest --config test/jest-e2e.json",
-    "build": "nest build"
+    "build": "nest build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
   }
 }
 ```
@@ -218,7 +325,7 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package*.json ./
-RUN npm ci --only=production && cp -r node_modules /prod_modules
+RUN npm ci --omit=dev && cp -r node_modules /prod_modules
 RUN npm ci
 
 FROM deps AS build

@@ -72,6 +72,117 @@ jobs:
 
 ---
 
+## Developer Experience — Formatting, Linting & Git Hooks
+
+One shared toolchain so every developer's diffs are identically formatted, and broken code is blocked locally before it reaches CI.
+
+### Prettier (formatting) + ESLint (correctness)
+
+Prettier owns formatting; ESLint owns code-quality rules. Run `eslint-config-prettier` so the two never fight over style. Add `prettier-plugin-tailwindcss` to auto-sort Tailwind class names into the canonical order.
+
+```bash
+npm install -D prettier eslint-config-prettier prettier-plugin-tailwindcss
+```
+
+```json
+// .prettierrc
+{
+  "semi": true,
+  "singleQuote": false,
+  "trailingComma": "all",
+  "printWidth": 100,
+  "plugins": ["prettier-plugin-tailwindcss"]
+}
+```
+
+```
+# .prettierignore
+.next
+coverage
+node_modules
+playwright-report
+```
+
+- Add `eslint-config-prettier` **last** in the flat ESLint config so it disables every stylistic rule Prettier already handles. Without it, ESLint and Prettier produce conflicting fixes.
+
+### Husky + lint-staged (pre-commit)
+
+Format and lint only the **staged** files — fast, and auto-fixes before the commit lands.
+
+```bash
+npm install -D husky lint-staged
+npx husky init
+```
+
+```json
+// package.json
+{
+  "lint-staged": {
+    "*.{ts,tsx}": ["eslint --fix", "prettier --write"],
+    "*.{json,md,css,yml,yaml}": ["prettier --write"]
+  }
+}
+```
+
+```bash
+# .husky/pre-commit
+npx lint-staged
+```
+
+> `prepare: "husky"` in `package.json` installs the hooks automatically on `npm install`, so every clone is set up with no manual step.
+
+### commitlint (commit-msg)
+
+Enforce Conventional Commits locally — the same rule the PR-title linter checks, but caught before the commit exists.
+
+```bash
+npm install -D @commitlint/cli @commitlint/config-conventional
+```
+
+```js
+// commitlint.config.js
+module.exports = { extends: ["@commitlint/config-conventional"] };
+```
+
+```bash
+# .husky/commit-msg
+npx --no -- commitlint --edit "$1"
+```
+
+### Pre-push — typecheck, test, build
+
+The heavy gate. Nothing reaches the remote (and CI) unless it type-checks, all unit/component tests pass, and the production build succeeds.
+
+```bash
+# .husky/pre-push
+npm run typecheck
+npm run test -- --run --coverage
+npm run build
+```
+
+> Playwright E2E is intentionally **not** in the pre-push hook — it needs browser binaries and a running app/staging target, which is too slow and environment-dependent for a local gate. It runs in CI instead.
+
+### Enforcing "every change has a test"
+
+A hook cannot prove a change is *meaningfully* tested, but coverage thresholds make undertested code fail any test run **that collects coverage** (requires `@vitest/coverage-v8`):
+
+```ts
+// vitest.config.ts
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    coverage: {
+      thresholds: { branches: 80, functions: 80, lines: 80, statements: 80 },
+    },
+  },
+});
+```
+
+The threshold only fires when coverage is collected, so the pre-push test step (and the CI test step) must pass `--coverage`. Pair this with code review: a PR that adds logic without adding tests should not be approved.
+
+---
+
 ## CI Pipeline
 
 **`.github/workflows/ci.yml`**
@@ -105,7 +216,7 @@ jobs:
         run: npm run typecheck
 
       - name: Unit & component tests
-        run: npm run test -- --run
+        run: npm run test -- --run --coverage
         env:
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
 
@@ -158,14 +269,19 @@ jobs:
 ```json
 {
   "scripts": {
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:e2e": "playwright test",
-    "build": "next build"
+    "build": "next build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
   }
 }
 ```
+
+> `next lint` was removed in Next.js 16 — run the ESLint CLI directly. Use `npx @next/codemod@latest next-lint-to-eslint-cli .` to migrate an existing project's config.
 
 ---
 

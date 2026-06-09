@@ -27,6 +27,7 @@ This project follows strict backend coding standards. Before writing or reviewin
 | Analytics | PostHog Node SDK. `capture()` on business events. `shutdown()` on destroy. |
 | Notifications | `@Sse()` + Redis pub/sub for multi-instance fan-out. |
 | CI/CD | Conventional Commits · GitHub Actions · Docker → GHCR → SSH deploy. |
+| Dev tooling | Prettier + ESLint (`eslint-config-prettier`). Husky: `lint-staged` pre-commit, commitlint commit-msg, typecheck + test + build pre-push. |
 
 ## Stack Versions
 

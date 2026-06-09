@@ -548,13 +548,18 @@ export const apiClient = axios.create({
 
 ### Request interceptor — attach bearer token
 
-The interceptor reads the Auth.js session on every request so the token is always fresh:
+The interceptor reads the Auth.js session on every request so the token is always fresh. `getSession()` makes an HTTP call to `/api/auth/session` with no built-in cache, so concurrent requests in the same tick are deduplicated to a single session fetch:
 
 ```ts
-import { getSession } from "next-auth/react";
+import { getSession, type Session } from "next-auth/react";
+
+// Deduplicate concurrent session fetches so a page with multiple parallel
+// queries only pays for one /api/auth/session round-trip per tick.
+let sessionFetch: Promise<Session | null> | null = null;
 
 apiClient.interceptors.request.use(async (config) => {
-  const session = await getSession();
+  if (!sessionFetch) sessionFetch = getSession().finally(() => { sessionFetch = null; });
+  const session = await sessionFetch;
   if (session?.accessToken) {
     config.headers.Authorization = `Bearer ${session.accessToken}`;
   }
@@ -1226,25 +1231,7 @@ export const config = { matcher: ["/((?!api|_next|.*\\..*).*)"] };
 
 **Authenticated API calls:**
 
-```ts
-// lib/api/client.ts — axios instance with automatic token injection
-import { getSession, type Session } from "next-auth/react";
-import axios from "axios";
-
-export const api = axios.create({ baseURL: process.env.NEXT_PUBLIC_API_URL });
-
-// `getSession()` makes an HTTP call to /api/auth/session every time with no
-// built-in cache. Deduplicate concurrent requests within the same tick so a
-// page with multiple parallel queries only pays for one session fetch.
-let sessionFetch: Promise<Session | null> | null = null;
-
-api.interceptors.request.use(async (config) => {
-  if (!sessionFetch) sessionFetch = getSession().finally(() => { sessionFetch = null; });
-  const session = await sessionFetch;
-  if (session?.accessToken) config.headers.Authorization = `Bearer ${session.accessToken}`;
-  return config;
-});
-```
+Client Components call through the shared `apiClient` defined in the [Axios Instance](#axios-instance) section — its request interceptor already injects the bearer token from the Auth.js session (with concurrent-session deduplication). Do not create a second axios instance here.
 
 ```ts
 // Server Components — read session directly

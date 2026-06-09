@@ -19,7 +19,7 @@ Do not update the best practices for one-off or project-specific decisions. Thes
 
 1. **Open a discussion first** — raise the proposed change in a team meeting or async channel before writing.
 2. **Branch off `main`** — name the branch `docs/frontend/<topic>`.
-3. **Edit `best-practices.md`** — keep changes focused; one topic per PR.
+3. **Edit `BEST-PRACTICES.md`** (or `BEST-PRACTICES-ANTD.md` for Ant Design projects) — keep changes focused; one topic per PR.
 4. **Update `docs/CHANGELOG.md`** — add an entry at the top with today's date, type, and a clear description.
 5. **Open a PR** — at least one other frontend developer must review and approve.
 
@@ -39,7 +39,7 @@ Do not update the best practices for one-off or project-specific decisions. Thes
 
 | Trigger | Action |
 |---|---|
-| Next.js major version bump | Review full `best-practices.md` against the migration guide. Update version references in `CLAUDE.md`. |
+| Next.js major version bump | Review full `BEST-PRACTICES.md` against the migration guide. Update version references in `CLAUDE.md`. |
 | React Query major version bump | Review the React Query section. v4 → v5 renamed `cacheTime`, removed `isLoading` — this level of change requires a full section review. |
 | Ant Design major version bump | Review Ant Design section. Test `ConfigProvider` theme token API for breaking changes. |
 | Security advisory | Update immediately, skip normal PR cycle, notify the team. |

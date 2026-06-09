@@ -1,6 +1,6 @@
 # Architecture Decision Records — Frontend (Next.js)
 
-Key technology and pattern choices with the reasoning behind each. Understanding the **why** helps the team make consistent decisions in cases not explicitly covered by `best-practices.md`.
+Key technology and pattern choices with the reasoning behind each. Understanding the **why** helps the team make consistent decisions in cases not explicitly covered by `BEST-PRACTICES.md`.
 
 ---
 

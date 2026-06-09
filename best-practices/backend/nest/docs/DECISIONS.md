@@ -1,6 +1,6 @@
 # Architecture Decision Records — Backend (NestJS)
 
-Key technology and pattern choices with the reasoning behind each. Understanding the **why** helps the team make consistent decisions in cases not explicitly covered by `best-practices.md`.
+Key technology and pattern choices with the reasoning behind each. Understanding the **why** helps the team make consistent decisions in cases not explicitly covered by `BEST-PRACTICES.md`.
 
 ---
 
@@ -16,7 +16,7 @@ Key technology and pattern choices with the reasoning behind each. Understanding
 
 ## ADR-002 — MongoDB as the default database
 
-**Decision**: MongoDB with `@nestjs/mongoose` for new projects. PostgreSQL available via `best-practices-postgresql.md`.
+**Decision**: MongoDB with `@nestjs/mongoose` for new projects. PostgreSQL available via `BEST-PRACTICES-POSTGRESQL.md`.
 
 **Why**: Schema flexibility fits rapid iteration. `{ timestamps: true }` on `@Schema` adds `createdAt`/`updatedAt` automatically with no migration. Atlas provides managed replica sets, enabling multi-document transactions without infrastructure overhead. `.lean()` on read queries returns plain objects — significantly faster for list endpoints than full Mongoose document instances.
 
