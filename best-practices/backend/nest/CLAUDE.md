@@ -47,13 +47,14 @@ This project follows strict backend coding standards. Before writing or reviewin
 | Config | `@nestjs/config` only. No direct `process.env` in services/controllers. Validate at startup. |
 | TypeScript | `strict: true`. No `any`. Explicit return types on all public methods. |
 | Security | `helmet`, `throttler`, parameterized queries, explicit CORS. No `origin: "*"` in production. |
-| Email | BullMQ queue → `MailProcessor` → Resend. Never send synchronously. |
+| Email | BullMQ queue → `MailProcessor` → `MailProvider` (SMTP via nodemailer). Provider-agnostic — Resend/Brevo/Google swap by env. Never send synchronously or from the frontend. |
 | Queues | BullMQ. Always set `attempts`, `backoff`, `removeOnComplete`. |
 | Files | Presigned URL → Cloudflare R2. Store key only. Serve via custom domain. |
 | Bot protection | `TurnstileGuard` on login, register, forgot-password. Invisible widget. |
 | Analytics | PostHog Node SDK. `capture()` on business events. `shutdown()` on destroy. |
 | Notifications | `@Sse()` + Redis pub/sub for multi-instance fan-out. |
 | CI/CD | Conventional Commits · GitHub Actions · Docker → GHCR → SSH deploy. |
+| Dependency isolation | Every third-party SDK behind a provider (`MailProvider`, `FilesService`, `AnalyticsService`…). Never instantiate an SDK or read `process.env` outside its wrapper. Don't over-wrap. |
 | Dev tooling | Prettier + ESLint (`eslint-config-prettier`). Husky: `lint-staged` pre-commit, commitlint commit-msg, typecheck + test + build pre-push. |
 
 ## Stack Versions
@@ -69,6 +70,6 @@ This project follows strict backend coding standards. Before writing or reviewin
 - Cloudflare R2 (`@aws-sdk/client-s3`)
 - Cloudflare Turnstile (invisible)
 - PostHog (`posthog-node`)
-- Resend + React Email
+- Email: SMTP via `nodemailer` (provider-agnostic — Resend/Brevo/Google) + React Email templates
 
 > For PostgreSQL projects, use `docs/BEST-PRACTICES-POSTGRESQL.md` instead.

@@ -31,6 +31,7 @@
 23. [Notifications — SSE](#notifications--sse)
 24. [API Response Shape & Pagination](#api-response-shape--pagination)
 25. [Observability — Error Tracking](#observability--error-tracking)
+26. [Dependency Isolation](#dependency-isolation)
 
 ---
 
@@ -477,6 +478,13 @@ export default () => ({
   cors: {
     allowedOrigins: process.env.ALLOWED_ORIGINS?.split(",") ?? [],
   },
+  mail: {
+    host: process.env.MAIL_HOST,
+    port: parseInt(process.env.MAIL_PORT ?? "587", 10),
+    user: process.env.MAIL_USER,
+    pass: process.env.MAIL_PASS,
+    from: process.env.MAIL_FROM,
+  },
 });
 ```
 
@@ -876,10 +884,13 @@ export class DatabaseService implements OnModuleDestroy {
 
 ## Email Service
 
-Never send email synchronously. Always enqueue via BullMQ.
+Never send email synchronously. Always enqueue via BullMQ. Send through a **provider-agnostic SMTP transport** so Resend, Brevo, or Google/Workspace are interchangeable by configuration — never by code.
+
+> Email is sent **only from the backend** — the SMTP credentials (`MAIL_*`) never reach the frontend. The client merely calls an endpoint that enqueues a job. Rationale: [ADR-009](./DECISIONS.md).
 
 ```bash
-npm install @nestjs/bullmq bullmq ioredis resend @react-email/render
+npm install @nestjs/bullmq bullmq ioredis nodemailer @react-email/render
+npm install -D @types/nodemailer
 ```
 
 ```ts
@@ -907,6 +918,73 @@ BullModule.forRootAsync({
 })
 ```
 
+### Provider port
+
+The rest of the app depends on this interface, not on any provider. Swapping transports never touches the service or processor.
+
+```ts
+// mail/mail-provider.interface.ts
+export interface MailMessage {
+  to: string;
+  subject: string;
+  html: string;
+}
+
+export interface MailProvider {
+  send(message: MailMessage): Promise<void>;
+}
+
+export const MAIL_PROVIDER = Symbol("MAIL_PROVIDER");
+```
+
+```ts
+// mail/smtp-mail.provider.ts — one transport for Resend / Brevo / Google
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { createTransport, type Transporter } from "nodemailer";
+import type { MailMessage, MailProvider } from "./mail-provider.interface";
+
+@Injectable()
+export class SmtpMailProvider implements MailProvider {
+  private readonly transport: Transporter;
+  private readonly from: string;
+
+  constructor(private readonly config: ConfigService) {
+    const port = this.config.get<number>("mail.port")!;
+    this.from = this.config.get<string>("mail.from")!;
+    this.transport = createTransport({
+      host: this.config.get<string>("mail.host"),
+      port,
+      secure: port === 465, // 465 = implicit TLS; 587 = STARTTLS
+      auth: {
+        user: this.config.get<string>("mail.user"),
+        pass: this.config.get<string>("mail.pass"),
+      },
+    });
+  }
+
+  async send({ to, subject, html }: MailMessage): Promise<void> {
+    await this.transport.sendMail({ from: this.from, to, subject, html });
+  }
+}
+```
+
+```ts
+// mail/mail.module.ts — the single line that picks the transport
+@Module({
+  imports: [BullModule.registerQueue({ name: QUEUES.MAIL })],
+  providers: [
+    MailService,
+    MailProcessor,
+    { provide: MAIL_PROVIDER, useClass: SmtpMailProvider },
+  ],
+  exports: [MailService],
+})
+export class MailModule {}
+```
+
+### Service & processor
+
 ```ts
 // mail/mail.service.ts — enqueues, never sends directly
 @Injectable()
@@ -928,10 +1006,12 @@ export class MailService {
 ```
 
 ```ts
-// mail/mail.processor.ts — sends via Resend
+// mail/mail.processor.ts — renders templates, delegates sending to the injected provider
 @Processor(QUEUES.MAIL)
 export class MailProcessor extends WorkerHost {
-  private resend = new Resend(process.env.RESEND_API_KEY);
+  constructor(@Inject(MAIL_PROVIDER) private readonly mail: MailProvider) {
+    super();
+  }
 
   async process(job: Job) {
     switch (job.name) {
@@ -944,12 +1024,24 @@ export class MailProcessor extends WorkerHost {
 
   private async sendWelcome({ to, name }: { to: string; name: string }) {
     const html = await render(WelcomeEmail({ name }));
-    await this.resend.emails.send({ from: process.env.MAIL_FROM, to, subject: "Welcome", html });
+    await this.mail.send({ to, subject: "Welcome", html });
   }
 }
 ```
 
-Email templates live in `mail/templates/` as React Email components (`WelcomeEmail.tsx`, `PasswordResetEmail.tsx`, `VerifyEmailEmail.tsx`).
+### Switching provider (env only)
+
+All three are standard SMTP — change credentials, not code:
+
+| Provider | `MAIL_HOST` | `MAIL_PORT` | `MAIL_USER` | `MAIL_PASS` |
+|---|---|---|---|---|
+| Resend | `smtp.resend.com` | `587` | `resend` | Resend API key |
+| Brevo | `smtp-relay.brevo.com` | `587` | Brevo SMTP login | Brevo SMTP key |
+| Google Workspace | `smtp.gmail.com` | `587` | your address | app password |
+
+> To use a provider's **native API** features (tags, idempotency keys, batch send), write an API-based `MailProvider` (e.g. `ResendMailProvider` using the `resend` SDK) and change the single `useClass` binding in `mail.module.ts`. Nothing else changes.
+
+Email templates live in `mail/templates/` as React Email components (`WelcomeEmail.tsx`, `PasswordResetEmail.tsx`, `VerifyEmailEmail.tsx`) — rendered to HTML with `render()`, transport-agnostic.
 
 ---
 
@@ -1364,3 +1456,24 @@ import { NestFactory } from "@nestjs/core";
 - Never send PII — leave `sendDefaultPii: false` (the default). Scrub tokens, passwords, and emails from breadcrumbs and request bodies.
 - `SENTRY_DSN` is environment config like any other — load it through `ConfigService` and list it in `.env.example`.
 - For cross-service request tracing, add OpenTelemetry — `@sentry/nestjs` integrates with it. Optional until you run more than one service.
+
+---
+
+## Dependency Isolation
+
+Every swappable third-party integration lives behind a NestJS provider (a service, or an injected port). Controllers and other services depend on the wrapper, never the SDK — so replacing the underlying package touches one file.
+
+| Concern | Wrapper (depend on this) | Package hidden behind it |
+|---|---|---|
+| Email | `MailProvider` / `SmtpMailProvider` | `nodemailer` (Resend/Brevo/Google) |
+| File storage | `FilesService` | `@aws-sdk/client-s3` |
+| Server analytics | `AnalyticsService` | `posthog-node` |
+| Bot check | `TurnstileService` | Cloudflare HTTP API |
+| Cache | `CacheModule` factory | Keyv / Redis |
+| Config & secrets | `ConfigService` | `process.env` |
+| Database | repositories/models in services | Mongoose / TypeORM |
+
+**Rules:**
+- Never instantiate an SDK client outside its provider. Never read `process.env` outside the config factory.
+- When more than one implementation is realistic, inject an **interface + token** (like `MAIL_PROVIDER`) so the binding is a one-line change and the dependency is trivially mockable in tests.
+- **Do not over-wrap.** This applies to libraries with a real chance of replacement (email, storage, analytics, payments, SMS). Wrapping the framework itself or a dependency you will never swap is premature indirection — it adds cost for no benefit.

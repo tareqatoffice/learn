@@ -49,6 +49,12 @@ Use it for data that does not depend on per-request runtime values (`cookies`, `
 
 ---
 
+**Q: Can the frontend send email?**
+
+No. Email is sent only from the backend (NestJS) — the provider API key must never be in a client bundle, even behind `NEXT_PUBLIC_`. The frontend triggers a backend endpoint (e.g. a form posting to `POST /auth/forgot-password`); the backend enqueues and sends. The same rule applies to any third-party secret (payment keys, SMS, etc.): keep it server-side.
+
+---
+
 ## React Query
 
 **Q: My query returns `undefined` even though the request succeeds. Why?**

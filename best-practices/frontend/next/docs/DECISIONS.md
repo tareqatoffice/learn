@@ -76,3 +76,13 @@ Key technology and pattern choices with the reasoning behind each. Understanding
 **Decision**: Zustand for shared client-side UI state (sidebar, theme, modals). Never for server data.
 
 **Why**: Lightweight, no boilerplate, no Provider required. Server data belongs in React Query — it has cache invalidation, background sync, and hydration. Duplicating it in Zustand creates two sources of truth that diverge.
+
+---
+
+## ADR-008 — Isolate third-party dependencies behind a thin internal module
+
+**Decision**: Swappable libraries (HTTP client, toasts, client analytics, …) are accessed through one internal wrapper under `lib/`. Components and hooks import the wrapper, never the package directly — e.g. `lib/api/*` (axios), `lib/notify.ts` (Sonner), `lib/analytics.ts` (PostHog).
+
+**Why**: A library swap (axios → ky, Sonner → another toaster, PostHog → another analytics tool) then changes one file instead of every call site. It also centralizes the library's config and keeps call sites clean and testable.
+
+**Scope / trade-off**: Targets libraries with a realistic chance of replacement. It does **not** apply to Tailwind utility classes — those are mitigated by `@theme` tokens plus the `components/ui/` → `components/features/` layer — or to React/Next themselves. Over-wrapping a dependency you will never replace is premature indirection.

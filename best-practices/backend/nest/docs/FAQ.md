@@ -142,3 +142,23 @@ Do not rely solely on E2E tests for guards — they are slow and difficult to co
 No external service to set up in CI. Tests are isolated — `dropDatabase()` in `afterEach` guarantees clean state. Fast startup (~1–2 seconds), no network latency.
 
 For PostgreSQL E2E tests, use a dedicated test database (see `BEST-PRACTICES-POSTGRESQL.md`) — there is no equivalent in-process PostgreSQL server suitable for production-schema tests.
+
+---
+
+## Email
+
+**Q: Where should email be sent from — backend or frontend?**
+
+Always the backend. The provider API key must never reach the browser, and the backend owns validation, rate limiting, retries (BullMQ), and SPF/DKIM signing. The frontend only calls an endpoint (e.g. `POST /auth/forgot-password`) that enqueues a mail job. See [ADR-009](./DECISIONS.md).
+
+---
+
+**Q: Can I use Gmail SMTP instead of Resend?**
+
+Not for application email. Gmail / Workspace SMTP isn't licensed for automated sending, caps you at ~500–2,000 messages/day, can't sign mail for your domain, and has no bounce/complaint webhooks — so it lands in spam and risks account suspension. Use Resend (or SES / Postmark at scale). Gmail SMTP is fine only for a quick local test — prefer Mailpit or Mailtrap even then.
+
+---
+
+**Q: Why enqueue email through BullMQ instead of sending inline?**
+
+Sending inline blocks the request on a third-party API call and loses the message if that call fails. Enqueuing returns immediately, retries with backoff, and survives transient provider outages. See the Email Service section in `BEST-PRACTICES.md`.

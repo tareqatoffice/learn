@@ -377,7 +377,7 @@ coverage
 | `DEPLOY_USER` | SSH username |
 | `DEPLOY_SSH_KEY` | SSH private key |
 
-Runtime secrets (`MONGODB_URI`, `JWT_SECRET`, `REDIS_URL`, `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`, `R2_*`, `POSTHOG_KEY`) live in `/opt/app/.env` on the server — never baked into the Docker image.
+Runtime secrets (`MONGODB_URI`, `JWT_SECRET`, `REDIS_URL`, `MAIL_HOST` / `MAIL_USER` / `MAIL_PASS` / `MAIL_FROM`, `TURNSTILE_SECRET_KEY`, `R2_*`, `POSTHOG_KEY`) live in `/opt/app/.env` on the server — never baked into the Docker image.
 
 ---
 

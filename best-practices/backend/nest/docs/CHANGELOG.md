@@ -8,6 +8,9 @@ Entry format: `type — description`, where `type` is one of `added`, `changed`,
 
 ## 2026-06-09
 
+- added — "Dependency Isolation" section + ADR-010: every third-party SDK lives behind a provider/port (the email `MailProvider` is the reference); call sites never touch the SDK or `process.env`. Includes a "don't over-wrap" caveat.
+- changed — Refactored the Email Service to a **provider-agnostic** `MailProvider` port with a single SMTP transport (nodemailer); Resend/Brevo/Google now swap by env (`MAIL_*`) with no code change. Processor injects the provider via DI (`ConfigService`, not `process.env`). Added a `mail` config namespace; updated runtime-secrets list (`RESEND_API_KEY` → `MAIL_*`).
+- added — ADR-009 (provider-agnostic SMTP email, backend-only) and FAQ "Email" entries; reinforced "backend-only, credentials never in frontend" in the Email Service section.
 - changed — Removed duplication in `BEST-PRACTICES-POSTGRESQL.md`: the Testing "Rules" block (verbatim copy of the base) and the Performance principles (paginate/index/cache) now reference the base instead of restating it; only TypeORM-specific guidance remains.
 - added — Agent-facing sections to `CLAUDE.md`: `Working Agreement` (definition of done, no-commit-without-approval) and `Commands` (canonical scripts incl. single-test invocation).
 - added — Multi-tool agent wiring so Claude Code, Codex, Cursor, Antigravity/Gemini, and Copilot all auto-load the same rules from a single source (`CLAUDE.md`): `AGENTS.md` + `GEMINI.md` + `.github/copilot-instructions.md` symlinks, plus a Cursor `.cursor/rules/standards.mdc` always-on rule. Documented in `CONTRIBUTING.md`.

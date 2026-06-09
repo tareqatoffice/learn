@@ -26,6 +26,7 @@
 18. [Accessibility](#accessibility)
 19. [Security Headers](#security-headers)
 20. [Observability — Error Tracking](#observability--error-tracking)
+21. [Dependency Isolation](#dependency-isolation)
 
 ---
 
@@ -874,14 +875,29 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-```ts
-import { toast } from "sonner";
+Wrap Sonner so call sites never import it directly — swapping the toast library then touches only `lib/notify.ts`:
 
-toast.success("User created");
-toast.error("Something went wrong");
+```ts
+// lib/notify.ts — the only module that imports the toast library
+import { toast, type ExternalToast } from "sonner";
+
+export const notify = {
+  success: (message: string, opts?: ExternalToast) => toast.success(message, opts),
+  error: (message: string, opts?: ExternalToast) => toast.error(message, opts),
+  info: (message: string, opts?: ExternalToast) => toast(message, opts),
+  promise: toast.promise,
+};
 ```
 
-Never use `alert()` or `window.confirm()`.
+```ts
+// usage — import the wrapper, never `sonner`
+import { notify } from "@/lib/notify";
+
+notify.success("User created");
+notify.error("Something went wrong");
+```
+
+Never use `alert()` or `window.confirm()`. Never import `sonner` outside `lib/notify.ts`.
 
 ### Styling Conventions
 
@@ -1007,7 +1023,7 @@ See [App Router Special Files](#app-router-special-files) for `error.tsx`, `glob
 **React Query errors:**
 
 - Type via `useQuery<TData, TError>` generic — never cast with `as` at the call site.
-- Show user-facing errors via `toast.error()` (Sonner) for async mutations, or inline `FormMessage` for form field errors.
+- Show user-facing errors via `notify.error()` (the Sonner wrapper) for async mutations, or inline `FormMessage` for form field errors.
 - Never swallow errors silently. At minimum, log to console in dev; send to Sentry in production.
 
 ```tsx
@@ -1025,7 +1041,7 @@ if (isError) {
 const { mutate } = useMutation({
   mutationFn: createUser,
   onError: (error: ApiError) => {
-    toast.error(error.message ?? "Failed to create user.");
+    notify.error(error.message ?? "Failed to create user.");
   },
 });
 ```
@@ -1036,14 +1052,14 @@ const { mutate } = useMutation({
 // Never throw from a Server Action — return a typed result instead
 const result = await createItemAction(formData);
 if (!result.success) {
-  toast.error(result.error);
+  notify.error(result.error);
   return;
 }
 ```
 
 **Rules:**
 - Server Action validation errors → inline `FormMessage` via React Hook Form `setError`
-- Mutation network errors → `toast.error()` in `onError`
+- Mutation network errors → `notify.error()` in `onError`
 - Route segment rendering errors → `error.tsx` boundary
 - Missing resources → `notFound()` → `not-found.tsx`
 
@@ -1376,10 +1392,22 @@ export function useIdentifyUser() {
 }
 ```
 
-**Track custom events anywhere in Client Components:**
+**Track custom events through a wrapper** — feature code calls `trackEvent`, never `posthog` directly, so swapping analytics tools touches only `lib/analytics.ts` (the provider, `PostHogPageView`, and `useIdentifyUser` above are that module's own setup internals):
 
 ```ts
-posthog.capture("report_exported", { format: "csv", rowCount: 5000 });
+// lib/analytics.ts — the only feature-facing module that imports the analytics SDK
+import posthog from "posthog-js";
+
+export function trackEvent(event: string, properties?: Record<string, unknown>) {
+  posthog.capture(event, properties);
+}
+```
+
+```ts
+// usage
+import { trackEvent } from "@/lib/analytics";
+
+trackEvent("report_exported", { format: "csv", rowCount: 5000 });
 ```
 
 ---
@@ -1470,7 +1498,7 @@ async function verifyTurnstile(token: string, ip?: string) {
 "use client";
 import { useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 
 export function useNotifications() {
   const { data: session } = useSession();
@@ -1499,12 +1527,12 @@ export function useNotifications() {
 function handleNotification(type: string, payload: unknown) {
   switch (type) {
     case "report.ready":
-      toast.success("Your report is ready", {
+      notify.success("Your report is ready", {
         action: { label: "Download", onClick: () => window.open((payload as any).downloadUrl) },
       });
       break;
     case "order.shipped":
-      toast.success("Your order has shipped!");
+      notify.success("Your order has shipped!");
       break;
   }
 }
@@ -1650,3 +1678,22 @@ export default function SegmentError({ error, reset }: { error: Error & { digest
   // ... same JSX as the App Router Special Files template
 }
 ```
+
+---
+
+## Dependency Isolation
+
+Wrap every swappable third-party library behind a thin module under `lib/`. Components and hooks import the wrapper — never the package — so replacing the library touches one file.
+
+| Concern | Import this | Never import directly |
+|---|---|---|
+| HTTP | `lib/api/*` (the axios instance) | `axios` |
+| Toasts | `lib/notify.ts` | `sonner` |
+| Client analytics | `lib/analytics.ts` | `posthog-js` |
+| Data fetching | hooks in `queries/` | `@tanstack/react-query` in components |
+| Auth session | `auth.ts` / `useSession` wrapper | `next-auth` internals |
+
+**Rules:**
+- A component importing a third-party package directly (other than React/Next primitives and the UI kit) is a smell — route it through a `lib/` wrapper.
+- Centralize the package's config/keys inside the wrapper, not at call sites.
+- **Do not over-wrap.** This targets libraries with a real chance of replacement (HTTP, toasts, analytics, payments, SMS, date). It does **not** apply to Tailwind utility classes — those are mitigated by `@theme` tokens plus the `components/ui/` → `components/features/` layer — or to React/Next themselves. Abstracting those is premature indirection.

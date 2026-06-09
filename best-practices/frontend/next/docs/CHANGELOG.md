@@ -8,6 +8,8 @@ Entry format: `type — description`, where `type` is one of `added`, `changed`,
 
 ## 2026-06-09
 
+- added — "Dependency Isolation" section + ADR-008: swappable libraries sit behind a `lib/` wrapper; added `lib/notify.ts` (Sonner) and `lib/analytics.ts` (PostHog) wrappers and routed all `toast.*` / `posthog.capture` call sites through them. Includes the Tailwind/framework exclusion and "don't over-wrap" caveat.
+- added — FAQ entry "Can the frontend send email?" (no — backend-only; provider keys never in the client bundle).
 - changed — Slimmed `BEST-PRACTICES-ANTD.md` to a **delta-only** doc (like the PostgreSQL backend variant): removed the 7 sections that merely restated the base (Next.js Guidelines, React Query, State, TypeScript, Performance, Testing, full Project Structure) and replaced them with an "inherited verbatim" pointer. Eliminates ~350 lines of duplication and the drift that left the AntD doc missing the base's newer sections.
 - changed — Deduped the "never throw in a Server Action" note in `BEST-PRACTICES.md` (kept one canonical statement in Server Actions; the Forms copy is now a cross-reference).
 - added — Agent-facing sections to `CLAUDE.md`: `Working Agreement` (definition of done, no-commit-without-approval) and `Commands` (canonical scripts incl. single-test invocation).

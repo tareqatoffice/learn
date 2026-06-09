@@ -53,6 +53,7 @@ This project follows strict frontend coding standards. Before writing or reviewi
 | Analytics | PostHog JS. `PostHogProvider` at root. `PostHogPageView` for App Router. `useIdentifyUser` hook. |
 | Notifications | `EventSource` with `?token=` query param. `useNotifications` hook. Mount at root layout. |
 | CI/CD | Conventional Commits · GitHub Actions · Docker standalone → GHCR → SSH deploy. |
+| Dependency isolation | Swappable libs behind a `lib/` wrapper (`lib/api` axios, `lib/notify` Sonner, `lib/analytics` PostHog). Import the wrapper, never the package. Excludes Tailwind/framework. |
 | Dev tooling | Prettier (+ `prettier-plugin-tailwindcss`) + ESLint (`eslint-config-prettier`). Husky: `lint-staged` pre-commit, commitlint commit-msg, typecheck + test + build pre-push. |
 
 ## Stack Versions

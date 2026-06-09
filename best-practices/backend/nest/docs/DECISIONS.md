@@ -81,3 +81,33 @@ Key technology and pattern choices with the reasoning behind each. Understanding
 **Why**: `ConfigService.get<string>("jwt.secret")` returns `string | undefined` — callers must handle undefined or use non-null assertions. `ConfigType<typeof jwtConfig>` gives fully typed access with no `| undefined`. Namespaced configs can be validated independently at startup.
 
 **Trade-off**: One file per namespace. Acceptable cost for the type safety gained in services.
+
+---
+
+## ADR-009 — Provider-agnostic SMTP email, sent only from the backend
+
+**Decision**: Send all transactional email from the backend, enqueued through BullMQ, behind a `MailProvider` port whose default implementation is a single **SMTP transport** (nodemailer). Resend (default), Brevo, and Google/Workspace are selected by configuration, not code. Never send email from the frontend.
+
+**Why (backend-only)**: SMTP credentials must never reach the browser — anything in a client bundle is public, even behind a `NEXT_PUBLIC_` prefix. The backend is also where recipient validation, rate limiting, retries (BullMQ), and SPF/DKIM alignment belong. The frontend only triggers an endpoint (e.g. `POST /auth/forgot-password`) that enqueues a job.
+
+**Why (provider-agnostic SMTP)**: Resend, Brevo, and Google/Workspace all expose standard SMTP, so one nodemailer transport swaps between them by changing `MAIL_HOST`/`MAIL_USER`/`MAIL_PASS` only. The `MailProvider` interface keeps the queue worker and templates (React Email → HTML) independent of the provider. Resend is the recommended default (good deliverability, domain auth, generous free tier).
+
+**Trade-off**: Plain SMTP gives up provider-API niceties (tags, idempotency keys, batch send, native webhooks-by-SDK). When those are needed, add an API-based `MailProvider` (e.g. `ResendMailProvider`) and flip the single `useClass` binding in `mail.module.ts` — the rest of the app is unaffected.
+
+**Alternatives rejected**:
+- **Hard-coding one provider's SDK in the processor** — couples the queue worker to a vendor; switching means editing send logic. The port removes that coupling.
+- **Gmail/Workspace SMTP as the *primary* provider** — fine as a swappable target, but not licensed for high-volume automated sending (~500 consumer / ~2,000 Workspace daily caps) and weaker deliverability; prefer Resend/Brevo for production volume.
+
+**When to switch**: very high volume → Amazon SES (cheapest at scale); strictest deliverability → Postmark. Add them as another SMTP target or as an API-based `MailProvider`; the backend-only and queue rules are unchanged.
+
+**Local dev**: point the SMTP vars at a local catcher (Mailpit / MailHog) or Mailtrap — not a real mailbox.
+
+---
+
+## ADR-010 — Isolate third-party dependencies behind a thin internal module
+
+**Decision**: Every swappable third-party library is accessed through one internal wrapper (a NestJS provider/port). Application code depends on the wrapper, never the package directly. The email `MailProvider` is the reference example.
+
+**Why**: Confines change. Replacing Resend with Brevo, the AWS SDK with another S3 client, or PostHog with another tool then touches a single provider instead of rippling across the codebase. It also centralizes credentials/config and makes each dependency trivially mockable in tests.
+
+**Scope / trade-off**: Applies to libraries with a realistic chance of replacement (email, storage, analytics, cache, payments, SMS). It does **not** apply to the framework itself or to pervasive primitives — wrapping those is premature indirection that adds boilerplate for no benefit. Use an interface + DI token only when more than one implementation is plausible; otherwise a plain service is enough.
