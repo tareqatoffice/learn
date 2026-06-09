@@ -130,7 +130,8 @@ export class UsersService {
     const existing = await this.userRepo.findOne({ where: { email: dto.email } });
     if (existing) throw new ConflictException("Email already in use");
 
-    const user = this.userRepo.create(dto);
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const user = this.userRepo.create({ ...dto, passwordHash });
     return this.userRepo.save(user);
   }
 }
@@ -187,7 +188,7 @@ export class User {
   email: string;
 
   @Exclude()
-  password: string;
+  passwordHash: string;
 }
 ```
 
@@ -299,7 +300,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message:
         typeof exceptionResponse === "string"
           ? exceptionResponse
-          : (exceptionResponse as any).message,
+          : (exceptionResponse as { message: string | string[] }).message,
       timestamp: new Date().toISOString(),
     });
   }
@@ -327,6 +328,9 @@ export default () => ({
   jwt: {
     secret: process.env.JWT_SECRET,
     expiresIn: process.env.JWT_EXPIRES_IN ?? "15m",
+  },
+  cors: {
+    allowedOrigins: process.env.ALLOWED_ORIGINS?.split(",") ?? [],
   },
 });
 ```
@@ -429,5 +433,8 @@ describe("UsersService", () => {
 import helmet from "helmet";
 
 app.use(helmet());
-app.enableCors({ origin: process.env.ALLOWED_ORIGINS?.split(",") });
+const allowedOrigins = app.get(ConfigService).get<string[]>("cors.allowedOrigins") ?? [];
+app.enableCors({ origin: allowedOrigins });
 ```
+
+> Always read CORS origins from `ConfigService`, not directly from `process.env`. If `ALLOWED_ORIGINS` is missing from `.env`, `process.env.ALLOWED_ORIGINS?.split(",")` silently returns `undefined`, which NestJS/Express treats as allowing all origins. Registering it in the config factory ensures it is validated at startup and fails fast when absent.

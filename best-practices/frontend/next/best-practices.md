@@ -54,26 +54,40 @@ src/
 - Never fetch data inside a Client Component when a Server Component can do it.
 
 ```tsx
-// Good — Server Component fetches, Client Component renders
+// Good — Server Component prefetches into the cache; Client Component reads from it
 // app/users/page.tsx
+import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query";
 import { UserTable } from "@/components/features/UserTable";
 import { getUsers } from "@/lib/api/users";
+import { userKeys } from "@/queries/users.keys";
 
 export default async function UsersPage() {
-  const users = await getUsers();
-  return <UserTable initialData={users} />;
+  const queryClient = new QueryClient();
+  await queryClient.prefetchQuery({ queryKey: userKeys.lists(), queryFn: getUsers });
+  return (
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <UserTable />
+    </HydrationBoundary>
+  );
 }
 ```
+
+> Do not pass server data as `initialData` to Client Components. React Query v5 treats `initialData` without `initialDataUpdatedAt` as immediately stale, triggering a background refetch on every client mount regardless of `staleTime`. Use `HydrationBoundary` + `dehydrate` so the configured `staleTime` is respected and no double-fetch occurs.
 
 ### Routing & Navigation
 
 - Use `<Link>` for all internal navigation. Never `<a>`.
-- Use `useRouter().push()` for programmatic navigation inside Client Components only.
-- Define route params with typed `params` props:
+- Use `useRouter().push()` for programmatic navigation inside Client Components only. Import `useRouter` from `next/navigation`, not `next/router` (Pages Router).
+- In Next.js 15+, `params` and `searchParams` are Promises. Always type and await them:
 
 ```tsx
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
+}
+
+export default async function UserPage({ params }: PageProps) {
+  const { id } = await params;
+  // ...
 }
 ```
 
@@ -102,10 +116,13 @@ const schema = z.object({ name: z.string().min(1) });
 
 export async function createItem(formData: FormData) {
   const parsed = schema.safeParse({ name: formData.get("name") });
-  if (!parsed.success) throw new Error("Invalid input");
-  // ...
+  if (!parsed.success) return { success: false as const, errors: parsed.error.flatten() };
+  // ... perform action
+  return { success: true as const };
 }
 ```
+
+> Never `throw` on validation failure inside a Server Action. A thrown error propagates to the nearest `error.tsx` boundary — a full-page crash screen. Return a structured result object instead so the calling component can display inline `Form.Item` errors.
 
 ---
 
@@ -153,14 +170,32 @@ export const userKeys = {
 import { useQuery } from "@tanstack/react-query";
 import { userKeys } from "./users.keys";
 import { fetchUsers } from "@/lib/api/users";
+import type { ApiError } from "@/types/api";
 
 export function useUsers(filters: UserFilters) {
-  return useQuery({
+  return useQuery<User[], ApiError>({
     queryKey: userKeys.list(filters),
     queryFn: () => fetchUsers(filters),
   });
 }
 ```
+
+```ts
+// queries/useUser.ts
+import { useQuery } from "@tanstack/react-query";
+import { userKeys } from "./users.keys";
+import { fetchUser } from "@/lib/api/users";
+import type { ApiError } from "@/types/api";
+
+export function useUser(id: string) {
+  return useQuery<User, ApiError>({
+    queryKey: userKeys.detail(id),
+    queryFn: () => fetchUser(id),
+  });
+}
+```
+
+- Always type both data and error generics on `useQuery<TData, TError>`. This makes `error` typed without any cast at the call site.
 
 ### Mutations
 
@@ -252,9 +287,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 ```tsx
 // 1. Imports (external → internal → types)
-import { useState } from "react";
-import { Button } from "antd";
-import { useUsers } from "@/queries/useUsers";
+import { Button, Skeleton } from "antd";
+import { useUser } from "@/queries/useUser";
 import type { User } from "@/types";
 
 // 2. Types
@@ -330,15 +364,16 @@ async function fetchUser(id: string): Promise<User> { ... }
 ## Error Handling
 
 - Wrap route segments with `error.tsx` to catch rendering errors.
-- API errors from React Query must be typed. Inspect `error` as `AxiosError` or a typed API error shape.
+- API errors from React Query must be typed via the `useQuery<TData, TError>` generic — never with a type assertion at the call site.
 - Show user-facing errors via `notification.error()` or inline `Form.Item` validation messages.
 - Never swallow errors silently. At minimum, log them.
 
 ```tsx
+// error is typed as ApiError — no cast needed because useUsers is useQuery<User[], ApiError>
 const { data, isError, error } = useUsers(filters);
 
 if (isError) {
-  return <Alert type="error" message={(error as ApiError).message} />;
+  return <Alert type="error" message={error.message} />;
 }
 ```
 
