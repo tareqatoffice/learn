@@ -1,6 +1,6 @@
 # Backend Best Practices
 
-> Stack: NestJS v11 · Node.js >= 20 · TypeORM ^0.3 · `@nestjs/typeorm` v11 · `@nestjs/jwt` v11 · `@nestjs/passport` v11
+> Stack: NestJS v11 · Node.js >= 20 · MongoDB · `@nestjs/mongoose` v11 · Mongoose v8 · `@nestjs/jwt` v11 · `@nestjs/passport` v11
 
 ---
 
@@ -31,8 +31,8 @@ src/
 │       ├── dto/
 │       │   ├── create-user.dto.ts
 │       │   └── update-user.dto.ts
-│       ├── entities/
-│       │   └── user.entity.ts
+│       ├── schemas/
+│       │   └── user.schema.ts
 │       ├── users.controller.ts
 │       ├── users.service.ts
 │       ├── users.module.ts
@@ -45,15 +45,13 @@ src/
 │   └── pipes/
 ├── config/
 │   └── configuration.ts
-├── database/
-│   └── database.module.ts
 ├── app.module.ts
 └── main.ts
 ```
 
 - One module per domain/feature. Never flatten all files into a single directory.
 - Shared cross-cutting concerns (guards, filters, interceptors, decorators) live in `common/`. Never duplicate them across modules.
-- Entities belong to the module that owns them, not a global `entities/` folder.
+- Schemas belong to the module that owns them, not a global `schemas/` folder.
 
 ---
 
@@ -128,23 +126,21 @@ export class UsersController {
 @Injectable()
 export class UsersService {
   constructor(
-    @InjectRepository(User)
-    private readonly userRepo: Repository<User>,
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {}
 
-  async findById(id: string): Promise<User> {
-    const user = await this.userRepo.findOne({ where: { id } });
+  async findById(id: string): Promise<UserDocument> {
+    const user = await this.userModel.findById(id).exec();
     if (!user) throw new NotFoundException(`User ${id} not found`);
     return user;
   }
 
-  async create(dto: CreateUserDto): Promise<User> {
-    const existing = await this.userRepo.findOne({ where: { email: dto.email } });
+  async create(dto: CreateUserDto): Promise<UserDocument> {
+    const existing = await this.userModel.findOne({ email: dto.email }).exec();
     if (existing) throw new ConflictException("Email already in use");
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
-    const user = this.userRepo.create({ ...dto, passwordHash });
-    return this.userRepo.save(user);
+    return new this.userModel({ ...dto, passwordHash }).save();
   }
 }
 ```
@@ -227,61 +223,104 @@ app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
 ## Database & Repositories
 
-- Use TypeORM with the Repository pattern. Never use raw `EntityManager` directly in services unless you need multi-entity transactions.
-- Use `Repository<T>` injected via `@InjectRepository(Entity)`.
-- Never construct raw SQL strings. Use QueryBuilder or the ORM API.
+### Connection
+
+- Connect via `MongooseModule.forRootAsync()` so `ConfigService` provides the URI — never hardcode connection strings.
 
 ```ts
-// Prefer
-const users = await this.userRepo.find({ where: { isActive: true } });
-
-// Over raw SQL
-const users = await this.userRepo.query("SELECT * FROM users WHERE is_active = true");
-```
-
-- For complex queries, use `createQueryBuilder`. Name all aliases explicitly.
-- Wrap multi-step operations in a transaction:
-
-```ts
-await this.dataSource.transaction(async (manager) => {
-  const user = manager.create(User, dto);
-  await manager.save(user);
-  await manager.save(AuditLog, { userId: user.id, action: "created" });
-});
-```
-
-- Never enable `synchronize: true` in production. It auto-aligns the schema with your entities and **can silently drop columns and data**. Use TypeORM migrations for all schema changes in non-development environments.
-
-```ts
-TypeOrmModule.forRoot({
-  synchronize: process.env.NODE_ENV === "development", // never true in production
-  migrations: ["dist/migrations/*.js"],
-  migrationsRun: true,
+// app.module.ts
+MongooseModule.forRootAsync({
+  useFactory: (config: ConfigService) => ({
+    uri: config.get<string>("database.uri"),
+  }),
+  inject: [ConfigService],
 })
 ```
 
-- Keep entities clean: only persistence concerns (columns, relations, indexes). No business logic in entities.
-- Always define explicit column types in entity definitions. Never rely on TypeORM inference for production entities.
+- Add `database.uri` to the config factory and validate it at startup so a missing `MONGODB_URI` fails fast.
+
+### Schema Definition
+
+- Define schemas with `@Schema()` / `@Prop()` decorators from `@nestjs/mongoose`. Export both the class and the `HydratedDocument` type.
 
 ```ts
-@Entity("users")
-export class User {
-  @PrimaryGeneratedColumn("uuid")
-  id: string;
+// schemas/user.schema.ts
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { HydratedDocument } from "mongoose";
 
-  @Column({ type: "varchar", length: 255, unique: true })
+export type UserDocument = HydratedDocument<User>;
+
+@Schema({ timestamps: true })
+export class User {
+  @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email: string;
 
-  @Column({ type: "varchar" })
+  @Prop({ required: true })
   passwordHash: string;
 
-  @CreateDateColumn()
-  createdAt: Date;
+  @Prop({ type: String, enum: Role, default: Role.USER })
+  role: Role;
+}
 
-  @UpdateDateColumn()
-  updatedAt: Date;
+export const UserSchema = SchemaFactory.createForClass(User);
+```
+
+- Keep schemas clean: only persistence concerns. No business logic.
+- Always set `{ timestamps: true }` — it adds `createdAt` and `updatedAt` automatically.
+- Add indexes at the schema level, not in service code:
+
+```ts
+UserSchema.index({ email: 1 }, { unique: true });
+```
+
+### Module Registration
+
+```ts
+@Module({
+  imports: [MongooseModule.forFeature([{ name: User.name, schema: UserSchema }])],
+  controllers: [UsersController],
+  providers: [UsersService],
+  exports: [UsersService],
+})
+export class UsersModule {}
+```
+
+### Model Injection & Querying
+
+- Inject via `@InjectModel(Entity.name)` and type as `Model<EntityDocument>`.
+- Always call `.exec()` at the end of Mongoose queries to get a real Promise.
+- Use `.lean()` for read-only list queries — returns plain objects, significantly faster than full Mongoose documents.
+
+```ts
+// List — lean for performance
+const users = await this.userModel.find({ isActive: true }).lean().exec();
+
+// Single document — full Mongoose doc for mutation
+const user = await this.userModel.findById(id).exec();
+```
+
+- Never construct raw query strings. Use Mongoose query API or aggregation pipelines.
+
+### Transactions
+
+- Use MongoDB sessions for multi-document atomic operations (requires a replica set or Atlas):
+
+```ts
+const session = await this.connection.startSession();
+try {
+  session.startTransaction();
+  await this.userModel.create([{ ...dto, passwordHash }], { session });
+  await this.auditModel.create([{ action: "user.created" }], { session });
+  await session.commitTransaction();
+} catch (error) {
+  await session.abortTransaction();
+  throw error;
+} finally {
+  await session.endSession();
 }
 ```
+
+- Inject `InjectConnection()` to access the Mongoose connection for session management.
 
 ---
 

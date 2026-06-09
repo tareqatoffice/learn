@@ -14,7 +14,7 @@ This project follows strict backend coding standards. Before writing or reviewin
 | Validation | `ValidationPipe` globally with `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true`. |
 | DTOs | Every request body/query has a DTO with `class-validator` decorators. |
 | Responses | Use `@Exclude()` on sensitive entity fields. Enable `ClassSerializerInterceptor` globally. |
-| Database | TypeORM Repository pattern. No raw SQL strings. Transactions for multi-step writes. |
+| Database | Mongoose Model pattern. `@InjectModel`. `.lean()` for reads. Sessions for multi-doc transactions. |
 | Auth | JWT (short-lived) + refresh tokens. `@Public()` decorator for open routes. Guards for roles. |
 | Errors | NestJS HTTP exceptions from services. Global `HttpExceptionFilter`. Never leak stack traces. |
 | Config | `@nestjs/config` only. No direct `process.env` in services/controllers. Validate at startup. |
@@ -25,7 +25,10 @@ This project follows strict backend coding standards. Before writing or reviewin
 
 - NestJS v11 (latest stable: v11.1.26)
 - Node.js >= 20
-- `@nestjs/typeorm` v11 · TypeORM `^0.3`
+- MongoDB (default database)
+- `@nestjs/mongoose` v11 · Mongoose v8
 - `@nestjs/jwt` v11
 - `@nestjs/passport` v11 · passport `^0.7`
 - `@nestjs/cache-manager` v3 (Keyv-based)
+
+> For PostgreSQL projects, use `best-practices-postgresql.md` instead.
