@@ -8,6 +8,8 @@ Entry format: `type — description`, where `type` is one of `added`, `changed`,
 
 ## 2026-06-09
 
+- added — Sentry to the `CLAUDE.md` Stack Versions list ("optional observability for production") so the cheat-sheet matches the Observability section in `BEST-PRACTICES.md`.
+- changed — Clarified the `next lint` removal note in `CICD.md` to state it applies to Next.js 16+ (Next.js 15 and earlier still have `next lint`).
 - added — "Dependency Isolation" section + ADR-008: swappable libraries sit behind a `lib/` wrapper; added `lib/notify.ts` (Sonner) and `lib/analytics.ts` (PostHog) wrappers and routed all `toast.*` / `posthog.capture` call sites through them. Includes the Tailwind/framework exclusion and "don't over-wrap" caveat.
 - added — FAQ entry "Can the frontend send email?" (no — backend-only; provider keys never in the client bundle).
 - changed — Slimmed `BEST-PRACTICES-ANTD.md` to a **delta-only** doc (like the PostgreSQL backend variant): removed the 7 sections that merely restated the base (Next.js Guidelines, React Query, State, TypeScript, Performance, Testing, full Project Structure) and replaced them with an "inherited verbatim" pointer. Eliminates ~350 lines of duplication and the drift that left the AntD doc missing the base's newer sections.
