@@ -76,6 +76,20 @@ jobs:
 
 One shared toolchain so every developer's diffs are identically formatted, and broken code is blocked locally before it reaches CI.
 
+### Runtime version pinning
+
+Pin Node so local, CI, and production all run the same version. Commit a `.nvmrc` and declare `engines`; CI reads the file via `node-version-file: .nvmrc`.
+
+```
+# .nvmrc
+20.18.0
+```
+
+```json
+// package.json
+{ "engines": { "node": ">=20" } }
+```
+
 ### Prettier (formatting) + ESLint (correctness)
 
 Prettier owns formatting; ESLint owns code-quality rules. Run `eslint-config-prettier` so the two never fight over style.
@@ -205,7 +219,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci

@@ -4,6 +4,32 @@ This project follows strict frontend coding standards. Before writing or reviewi
 
 **[Frontend Best Practices](./docs/BEST-PRACTICES.md)** · **[CI/CD](./docs/CICD.md)**
 
+## Working Agreement
+
+- **Definition of done**: before declaring a task complete, run `npm run typecheck`, `npm run lint`, and the relevant tests — all must pass. Report failures honestly; do not claim success on red.
+- **Tests are part of the change**: add or update tests for new hooks, components, and flows. Critical paths (auth, forms, data tables) must stay covered.
+- **Never commit or push without explicit approval.** Show the diff and wait. If on `main`, create a branch first.
+- **Ask before destructive or outward-facing actions** (deleting files you didn't create, calling external services, force-pushing).
+- **Stay in scope**: change what the task needs. Match the surrounding style; don't reformat unrelated code.
+- **Secrets never leave config**: only `NEXT_PUBLIC_*` reaches the client; no server secrets in client components or examples; no `.env` committed.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `npm install` | Install dependencies (sets up Husky hooks via `prepare`) |
+| `npm run dev` | Run the dev server |
+| `npm run build` | Production build (`next build`) · `npm start` serves it |
+| `npm run typecheck` | `tsc --noEmit` — type-check without emitting |
+| `npm run lint` | ESLint (`eslint .`) |
+| `npm run format` | Prettier write · `npm run format:check` to verify only |
+| `npm test` | Unit/component tests (Vitest) · add `-- --coverage` to enforce thresholds |
+| `npm test -- UserCard` | Run a single test file / pattern |
+| `npm run test:e2e` | E2E tests (Playwright) |
+| `npm run gen:api` | Regenerate API types from the backend OpenAPI spec |
+
+> Exact script names live in `docs/CICD.md`. If a command is missing from `package.json`, add it there rather than inventing an ad-hoc invocation.
+
 ## Quick Reference
 
 | Topic | Rule |
@@ -18,6 +44,9 @@ This project follows strict frontend coding standards. Before writing or reviewi
 | State | Server state → React Query. URL state → `useSearchParams`. Global UI state → Zustand. |
 | TypeScript | `strict: true`. No `any`. Validate external data with Zod at API boundaries. |
 | Images/Fonts | `next/image` and `next/font` only. |
+| API types | Generate from the backend OpenAPI spec (`openapi-typescript`) into `types/api.gen.ts`. Don't hand-write request/response types. |
+| Accessibility | Semantic HTML, label every input, keyboard-operable. `eslint-plugin-jsx-a11y` enforced. |
+| Security headers | CSP + security headers via `headers()` in `next.config.ts`. |
 | Environment | `NEXT_PUBLIC_` prefix for client vars. Secrets in Server Components only. |
 | Auth | Auth.js v5 (NextAuth). Credentials → NestJS. JWT in encrypted session. Middleware protects routes. |
 | Bot protection | Invisible Turnstile (`appearance: "interaction-only"`). Disable submit until token ready. |

@@ -22,6 +22,10 @@
 14. [Analytics — PostHog](#analytics--posthog)
 15. [Bot Protection — Cloudflare Turnstile](#bot-protection--cloudflare-turnstile)
 16. [Notifications — SSE](#notifications--sse)
+17. [Generated API Types](#generated-api-types)
+18. [Accessibility](#accessibility)
+19. [Security Headers](#security-headers)
+20. [Observability — Error Tracking](#observability--error-tracking)
 
 ---
 
@@ -29,10 +33,19 @@
 
 ```
 project-root/
-├── CLAUDE.md                    # Claude Code instructions (auto-loaded)
+├── CLAUDE.md                    # Canonical agent instructions (Claude Code)
+├── AGENTS.md                    # → CLAUDE.md  (Codex, Antigravity, Windsurf, Zed…)
+├── GEMINI.md                    # → CLAUDE.md  (Antigravity / Gemini priority slot)
+├── .cursor/rules/standards.mdc  # Cursor always-on rule → CLAUDE.md
+├── .github/
+│   └── copilot-instructions.md  # → CLAUDE.md  (GitHub Copilot)
+├── .env.example                 # Every env var, keys only — committed
+├── .nvmrc                       # Pinned Node version
 ├── docs/
 │   ├── BEST-PRACTICES.md        # This file
+│   ├── BEST-PRACTICES-ANTD.md   # Ant Design variant
 │   ├── CICD.md                  # CI/CD & git workflow
+│   ├── CHANGELOG.md             # Log of changes to these standards
 │   ├── DECISIONS.md             # Architecture decision records
 │   ├── FAQ.md                   # Common questions
 │   └── CONTRIBUTING.md          # How to propose changes
@@ -72,7 +85,7 @@ project-root/
 │   └── utils.ts                 # cn() and other pure utilities
 ├── queries/                     # React Query key factories + hooks
 ├── providers/                   # Client-side context providers
-├── types/                       # Shared TypeScript types and interfaces
+├── types/                       # Shared types — incl. api.gen.ts (generated)
 └── constants/                   # App-wide constants
 ```
 
@@ -218,6 +231,7 @@ export const getUser = cache(async (id: string) => db.users.findById(id));
 - Prefix client-exposed variables with `NEXT_PUBLIC_`.
 - Access server-only secrets exclusively in Server Components, API routes, or server actions.
 - Never log or expose env vars in client bundles.
+- Commit a `.env.example` listing **every** variable the app reads — keys only, no values. Keep it in sync as you add variables; the real `.env*` files stay gitignored. It is the canonical list of required config for new developers and CI.
 
 ### Server Actions
 
@@ -578,6 +592,12 @@ export interface ApiError {
   statusCode: number;
   errors?: Record<string, string[]>;
 }
+
+// Mirrors the backend `Paginated<T>` envelope for list endpoints.
+export interface Paginated<T> {
+  data: T[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+}
 ```
 
 ```ts
@@ -639,6 +659,7 @@ These functions are then called inside React Query hooks in `queries/` — never
 - `lib/api/` functions are pure async functions. No hooks, no React imports.
 - Never call `apiClient` directly inside a component or a Server Component — use the domain functions.
 - Server Components fetch via `fetch()` with Next.js caching semantics, not Axios.
+- Type request/response payloads with the **generated** API types (see [Generated API Types](#generated-api-types)) rather than hand-written interfaces, so they can't drift from the backend.
 
 ---
 
@@ -1499,4 +1520,133 @@ export function NotificationListener() { useNotifications(); return null; }
 
 // app/layout.tsx
 <NotificationListener />
+```
+
+---
+
+## Generated API Types
+
+The backend serves its OpenAPI spec at `/api/docs-json`. Generate the frontend's request/response types from it instead of hand-writing them — they then track the backend automatically, and a contract change breaks `typecheck` immediately instead of failing silently at runtime.
+
+Use **`openapi-typescript`** (types only — it pairs with the hand-written domain functions in `lib/api/`):
+
+```bash
+npm install -D openapi-typescript
+```
+
+```json
+// package.json
+{
+  "scripts": {
+    "gen:api": "openapi-typescript $NEXT_PUBLIC_API_URL/api/docs-json -o types/api.gen.ts"
+  }
+}
+```
+
+```ts
+// lib/api/users.ts — consume generated types
+import { apiClient } from "./client";
+import type { components } from "@/types/api.gen";
+import type { Paginated } from "@/types/api";
+
+type User = components["schemas"]["UserResponseDto"];
+
+export async function fetchUsers(filters: UserFilters): Promise<Paginated<User>> {
+  const { data } = await apiClient.get("/users", { params: filters });
+  return data;
+}
+```
+
+**Rules:**
+- Commit `types/api.gen.ts` so contract changes show up in the diff for CI and reviewers.
+- Regenerate (`npm run gen:api`) whenever the backend API changes; never hand-edit the generated file.
+- Hand-write a type only for shapes the backend doesn't expose (third-party APIs, client-only models).
+- For a full typed client + generated React Query hooks instead of types-only, `orval` is the heavier alternative — adopt it only if maintaining the `lib/api/` layer by hand becomes a burden.
+
+---
+
+## Accessibility
+
+Accessibility is a requirement, not a finishing touch.
+
+- Enable `eslint-plugin-jsx-a11y` (shipped with the Next.js ESLint config) and treat its findings as errors in CI.
+- Use semantic HTML: `<button>` for actions, `<a>`/`<Link>` for navigation, one `<h1>` per page, landmarks (`<nav>`, `<main>`, `<header>`).
+- Every form control has a label. shadcn/ui `Form` wires `FormLabel`'s `htmlFor`/`id` automatically — never substitute a placeholder for a label.
+- All interactive elements must be keyboard-operable with a visible focus ring. Don't strip `outline` without an equivalent replacement.
+- Prefer Radix-based shadcn/ui primitives (Dialog, Dropdown, etc.) — they handle focus trapping and `aria-*` correctly, unlike hand-rolled overlays.
+- Give every `next/image` a meaningful `alt`; use `alt=""` only for purely decorative images.
+- Never encode meaning in color alone; verify text/background contrast meets WCAG AA against your `@theme` tokens.
+- Announce async results to assistive tech: Sonner toasts use polite live regions; for custom status use `aria-live`.
+
+---
+
+## Security Headers
+
+Set security headers in `next.config.ts` via `headers()` — they apply to every route.
+
+```ts
+// next.config.ts
+import type { NextConfig } from "next";
+
+const securityHeaders = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  {
+    key: "Content-Security-Policy",
+    value: [
+      "default-src 'self'",
+      "img-src 'self' data: https:",
+      "script-src 'self' 'unsafe-inline'", // tighten with a per-request nonce where possible
+      "style-src 'self' 'unsafe-inline'",
+      `connect-src 'self' ${process.env.NEXT_PUBLIC_API_URL ?? ""}`,
+    ].join("; "),
+  },
+];
+
+const nextConfig: NextConfig = {
+  output: "standalone",
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders }];
+  },
+};
+
+export default nextConfig;
+```
+
+- Add the analytics, Turnstile, and Sentry origins your app actually calls to `connect-src` / `script-src` — start strict, widen only as needed.
+- `'unsafe-inline'` on `script-src` is a pragmatic default; for a hardened CSP, generate a per-request nonce in `middleware.ts` and drop `'unsafe-inline'`.
+- HSTS only takes effect over HTTPS — browsers ignore it on `http://localhost`, so it is safe to leave enabled.
+
+---
+
+## Observability — Error Tracking
+
+Capture client and server errors with full context instead of relying on `console.error`. Use **Sentry**.
+
+```bash
+npx @sentry/wizard@latest -i nextjs
+```
+
+The wizard creates `sentry.*.config.ts` / `instrumentation.ts` and wires source-map upload. Then:
+
+- Report from the App Router error boundaries: replace the placeholder `console.error` in `error.tsx` and `global-error.tsx` with `Sentry.captureException(error)`.
+- Use a low `tracesSampleRate` (e.g. `0.1`) in production; sample session replays even lower.
+- Scrub PII via `beforeSend` — never send tokens, passwords, or full request bodies.
+- `NEXT_PUBLIC_SENTRY_DSN` is a public build-time value (like other `NEXT_PUBLIC_*`); list it in `.env.example` and the CI build args.
+
+```tsx
+// app/error.tsx — report to Sentry instead of console
+"use client";
+import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
+
+export default function SegmentError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+  // ... same JSX as the App Router Special Files template
+}
 ```

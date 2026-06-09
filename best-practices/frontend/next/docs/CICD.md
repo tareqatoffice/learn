@@ -76,6 +76,20 @@ jobs:
 
 One shared toolchain so every developer's diffs are identically formatted, and broken code is blocked locally before it reaches CI.
 
+### Runtime version pinning
+
+Pin Node so local, CI, and production all run the same version. Commit a `.nvmrc` and declare `engines`; CI reads the file via `node-version-file: .nvmrc`. Next.js 16 requires Node ≥ 20.9.
+
+```
+# .nvmrc
+20.18.0
+```
+
+```json
+// package.json
+{ "engines": { "node": ">=20.9" } }
+```
+
 ### Prettier (formatting) + ESLint (correctness)
 
 Prettier owns formatting; ESLint owns code-quality rules. Run `eslint-config-prettier` so the two never fight over style. Add `prettier-plugin-tailwindcss` to auto-sort Tailwind class names into the canonical order.
@@ -204,7 +218,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
@@ -240,7 +254,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
@@ -276,6 +290,7 @@ jobs:
     "build": "next build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "gen:api": "openapi-typescript $NEXT_PUBLIC_API_URL/api/docs-json -o types/api.gen.ts",
     "prepare": "husky"
   }
 }

@@ -29,6 +29,8 @@
 21. [Bot Protection — Cloudflare Turnstile](#bot-protection--cloudflare-turnstile)
 22. [Analytics — PostHog](#analytics--posthog)
 23. [Notifications — SSE](#notifications--sse)
+24. [API Response Shape & Pagination](#api-response-shape--pagination)
+25. [Observability — Error Tracking](#observability--error-tracking)
 
 ---
 
@@ -36,10 +38,19 @@
 
 ```
 project-root/
-├── CLAUDE.md                    # Claude Code instructions (auto-loaded)
+├── CLAUDE.md                    # Canonical agent instructions (Claude Code)
+├── AGENTS.md                    # → CLAUDE.md  (Codex, Antigravity, Windsurf, Zed…)
+├── GEMINI.md                    # → CLAUDE.md  (Antigravity / Gemini priority slot)
+├── .cursor/rules/standards.mdc  # Cursor always-on rule → CLAUDE.md
+├── .github/
+│   └── copilot-instructions.md  # → CLAUDE.md  (GitHub Copilot)
+├── .env.example                 # Every env var, keys only — committed
+├── .nvmrc                       # Pinned Node version
 ├── docs/
 │   ├── BEST-PRACTICES.md        # This file
+│   ├── BEST-PRACTICES-POSTGRESQL.md  # PostgreSQL/TypeORM variant
 │   ├── CICD.md                  # CI/CD & git workflow
+│   ├── CHANGELOG.md             # Log of changes to these standards
 │   ├── DECISIONS.md             # Architecture decision records
 │   ├── FAQ.md                   # Common questions
 │   └── CONTRIBUTING.md          # How to propose changes
@@ -476,6 +487,7 @@ ConfigModule.forRoot({ isGlobal: true, load: [configuration], validationSchema }
 ```
 
 - Validate environment variables at startup using `Joi` or `class-validator` schema in `ConfigModule.forRoot({ validationSchema })`. Fail fast on missing required variables.
+- Commit a `.env.example` listing **every** variable the app reads — keys only, no values. Keep it in sync with the validation schema; the real `.env` stays gitignored. It is the canonical list of required config for new developers and CI.
 - Use `registerAs()` to namespace related config, then inject the namespace directly for strong typing:
 
 ```ts
@@ -779,6 +791,7 @@ createUser(@Body() dto: CreateUserDto): Promise<UserResponseDto> { ... }
 ```
 
 - Protect the docs endpoint in production — either disable it (`if (env !== "production")`) or guard it behind basic auth.
+- The raw OpenAPI JSON is served at `/api/docs-json` automatically. This spec is the **source of truth for the frontend API client** (see the frontend "Generated API Types" section) — keep `@ApiProperty()`, DTO types, and `@ApiResponse()` accurate so generated frontend types match runtime behaviour.
 - Use `@ApiBearerAuth()` on controllers or routes that require JWT so the docs UI can send the `Authorization` header.
 
 ---
@@ -1239,3 +1252,115 @@ Publish from any service:
 ```ts
 await this.notificationsService.publish(userId, "report.ready", { downloadUrl });
 ```
+
+---
+
+## API Response Shape & Pagination
+
+Every endpoint returns a predictable shape so clients never special-case per route.
+
+- **Single resource** → return the resource directly (serialized by `ClassSerializerInterceptor`).
+- **Collection** → return `{ data, meta }`, where `meta` carries pagination state.
+- **Error** → the shape produced by the global `HttpExceptionFilter` (`statusCode`, `message`, `timestamp`). Never invent ad-hoc error bodies.
+
+### Pagination contract
+
+Accept pagination through query params with one shared DTO. Defaults: `page=1`, `limit=20`; hard-cap `limit ≤ 100` so a client can never request an unbounded page.
+
+```
+GET /users?page=2&limit=20&sort=createdAt&order=desc
+```
+
+```ts
+// common/dto/pagination-query.dto.ts
+import { Type } from "class-transformer";
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+
+export class PaginationQueryDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  page: number = 1;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @IsOptional()
+  limit: number = 20;
+
+  @IsString()
+  @IsOptional()
+  sort: string = "createdAt";
+
+  @IsIn(["asc", "desc"])
+  @IsOptional()
+  order: "asc" | "desc" = "desc";
+}
+```
+
+```ts
+// common/interfaces/paginated.interface.ts
+export interface Paginated<T> {
+  data: T[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+}
+```
+
+```ts
+// service — build the envelope once; count and page in parallel
+async findAll(query: PaginationQueryDto): Promise<Paginated<UserDocument>> {
+  const { page, limit, sort, order } = query;
+  const [data, total] = await Promise.all([
+    this.userModel
+      .find()
+      .sort({ [sort]: order === "asc" ? 1 : -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean()
+      .exec(),
+    this.userModel.countDocuments().exec(),
+  ]);
+  return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+}
+```
+
+> The PostgreSQL variant uses the same DTO with `findAndCount` + `take`/`skip` (see `BEST-PRACTICES-POSTGRESQL.md`). The frontend mirrors `Paginated<T>` — or, better, generates its types from this API's OpenAPI spec.
+
+---
+
+## Observability — Error Tracking
+
+Structured logging records *what happened*; error tracking captures *unhandled failures with full context* (stack, request, release) and alerts on them. Use **Sentry**.
+
+```bash
+npm install @sentry/nestjs
+```
+
+```ts
+// instrument.ts
+import * as Sentry from "@sentry/nestjs";
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: process.env.NODE_ENV,
+  tracesSampleRate: 0.1,
+  beforeSend(event, hint) {
+    // Don't report expected client errors (4xx) — only unexpected failures.
+    const status = (hint.originalException as { status?: number })?.status;
+    return status && status < 500 ? null : event;
+  },
+});
+```
+
+```ts
+// main.ts — must be the FIRST import so Sentry instruments everything
+import "./instrument";
+import { NestFactory } from "@nestjs/core";
+```
+
+- Register `SentryModule.forRoot()` in `AppModule`. Sentry captures unhandled exceptions automatically; your `HttpExceptionFilter` still owns the client-facing response shape.
+- Never send PII — leave `sendDefaultPii: false` (the default). Scrub tokens, passwords, and emails from breadcrumbs and request bodies.
+- `SENTRY_DSN` is environment config like any other — load it through `ConfigService` and list it in `.env.example`.
+- For cross-service request tracing, add OpenTelemetry — `@sentry/nestjs` integrates with it. Optional until you run more than one service.

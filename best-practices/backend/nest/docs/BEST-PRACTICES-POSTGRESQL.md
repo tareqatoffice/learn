@@ -372,6 +372,8 @@ const [users, total] = await this.userRepo.findAndCount({
 });
 ```
 
+- Use the shared `PaginationQueryDto` and return the same `{ data, meta }` envelope as the MongoDB variant — see [API Response Shape & Pagination](./BEST-PRACTICES.md#api-response-shape--pagination). `findAndCount` returns `[rows, total]` in one round-trip, so no separate count query is needed.
+
 - Cache expensive, rarely-changing reads with `@nestjs/cache-manager` v3 (see main `BEST-PRACTICES.md` for setup).
 - Enable SSL in production connections (see Connection section above).
 - Use connection pooling defaults from TypeORM — tune `extra.max` (pool size) based on Postgres `max_connections`.

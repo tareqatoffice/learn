@@ -35,6 +35,33 @@ Do not update the best practices for one-off or project-specific decisions. Thes
 
 ---
 
+## Agent configuration (multi-tool)
+
+`CLAUDE.md` is the **single source of truth** for agent instructions. Every other AI tool reads the same content through its own native entry point — kept in sync by symlinks (plus one small pointer file for Cursor), so there is nothing to duplicate or let drift.
+
+| Tool | Entry point | How |
+|---|---|---|
+| Claude Code | `CLAUDE.md` | Canonical file |
+| OpenAI Codex | `AGENTS.md` | Symlink → `CLAUDE.md` |
+| Cursor | `AGENTS.md` + `.cursor/rules/standards.mdc` | `alwaysApply: true` rule pointing to `CLAUDE.md` |
+| Google Antigravity / Gemini | `GEMINI.md` + `AGENTS.md` | Symlinks → `CLAUDE.md` |
+| GitHub Copilot | `.github/copilot-instructions.md` | Symlink → `CLAUDE.md` |
+| Windsurf · Zed · Aider | `AGENTS.md` | Symlink → `CLAUDE.md` |
+
+Recreate the wiring in a new project from the repo root:
+
+```bash
+ln -s CLAUDE.md AGENTS.md
+ln -s CLAUDE.md GEMINI.md
+mkdir -p .github .cursor/rules
+ln -s ../CLAUDE.md .github/copilot-instructions.md
+# .cursor/rules/standards.mdc is a real file (needs MDC frontmatter) — copy it from this template
+```
+
+Edit only `CLAUDE.md`; the symlinks follow automatically. On Windows, enable symlink support (`git config core.symlinks true`) or replace the symlinks with copies and keep them in sync during review.
+
+---
+
 ## Versioning policy
 
 | Trigger | Action |
