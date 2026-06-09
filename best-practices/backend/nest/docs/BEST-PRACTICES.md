@@ -22,6 +22,13 @@
 14. [Swagger / OpenAPI](#swagger--openapi)
 15. [Health Checks](#health-checks)
 16. [Graceful Shutdown](#graceful-shutdown)
+17. [Email Service](#email-service)
+18. [Queues & Background Jobs](#queues--background-jobs)
+19. [Scheduled Jobs](#scheduled-jobs)
+20. [File Storage — Cloudflare R2](#file-storage--cloudflare-r2)
+21. [Bot Protection — Cloudflare Turnstile](#bot-protection--cloudflare-turnstile)
+22. [Analytics — PostHog](#analytics--posthog)
+23. [Notifications — SSE](#notifications--sse)
 
 ---
 
@@ -29,12 +36,13 @@
 
 ```
 project-root/
-├── CLAUDE.md                   # Claude Code instructions (auto-loaded)
+├── CLAUDE.md                    # Claude Code instructions (auto-loaded)
 ├── docs/
-│   ├── BEST-PRACTICES.md       # This file
-│   ├── DECISIONS.md            # Architecture decision records
-│   ├── FAQ.md                  # Common questions
-│   └── CONTRIBUTING.md        # How to propose changes
+│   ├── BEST-PRACTICES.md        # This file
+│   ├── CICD.md                  # CI/CD & git workflow
+│   ├── DECISIONS.md             # Architecture decision records
+│   ├── FAQ.md                   # Common questions
+│   └── CONTRIBUTING.md          # How to propose changes
 └── src/
     ├── modules/
     │   └── users/
@@ -850,3 +858,384 @@ export class DatabaseService implements OnModuleDestroy {
 
 - Set a termination grace period in Kubernetes (`terminationGracePeriodSeconds`) that is longer than your slowest request. 30 seconds is a safe default.
 - Use `SIGTERM` as the shutdown signal in Docker: `CMD ["node", "dist/main.js"]` (not `npm start`) so Node receives the signal directly, not via an npm wrapper that may not forward it.
+
+---
+
+## Email Service
+
+Never send email synchronously. Always enqueue via BullMQ.
+
+```bash
+npm install @nestjs/bullmq bullmq ioredis resend @react-email/render
+```
+
+```ts
+// queue/queue.constants.ts
+export const QUEUES = {
+  MAIL: "mail",
+  NOTIFICATIONS: "notifications",
+  REPORTS: "reports",
+} as const;
+```
+
+```ts
+// app.module.ts — global BullMQ registration
+BullModule.forRootAsync({
+  inject: [ConfigService],
+  useFactory: (config: ConfigService) => ({
+    connection: { url: config.get<string>("redis.url") },
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 3000 },
+      removeOnComplete: { count: 1000 },
+      removeOnFail: { count: 5000 },
+    },
+  }),
+})
+```
+
+```ts
+// mail/mail.service.ts — enqueues, never sends directly
+@Injectable()
+export class MailService {
+  constructor(@InjectQueue(QUEUES.MAIL) private readonly mailQueue: Queue) {}
+
+  async sendWelcome(to: string, name: string) {
+    await this.mailQueue.add("welcome", { to, name });
+  }
+
+  async sendPasswordReset(to: string, resetUrl: string) {
+    await this.mailQueue.add("password-reset", { to, resetUrl });
+  }
+
+  async sendVerifyEmail(to: string, verifyUrl: string) {
+    await this.mailQueue.add("verify-email", { to, verifyUrl });
+  }
+}
+```
+
+```ts
+// mail/mail.processor.ts — sends via Resend
+@Processor(QUEUES.MAIL)
+export class MailProcessor extends WorkerHost {
+  private resend = new Resend(process.env.RESEND_API_KEY);
+
+  async process(job: Job) {
+    switch (job.name) {
+      case "welcome":        return this.sendWelcome(job.data);
+      case "password-reset": return this.sendPasswordReset(job.data);
+      case "verify-email":   return this.sendVerifyEmail(job.data);
+      default: throw new Error(`Unknown mail job: ${job.name}`);
+    }
+  }
+
+  private async sendWelcome({ to, name }: { to: string; name: string }) {
+    const html = await render(WelcomeEmail({ name }));
+    await this.resend.emails.send({ from: process.env.MAIL_FROM, to, subject: "Welcome", html });
+  }
+}
+```
+
+Email templates live in `mail/templates/` as React Email components (`WelcomeEmail.tsx`, `PasswordResetEmail.tsx`, `VerifyEmailEmail.tsx`).
+
+---
+
+## Queues & Background Jobs
+
+```ts
+// Fire and forget
+await queue.add("job-name", data);
+
+// Delayed (e.g. follow-up email 24h after signup)
+await queue.add("follow-up", data, { delay: 24 * 60 * 60 * 1000 });
+
+// Priority (1 = highest)
+await queue.add("urgent", data, { priority: 1 });
+
+// Repeatable (survives restarts, distributed-safe)
+await queue.add("daily-digest", {}, { repeat: { pattern: "0 8 * * *" } });
+```
+
+Add **Bull Board** for a queue dashboard in non-production environments:
+
+```ts
+BullBoardModule.forRoot({ route: "/queues", adapter: ExpressAdapter }),
+BullBoardModule.forFeature({ name: QUEUES.MAIL, adapter: BullMQAdapter }),
+```
+
+Protect `/queues` behind a guard so it is never exposed in production.
+
+---
+
+## Scheduled Jobs
+
+```bash
+npm install @nestjs/schedule redlock
+```
+
+```ts
+// scheduler/scheduler.service.ts
+import { Logger } from "@nestjs/common";
+import Redlock, { type Lock } from "redlock";
+
+@Injectable()
+export class SchedulerService {
+  private readonly logger = new Logger(SchedulerService.name);
+  private redlock: Redlock;
+
+  constructor(@InjectRedis() private readonly redis: Redis) {
+    this.redlock = new Redlock([redis], { retryCount: 0 });
+  }
+
+  @Cron("0 2 * * *") // 2 am daily
+  async purgeExpiredTokens() {
+    let lock: Lock | undefined;
+    try {
+      lock = await this.redlock.acquire(["lock:purge-tokens"], 30_000);
+      await this.authService.purgeExpiredRefreshTokens();
+    } catch (err) {
+      if (lock === undefined) {
+        // Lock contention — another instance is running this job. Skip silently.
+      } else {
+        // Job failed after acquiring the lock.
+        this.logger.error("purgeExpiredTokens failed", err);
+      }
+    } finally {
+      await lock?.release().catch(() => undefined);
+    }
+  }
+}
+```
+
+Use Redlock on every `@Cron` job when running multiple instances — without it, all instances execute the job simultaneously. If a job can fail and needs retry, use a BullMQ repeatable job instead.
+
+---
+
+## File Storage — Cloudflare R2
+
+R2 is S3-compatible with zero egress fees. Use the AWS SDK with a custom endpoint.
+
+```bash
+npm install @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
+```
+
+```ts
+// files/r2.client.ts
+export function createR2Client(config: ConfigService): S3Client {
+  return new S3Client({
+    region: "auto",
+    endpoint: `https://${config.get("r2.accountId")}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: config.get("r2.accessKeyId"),
+      secretAccessKey: config.get("r2.secretAccessKey"),
+    },
+  });
+}
+```
+
+```ts
+// files/files.service.ts
+@Injectable()
+export class FilesService {
+  private r2: S3Client;
+
+  constructor(private readonly config: ConfigService) {
+    this.r2 = createR2Client(config);
+  }
+
+  async getPresignedUploadUrl(userId: string, filename: string, contentType: string) {
+    const ext = filename.split(".").pop();
+    const key = `uploads/${userId}/${Date.now()}.${ext}`;
+    const url = await getSignedUrl(
+      this.r2,
+      new PutObjectCommand({ Bucket: this.config.get("r2.bucket"), Key: key, ContentType: contentType }),
+      { expiresIn: 300 },
+    );
+    return { uploadUrl: url, key };
+  }
+
+  getPublicUrl(key: string): string {
+    return `${this.config.get("r2.publicUrl")}/${key}`;
+  }
+
+  async delete(key: string): Promise<void> {
+    await this.r2.send(new DeleteObjectCommand({ Bucket: this.config.get("r2.bucket"), Key: key }));
+  }
+}
+```
+
+**Rules:**
+- Always use presigned URLs — never proxy file bytes through NestJS
+- Store only the `key` in the database, never the full URL
+- Validate MIME type from magic bytes (`file-type` package), not the `Content-Type` header
+- Serve assets via an R2 custom domain — never expose the raw `*.r2.cloudflarestorage.com` URL
+- Delete the R2 object when the DB record is deleted
+
+---
+
+## Bot Protection — Cloudflare Turnstile
+
+Apply to login, register, password reset, and any public form endpoint. Use **invisible** widget type (set in Cloudflare dashboard) — no user interaction required.
+
+```ts
+// common/turnstile/turnstile.service.ts
+@Injectable()
+export class TurnstileService {
+  constructor(private readonly config: ConfigService) {}
+
+  async verify(token: string, ip?: string): Promise<boolean> {
+    const body = new URLSearchParams({
+      secret: this.config.get<string>("turnstile.secretKey")!,
+      response: token,
+      ...(ip ? { remoteip: ip } : {}),
+    });
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      body,
+    });
+    const data = await res.json();
+    return data.success === true;
+  }
+}
+```
+
+```ts
+// common/guards/turnstile.guard.ts
+@Injectable()
+export class TurnstileGuard implements CanActivate {
+  constructor(private readonly turnstile: TurnstileService) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest<Request>();
+    const token = (req.body as any)?.turnstileToken;
+    if (!token) throw new BadRequestException("Turnstile token required");
+    const ip = req.headers["cf-connecting-ip"] as string | undefined;
+    const valid = await this.turnstile.verify(token, ip);
+    if (!valid) throw new BadRequestException("Turnstile verification failed");
+    return true;
+  }
+}
+```
+
+```ts
+// Apply to public auth endpoints
+@UseGuards(TurnstileGuard)
+@Post("register")
+register(@Body() dto: RegisterDto) { ... }
+
+@UseGuards(TurnstileGuard)
+@Post("login")
+login(@Body() dto: LoginDto) { ... }
+
+@UseGuards(TurnstileGuard)
+@Post("forgot-password")
+forgotPassword(@Body() dto: ForgotPasswordDto) { ... }
+```
+
+Add `turnstileToken: string` with `@IsString() @IsNotEmpty()` to every affected DTO.
+
+> Test secret key (always passes): `1x0000000000000000000000000000000AA`. Use it in `.env.test` and CI — never mock Turnstile verification in tests.
+
+---
+
+## Analytics — PostHog
+
+Track server-side events that should not be exposed to the client (signups, purchases, job completions).
+
+```bash
+npm install posthog-node
+```
+
+```ts
+// analytics/analytics.service.ts
+@Injectable()
+export class AnalyticsService implements OnModuleDestroy {
+  private client: PostHog;
+
+  constructor(private readonly config: ConfigService) {
+    this.client = new PostHog(config.get<string>("posthog.key")!, {
+      host: config.get("posthog.host") ?? "https://app.posthog.com",
+      flushAt: 20,
+      flushInterval: 10_000,
+    });
+  }
+
+  capture(distinctId: string, event: string, properties?: Record<string, unknown>) {
+    this.client.capture({ distinctId, event, properties });
+  }
+
+  async onModuleDestroy() {
+    await this.client.shutdown(); // flush remaining events before process exits
+  }
+}
+```
+
+```ts
+// Usage — track meaningful business events from services
+async create(dto: CreateUserDto) {
+  const user = await this.userModel.create(dto);
+  this.analytics.capture(user.id, "user_signed_up", { role: user.role });
+  await this.mailService.sendWelcome(user.email, user.name);
+  return user;
+}
+```
+
+Always call `client.shutdown()` in `onModuleDestroy` — PostHog batches events and a process exit without flushing loses the last batch.
+
+---
+
+## Notifications — SSE
+
+Server-Sent Events: unidirectional (server → client), HTTP/1.1, auto-reconnects. Use Redis pub/sub so any instance can push to any connected client.
+
+```ts
+// notifications/notifications.service.ts
+@Injectable()
+export class NotificationsService implements OnModuleInit, OnModuleDestroy {
+  private events$ = new Subject<{ userId: string; type: string; payload: unknown }>();
+
+  constructor(
+    @InjectRedis() private readonly redis: Redis,
+    @InjectRedis() private readonly sub: Redis,
+  ) {}
+
+  async onModuleInit() {
+    await this.sub.subscribe("notifications");
+    this.sub.on("message", (_, msg) => this.events$.next(JSON.parse(msg)));
+  }
+
+  async onModuleDestroy() {
+    await this.sub.unsubscribe("notifications");
+  }
+
+  async publish(userId: string, type: string, payload: unknown) {
+    await this.redis.publish("notifications", JSON.stringify({ userId, type, payload }));
+  }
+
+  subscribe(userId: string): Observable<MessageEvent> {
+    return this.events$.pipe(
+      filter((e) => e.userId === userId),
+      map((e) => ({ data: { type: e.type, payload: e.payload } }) as MessageEvent),
+    );
+  }
+}
+```
+
+```ts
+// notifications/notifications.controller.ts
+@Controller("notifications")
+export class NotificationsController {
+  constructor(private readonly notifications: NotificationsService) {}
+
+  @Sse("stream")
+  stream(@CurrentUser() user: JwtPayload): Observable<MessageEvent> {
+    return this.notifications.subscribe(user.sub);
+  }
+}
+```
+
+Publish from any service:
+
+```ts
+await this.notificationsService.publish(userId, "report.ready", { downloadUrl });
+```

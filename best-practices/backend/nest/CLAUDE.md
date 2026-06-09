@@ -2,7 +2,7 @@
 
 This project follows strict backend coding standards. Before writing or reviewing any code, read and apply all guidelines in:
 
-**[Backend Best Practices](./docs/BEST-PRACTICES.md)**
+**[Backend Best Practices](./docs/BEST-PRACTICES.md)** · **[CI/CD](./docs/CICD.md)**
 
 ## Quick Reference
 
@@ -20,6 +20,13 @@ This project follows strict backend coding standards. Before writing or reviewin
 | Config | `@nestjs/config` only. No direct `process.env` in services/controllers. Validate at startup. |
 | TypeScript | `strict: true`. No `any`. Explicit return types on all public methods. |
 | Security | `helmet`, `throttler`, parameterized queries, explicit CORS. No `origin: "*"` in production. |
+| Email | BullMQ queue → `MailProcessor` → Resend. Never send synchronously. |
+| Queues | BullMQ. Always set `attempts`, `backoff`, `removeOnComplete`. |
+| Files | Presigned URL → Cloudflare R2. Store key only. Serve via custom domain. |
+| Bot protection | `TurnstileGuard` on login, register, forgot-password. Invisible widget. |
+| Analytics | PostHog Node SDK. `capture()` on business events. `shutdown()` on destroy. |
+| Notifications | `@Sse()` + Redis pub/sub for multi-instance fan-out. |
+| CI/CD | Conventional Commits · GitHub Actions · Docker → GHCR → SSH deploy. |
 
 ## Stack Versions
 
@@ -30,5 +37,10 @@ This project follows strict backend coding standards. Before writing or reviewin
 - `@nestjs/jwt` v11
 - `@nestjs/passport` v11 · passport `^0.7`
 - `@nestjs/cache-manager` v3 (Keyv-based)
+- BullMQ · `@nestjs/bullmq` · `@nestjs/schedule`
+- Cloudflare R2 (`@aws-sdk/client-s3`)
+- Cloudflare Turnstile (invisible)
+- PostHog (`posthog-node`)
+- Resend + React Email
 
 > For PostgreSQL projects, use `docs/BEST-PRACTICES-POSTGRESQL.md` instead.
