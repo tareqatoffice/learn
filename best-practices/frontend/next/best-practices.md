@@ -7,7 +7,7 @@
 ## Table of Contents
 
 1. [Project Structure](#project-structure)
-2. [Next.js Guidelines](#nextjs-guidelines)
+2. [Next.js Guidelines](#nextjs-guidelines) — App Router · Routing · Data Fetching · Caching & Revalidation · Metadata & SEO · Server Actions
 3. [React Query Guidelines](#react-query-guidelines)
 4. [Ant Design Guidelines](#ant-design-guidelines)
 5. [Component Standards](#component-standards)
@@ -95,7 +95,86 @@ export default async function UserPage({ params }: PageProps) {
 
 - Server Components: fetch directly via `async/await` with `fetch()` or a server-side service layer.
 - Client Components: use React Query (see below). Never `useEffect` + `fetch`.
-- Use `loading.tsx` and `error.tsx` for route-level Suspense and error boundaries.
+- Use `loading.tsx` for route-level loading UI and `error.tsx` for error boundaries.
+- Initiate independent fetches in parallel with `Promise.all` — never await them sequentially:
+
+```tsx
+// Bad — getAlbums blocks until getArtist resolves
+const artist = await getArtist(username);
+const albums = await getAlbums(username);
+
+// Good — both start at the same time
+const [artist, albums] = await Promise.all([getArtist(username), getAlbums(username)]);
+```
+
+- Wrap slow or dynamic Server Components in `<Suspense>` for component-level streaming. The fallback renders immediately while the async work completes:
+
+```tsx
+import { Suspense } from "react";
+
+export default function Page() {
+  return (
+    <>
+      <StaticHeader />
+      <Suspense fallback={<Skeleton />}>
+        <SlowDataComponent />   {/* streams in when ready */}
+      </Suspense>
+    </>
+  );
+}
+```
+
+- Wrap components that use runtime APIs (`cookies()`, `headers()`, `searchParams`) in `<Suspense>` so they don't block the static shell.
+
+### Caching & Revalidation
+
+Next.js 16 has two caching models. Use the new model for new projects.
+
+**New model — `use cache` directive** (opt-in: `cacheComponents: true` in `next.config.ts`):
+
+- Add `"use cache"` to the top of any async function or Server Component to cache its result.
+- Use `cacheLife()` to set cache duration. Use `cacheTag()` to enable on-demand invalidation.
+
+```ts
+// lib/data.ts
+import { cacheLife, cacheTag } from "next/cache";
+
+export async function getProducts() {
+  "use cache";
+  cacheLife("hours");   // profiles: seconds | minutes | hours | days | weeks | max
+  cacheTag("products");
+  return db.query("SELECT * FROM products");
+}
+```
+
+- `revalidateTag("products")` — stale-while-revalidate (use in Server Actions or Route Handlers).
+- `updateTag("products")` — immediately expires the cache, user sees their change right away (Server Actions only).
+- Prefer tag-based invalidation over `revalidatePath` — it is more precise.
+
+**Previous model** (default, no config change needed):
+
+- Cache individual `fetch` calls with `{ next: { revalidate: 3600 } }` (time-based) or `{ cache: "force-cache" }` (indefinite).
+- Cache non-`fetch` async functions (e.g. DB queries) with `unstable_cache`:
+
+```ts
+import { unstable_cache } from "next/cache";
+
+export const getCachedUser = unstable_cache(
+  async (id: string) => db.users.findById(id),
+  ["user"],
+  { tags: ["user"], revalidate: 3600 }
+);
+```
+
+- On-demand invalidation: call `revalidateTag("user")` or `revalidatePath("/profile")` in a Server Action after a mutation.
+
+**Deduplication** — wrap shared data fetches in `React.cache` so the same request is only executed once per render, even when called from multiple components:
+
+```ts
+import { cache } from "react";
+
+export const getUser = cache(async (id: string) => db.users.findById(id));
+```
 
 ### Environment Variables
 
@@ -123,6 +202,75 @@ export async function createItem(formData: FormData) {
 ```
 
 > Never `throw` on validation failure inside a Server Action. A thrown error propagates to the nearest `error.tsx` boundary — a full-page crash screen. Return a structured result object instead so the calling component can display inline `Form.Item` errors.
+
+### Metadata & SEO
+
+- Export a static `metadata` object from any `layout.tsx` or `page.tsx` for fixed titles and descriptions:
+
+```tsx
+// app/blog/layout.tsx
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Blog",
+  description: "Read our latest posts.",
+};
+```
+
+- Use `generateMetadata` for pages where metadata depends on data (e.g. dynamic routes). `params` is a Promise in Next.js 16:
+
+```tsx
+// app/blog/[slug]/page.tsx
+import type { Metadata } from "next";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const post = await getPost(slug);
+  return { title: post.title, description: post.description };
+}
+```
+
+- When the same data is needed in both `generateMetadata` and the page component, wrap the fetch in `React.cache` to avoid a duplicate request:
+
+```ts
+// lib/data.ts
+import { cache } from "react";
+export const getPost = cache(async (slug: string) => db.posts.findBySlug(slug));
+```
+
+- Use file-based metadata conventions for static assets — place these files in the `app/` directory:
+
+| File | Purpose |
+|---|---|
+| `favicon.ico` | Browser tab icon |
+| `opengraph-image.jpg` | Default social share image |
+| `robots.txt` | Crawler rules |
+| `sitemap.xml` | Sitemap for search engines |
+
+- Generate dynamic OG images per route with `opengraph-image.tsx` and `ImageResponse`:
+
+```tsx
+// app/blog/[slug]/opengraph-image.tsx
+import { ImageResponse } from "next/og";
+
+export const size = { width: 1200, height: 630 };
+export const contentType = "image/png";
+
+export default async function Image({ params }: { params: { slug: string } }) {
+  const post = await getPost(params.slug);
+  return new ImageResponse(
+    <div style={{ fontSize: 64, background: "white", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {post.title}
+    </div>
+  );
+}
+```
+
+> `ImageResponse` supports flexbox and a subset of CSS. `display: grid` and other advanced layouts are not supported.
 
 ---
 
@@ -358,6 +506,23 @@ async function fetchUser(id: string): Promise<User> { ... }
 - Memoize expensive computations with `useMemo`. Memoize stable callbacks with `useCallback` only when passed to memoized children.
 - Do not over-memoize. Profile before adding `React.memo`.
 - Keep bundle size in check — run `next build` and review the output before each release.
+- Load third-party scripts with `next/script` and the appropriate `strategy`:
+
+```tsx
+import Script from "next/script";
+
+// afterInteractive (default) — loads after hydration. Use for: tag managers, analytics.
+<Script src="https://www.googletagmanager.com/gtag/js" strategy="afterInteractive" />
+
+// lazyOnload — loads during browser idle time. Use for: chat widgets, social plugins.
+<Script src="https://cdn.example.com/chat.js" strategy="lazyOnload" />
+
+// beforeInteractive — loads before Next.js code, blocks hydration. Use sparingly for: cookie consent, bot detectors.
+// Must be placed in the root layout.
+<Script src="https://cdn.example.com/consent.js" strategy="beforeInteractive" />
+```
+
+> Never use `<script>` tags directly — they bypass Next.js optimisations. The `worker` strategy is experimental and not supported in the App Router.
 
 ---
 
