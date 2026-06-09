@@ -1200,7 +1200,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.expiresAt = Date.now() + 14 * 60 * 1000; // match NestJS JWT TTL
         return token;
       }
-      // Previous refresh failed — stop retrying, let middleware redirect to login
+      // Previous refresh failed — stop retrying, let proxy.ts redirect to login
       if (token.error === "RefreshAccessTokenError") return token;
       // Access token still valid
       if (Date.now() < (token.expiresAt as number)) return token;
@@ -1508,7 +1508,7 @@ export function useNotifications() {
   const { data: session } = useSession();
 
   useEffect(() => {
-    // Stop if unauthenticated or if token refresh failed (middleware will redirect)
+    // Stop if unauthenticated or if token refresh failed (proxy.ts will redirect)
     if (!session?.accessToken || session.error === "RefreshAccessTokenError") return;
 
     // EventSource doesn't support headers — pass token as query param
@@ -1649,7 +1649,7 @@ export default nextConfig;
 ```
 
 - Add the analytics, Turnstile, and Sentry origins your app actually calls to `connect-src` / `script-src` — start strict, widen only as needed.
-- `'unsafe-inline'` on `script-src` is a pragmatic default; for a hardened CSP, generate a per-request nonce in `middleware.ts` and drop `'unsafe-inline'`.
+- `'unsafe-inline'` on `script-src` is a pragmatic default; for a hardened CSP, generate a per-request nonce in `proxy.ts` and drop `'unsafe-inline'`.
 - HSTS only takes effect over HTTPS — browsers ignore it on `http://localhost`, so it is safe to leave enabled.
 
 ---
