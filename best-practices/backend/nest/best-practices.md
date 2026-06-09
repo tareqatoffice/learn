@@ -546,42 +546,103 @@ export const USER_REPO = Symbol("USER_REPO");
 
 ### Unit Tests
 
-- Test services in isolation. Mock all dependencies with `jest.fn()` or `@nestjs/testing`'s `createMock`.
+- Test services in isolation. Mock the Mongoose model using `getModelToken(Entity.name)`.
 - One `describe` block per service. One `it` per behavior, not per line.
 
 ```ts
+import { getModelToken } from "@nestjs/mongoose";
+import { Model } from "mongoose";
+
 describe("UsersService", () => {
   let service: UsersService;
-  let userRepo: jest.Mocked<Repository<User>>;
+  let userModel: jest.Mocked<Model<UserDocument>>;
+
+  const mockUserModel = {
+    findById: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module = await Test.createTestingModule({
       providers: [
         UsersService,
-        { provide: getRepositoryToken(User), useValue: { findOne: jest.fn(), save: jest.fn(), create: jest.fn() } },
+        { provide: getModelToken(User.name), useValue: mockUserModel },
       ],
     }).compile();
 
     service = module.get(UsersService);
-    userRepo = module.get(getRepositoryToken(User));
+    userModel = module.get(getModelToken(User.name));
   });
 
   it("throws NotFoundException when user does not exist", async () => {
-    userRepo.findOne.mockResolvedValue(null);
-    await expect(service.findById("non-existent")).rejects.toThrow(NotFoundException);
+    userModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) } as any);
+    await expect(service.findById("non-existent-id")).rejects.toThrow(NotFoundException);
   });
 });
 ```
 
-### Integration / E2E Tests
+- Chain `.exec()` on mocked query methods to match the production code pattern.
+
+### E2E Tests
 
 - Use `@nestjs/testing` + `supertest` for E2E tests against a real HTTP server.
-- Use a separate test database. Never run E2E tests against the development or production database.
-- Reset test data between tests with transactions that roll back, or by truncating tables in `afterEach`.
+- Use **`mongodb-memory-server`** for an in-process MongoDB instance — no external database needed in CI.
+
+```ts
+// test/users.e2e-spec.ts
+import { MongoMemoryServer } from "mongodb-memory-server";
+import * as mongoose from "mongoose";
+
+describe("UsersController (e2e)", () => {
+  let app: INestApplication;
+  let mongod: MongoMemoryServer;
+
+  beforeAll(async () => {
+    mongod = await MongoMemoryServer.create();
+    const uri = mongod.getUri();
+
+    const moduleFixture = await Test.createTestingModule({
+      imports: [
+        MongooseModule.forRoot(uri),
+        UsersModule,
+      ],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await mongoose.connection.dropDatabase();
+  });
+
+  afterAll(async () => {
+    await app.close();
+    await mongod.stop();
+  });
+
+  it("POST /users — creates a user and returns 201", () => {
+    return request(app.getHttpServer())
+      .post("/users")
+      .send({ email: "test@example.com", password: "password123" })
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body.email).toBe("test@example.com");
+        expect(body.passwordHash).toBeUndefined();
+      });
+  });
+});
+```
+
+- Drop the database in `afterEach` to isolate tests. Never share state between test cases.
+- Apply the same global pipes/interceptors in the test app as in production — otherwise tests don't reflect real behaviour.
 
 ### Rules
 
-- Do not test NestJS internals (routing, DI wiring). Test your code's behavior.
+- Do not test NestJS internals (routing, DI wiring). Test your code's behaviour.
 - Test all happy paths and all explicitly handled error paths.
 - Name tests as readable sentences: `it("returns 404 when user is not found")`.
 

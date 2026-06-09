@@ -381,8 +381,93 @@ if (isError) {
 
 ## Testing
 
-- Unit test pure utilities with Vitest.
-- Test hooks with `@testing-library/react` + `renderHook`.
-- Integration-test pages and forms with React Testing Library. Mock React Query with `QueryClientProvider` wrapping a fresh `QueryClient` per test.
+### Unit Tests
+
+- Unit test pure utility functions with **Vitest**.
+- Test custom hooks with `@testing-library/react` + `renderHook`. Wrap in a `QueryClientProvider` with a fresh `QueryClient` per test.
+
+```tsx
+import { renderHook, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+function wrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      {children}
+    </QueryClientProvider>
+  );
+}
+
+it("returns user data", async () => {
+  const { result } = renderHook(() => useUser("123"), { wrapper });
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  expect(result.current.data?.email).toBe("test@example.com");
+});
+```
+
+- Mock API calls with **MSW (Mock Service Worker)** — intercept at the network level, not by mocking modules.
+
+```ts
+// tests/mocks/handlers.ts
+import { http, HttpResponse } from "msw";
+
+export const handlers = [
+  http.get("/api/users/:id", ({ params }) =>
+    HttpResponse.json({ id: params.id, email: "test@example.com" })
+  ),
+];
+
+// tests/setup.ts
+import { setupServer } from "msw/node";
+import { handlers } from "./mocks/handlers";
+
+export const server = setupServer(...handlers);
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+```
+
+### Component / Integration Tests
+
+- Test pages and forms with **React Testing Library**. Query by accessible roles, not by class names or test IDs.
+
+```tsx
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+
+it("submits the form and shows success message", async () => {
+  render(<CreateUserForm />);
+  await userEvent.type(screen.getByRole("textbox", { name: /email/i }), "test@example.com");
+  await userEvent.click(screen.getByRole("button", { name: /submit/i }));
+  expect(await screen.findByText(/user created/i)).toBeInTheDocument();
+});
+```
+
+- Never test AntD internals (e.g. dropdown open state). Test what the user sees and can do.
+
+### E2E Tests
+
+- Use **Playwright** for end-to-end tests. Test critical user journeys against the running app.
+
+```ts
+// e2e/auth.spec.ts
+import { test, expect } from "@playwright/test";
+
+test("user can log in and see the dashboard", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill("user@example.com");
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page).toHaveURL("/dashboard");
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+});
+```
+
+- Keep E2E tests focused on happy paths and critical error paths (failed login, 404, form validation).
+- Run E2E against a dedicated test environment — never against production.
+
+### Rules
+
 - Do not test implementation details (internal state, private methods). Test behavior.
 - Aim for coverage on critical paths (auth flows, form submissions, data tables). Do not chase 100% coverage on UI scaffolding.
+- Set `retry: false` on the test `QueryClient` to prevent React Query from masking errors with silent retries.

@@ -2,7 +2,7 @@
 
 > Stack: NestJS v11 · Node.js >= 20 · PostgreSQL · `@nestjs/typeorm` v11 · TypeORM `^0.3` · `@nestjs/jwt` v11 · `@nestjs/passport` v11
 
-All non-database sections (Modules, Controllers, Services, DTOs & Validation, Auth, Error Handling, Configuration, Logging, TypeScript Standards, Testing, Security) follow the same rules as the [MongoDB best practices](./best-practices.md). This file covers only what differs: the **database layer**.
+All non-database sections (Modules, Controllers, Services, DTOs & Validation, Auth, Error Handling, Configuration, Logging, TypeScript Standards, Security) follow the same rules as the [MongoDB best practices](./best-practices.md). This file covers what differs: the **database layer** and **testing**.
 
 ---
 
@@ -10,7 +10,8 @@ All non-database sections (Modules, Controllers, Services, DTOs & Validation, Au
 
 1. [Project Structure](#project-structure)
 2. [Database & Repositories](#database--repositories)
-3. [Performance](#performance)
+3. [Testing](#testing)
+4. [Performance](#performance)
 
 ---
 
@@ -225,6 +226,127 @@ export default new DataSource({
 ```
 
 - Review every generated migration before running it. TypeORM may generate `DROP COLUMN` on a rename — handle renames manually.
+
+---
+
+## Testing
+
+### Unit Tests
+
+- Mock TypeORM repositories using `getRepositoryToken(Entity)` — the TypeORM equivalent of Mongoose's `getModelToken`.
+
+```ts
+import { getRepositoryToken } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+
+describe("UsersService", () => {
+  let service: UsersService;
+  let userRepo: jest.Mocked<Repository<User>>;
+
+  const mockUserRepo = {
+    findOne: jest.fn(),
+    find: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+  };
+
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      providers: [
+        UsersService,
+        { provide: getRepositoryToken(User), useValue: mockUserRepo },
+      ],
+    }).compile();
+
+    service = module.get(UsersService);
+    userRepo = module.get(getRepositoryToken(User));
+  });
+
+  afterEach(() => jest.clearAllMocks());
+
+  it("throws NotFoundException when user does not exist", async () => {
+    userRepo.findOne.mockResolvedValue(null);
+    await expect(service.findById("non-existent-id")).rejects.toThrow(NotFoundException);
+  });
+});
+```
+
+### E2E Tests
+
+- Use `@nestjs/testing` + `supertest` + a **dedicated test PostgreSQL database**. Never run against the development or production database.
+- Run migrations before the test suite and truncate tables between tests — do not use `synchronize: true` in the test config.
+
+```ts
+// test/users.e2e-spec.ts
+describe("UsersController (e2e)", () => {
+  let app: INestApplication;
+  let dataSource: DataSource;
+
+  beforeAll(async () => {
+    const moduleFixture = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(ConfigService)
+      .useValue({
+        get: (key: string) => ({
+          "database.host": process.env.TEST_DB_HOST ?? "localhost",
+          "database.port": 5432,
+          "database.user": process.env.TEST_DB_USER,
+          "database.password": process.env.TEST_DB_PASSWORD,
+          "database.name": process.env.TEST_DB_NAME,
+          "app.env": "test",
+        }[key]),
+      })
+      .compile();
+
+    app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+    await app.init();
+
+    dataSource = moduleFixture.get(DataSource);
+    await dataSource.runMigrations();
+  });
+
+  afterEach(async () => {
+    // Truncate in reverse FK order
+    await dataSource.query(`TRUNCATE TABLE "users" RESTART IDENTITY CASCADE`);
+  });
+
+  afterAll(async () => {
+    await dataSource.dropDatabase();
+    await app.close();
+  });
+
+  it("POST /users — creates a user and returns 201", () => {
+    return request(app.getHttpServer())
+      .post("/users")
+      .send({ email: "test@example.com", password: "password123" })
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body.email).toBe("test@example.com");
+        expect(body.passwordHash).toBeUndefined();
+      });
+  });
+});
+```
+
+- Apply the same global pipes and interceptors in the test app as in production.
+- Use a `.env.test` file for test database credentials. Load it in Jest config via `dotenv`.
+
+```js
+// jest.config.js
+module.exports = {
+  setupFiles: ["dotenv/config"],
+  // dotenv loads .env.test when NODE_ENV=test
+};
+```
+
+### Rules
+
+- Do not test NestJS internals (routing, DI wiring). Test your code's behaviour.
+- Test all happy paths and all explicitly handled error paths.
+- Name tests as readable sentences: `it("returns 404 when user is not found")`.
 
 ---
 
