@@ -1,6 +1,6 @@
 # Backend Best Practices
 
-> Stack: NestJS
+> Stack: NestJS v11 · Node.js >= 20 · TypeORM ^0.3 · `@nestjs/typeorm` v11 · `@nestjs/jwt` v11 · `@nestjs/passport` v11
 
 ---
 
@@ -289,10 +289,37 @@ export class User {
 
 ### Authentication
 
-- Use `@nestjs/passport` with `passport-jwt` for JWT-based authentication.
+NestJS v11 supports two JWT authentication approaches — choose one per project and stay consistent:
+
+**Option A — Native `@nestjs/jwt` (recommended for new projects)**
+Simpler, no Passport dependency. Use `@nestjs/jwt` directly to sign and verify tokens in a custom `AuthGuard`.
+
+```ts
+// auth.guard.ts
+@Injectable()
+export class AuthGuard implements CanActivate {
+  constructor(private readonly jwtService: JwtService) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const token = request.headers.authorization?.split(" ")[1];
+    if (!token) throw new UnauthorizedException();
+    try {
+      request.user = await this.jwtService.verifyAsync(token);
+    } catch {
+      throw new UnauthorizedException();
+    }
+    return true;
+  }
+}
+```
+
+**Option B — `@nestjs/passport` with `passport-jwt`**
+Use when you need multiple strategies (local + JWT, OAuth, etc.) or are extending an existing passport-based project.
+
 - Store only non-sensitive data in the JWT payload (user ID, role). Never store passwords or PII.
 - Short-lived access tokens (15 min). Use refresh tokens stored server-side (DB or Redis) for re-issuance.
-- Hash passwords with `bcrypt` (min cost factor 12). Never store plaintext passwords or use weak hashing (MD5, SHA1).
+- Hash passwords with `bcrypt` (min cost factor 12). Never store plaintext passwords or use weak hashing (MD5, SHA1). Always use the async form — `bcrypt.hash()` not `bcrypt.hashSync()` — to avoid blocking the event loop.
 
 ```ts
 const hash = await bcrypt.hash(plaintext, 12);
@@ -464,6 +491,15 @@ export enum Role {
 ```
 
 - Avoid non-null assertions (`!`). Prefer explicit null checks or optional chaining.
+- In NestJS v11, `@Inject()` enforces **strict token typing** — injection tokens must be typed as `string`, `symbol`, or a class/abstract class. Raw untyped tokens will produce TypeScript errors. Use `InjectionToken<T>` or typed constants:
+
+```ts
+// Use a typed token
+export const USER_REPO = Symbol("USER_REPO");
+
+// Or use registerAs() which returns a typed ConfigType key
+@Inject(jwtConfig.KEY) private readonly jwt: ConfigType<typeof jwtConfig>
+```
 
 ---
 
@@ -519,7 +555,23 @@ describe("UsersService", () => {
 - Use indexes on all columns used in `WHERE`, `JOIN`, or `ORDER BY` clauses.
 - Paginate all list endpoints. Never return an unbounded list from the database.
 - Use `select` in TypeORM queries to fetch only required columns for list endpoints.
-- Cache expensive, rarely-changing reads with Redis via `@nestjs/cache-manager`.
+- Cache expensive, rarely-changing reads with `@nestjs/cache-manager` v3+. This version uses **Keyv** under the hood — the old `store` adapter pattern is gone. Redis setup:
+
+```ts
+// npm install @nestjs/cache-manager @keyv/redis cacheable-memory
+
+CacheModule.registerAsync({
+  isGlobal: true,
+  useFactory: () => ({
+    stores: [
+      new Keyv({ store: new KeyvCacheableMemory({ ttl: 60_000, lruSize: 5000 }) }),
+      new KeyvRedis(process.env.REDIS_URL),
+    ],
+  }),
+})
+```
+
+The first store is primary (in-memory), the second is fallback (Redis). For in-memory-only caching, omit the `KeyvRedis` entry.
 
 ### Security
 

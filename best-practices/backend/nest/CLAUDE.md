@@ -23,6 +23,9 @@ This project follows strict backend coding standards. Before writing or reviewin
 
 ## Stack Versions
 
-- NestJS v10
-- TypeORM v0.3
-- Passport JWT
+- NestJS v11 (latest stable: v11.1.26)
+- Node.js >= 20
+- `@nestjs/typeorm` v11 · TypeORM `^0.3`
+- `@nestjs/jwt` v11
+- `@nestjs/passport` v11 · passport `^0.7`
+- `@nestjs/cache-manager` v3 (Keyv-based)
