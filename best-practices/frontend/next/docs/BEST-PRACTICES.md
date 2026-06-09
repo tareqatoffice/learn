@@ -9,18 +9,19 @@
 1. [Project Structure](#project-structure)
 2. [Next.js Guidelines](#nextjs-guidelines) — App Router · Routing · Data Fetching · Caching & Revalidation · Metadata & SEO · Server Actions
 3. [App Router Special Files](#app-router-special-files) — loading.tsx · error.tsx · not-found.tsx · global-error.tsx
-4. [React Query Guidelines](#react-query-guidelines)
-5. [Tailwind & Component Guidelines](#tailwind--component-guidelines)
-6. [Component Standards](#component-standards)
-7. [State Management](#state-management)
-8. [TypeScript Standards](#typescript-standards)
-9. [Performance](#performance)
-10. [Error Handling](#error-handling)
-11. [Testing](#testing)
-12. [Authentication — Auth.js v5](#authentication--authjs-v5)
-13. [Analytics — PostHog](#analytics--posthog)
-14. [Bot Protection — Cloudflare Turnstile](#bot-protection--cloudflare-turnstile)
-15. [Notifications — SSE](#notifications--sse)
+4. [Axios Instance](#axios-instance)
+5. [React Query Guidelines](#react-query-guidelines)
+6. [Tailwind & Component Guidelines](#tailwind--component-guidelines)
+7. [Component Standards](#component-standards)
+8. [State Management](#state-management)
+9. [TypeScript Standards](#typescript-standards)
+10. [Performance](#performance)
+11. [Error Handling](#error-handling)
+12. [Testing](#testing)
+13. [Authentication — Auth.js v5](#authentication--authjs-v5)
+14. [Analytics — PostHog](#analytics--posthog)
+15. [Bot Protection — Cloudflare Turnstile](#bot-protection--cloudflare-turnstile)
+16. [Notifications — SSE](#notifications--sse)
 
 ---
 
@@ -525,6 +526,114 @@ export default function GlobalError({ reset }: { reset: () => void }) {
 | `error.tsx` | Every segment that can error | Any segment making API calls or DB queries |
 | `not-found.tsx` | `app/` root | Once — covers all `notFound()` calls |
 | `global-error.tsx` | `app/` root | Once — last-resort only |
+
+---
+
+## Axios Instance
+
+All Client Component data fetching goes through a singleton Axios instance defined in `lib/api/client.ts`. Server Components use `fetch()` directly.
+
+### Setup
+
+```ts
+// lib/api/client.ts
+import axios from "axios";
+
+export const apiClient = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  headers: { "Content-Type": "application/json" },
+  withCredentials: false,
+});
+```
+
+### Request interceptor — attach bearer token
+
+The interceptor reads the Auth.js session on every request so the token is always fresh:
+
+```ts
+import { getSession } from "next-auth/react";
+
+apiClient.interceptors.request.use(async (config) => {
+  const session = await getSession();
+  if (session?.accessToken) {
+    config.headers.Authorization = `Bearer ${session.accessToken}`;
+  }
+  return config;
+});
+```
+
+### Response interceptor — normalize errors
+
+Throw a typed `ApiError` so query hooks have a consistent error shape:
+
+```ts
+// types/api.ts
+export interface ApiError {
+  message: string;
+  statusCode: number;
+  errors?: Record<string, string[]>;
+}
+```
+
+```ts
+// lib/api/client.ts (continued)
+import type { ApiError } from "@/types/api";
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const apiError: ApiError = {
+      message: error.response?.data?.message ?? "An unexpected error occurred",
+      statusCode: error.response?.status ?? 500,
+      errors: error.response?.data?.errors,
+    };
+    return Promise.reject(apiError);
+  }
+);
+```
+
+### Per-domain files
+
+Each domain gets its own file in `lib/api/` that exports plain async functions (no hooks):
+
+```ts
+// lib/api/users.ts
+import { apiClient } from "./client";
+import type { User } from "@/types/user";
+
+export async function fetchUsers(filters: UserFilters): Promise<User[]> {
+  const { data } = await apiClient.get("/users", { params: filters });
+  return data;
+}
+
+export async function fetchUser(id: string): Promise<User> {
+  const { data } = await apiClient.get(`/users/${id}`);
+  return data;
+}
+
+export async function createUser(payload: CreateUserDto): Promise<User> {
+  const { data } = await apiClient.post("/users", payload);
+  return data;
+}
+
+export async function updateUser(id: string, payload: UpdateUserDto): Promise<User> {
+  const { data } = await apiClient.patch(`/users/${id}`, payload);
+  return data;
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  await apiClient.delete(`/users/${id}`);
+}
+```
+
+These functions are then called inside React Query hooks in `queries/` — never called directly inside components.
+
+### Rules
+
+- One `apiClient` instance for the entire app — no new `axios.create()` calls elsewhere.
+- `lib/api/` functions are pure async functions. No hooks, no React imports.
+- Never call `apiClient` directly inside a component or a Server Component — use the domain functions.
+- Server Components fetch via `fetch()` with Next.js caching semantics, not Axios.
 
 ---
 
