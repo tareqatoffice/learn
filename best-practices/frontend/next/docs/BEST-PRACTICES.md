@@ -839,7 +839,7 @@ export function CreateUserForm() {
 }
 ```
 
-> Never `throw` on validation failure inside a Server Action — it crashes to the nearest `error.tsx`. Return a structured result object so the caller can display inline field errors.
+> When a form submits through a Server Action, the action must **return** a structured result on validation failure, never `throw` — see [Server Actions](#server-actions).
 
 ### Tables
 

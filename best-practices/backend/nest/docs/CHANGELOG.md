@@ -8,6 +8,7 @@ Entry format: `type — description`, where `type` is one of `added`, `changed`,
 
 ## 2026-06-09
 
+- changed — Removed duplication in `BEST-PRACTICES-POSTGRESQL.md`: the Testing "Rules" block (verbatim copy of the base) and the Performance principles (paginate/index/cache) now reference the base instead of restating it; only TypeORM-specific guidance remains.
 - added — Agent-facing sections to `CLAUDE.md`: `Working Agreement` (definition of done, no-commit-without-approval) and `Commands` (canonical scripts incl. single-test invocation).
 - added — Multi-tool agent wiring so Claude Code, Codex, Cursor, Antigravity/Gemini, and Copilot all auto-load the same rules from a single source (`CLAUDE.md`): `AGENTS.md` + `GEMINI.md` + `.github/copilot-instructions.md` symlinks, plus a Cursor `.cursor/rules/standards.mdc` always-on rule. Documented in `CONTRIBUTING.md`.
 - added — "API Response Shape & Pagination" section: `{ data, meta }` envelope, shared `PaginationQueryDto` (`page`/`limit` max 100/`sort`/`order`), and `Paginated<T>`. Mirrored in the PostgreSQL variant.

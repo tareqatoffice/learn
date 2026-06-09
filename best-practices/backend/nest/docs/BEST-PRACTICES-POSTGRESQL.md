@@ -344,13 +344,13 @@ module.exports = {
 
 ### Rules
 
-- Do not test NestJS internals (routing, DI wiring). Test your code's behaviour.
-- Test all happy paths and all explicitly handled error paths.
-- Name tests as readable sentences: `it("returns 404 when user is not found")`.
+Same as the base [Testing rules](./BEST-PRACTICES.md#testing): test behaviour not framework internals, cover happy and explicitly-handled error paths, and name tests as readable sentences.
 
 ---
 
 ## Performance
+
+The base [Performance & Security](./BEST-PRACTICES.md#performance--security) principles apply (paginate every list, index queried/sorted columns, cache expensive reads). Postgres/TypeORM specifics:
 
 - Use `select` to fetch only required columns on list endpoints:
 
@@ -361,8 +361,8 @@ const users = await this.userRepo.find({
 });
 ```
 
-- Add indexes on all columns used in `WHERE`, `JOIN`, or `ORDER BY`. For composite queries, use composite indexes.
-- Paginate all list endpoints. Never return an unbounded result set:
+- For columns used together in `WHERE` / `JOIN` / `ORDER BY`, prefer one **composite** index over several single-column indexes.
+- Paginate with `findAndCount` — it returns `[rows, total]` in a single round-trip, so no separate count query is needed. Use the shared `PaginationQueryDto` and the same `{ data, meta }` envelope as the base — see [API Response Shape & Pagination](./BEST-PRACTICES.md#api-response-shape--pagination):
 
 ```ts
 const [users, total] = await this.userRepo.findAndCount({
@@ -372,8 +372,5 @@ const [users, total] = await this.userRepo.findAndCount({
 });
 ```
 
-- Use the shared `PaginationQueryDto` and return the same `{ data, meta }` envelope as the MongoDB variant — see [API Response Shape & Pagination](./BEST-PRACTICES.md#api-response-shape--pagination). `findAndCount` returns `[rows, total]` in one round-trip, so no separate count query is needed.
-
-- Cache expensive, rarely-changing reads with `@nestjs/cache-manager` v3 (see main `BEST-PRACTICES.md` for setup).
 - Enable SSL in production connections (see Connection section above).
-- Use connection pooling defaults from TypeORM — tune `extra.max` (pool size) based on Postgres `max_connections`.
+- Tune `extra.max` (connection pool size) against Postgres `max_connections`.

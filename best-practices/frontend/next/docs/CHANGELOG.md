@@ -8,6 +8,8 @@ Entry format: `type — description`, where `type` is one of `added`, `changed`,
 
 ## 2026-06-09
 
+- changed — Slimmed `BEST-PRACTICES-ANTD.md` to a **delta-only** doc (like the PostgreSQL backend variant): removed the 7 sections that merely restated the base (Next.js Guidelines, React Query, State, TypeScript, Performance, Testing, full Project Structure) and replaced them with an "inherited verbatim" pointer. Eliminates ~350 lines of duplication and the drift that left the AntD doc missing the base's newer sections.
+- changed — Deduped the "never throw in a Server Action" note in `BEST-PRACTICES.md` (kept one canonical statement in Server Actions; the Forms copy is now a cross-reference).
 - added — Agent-facing sections to `CLAUDE.md`: `Working Agreement` (definition of done, no-commit-without-approval) and `Commands` (canonical scripts incl. single-test invocation).
 - added — Multi-tool agent wiring so Claude Code, Codex, Cursor, Antigravity/Gemini, and Copilot all auto-load the same rules from a single source (`CLAUDE.md`): `AGENTS.md` + `GEMINI.md` + `.github/copilot-instructions.md` symlinks, plus a Cursor `.cursor/rules/standards.mdc` always-on rule. Documented in `CONTRIBUTING.md`.
 - added — "Generated API Types" section: generate `types/api.gen.ts` from the backend OpenAPI spec with `openapi-typescript` (`gen:api` script) instead of hand-writing payload types. Added `Paginated<T>` mirroring the backend envelope.
