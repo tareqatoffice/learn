@@ -123,7 +123,7 @@ export default async function UsersPage() {
 }
 ```
 
-> Do not pass server data as `initialData` to Client Components. React Query v5 treats `initialData` without `initialDataUpdatedAt` as immediately stale, triggering a background refetch on every client mount regardless of `staleTime`. Use `HydrationBoundary` + `dehydrate` so the configured `staleTime` is respected and no double-fetch occurs.
+> Do not pass server data as `initialData` to Client Components. `initialData` is seeded into the cache untimed, so its `staleTime` is measured from client mount rather than when the server actually fetched the data (and under the common `staleTime: 0` it refetches on every mount) — and it has to be threaded down through props. `HydrationBoundary` + `dehydrate` instead transfers the full server cache *with* each query's real fetch timestamp, so the configured `staleTime` is honored across every prefetched query and no double-fetch occurs.
 
 ### Routing & Navigation
 
@@ -198,7 +198,7 @@ export async function getProducts() {
 }
 ```
 
-- `revalidateTag("products", "max")` — stale-while-revalidate (use in Server Actions or Route Handlers). In Next.js 16 the cache-profile second arg drives SWR behaviour; the single-arg `revalidateTag("products")` form is deprecated and now expires immediately like `updateTag`.
+- `revalidateTag("products", "max")` — stale-while-revalidate (use in Server Actions or Route Handlers). In Next.js 16 the cache-profile second arg drives SWR behaviour; the single-arg `revalidateTag("products")` form is deprecated and now does a blocking expire (without `updateTag`'s read-your-writes refresh).
 - `updateTag("products")` — immediately expires the cache, user sees their change right away (Server Actions only).
 - Prefer tag-based invalidation over `revalidatePath` — it is more precise.
 
@@ -1367,6 +1367,8 @@ export function resetAnalytics() {
   posthog.reset();
 }
 ```
+
+> PostHog also offers `capture_pageview: 'history_change'` to auto-track SPA navigations. We keep `false` + the manual `PostHogPageView` below **on purpose** — it routes every pageview through this wrapper, consistent with [Dependency Isolation](#dependency-isolation).
 
 ```tsx
 // providers/PostHogProvider.tsx — initializes the wrapper once, client-side

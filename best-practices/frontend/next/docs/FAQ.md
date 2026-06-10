@@ -24,7 +24,7 @@ Default to Server Components. Add `"use client"` only when the component needs b
 
 **Q: Can I use `initialData` to pass server-fetched data to a Client Component?**
 
-No. React Query v5 treats `initialData` without `initialDataUpdatedAt` as immediately stale, triggering a background refetch on every mount regardless of `staleTime`. Use `HydrationBoundary` + `dehydrate` + `prefetchQuery` in the Server Component instead.
+Prefer not to. `initialData` is seeded untimed — its `staleTime` counts from client mount rather than the real server fetch (so under the default `staleTime: 0` it refetches immediately), and it has to be threaded through props. Use `HydrationBoundary` + `dehydrate` + `prefetchQuery` in the Server Component instead: it transfers each query's real fetch timestamp and the whole dehydrated cache, so `staleTime` is honored and there's no double-fetch.
 
 ---
 

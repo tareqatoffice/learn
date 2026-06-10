@@ -297,6 +297,8 @@ jobs:
 ```
 
 > Applies to Next.js 16+: `next lint` was removed — run the ESLint CLI directly. Use `npx @next/codemod@latest next-lint-to-eslint-cli .` to migrate an existing project's config. (For Next.js 15 and earlier, `next lint` is still available.)
+>
+> Also in Next.js 16+: Turbopack is the default bundler for both `next dev` and `next build` (opt back to webpack with `--webpack` if a plugin isn't yet compatible), and React 19 is the baseline.
 
 ---
 

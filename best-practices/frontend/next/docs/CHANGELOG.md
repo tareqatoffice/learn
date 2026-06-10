@@ -8,6 +8,10 @@ Entry format: `type — description`, where `type` is one of `added`, `changed`,
 
 ## 2026-06-10
 
+- fixed — Corrected the `initialData` rationale in `BEST-PRACTICES.md` and `FAQ.md`: the old "immediately stale regardless of `staleTime`" wording only holds at `staleTime: 0`. Reworded to the accurate reason for preferring `HydrationBoundary` (untimed seed → `staleTime` counts from client mount, must be prop-threaded; `HydrationBoundary` carries each query's real fetch timestamp and the full dehydrated cache).
+- fixed — `revalidateTag` note in `BEST-PRACTICES.md`: single-arg `revalidateTag("tag")` does a blocking expire *without* `updateTag`'s read-your-writes refresh — corrected the "expires immediately like `updateTag`" phrasing that conflated the two.
+- added — PostHog note that `capture_pageview: 'history_change'` is a built-in SPA alternative, with the rationale for intentionally keeping manual `PostHogPageView` (routes pageviews through the `lib/analytics.ts` wrapper).
+- added — `CICD.md` note that Next.js 16 defaults to Turbopack for `dev`/`build` (opt out with `--webpack`) and that React 19 is the baseline.
 - changed — SSE (`useNotifications`) no longer passes the access token in the URL (`?token=<jwt>`), which leaks into access logs, history, and `Referer`. It now exchanges the bearer token for a short-lived single-use ticket via an authenticated `apiClient` call and connects with `?ticket=`. Noted `@microsoft/fetch-event-source` as the header-supporting alternative. Backend SSE section updated to issue/redeem the ticket.
 
 ## 2026-06-09

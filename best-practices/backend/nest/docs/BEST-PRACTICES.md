@@ -187,6 +187,7 @@ export class ParseObjectIdPipe implements PipeTransform<string, string> {
 - Validate `ObjectId` fields inside DTOs with `@IsMongoId()` (from `class-validator`) for the same reason.
 - Use `@HttpCode()` explicitly when the default status code is wrong.
 - Apply guards and interceptors at the controller or route level, not globally, when they are route-specific.
+- NestJS 11 runs on Express 5 — catch-all route paths use named wildcards (`/*splat` or `/{*splat}`), not the bare `*` from Express 4.
 
 ---
 
@@ -861,23 +862,23 @@ describe("UsersController (e2e)", () => {
 ```ts
 // npm install @nestjs/cache-manager cache-manager @keyv/redis keyv cacheable
 import { CacheModule } from "@nestjs/cache-manager";
-import { createKeyv } from "@keyv/redis";
+import KeyvRedis from "@keyv/redis";
 import { Keyv } from "keyv";
-import { CacheableMemory } from "cacheable";
+import { KeyvCacheableMemory } from "cacheable";
 
 CacheModule.registerAsync({
   isGlobal: true,
   inject: [ConfigService],
   useFactory: (config: ConfigService) => ({
     stores: [
-      new Keyv({ store: new CacheableMemory({ ttl: 60_000, lruSize: 5000 }) }),
-      createKeyv(config.get<string>("redis.url")),
+      new Keyv({ store: new KeyvCacheableMemory({ ttl: 60_000, lruSize: 5000 }) }),
+      new KeyvRedis(config.get<string>("redis.url")),
     ],
   }),
 })
 ```
 
-The first store is primary (in-memory), the second is fallback (Redis). For in-memory-only caching, omit the `createKeyv` entry. (Class names match the current `@nestjs/cache-manager` v3 docs: `CacheableMemory` from `cacheable`, `createKeyv` from `@keyv/redis`, `Keyv` from `keyv`.)
+The first store is primary (in-memory), the second is fallback (Redis). For in-memory-only caching, omit the `KeyvRedis` entry. (Class names match the current `@nestjs/cache-manager` v3 docs: `KeyvCacheableMemory` from `cacheable`, the default-imported `KeyvRedis` from `@keyv/redis`, and `Keyv` from `keyv`. Note `KeyvCacheableMemory` — not the lower-level `CacheableMemory` — is the class that implements the Keyv store interface.)
 
 ### Security
 

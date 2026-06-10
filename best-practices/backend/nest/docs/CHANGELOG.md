@@ -8,6 +8,8 @@ Entry format: `type — description`, where `type` is one of `added`, `changed`,
 
 ## 2026-06-10
 
+- fixed — Corrected the `@nestjs/cache-manager` v3 example (and ADR-006) to match the current official docs: `KeyvCacheableMemory` from `cacheable` (not the lower-level `CacheableMemory`, which doesn't implement the Keyv store interface) and the default-imported `KeyvRedis` from `@keyv/redis` (not `createKeyv`).
+- added — Controllers note that NestJS 11 runs on Express 5, so catch-all route paths use named wildcards (`/*splat` / `/{*splat}`), not the bare `*`.
 - fixed — Controllers used `ParseUUIDPipe` on MongoDB `_id` params, which rejects valid `ObjectId`s. Replaced with a custom `ParseObjectIdPipe` (and `@IsMongoId()` for DTOs); noted that `ParseUUIDPipe` belongs to the PostgreSQL/UUID variant.
 - fixed — Controller return types referenced an undefined `UserResponseDto` while services returned `UserDocument` (type mismatch). Controllers now return `UserDocument`; added a defined `UserResponseDto` response class in the Swagger section as the documented wire shape the frontend generates from.
 - fixed — Auth guard now checks the `Bearer` scheme (not just `split(" ")[1]`); removed the unused `MongooseHealthIndicator` import from the health module example.

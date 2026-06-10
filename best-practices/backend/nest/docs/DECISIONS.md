@@ -62,7 +62,7 @@ Key technology and pattern choices with the reasoning behind each. Understanding
 
 **Decision**: `@nestjs/cache-manager` v3 which uses Keyv as the storage adapter.
 
-**Why**: v3 replaced the old `store` adapter pattern with Keyv, which is actively maintained and supports a wider range of backends. Multi-store configuration (in-memory L1 + Redis L2) is first-class in v3. `CacheableMemory` with LRU eviction prevents unbounded memory growth.
+**Why**: v3 replaced the old `store` adapter pattern with Keyv, which is actively maintained and supports a wider range of backends. Multi-store configuration (in-memory L1 + Redis L2) is first-class in v3. `KeyvCacheableMemory` with LRU eviction prevents unbounded memory growth.
 
 **Breaking change**: v2 used a different store API — see `docs/CHANGELOG.md` for migration details.
 
