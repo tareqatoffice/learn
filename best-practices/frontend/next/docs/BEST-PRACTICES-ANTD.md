@@ -108,6 +108,8 @@ Use `Form` + `Form.Item` for all forms — this **replaces** the base's React Ho
 
 Use Tailwind for layout inside forms (`flex`, `gap`, `grid`) — not AntD `Space` or `Row/Col`.
 
+> This replaces only *form-field* validation. **Zod is still used at API/trust boundaries** — Server Action input parsing and validating external/API responses (base [TypeScript rule](./BEST-PRACTICES.md#typescript-standards)) — since AntD `rules` only run in the browser and don't validate untrusted server-side input.
+
 ### Tables
 
 Use `Table` with `columns` typed as `ColumnsType<T>` — this **replaces** the base's TanStack Table guidance. Always define a `rowKey`:
@@ -172,6 +174,18 @@ Route-segment error boundaries (`error.tsx`, `global-error.tsx`, `not-found.tsx`
 - Surface mutation/async errors with `notification.error()` (not Sonner `toast`).
 - Surface inline query errors with `<Alert type="error" />`.
 - Surface field errors through `Form.Item` validation (not shadcn `FormMessage`).
+
+> **Use the `App` wrapper, not the static `notification`/`message` imports.** In AntD v6 the static `notification.error()` / `message.x()` methods do **not** read `ConfigProvider` theme/locale context (and warn in the console). Wrap the tree once in `<App>` and pull context-aware instances from `App.useApp()`:
+>
+> ```tsx
+> // providers — wrap once, inside ConfigProvider
+> import { App, ConfigProvider } from "antd";
+> <ConfigProvider theme={theme}><App>{children}</App></ConfigProvider>
+>
+> // in a component/hook
+> const { notification } = App.useApp();
+> notification.error({ message: "Failed to save" });
+> ```
 
 ```tsx
 const { data, isError, error } = useUsers(filters);

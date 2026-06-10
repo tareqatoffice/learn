@@ -727,10 +727,11 @@ import { userKeys } from "./users.keys";
 import { fetchUser } from "@/lib/api/users";
 import type { ApiError } from "@/types/api";
 
-export function useUser(id: string) {
+export function useUser(id: string | undefined) {
   return useQuery<User, ApiError>({
     queryKey: userKeys.detail(id),
-    queryFn: () => fetchUser(id),
+    queryFn: () => fetchUser(id!),
+    enabled: !!id, // don't fire for an undefined/empty id (e.g. /users/undefined)
   });
 }
 ```
@@ -1043,7 +1044,11 @@ if (isError) {
 const { mutate } = useMutation({
   mutationFn: createUser,
   onError: (error: ApiError) => {
-    notify.error(error.message ?? "Failed to create user.");
+    // Only surface the backend message for client errors (4xx, which are
+    // intentional and safe to show). For 5xx, show generic copy — the raw
+    // message can leak internal/stack detail.
+    const message = error.statusCode < 500 ? error.message : "Failed to create user. Please try again.";
+    notify.error(message ?? "Failed to create user.");
   },
 });
 ```
@@ -1061,7 +1066,7 @@ if (!result.success) {
 
 **Rules:**
 - Server Action validation errors → inline `FormMessage` via React Hook Form `setError`
-- Mutation network errors → `notify.error()` in `onError`
+- Mutation network errors → `notify.error()` in `onError`. Only echo the raw `error.message` for 4xx; map 5xx to generic copy so backend internals never reach the user.
 - Route segment rendering errors → `error.tsx` boundary
 - Missing resources → `notFound()` → `not-found.tsx`
 
@@ -1709,9 +1714,13 @@ const securityHeaders = [
     value: [
       "default-src 'self'",
       "img-src 'self' data: https:",
-      "script-src 'self' 'unsafe-inline'", // tighten with a per-request nonce where possible
+      // Turnstile loads its widget script; tighten with a per-request nonce where possible.
+      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
       "style-src 'self' 'unsafe-inline'",
-      `connect-src 'self' ${process.env.NEXT_PUBLIC_API_URL ?? ""}`,
+      // Turnstile renders inside an iframe — without frame-src the challenge is blocked.
+      "frame-src 'self' https://challenges.cloudflare.com",
+      // API + the origins the documented stack actually calls (PostHog ingestion, Sentry).
+      `connect-src 'self' ${process.env.NEXT_PUBLIC_API_URL ?? ""} https://us.i.posthog.com https://*.ingest.sentry.io`,
     ].join("; "),
   },
 ];
@@ -1726,7 +1735,7 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 ```
 
-- Add the analytics, Turnstile, and Sentry origins your app actually calls to `connect-src` / `script-src` — start strict, widen only as needed.
+- The directives above already cover the documented stack (Turnstile in `script-src`/`frame-src`, PostHog + Sentry in `connect-src`). Adjust the PostHog/Sentry hosts to your region/DSN, and add any other origin your app calls — start strict, widen only as needed. (`X-Frame-Options: DENY` is unaffected — it controls who may frame *your* pages, not the iframes you embed, so it does not block Turnstile.)
 - `'unsafe-inline'` on `script-src` is a pragmatic default; for a hardened CSP, generate a per-request nonce in `proxy.ts` and drop `'unsafe-inline'`.
 - HSTS only takes effect over HTTPS — browsers ignore it on `http://localhost`, so it is safe to leave enabled.
 

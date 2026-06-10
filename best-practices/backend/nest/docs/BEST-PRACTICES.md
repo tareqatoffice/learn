@@ -319,6 +319,10 @@ export class User {
 app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 ```
 
+> **Mongoose caveat — `@Exclude()` on a `@Schema` class is NOT honored.** `ClassSerializerInterceptor` only applies `class-transformer` decorators to instances of the decorated class. A Mongoose `HydratedDocument` returned from a controller is **not** such an instance, so `@Exclude()` placed on the schema (or on a separate entity class the document isn't an instance of) silently does nothing — `passwordHash` leaks. Pick one of:
+> - **Schema-level transform** (simplest for Mongoose): strip sensitive fields in the schema's `toJSON` so every serialization path is safe — `@Schema({ toJSON: { transform: (_, ret) => { delete ret.passwordHash; return ret; } } })`. Combine with `.select("-passwordHash")` on reads so the field never loads in the first place.
+> - **Explicit DTO mapping**: return a real class instance — `plainToInstance(UserResponseDto, doc.toObject())` — so `@Exclude()`/`@Expose()` on `UserResponseDto` apply as intended. Use this when the wire shape diverges from the document.
+
 ---
 
 ## Database & Repositories
@@ -533,24 +537,38 @@ providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }]
 ## Error Handling
 
 - Use NestJS built-in HTTP exceptions. Never throw plain `Error` from a service.
-- Register a global `HttpExceptionFilter` to normalize all error responses.
+- Register a global `HttpExceptionFilter` to normalize all error responses. Use a **catch-all `@Catch()`** (not `@Catch(HttpException)`): third-party libraries, drivers, and plain `Error`s throw non-`HttpException`s, and a filter scoped to `HttpException` lets those fall through to Nest's default 500 — a different body that breaks the "every endpoint returns a predictable shape" guarantee. The filter handles `HttpException`s normally and maps everything else to a sanitized 500.
 
 ```ts
 // common/filters/http-exception.filter.ts
-@Catch(HttpException)
+@Catch() // catch-all — HttpExceptions AND unexpected errors
 export class HttpExceptionFilter implements ExceptionFilter {
-  catch(exception: HttpException, host: ArgumentsHost) {
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
+  catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const status = exception.getStatus();
-    const exceptionResponse = exception.getResponse();
+
+    const isHttp = exception instanceof HttpException;
+    const status = isHttp ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
+
+    // Unexpected errors (5xx / non-HttpException): log with stack, never leak details.
+    if (status >= 500) {
+      this.logger.error(exception instanceof Error ? exception.stack : String(exception));
+    }
+
+    const message = isHttp
+      ? (() => {
+          const res = exception.getResponse();
+          return typeof res === "string"
+            ? res
+            : (res as { message: string | string[] }).message;
+        })()
+      : "Internal server error"; // never echo the raw error to the client
 
     response.status(status).json({
       statusCode: status,
-      message:
-        typeof exceptionResponse === "string"
-          ? exceptionResponse
-          : (exceptionResponse as { message: string | string[] }).message,
+      message,
       timestamp: new Date().toISOString(),
     });
   }
@@ -880,6 +898,8 @@ login(@Body() dto: LoginDto) { ... }
 @Get("health")
 health() { ... }
 ```
+
+> **Multi-instance deployments need shared storage.** `@nestjs/throttler`'s default storage is in-memory and **per-process**, so behind N replicas a limit of 5 becomes effectively 5×N — the brute-force protection on auth routes silently weakens as you scale. Configure a shared store (`@nest-lab/throttler-storage-redis`) via the `storage` option so counters are global across instances.
 
 - Sanitize and validate all user input via `ValidationPipe`. Never trust request data.
 - Use parameterized queries or the ORM at all times. Never interpolate user input into SQL.
@@ -1639,21 +1659,35 @@ export class IdempotencyInterceptor implements NestInterceptor {
     const key = req.headers["idempotency-key"] as string | undefined;
     if (!key || req.method !== "POST") return next.handle();
 
-    const cacheKey = `idem:${key}`;
+    // Scope per user + route so one client can't replay another's response.
+    const cacheKey = `idem:${req.user?.sub ?? "anon"}:${req.route?.path}:${key}`;
+
     const cached = await this.redis.get(cacheKey);
+    if (cached === PROCESSING) {
+      throw new ConflictException("Request with this Idempotency-Key is still in flight");
+    }
     if (cached) return of(JSON.parse(cached)); // replay stored response
 
+    // Atomically claim the key: SET NX fails if another retry already claimed it.
+    const claimed = await this.redis.set(cacheKey, PROCESSING, "EX", 86_400, "NX");
+    if (claimed !== "OK") {
+      throw new ConflictException("Request with this Idempotency-Key is still in flight");
+    }
+
     return next.handle().pipe(
-      // Store for 24h. Use SET NX + a "processing" marker to also reject concurrent in-flight retries.
+      // Overwrite the "processing" marker with the real response on success...
       tap((body) => this.redis.set(cacheKey, JSON.stringify(body), "EX", 86_400)),
+      // ...and release the claim on failure so a genuine retry can proceed.
+      catchError((err) => this.redis.del(cacheKey).then(() => { throw err; })),
     );
   }
 }
+// const PROCESSING = "__processing__";
 ```
 
-- Scope keys per user/route so one client can't replay another's response.
+- Scope keys per user/route so one client can't replay another's response (shown above via `req.user.sub` + route path).
 - Set a TTL (24h is typical) — keys are short-lived retry guards, not permanent history.
-- Guard against the race where two retries arrive before the first finishes: write a `processing` marker with `SET NX` and return `409 Conflict` while it's in flight.
+- The `SET … NX` claim above closes the race where two retries arrive before the first finishes: the loser gets `409 Conflict`, and the claim is released on failure so a genuine later retry can still succeed. (One nuance left out of the sketch: `tap` fires per emitted value — for a single-response handler that's exactly once, but if you adapt it to streams, store only the final response.)
 - This complements, but does not replace, a unique DB constraint (e.g. `unique` on `email`) — the constraint is the last line of defence.
 
 ---
