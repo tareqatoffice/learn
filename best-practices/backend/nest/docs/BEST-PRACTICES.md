@@ -89,7 +89,7 @@ project-root/
 
 - Every feature is a NestJS module. Each module is self-contained: it declares its controllers, providers, and explicitly exports what other modules may use.
 - Use `forRoot` / `forFeature` patterns for configurable modules (database, config, JWT).
-- Avoid circular dependencies. If two modules depend on each other, extract the shared logic into a third module.
+- Avoid circular dependencies. They almost always mean a responsibility sits in the wrong module, not just a wiring problem — see [Circular Dependencies](#circular-dependencies) below.
 
 ```ts
 @Module({
@@ -112,6 +112,31 @@ export class AppModule {}
 
 // Only use useGlobalXxx() for things with zero dependencies
 app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+```
+
+### Circular Dependencies
+
+A circular dependency — module A imports module B while B imports A, or two providers inject each other — is almost always a sign that a responsibility lives in the wrong place, not something to work around. NestJS may fail to resolve one side and inject `undefined`, so the failure often surfaces at call time rather than at startup.
+
+Resolve it in this order — reach for the escape hatch only after the first three fail:
+
+1. **Make the dependency one-directional.** Decide which module is lower-level (owns the data or primitive) and which is higher-level (orchestrates a flow). Point the arrow one way: the higher-level module imports the lower-level one and calls into it; the lower-level module stays completely unaware of the higher-level one.
+2. **Move the misplaced responsibility.** The cycle usually exists because a piece of logic sits in the wrong module — typically a lower-level service reaching back into a higher-level one to finish an operation. Relocate that logic, or let a controller/flow orchestrate the two services in sequence, so the back-reference disappears.
+3. **Extract a shared module.** If both modules genuinely need the same logic, pull it into a third, lower-level module that both import. Neither original module then depends on the other.
+4. **`forwardRef()` — last resort only.** When two providers truly must reference each other, NestJS offers `forwardRef()` at both the module and provider level. It works, but it hides the cycle instead of removing it — treat every `forwardRef` as tech debt and a prompt to revisit the boundary.
+
+```ts
+// Escape hatch — prefer options 1–3 first
+@Module({ imports: [forwardRef(() => OtherModule)] })
+export class FeatureModule {}
+
+@Injectable()
+export class FeatureService {
+  constructor(
+    @Inject(forwardRef(() => OtherService))
+    private readonly other: OtherService,
+  ) {}
+}
 ```
 
 ---
