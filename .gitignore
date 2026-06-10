@@ -1,0 +1,66 @@
+# Build output
+bin/
+obj/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+project.lock.json
+project.fragment.lock.json
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+*.DotSettings.user
+
+# VS Code
+.vscode/
+
+# Test results & coverage
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage*/
+[Cc]overage*/
+
+# Publish output
+publish/
+**/Properties/PublishProfiles/
+
+# Secrets & environment
+*.env
+.env*
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+secrets.json
+**/secrets.json
+
+# User secrets
+%APPDATA%/Microsoft/UserSecrets/
+~/.microsoft/usersecrets/
+
+# Logs
+logs/
+*.log
+Serilog*/
+
+# Temp / OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code project settings (local only)
+.claude/
+
+# Mini-project data files (runtime-generated)
+**/todos.json
