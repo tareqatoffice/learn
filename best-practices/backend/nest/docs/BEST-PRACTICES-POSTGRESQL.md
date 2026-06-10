@@ -66,12 +66,14 @@ TypeOrmModule.forRootAsync({
     entities: [__dirname + "/**/*.entity{.ts,.js}"],
     synchronize: config.get<string>("app.env") === "development",
     migrations: ["dist/migrations/*.js"],
-    migrationsRun: true,
+    migrationsRun: false, // see note — run migrations as an explicit deploy step, not on boot
     ssl: config.get<string>("app.env") === "production" ? { rejectUnauthorized: true } : false,
   }),
   inject: [ConfigService],
 })
 ```
+
+> **Don't auto-run migrations on app boot in production.** `migrationsRun: true` runs pending migrations every time *any* instance starts — with multiple replicas they race, and a failed migration takes down every booting pod. Run `npm run migration:run` as a discrete pre-deploy step (one runner, gated before traffic shifts) and keep `migrationsRun: false`. `synchronize` stays `true` only in development; never in production (it silently alters the schema). Keeping both auto-behaviors off in prod leaves migrations as the single source of schema truth.
 
 Add to the config factory:
 

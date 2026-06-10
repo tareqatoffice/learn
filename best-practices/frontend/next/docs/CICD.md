@@ -239,7 +239,7 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:3001
           NEXT_PUBLIC_POSTHOG_KEY: phc_placeholder
-          NEXT_PUBLIC_POSTHOG_HOST: https://app.posthog.com
+          NEXT_PUBLIC_POSTHOG_HOST: https://us.i.posthog.com
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
           AUTH_SECRET: ci-placeholder
           AUTH_URL: http://localhost:3000

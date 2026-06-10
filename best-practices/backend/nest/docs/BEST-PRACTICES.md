@@ -437,14 +437,23 @@ Simpler, no Passport dependency. Use `@nestjs/jwt` directly to sign and verify t
 // auth.guard.ts
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const [scheme, token] = request.headers.authorization?.split(" ") ?? [];
     if (scheme !== "Bearer" || !token) throw new UnauthorizedException();
     try {
-      request.user = await this.jwtService.verifyAsync(token);
+      // Pin the algorithm and validate iss/aud. Without `algorithms`, a project that
+      // later moves to asymmetric keys is exposed to algorithm-confusion attacks.
+      request.user = await this.jwtService.verifyAsync(token, {
+        algorithms: ["HS256"], // or ["RS256"] for asymmetric keys
+        issuer: this.config.get("jwt.issuer"),
+        audience: this.config.get("jwt.audience"),
+      });
     } catch {
       throw new UnauthorizedException();
     }
@@ -457,11 +466,41 @@ export class AuthGuard implements CanActivate {
 Use when you need multiple strategies (local + JWT, OAuth, etc.) or are extending an existing passport-based project.
 
 - Store only non-sensitive data in the JWT payload (user ID, role). Never store passwords or PII.
-- Short-lived access tokens (15 min). Use refresh tokens stored server-side (DB or Redis) for re-issuance.
+- Short-lived access tokens (15 min). Use refresh tokens stored server-side (DB or Redis) for re-issuance, with **rotation + reuse detection** (below).
 - Hash passwords with `bcrypt` (min cost factor 12). Never store plaintext passwords or use weak hashing (MD5, SHA1). Always use the async form — `bcrypt.hash()` not `bcrypt.hashSync()` — to avoid blocking the event loop.
 
 ```ts
 const hash = await bcrypt.hash(plaintext, 12);
+```
+
+**Refresh-token rotation with reuse detection.** Never return a long-lived token the client keeps forever. On every refresh, issue a *new* refresh token and invalidate the old one; if an already-used (rotated-out) token is presented, treat it as theft and revoke the whole token family. Store only a **hash** of the refresh token (it's a credential), keyed by user + a per-token `jti`.
+
+```ts
+// auth.service.ts — sketch
+async refresh(presentedToken: string): Promise<{ accessToken: string; refreshToken: string }> {
+  const { sub, jti } = await this.jwtService.verifyAsync(presentedToken, {
+    algorithms: ["HS256"],
+    secret: this.config.get("jwt.refreshSecret"),
+  });
+
+  const stored = await this.refreshStore.find(sub, jti); // e.g. Redis key refresh:{sub}:{jti}
+  // Reuse detection: a valid-but-unknown jti means this token was already rotated out → theft.
+  if (!stored || !(await argon2.verify(stored.hash, presentedToken))) {
+    await this.refreshStore.revokeAllForUser(sub); // nuke the family
+    throw new UnauthorizedException("Refresh token reuse detected");
+  }
+
+  await this.refreshStore.revoke(sub, jti); // one-time use
+  const newJti = randomUUID();
+  const refreshToken = await this.jwtService.signAsync(
+    { sub, jti: newJti },
+    { secret: this.config.get("jwt.refreshSecret"), expiresIn: "7d" },
+  );
+  await this.refreshStore.save(sub, newJti, await argon2.hash(refreshToken), /* ttl */ 7 * 86_400);
+
+  const accessToken = await this.jwtService.signAsync({ sub }, { expiresIn: "15m" });
+  return { accessToken, refreshToken };
+}
 ```
 
 > **`argon2id` is OWASP's current first recommendation** for new projects (memory-hard, more GPU/ASIC-resistant than bcrypt). Use `argon2` (`npm i argon2`) with the OWASP-suggested parameters (`memoryCost: 19456`, `timeCost: 2`, `parallelism: 1`); bcrypt at cost 12 remains acceptable. Whichever you pick, keep it behind the auth service so the algorithm is a one-place change — see [ADR-005](./DECISIONS.md).
@@ -802,21 +841,25 @@ describe("UsersController (e2e)", () => {
 - Cache expensive, rarely-changing reads with `@nestjs/cache-manager` v3+. This version uses **Keyv** under the hood — the old `store` adapter pattern is gone. Redis setup:
 
 ```ts
-// npm install @nestjs/cache-manager @keyv/redis cacheable-memory
+// npm install @nestjs/cache-manager cache-manager @keyv/redis keyv cacheable
+import { CacheModule } from "@nestjs/cache-manager";
+import { createKeyv } from "@keyv/redis";
+import { Keyv } from "keyv";
+import { CacheableMemory } from "cacheable";
 
 CacheModule.registerAsync({
   isGlobal: true,
   inject: [ConfigService],
   useFactory: (config: ConfigService) => ({
     stores: [
-      new Keyv({ store: new KeyvCacheableMemory({ ttl: 60_000, lruSize: 5000 }) }),
-      new KeyvRedis(config.get<string>("redis.url")),
+      new Keyv({ store: new CacheableMemory({ ttl: 60_000, lruSize: 5000 }) }),
+      createKeyv(config.get<string>("redis.url")),
     ],
   }),
 })
 ```
 
-The first store is primary (in-memory), the second is fallback (Redis). For in-memory-only caching, omit the `KeyvRedis` entry.
+The first store is primary (in-memory), the second is fallback (Redis). For in-memory-only caching, omit the `createKeyv` entry. (Class names match the current `@nestjs/cache-manager` v3 docs: `CacheableMemory` from `cacheable`, `createKeyv` from `@keyv/redis`, `Keyv` from `keyv`.)
 
 ### Security
 
@@ -1378,7 +1421,7 @@ export class AnalyticsService implements OnModuleDestroy {
 
   constructor(private readonly config: ConfigService) {
     this.client = new PostHog(config.get<string>("posthog.key")!, {
-      host: config.get("posthog.host") ?? "https://app.posthog.com",
+      host: config.get("posthog.host") ?? "https://us.i.posthog.com", // ingestion host, not app.posthog.com (EU: https://eu.i.posthog.com)
       flushAt: 20,
       flushInterval: 10_000,
     });
@@ -1492,6 +1535,8 @@ export class NotificationsController {
   }
 }
 ```
+
+Because `redeem` consumes the ticket atomically (`GETDEL`), every ticket works for exactly one connection. The browser's native `EventSource` auto-reconnect re-requests the same `?ticket=` URL, so it would hit a `401` loop after the first drop — the client must instead detect the drop, request a **fresh** ticket via `POST /notifications/ticket`, and open a new stream (see the frontend `useNotifications` hook). This is the deliberate trade-off for single-use tickets: stronger replay protection in exchange for client-managed reconnection.
 
 Publish from any service:
 
@@ -1628,7 +1673,8 @@ import * as Sentry from "@sentry/nestjs";
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
   environment: process.env.NODE_ENV,
-  tracesSampleRate: 0.1,
+  // Config-driven, not hardcoded — tune per environment via SENTRY_TRACES_SAMPLE_RATE.
+  tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? 0.1),
   beforeSend(event, hint) {
     // Don't report expected client errors (4xx) — only unexpected failures.
     const status = (hint.originalException as { status?: number })?.status;
@@ -1643,7 +1689,15 @@ import "./instrument";
 import { NestFactory } from "@nestjs/core";
 ```
 
-- Register `SentryModule.forRoot()` in `AppModule`. Sentry captures unhandled exceptions automatically; your `HttpExceptionFilter` still owns the client-facing response shape.
+- Register `SentryModule.forRoot()` in `AppModule`, **and** register `SentryGlobalFilter` via `APP_FILTER` — `Sentry.init` alone instruments the runtime but does not capture exceptions handled inside Nest's request lifecycle. Per Sentry's NestJS guide, `SentryGlobalFilter` must be registered **before** any other exception filter in the providers array; it reports the error and then delegates to the next filter, so your `HttpExceptionFilter` still owns the client-facing response shape.
+
+```ts
+// app.module.ts
+providers: [
+  { provide: APP_FILTER, useClass: SentryGlobalFilter }, // first — reports to Sentry, then delegates
+  { provide: APP_FILTER, useClass: HttpExceptionFilter }, // shapes the client-facing response
+],
+```
 - Never send PII — leave `sendDefaultPii: false` (the default). Scrub tokens, passwords, and emails from breadcrumbs and request bodies.
 - `SENTRY_DSN` is environment config like any other — load it through `ConfigService` and list it in `.env.example`.
 - For cross-service request tracing, add OpenTelemetry — `@sentry/nestjs` integrates with it. Optional until you run more than one service.

@@ -548,6 +548,8 @@ export default function GlobalError({ reset }: { reset: () => void }) {
 
 All Client Component data fetching goes through a singleton Axios instance defined in `lib/api/client.ts`. Server Components use `fetch()` directly.
 
+> **`apiClient` and every `lib/api/*` domain function are client-only.** The request interceptor reads the session via `getSession()` from `next-auth/react`, which only runs in the browser — importing a domain function into a Server Component compiles but silently sends an unauthenticated request. In Server Components, call `fetch()` directly and attach the token from `auth()` (see [Server Component Data Fetching](#data-fetching)). Keep the two paths separate; don't share the axios layer across the server/client boundary.
+
 ### Setup
 
 ```ts
@@ -992,7 +994,7 @@ async function fetchUser(id: string): Promise<User> { ... }
 
 - Use `next/image` for all images. Never `<img>`.
 - Use `next/font` for all fonts. Never load fonts via `<link>` in `<head>`.
-- Lazy-load heavy Client Components with `dynamic(() => import(...), { ssr: false })`.
+- Lazy-load heavy Client Components with `next/dynamic`. Note: `dynamic(() => import(...), { ssr: false })` is **only allowed inside a Client Component** — calling it with `ssr: false` from a Server Component throws in the App Router (Next 15+). To defer a client-only chunk from a Server Component, wrap it in a small `"use client"` boundary (or use `React.lazy` + `<Suspense>` there). Server-rendered lazy chunks (`dynamic(() => import(...))` without `ssr: false`) are fine anywhere.
 - Memoize expensive computations with `useMemo`. Memoize stable callbacks with `useCallback` only when passed to memoized children.
 - Do not over-memoize. Profile before adding `React.memo`.
 - Keep bundle size in check — run `next build` and review the output before each release.
@@ -1328,36 +1330,64 @@ declare module "next-auth/jwt" {
 npm install posthog-js
 ```
 
-```tsx
-// providers/PostHogProvider.tsx
-"use client";
-import posthog from "posthog-js";
-import { PostHogProvider as PHProvider } from "posthog-js/react";
-import { useEffect } from "react";
+**`lib/analytics.ts` is the only module that imports the analytics SDK.** It owns init, config, the API host, and every `capture`/`identify` call. The provider, page-view tracker, and identify hook below call *into* this wrapper — they never import `posthog-js` themselves — so swapping analytics tools (or stubbing it in tests) touches only this one file.
 
-export function PostHogProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
-      api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://app.posthog.com",
-      capture_pageview: false, // handled manually below
-    });
-  }, []);
-  return <PHProvider client={posthog}>{children}</PHProvider>;
+```ts
+// lib/analytics.ts — the single SDK boundary: init, keys, host, and all calls live here
+import posthog from "posthog-js";
+
+export function initAnalytics() {
+  // Idempotent: guards React Strict Mode's double-invoke and Fast Refresh re-runs.
+  if (typeof window === "undefined" || posthog.__loaded) return;
+  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
+    // Ingestion endpoint — NOT app.posthog.com (that's the dashboard). EU: https://eu.i.posthog.com
+    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com",
+    capture_pageview: false, // App Router navigation is captured manually (see PostHogPageView)
+  });
+}
+
+export function trackEvent(event: string, properties?: Record<string, unknown>) {
+  posthog.capture(event, properties);
+}
+
+export function trackPageView() {
+  posthog.capture("$pageview");
+}
+
+export function identifyUser(id: string, traits?: Record<string, unknown>) {
+  posthog.identify(id, traits);
+}
+
+export function resetAnalytics() {
+  posthog.reset();
 }
 ```
 
 ```tsx
-// providers/PostHogPageView.tsx — tracks App Router navigation
+// providers/PostHogProvider.tsx — initializes the wrapper once, client-side
+"use client";
+import { useEffect } from "react";
+import { initAnalytics } from "@/lib/analytics";
+
+export function PostHogProvider({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    initAnalytics();
+  }, []);
+  return <>{children}</>;
+}
+```
+
+```tsx
+// providers/PostHogPageView.tsx — tracks App Router navigation through the wrapper
 "use client";
 import { usePathname, useSearchParams } from "next/navigation";
-import { usePostHog } from "posthog-js/react";
 import { useEffect } from "react";
+import { trackPageView } from "@/lib/analytics";
 
 export function PostHogPageView() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const posthog = usePostHog();
-  useEffect(() => { posthog.capture("$pageview"); }, [pathname, searchParams, posthog]);
+  useEffect(() => { trackPageView(); }, [pathname, searchParams]);
   return null;
 }
 ```
@@ -1379,33 +1409,29 @@ export default function RootLayout({ children }) {
 }
 ```
 
-**Identify user after login:**
+**Identify user after login** — through the wrapper, not the SDK:
 
 ```ts
 // hooks/useIdentifyUser.ts
+"use client";
+import { useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { identifyUser, resetAnalytics } from "@/lib/analytics";
+
 export function useIdentifyUser() {
   const { data: session } = useSession();
-  const posthog = usePostHog();
+  const userId = session?.user?.id;
   useEffect(() => {
     if (session?.user) {
-      posthog.identify(session.user.id, { email: session.user.email, role: session.user.role });
+      identifyUser(session.user.id, { email: session.user.email, role: session.user.role });
     } else {
-      posthog.reset();
+      resetAnalytics();
     }
-  }, [session, posthog]);
+  }, [userId]); // key on stable identity, not the whole session object
 }
 ```
 
-**Track custom events through a wrapper** — feature code calls `trackEvent`, never `posthog` directly, so swapping analytics tools touches only `lib/analytics.ts` (the provider, `PostHogPageView`, and `useIdentifyUser` above are that module's own setup internals):
-
-```ts
-// lib/analytics.ts — the only feature-facing module that imports the analytics SDK
-import posthog from "posthog-js";
-
-export function trackEvent(event: string, properties?: Record<string, unknown>) {
-  posthog.capture(event, properties);
-}
-```
+**Track custom events through the wrapper** — feature code calls `trackEvent`, never `posthog` directly:
 
 ```ts
 // usage
@@ -1495,7 +1521,7 @@ async function verifyTurnstile(token: string, ip?: string) {
 
 ## Notifications — SSE
 
-`EventSource` opens a persistent connection to the NestJS SSE endpoint. The browser auto-reconnects on drop.
+`EventSource` opens a persistent connection to the NestJS SSE endpoint. Because the connection is authenticated with a **single-use** ticket (below), you cannot rely on the browser's native auto-reconnect — it would replay the already-consumed ticket and loop on `401`. Handle `onerror` yourself: close, mint a fresh ticket, and reconnect with backoff (see the hook below).
 
 > **Never put the access token in the URL** (`?token=<jwt>`). `EventSource` can't send an `Authorization` header, but URLs leak into server/proxy access logs, browser history, and `Referer` — a long-lived bearer token there is a real exposure. Instead, exchange it for a **short-lived, single-use SSE ticket**: call an authenticated endpoint through `apiClient` (which sends the bearer header normally), get back a ~30s one-time ticket, and pass *that* in the query string. The backend validates and immediately consumes the ticket. (Alternative: `@microsoft/fetch-event-source`, which is a `fetch`-based SSE client that *does* support headers — use it if you'd rather send the bearer token directly and skip the ticket round-trip.)
 
@@ -1519,33 +1545,65 @@ import { getSseTicket } from "@/lib/api/notifications";
 
 export function useNotifications() {
   const { data: session } = useSession();
+  const userId = session?.user?.id;
+  const refreshFailed = session?.error === "RefreshAccessTokenError";
 
   useEffect(() => {
-    // Stop if unauthenticated or if token refresh failed (proxy.ts will redirect)
-    if (!session?.accessToken || session.error === "RefreshAccessTokenError") return;
+    // Stop if unauthenticated or if token refresh failed (proxy.ts will redirect).
+    // Depend on a STABLE identity (userId), not session.accessToken — the access token
+    // rotates on every refresh (~14 min), and keying the effect on it would tear down
+    // and re-establish the stream on every refresh for no reason.
+    if (!userId || refreshFailed) return;
 
     let es: EventSource | undefined;
     let cancelled = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let backoff = 1000;
 
-    // Exchange the bearer token for a short-lived, single-use ticket, then connect.
-    getSseTicket().then((ticket) => {
+    // Tickets are SINGLE-USE (the server redeems them with GETDEL). Native EventSource
+    // auto-reconnect re-requests the same ?ticket= URL, but that ticket is already
+    // consumed — so it would 401 in a loop. We must handle onerror ourselves: tear the
+    // connection down, mint a FRESH ticket, and reconnect with exponential backoff.
+    const connect = async () => {
       if (cancelled) return;
+
+      let ticket: string;
+      try {
+        ticket = await getSseTicket();
+      } catch {
+        retry = setTimeout(connect, backoff);
+        backoff = Math.min(backoff * 2, 30_000);
+        return;
+      }
+      if (cancelled) return;
+
       es = new EventSource(
         `${process.env.NEXT_PUBLIC_API_URL}/notifications/stream?ticket=${ticket}`,
       );
+      es.onopen = () => {
+        backoff = 1000; // reset backoff once the stream is healthy
+      };
       es.onmessage = (event) => {
         const { type, payload } = JSON.parse(event.data);
         handleNotification(type, payload);
       };
-      // Do NOT call es.close() on error — that permanently terminates the connection.
-      // Omitting onerror lets the browser auto-reconnect with exponential backoff.
-    });
+      es.onerror = () => {
+        // The current ticket is spent — close and reconnect with a new one.
+        es?.close();
+        if (cancelled) return;
+        retry = setTimeout(connect, backoff);
+        backoff = Math.min(backoff * 2, 30_000);
+      };
+    };
+
+    void connect();
 
     return () => {
       cancelled = true;
-      es?.close(); // cleanup only on unmount / token change
+      clearTimeout(retry);
+      es?.close(); // cleanup on unmount / sign-out
     };
-  }, [session?.accessToken, session?.error]);
+  }, [userId, refreshFailed]);
 }
 
 function handleNotification(type: string, payload: unknown) {
