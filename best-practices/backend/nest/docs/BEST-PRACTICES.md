@@ -9,29 +9,32 @@
 1. [Project Structure](#project-structure)
 2. [Modules](#modules)
 3. [Controllers](#controllers)
-4. [Services](#services)
-5. [DTOs & Validation](#dtos--validation)
-6. [Database & Repositories](#database--repositories)
-7. [Authentication & Authorization](#authentication--authorization)
-8. [Error Handling](#error-handling)
-9. [Configuration](#configuration)
-10. [Logging](#logging)
-11. [TypeScript Standards](#typescript-standards)
-12. [Testing](#testing)
-13. [Performance & Security](#performance--security)
-14. [Swagger / OpenAPI](#swagger--openapi)
-15. [Health Checks](#health-checks)
-16. [Graceful Shutdown](#graceful-shutdown)
-17. [Email Service](#email-service)
-18. [Queues & Background Jobs](#queues--background-jobs)
-19. [Scheduled Jobs](#scheduled-jobs)
-20. [File Storage — Cloudflare R2](#file-storage--cloudflare-r2)
-21. [Bot Protection — Cloudflare Turnstile](#bot-protection--cloudflare-turnstile)
-22. [Analytics — PostHog](#analytics--posthog)
-23. [Notifications — SSE](#notifications--sse)
-24. [API Response Shape & Pagination](#api-response-shape--pagination)
-25. [Observability — Error Tracking](#observability--error-tracking)
-26. [Dependency Isolation](#dependency-isolation)
+4. [API Versioning](#api-versioning)
+5. [Services](#services)
+6. [DTOs & Validation](#dtos--validation)
+7. [Database & Repositories](#database--repositories)
+8. [Authentication & Authorization](#authentication--authorization)
+9. [Error Handling](#error-handling)
+10. [Configuration](#configuration)
+11. [Logging](#logging)
+12. [Request Context & Correlation IDs](#request-context--correlation-ids)
+13. [TypeScript Standards](#typescript-standards)
+14. [Testing](#testing)
+15. [Performance & Security](#performance--security)
+16. [Swagger / OpenAPI](#swagger--openapi)
+17. [Health Checks](#health-checks)
+18. [Graceful Shutdown](#graceful-shutdown)
+19. [Email Service](#email-service)
+20. [Queues & Background Jobs](#queues--background-jobs)
+21. [Scheduled Jobs](#scheduled-jobs)
+22. [File Storage — Cloudflare R2](#file-storage--cloudflare-r2)
+23. [Bot Protection — Cloudflare Turnstile](#bot-protection--cloudflare-turnstile)
+24. [Analytics — PostHog](#analytics--posthog)
+25. [Notifications — SSE](#notifications--sse)
+26. [API Response Shape & Pagination](#api-response-shape--pagination)
+27. [Idempotency](#idempotency)
+28. [Observability — Error Tracking](#observability--error-tracking)
+29. [Dependency Isolation](#dependency-isolation)
 
 ---
 
@@ -145,7 +148,7 @@ export class FeatureService {
 
 - Controllers handle HTTP only: routing, input extraction, response shaping.
 - No business logic in controllers. Delegate everything to the service.
-- Always type the return value. Use a DTO or typed interface as the response shape.
+- Always type the return value. Return the entity/document and let `ClassSerializerInterceptor` strip `@Exclude()` fields; document the wire shape as `UserResponseDto` in Swagger (see [Swagger / OpenAPI](#swagger--openapi)).
 
 ```ts
 @Controller("users")
@@ -153,21 +156,63 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get(":id")
-  getUser(@Param("id", ParseUUIDPipe) id: string): Promise<UserResponseDto> {
+  getUser(@Param("id", ParseObjectIdPipe) id: string): Promise<UserDocument> {
     return this.usersService.findById(id);
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  createUser(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
+  createUser(@Body() dto: CreateUserDto): Promise<UserDocument> {
     return this.usersService.create(dto);
   }
 }
 ```
 
-- Use built-in pipes (`ParseUUIDPipe`, `ParseIntPipe`, `ParseEnumPipe`) for path/query params.
+- Use built-in pipes (`ParseIntPipe`, `ParseEnumPipe`, `ParseBoolPipe`) for primitive path/query params. **`ParseUUIDPipe` is for UUID primary keys (the PostgreSQL variant) — it rejects MongoDB `ObjectId`s.** For Mongo `_id` params, use a small custom `ParseObjectIdPipe`:
+
+```ts
+// common/pipes/parse-object-id.pipe.ts
+import { BadRequestException, Injectable, PipeTransform } from "@nestjs/common";
+import { isValidObjectId } from "mongoose";
+
+@Injectable()
+export class ParseObjectIdPipe implements PipeTransform<string, string> {
+  transform(value: string): string {
+    if (!isValidObjectId(value)) throw new BadRequestException(`Invalid id: ${value}`);
+    return value;
+  }
+}
+```
+
+- Validate `ObjectId` fields inside DTOs with `@IsMongoId()` (from `class-validator`) for the same reason.
 - Use `@HttpCode()` explicitly when the default status code is wrong.
 - Apply guards and interceptors at the controller or route level, not globally, when they are route-specific.
+
+---
+
+## API Versioning
+
+Version the API from day one so the contract can evolve without breaking existing clients (including the generated frontend types). Use **URI versioning** — explicit, cache-friendly, and visible in logs.
+
+```ts
+// main.ts
+import { VersioningType } from "@nestjs/common";
+
+app.enableVersioning({
+  type: VersioningType.URI, // /v1/users
+  defaultVersion: "1",
+});
+```
+
+```ts
+@Controller({ path: "users", version: "1" })
+export class UsersController {}
+```
+
+- Routes are then served under `/v1/...`. Set `defaultVersion` so unversioned controllers still resolve.
+- Bump the version only on a **breaking** change (removed field, changed type, different semantics). Additive changes (new optional field, new endpoint) stay on the current version.
+- Run versions side by side during a migration: keep `UsersV1Controller` and `UsersV2Controller` until clients move off v1, then delete v1.
+- Reflect the version in Swagger (`DocumentBuilder().setVersion(...)`) and regenerate the frontend types after any bump.
 
 ---
 
@@ -221,7 +266,7 @@ app.useGlobalPipes(
 );
 ```
 
-> `disableErrorMessages: true` in production prevents exposing validation field names and constraints to clients.
+> `disableErrorMessages: true` in production prevents exposing validation field names and constraints to clients. **Trade-off:** it also hides legitimate messages the UI may want to surface (e.g. "email is invalid"). If the frontend relies on per-field messages, keep them enabled and instead avoid leaking internals by using explicit, user-safe DTO messages — don't depend on `disableErrorMessages` as your only guard.
 
 ```ts
 // dto/create-user.dto.ts
@@ -396,8 +441,8 @@ export class AuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const token = request.headers.authorization?.split(" ")[1];
-    if (!token) throw new UnauthorizedException();
+    const [scheme, token] = request.headers.authorization?.split(" ") ?? [];
+    if (scheme !== "Bearer" || !token) throw new UnauthorizedException();
     try {
       request.user = await this.jwtService.verifyAsync(token);
     } catch {
@@ -419,6 +464,8 @@ Use when you need multiple strategies (local + JWT, OAuth, etc.) or are extendin
 const hash = await bcrypt.hash(plaintext, 12);
 ```
 
+> **`argon2id` is OWASP's current first recommendation** for new projects (memory-hard, more GPU/ASIC-resistant than bcrypt). Use `argon2` (`npm i argon2`) with the OWASP-suggested parameters (`memoryCost: 19456`, `timeCost: 2`, `parallelism: 1`); bcrypt at cost 12 remains acceptable. Whichever you pick, keep it behind the auth service so the algorithm is a one-place change — see [ADR-005](./DECISIONS.md).
+
 ### Authorization
 
 - Use Guards for authorization. Never check roles/permissions inside a service method.
@@ -428,7 +475,7 @@ const hash = await bcrypt.hash(plaintext, 12);
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 @Delete(":id")
-deleteUser(@Param("id", ParseUUIDPipe) id: string): Promise<void> {
+deleteUser(@Param("id", ParseObjectIdPipe) id: string): Promise<void> {
   return this.usersService.delete(id);
 }
 ```
@@ -575,6 +622,37 @@ const app = await NestFactory.create(AppModule, {
 - Use `bufferLogs: true` to capture early bootstrap log messages before the logger is set.
 - Log levels: use `error` for 5xx failures, `warn` for recoverable issues, `log` for significant business events, `debug` for development traces. Never log sensitive data (passwords, tokens, PII).
 - For advanced needs (Winston, Pino), create a custom logger that implements `LoggerService` and register it via `app.useLogger()`.
+
+---
+
+## Request Context & Correlation IDs
+
+Every log line and outbound call should be tied to the request that caused it. A correlation (request) ID makes a single request traceable across async boundaries, queue jobs, and downstream services.
+
+- Accept an inbound `X-Request-Id` (or generate one) at the edge and echo it back on the response.
+- Propagate it without threading it through every function signature using `AsyncLocalStorage` (Node's built-in request-scoped store). `nestjs-cls` wraps this cleanly:
+
+```bash
+npm install nestjs-cls
+```
+
+```ts
+// app.module.ts
+ClsModule.forRoot({
+  global: true,
+  middleware: {
+    mount: true,
+    generateId: true,
+    idGenerator: (req: Request) => (req.headers["x-request-id"] as string) ?? randomUUID(),
+    setup: (cls, req) => cls.set("requestId", cls.getId()),
+  },
+})
+```
+
+- Include the ID in every log line — with `nestjs-pino` set `genReqId` to the same value; with the built-in JSON logger, read it from CLS in a custom logger.
+- Forward it on outbound HTTP/queue calls (`X-Request-Id` header, or as job data) so the ID survives across service hops.
+- Set it as a Sentry tag (`Sentry.setTag("request_id", id)`) so an error links straight back to its logs.
+- Prefer this over a request-scoped (`Scope.REQUEST`) provider, which forces a new instance of the whole dependency chain per request and hurts throughput.
 
 ---
 
@@ -816,13 +894,27 @@ export class CreateUserDto {
 }
 ```
 
-- Use `@ApiResponse()` on controller methods to document possible status codes:
+- Declare a **response DTO** as the documented wire shape. This class is what `@ApiResponse({ type })` emits into the OpenAPI schema and what the frontend generates its `components["schemas"]["UserResponseDto"]` type from — so it must list exactly the fields the client receives (no `passwordHash`):
+
+```ts
+// dto/user-response.dto.ts
+import { ApiProperty } from "@nestjs/swagger";
+
+export class UserResponseDto {
+  @ApiProperty() id: string;
+  @ApiProperty({ example: "user@example.com" }) email: string;
+  @ApiProperty({ enum: Role }) role: Role;
+  @ApiProperty() createdAt: Date;
+}
+```
+
+- Use `@ApiResponse()` on controller methods to document possible status codes. The runtime return type stays `UserDocument` (serialized by `ClassSerializerInterceptor`); `type: UserResponseDto` documents the shape:
 
 ```ts
 @ApiResponse({ status: 201, description: "User created.", type: UserResponseDto })
 @ApiResponse({ status: 409, description: "Email already in use." })
 @Post()
-createUser(@Body() dto: CreateUserDto): Promise<UserResponseDto> { ... }
+createUser(@Body() dto: CreateUserDto): Promise<UserDocument> { ... }
 ```
 
 - Protect the docs endpoint in production — either disable it (`if (env !== "production")`) or guard it behind basic auth.
@@ -841,7 +933,7 @@ npm install @nestjs/terminus
 
 ```ts
 // health/health.module.ts
-import { TerminusModule, MongooseHealthIndicator } from "@nestjs/terminus";
+import { TerminusModule } from "@nestjs/terminus";
 
 @Module({
   imports: [TerminusModule],
@@ -1353,15 +1445,50 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
 }
 ```
 
+The stream itself can't be protected by the normal JWT guard: browsers' `EventSource` can't send an `Authorization` header. **Do not work around this by accepting the access token in the query string** — URLs leak into access logs and history. Instead issue a **short-lived, single-use ticket** from a normally-authenticated endpoint, and authenticate the stream with that ticket.
+
+```ts
+// notifications/sse-ticket.service.ts — mint & redeem one-time tickets in Redis
+@Injectable()
+export class SseTicketService {
+  constructor(@InjectRedis() private readonly redis: Redis) {}
+
+  async issue(userId: string): Promise<string> {
+    const ticket = randomUUID();
+    await this.redis.set(`sse:ticket:${ticket}`, userId, "EX", 30); // 30s TTL
+    return ticket;
+  }
+
+  async redeem(ticket: string): Promise<string> {
+    // GETDEL is atomic — a ticket can be consumed exactly once.
+    const userId = await this.redis.getdel(`sse:ticket:${ticket}`);
+    if (!userId) throw new UnauthorizedException("Invalid or expired SSE ticket");
+    return userId;
+  }
+}
+```
+
 ```ts
 // notifications/notifications.controller.ts
 @Controller("notifications")
 export class NotificationsController {
-  constructor(private readonly notifications: NotificationsService) {}
+  constructor(
+    private readonly notifications: NotificationsService,
+    private readonly tickets: SseTicketService,
+  ) {}
 
+  // Normal JWT guard applies (header-authenticated via the frontend apiClient).
+  @Post("ticket")
+  issueTicket(@CurrentUser() user: JwtPayload): Promise<{ ticket: string }> {
+    return this.tickets.issue(user.sub).then((ticket) => ({ ticket }));
+  }
+
+  // Public to the JWT guard (@Public) — authenticated by the one-time ticket instead.
+  @Public()
   @Sse("stream")
-  stream(@CurrentUser() user: JwtPayload): Observable<MessageEvent> {
-    return this.notifications.subscribe(user.sub);
+  async stream(@Query("ticket") ticket: string): Promise<Observable<MessageEvent>> {
+    const userId = await this.tickets.redeem(ticket);
+    return this.notifications.subscribe(userId);
   }
 }
 ```
@@ -1449,6 +1576,43 @@ async findAll(query: PaginationQueryDto): Promise<Paginated<UserDocument>> {
 
 ---
 
+## Idempotency
+
+A client that retries a `POST` after a timeout (or a flaky network) must not create a duplicate resource or charge a card twice. Make state-changing, non-idempotent endpoints **safe to retry** with an idempotency key — the standard pattern for payments, signups, and order creation.
+
+- The client sends a unique `Idempotency-Key` header (a UUID) per logical operation. Retries reuse the **same** key.
+- The server stores the key with the result; a repeat with the same key returns the stored response instead of re-executing.
+
+```ts
+// common/interceptors/idempotency.interceptor.ts — sketch
+@Injectable()
+export class IdempotencyInterceptor implements NestInterceptor {
+  constructor(@InjectRedis() private readonly redis: Redis) {}
+
+  async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<unknown>> {
+    const req = context.switchToHttp().getRequest<Request>();
+    const key = req.headers["idempotency-key"] as string | undefined;
+    if (!key || req.method !== "POST") return next.handle();
+
+    const cacheKey = `idem:${key}`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return of(JSON.parse(cached)); // replay stored response
+
+    return next.handle().pipe(
+      // Store for 24h. Use SET NX + a "processing" marker to also reject concurrent in-flight retries.
+      tap((body) => this.redis.set(cacheKey, JSON.stringify(body), "EX", 86_400)),
+    );
+  }
+}
+```
+
+- Scope keys per user/route so one client can't replay another's response.
+- Set a TTL (24h is typical) — keys are short-lived retry guards, not permanent history.
+- Guard against the race where two retries arrive before the first finishes: write a `processing` marker with `SET NX` and return `409 Conflict` while it's in flight.
+- This complements, but does not replace, a unique DB constraint (e.g. `unique` on `email`) — the constraint is the last line of defence.
+
+---
+
 ## Observability — Error Tracking
 
 Structured logging records *what happened*; error tracking captures *unhandled failures with full context* (stack, request, release) and alerts on them. Use **Sentry**.
@@ -1498,9 +1662,10 @@ Every swappable third-party integration lives behind a NestJS provider (a servic
 | Bot check | `TurnstileService` | Cloudflare HTTP API |
 | Cache | `CacheModule` factory | Keyv / Redis |
 | Config & secrets | `ConfigService` | `process.env` |
-| Database | repositories/models in services | Mongoose / TypeORM |
+
+> **The persistence library is deliberately *not* behind a port.** Services inject the Mongoose `Model` / TypeORM `Repository` directly — swapping Mongoose↔TypeORM is a documented stack migration (you change the whole `BEST-PRACTICES` variant), not a runtime swap, so an abstraction over it would be premature indirection. If a project genuinely needs storage-engine independence, introduce a repository interface + token then — not by default.
 
 **Rules:**
 - Never instantiate an SDK client outside its provider. Never read `process.env` outside the config factory.
 - When more than one implementation is realistic, inject an **interface + token** (like `MAIL_PROVIDER`) so the binding is a one-line change and the dependency is trivially mockable in tests.
-- **Do not over-wrap.** This applies to libraries with a real chance of replacement (email, storage, analytics, payments, SMS). Wrapping the framework itself or a dependency you will never swap is premature indirection — it adds cost for no benefit.
+- **Do not over-wrap.** This applies to libraries with a real chance of replacement (email, storage, analytics, payments, SMS). Wrapping the framework itself or a dependency you will never swap (the ORM, the DI container) is premature indirection — it adds cost for no benefit.

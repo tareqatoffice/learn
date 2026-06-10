@@ -52,6 +52,8 @@ Key technology and pattern choices with the reasoning behind each. Understanding
 
 **Why**: bcrypt is purpose-built for password hashing — slow by design, resistant to GPU attacks, automatically salted. Cost factor 12 balances security (~200–300ms per hash on modern hardware, slow enough to hinder brute-force) with performance. Async form is mandatory — `bcrypt.hashSync` blocks the event loop, degrading all concurrent requests during a hash.
 
+**Considered — `argon2id`**: OWASP's current *first* recommendation (memory-hard, more resistant to GPU/ASIC attacks than bcrypt). Equally valid for new projects via the `argon2` package with OWASP parameters (`memoryCost: 19456`, `timeCost: 2`, `parallelism: 1`). bcrypt is kept as the documented default for its ubiquity and zero-config maturity; argon2id is the recommended upgrade where the dependency is acceptable. Keep whichever you choose behind the auth service so the algorithm is a one-place swap.
+
 **Alternatives rejected**: MD5/SHA1/SHA256 — not designed for password hashing, computable at billions/second on consumer GPUs.
 
 ---

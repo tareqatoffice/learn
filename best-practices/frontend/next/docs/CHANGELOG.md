@@ -6,6 +6,10 @@ Entry format: `type — description`, where `type` is one of `added`, `changed`,
 
 ---
 
+## 2026-06-10
+
+- changed — SSE (`useNotifications`) no longer passes the access token in the URL (`?token=<jwt>`), which leaks into access logs, history, and `Referer`. It now exchanges the bearer token for a short-lived single-use ticket via an authenticated `apiClient` call and connects with `?ticket=`. Noted `@microsoft/fetch-event-source` as the header-supporting alternative. Backend SSE section updated to issue/redeem the ticket.
+
 ## 2026-06-09
 
 - added — Sentry to the `CLAUDE.md` Stack Versions list ("optional observability for production") so the cheat-sheet matches the Observability section in `BEST-PRACTICES.md`.

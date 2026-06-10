@@ -35,14 +35,15 @@ This project follows strict backend coding standards. Before writing or reviewin
 | Topic | Rule |
 |---|---|
 | Structure | One module per feature. Controllers, services, DTOs, entities all scoped to their module. |
-| Controllers | HTTP concerns only. No business logic. Always type return values. |
+| Controllers | HTTP concerns only. No business logic. Always type return values. Mongo `_id` params use `ParseObjectIdPipe` (not `ParseUUIDPipe`). |
+| Versioning | URI versioning (`enableVersioning`, `/v1/...`) from day one. Bump only on breaking changes. |
 | Services | All business logic lives here. No HTTP types (`Request`, `@Req`) in services. |
 | Validation | `ValidationPipe` globally with `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true`. |
 | DTOs | Every request body/query has a DTO with `class-validator` decorators. |
 | Responses | Use `@Exclude()` on sensitive entity fields. Enable `ClassSerializerInterceptor` globally. |
 | Pagination | List endpoints return `{ data, meta }`. `PaginationQueryDto` — `page` / `limit` (max 100) / `sort` / `order`. Single resource returned bare. |
 | Database | Mongoose Model pattern. `@InjectModel`. `.lean()` for reads. Sessions for multi-doc transactions. |
-| Auth | JWT (short-lived) + refresh tokens. `@Public()` decorator for open routes. Guards for roles. |
+| Auth | JWT (short-lived) + refresh tokens. `@Public()` decorator for open routes. Guards for roles. Hash with `bcrypt` (cost 12) or `argon2id`. |
 | Errors | NestJS HTTP exceptions from services. Global `HttpExceptionFilter`. Never leak stack traces. |
 | Config | `@nestjs/config` only. No direct `process.env` in services/controllers. Validate at startup. |
 | TypeScript | `strict: true`. No `any`. Explicit return types on all public methods. |
@@ -52,7 +53,9 @@ This project follows strict backend coding standards. Before writing or reviewin
 | Files | Presigned URL → Cloudflare R2. Store key only. Serve via custom domain. |
 | Bot protection | `TurnstileGuard` on login, register, forgot-password. Invisible widget. |
 | Analytics | PostHog Node SDK. `capture()` on business events. `shutdown()` on destroy. |
-| Notifications | `@Sse()` + Redis pub/sub for multi-instance fan-out. |
+| Notifications | `@Sse()` + Redis pub/sub for multi-instance fan-out. Auth the stream with a short-lived single-use ticket — never the token in `?token=`. |
+| Idempotency | `Idempotency-Key` header on retry-unsafe `POST`s (payments, signup). Store result in Redis with TTL; replay on repeat. |
+| Observability | Sentry for unhandled errors (4xx filtered). Correlation ID per request via `nestjs-cls` (`AsyncLocalStorage`) in every log line. |
 | CI/CD | Conventional Commits · GitHub Actions · Docker → GHCR → SSH deploy. |
 | Dependency isolation | Every third-party SDK behind a provider (`MailProvider`, `FilesService`, `AnalyticsService`…). Never instantiate an SDK or read `process.env` outside its wrapper. Don't over-wrap. |
 | Dev tooling | Prettier + ESLint (`eslint-config-prettier`). Husky: `lint-staged` pre-commit, commitlint commit-msg, typecheck + test + build pre-push. |

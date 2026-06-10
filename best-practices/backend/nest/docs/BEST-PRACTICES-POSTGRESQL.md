@@ -2,7 +2,9 @@
 
 > Stack: NestJS v11 · Node.js >= 20 · PostgreSQL · `@nestjs/typeorm` v11 · TypeORM `^0.3` · `@nestjs/jwt` v11 · `@nestjs/passport` v11
 
-All non-database sections (Modules, Controllers, Services, DTOs & Validation, Auth, Error Handling, Configuration, Logging, TypeScript Standards, Security, Swagger / OpenAPI, Health Checks, Graceful Shutdown) follow the same rules as the [MongoDB best practices](./BEST-PRACTICES.md). This file covers what differs: the **database layer** and **testing**.
+All non-database sections (Modules, Controllers, Services, DTOs & Validation, API Versioning, Auth, Error Handling, Configuration, Logging, Request Context & Correlation IDs, TypeScript Standards, Security, Swagger / OpenAPI, Health Checks, Graceful Shutdown, Idempotency) follow the same rules as the [MongoDB best practices](./BEST-PRACTICES.md). This file covers what differs: the **database layer** and **testing**.
+
+> **One controller-level difference:** primary keys are UUIDs here, so use the **built-in `ParseUUIDPipe`** for id params (`@Param("id", ParseUUIDPipe)`) and `@IsUUID()` on DTOs — not the Mongo `ParseObjectIdPipe` / `@IsMongoId()` shown in the base. The base's `MongooseHealthIndicator` becomes `TypeOrmHealthIndicator` (`() => this.db.pingCheck("database")`) in the health check.
 
 ---
 

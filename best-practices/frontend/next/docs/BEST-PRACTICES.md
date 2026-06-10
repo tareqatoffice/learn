@@ -1497,12 +1497,25 @@ async function verifyTurnstile(token: string, ip?: string) {
 
 `EventSource` opens a persistent connection to the NestJS SSE endpoint. The browser auto-reconnects on drop.
 
+> **Never put the access token in the URL** (`?token=<jwt>`). `EventSource` can't send an `Authorization` header, but URLs leak into server/proxy access logs, browser history, and `Referer` — a long-lived bearer token there is a real exposure. Instead, exchange it for a **short-lived, single-use SSE ticket**: call an authenticated endpoint through `apiClient` (which sends the bearer header normally), get back a ~30s one-time ticket, and pass *that* in the query string. The backend validates and immediately consumes the ticket. (Alternative: `@microsoft/fetch-event-source`, which is a `fetch`-based SSE client that *does* support headers — use it if you'd rather send the bearer token directly and skip the ticket round-trip.)
+
+```ts
+// lib/api/notifications.ts — authenticated ticket request (bearer header via apiClient)
+import { apiClient } from "./client";
+
+export async function getSseTicket(): Promise<string> {
+  const { data } = await apiClient.post<{ ticket: string }>("/notifications/ticket");
+  return data.ticket;
+}
+```
+
 ```ts
 // hooks/useNotifications.ts
 "use client";
 import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { notify } from "@/lib/notify";
+import { getSseTicket } from "@/lib/api/notifications";
 
 export function useNotifications() {
   const { data: session } = useSession();
@@ -1511,20 +1524,27 @@ export function useNotifications() {
     // Stop if unauthenticated or if token refresh failed (proxy.ts will redirect)
     if (!session?.accessToken || session.error === "RefreshAccessTokenError") return;
 
-    // EventSource doesn't support headers — pass token as query param
-    const es = new EventSource(
-      `${process.env.NEXT_PUBLIC_API_URL}/notifications/stream?token=${session.accessToken}`,
-    );
+    let es: EventSource | undefined;
+    let cancelled = false;
 
-    es.onmessage = (event) => {
-      const { type, payload } = JSON.parse(event.data);
-      handleNotification(type, payload);
+    // Exchange the bearer token for a short-lived, single-use ticket, then connect.
+    getSseTicket().then((ticket) => {
+      if (cancelled) return;
+      es = new EventSource(
+        `${process.env.NEXT_PUBLIC_API_URL}/notifications/stream?ticket=${ticket}`,
+      );
+      es.onmessage = (event) => {
+        const { type, payload } = JSON.parse(event.data);
+        handleNotification(type, payload);
+      };
+      // Do NOT call es.close() on error — that permanently terminates the connection.
+      // Omitting onerror lets the browser auto-reconnect with exponential backoff.
+    });
+
+    return () => {
+      cancelled = true;
+      es?.close(); // cleanup only on unmount / token change
     };
-
-    // Do NOT call es.close() on error — that permanently terminates the connection.
-    // Omitting onerror lets the browser auto-reconnect with exponential backoff.
-
-    return () => es.close(); // cleanup only on unmount / token change
   }, [session?.accessToken, session?.error]);
 }
 

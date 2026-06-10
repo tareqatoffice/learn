@@ -6,6 +6,19 @@ Entry format: `type — description`, where `type` is one of `added`, `changed`,
 
 ---
 
+## 2026-06-10
+
+- fixed — Controllers used `ParseUUIDPipe` on MongoDB `_id` params, which rejects valid `ObjectId`s. Replaced with a custom `ParseObjectIdPipe` (and `@IsMongoId()` for DTOs); noted that `ParseUUIDPipe` belongs to the PostgreSQL/UUID variant.
+- fixed — Controller return types referenced an undefined `UserResponseDto` while services returned `UserDocument` (type mismatch). Controllers now return `UserDocument`; added a defined `UserResponseDto` response class in the Swagger section as the documented wire shape the frontend generates from.
+- fixed — Auth guard now checks the `Bearer` scheme (not just `split(" ")[1]`); removed the unused `MongooseHealthIndicator` import from the health module example.
+- added — "API Versioning" section (URI versioning via `enableVersioning`, bump-on-breaking-change policy).
+- added — "Request Context & Correlation IDs" section (`nestjs-cls` / `AsyncLocalStorage`, propagation to logs, Sentry, outbound calls).
+- added — "Idempotency" section (`Idempotency-Key` header, Redis-backed replay, concurrent-retry guard) for retry-unsafe `POST`s.
+- changed — SSE stream is now authenticated with a short-lived single-use Redis ticket (`SseTicketService`, atomic `GETDEL`) instead of the access token in the query string, which leaks into logs/history. Frontend updated in lockstep.
+- changed — ADR-005 + Auth section now document `argon2id` (OWASP's first recommendation) as the equal-footing alternative to bcrypt; bcrypt stays the default.
+- changed — Dependency Isolation table: removed the misleading "Database" row and added a note that the ORM is deliberately *not* behind a port (DIP applied where a runtime swap is realistic, not to the persistence library).
+- changed — `disableErrorMessages` note now flags the UX trade-off (it also hides legitimate field messages).
+
 ## 2026-06-09
 
 - added — "Dependency Isolation" section + ADR-010: every third-party SDK lives behind a provider/port (the email `MailProvider` is the reference); call sites never touch the SDK or `process.env`. Includes a "don't over-wrap" caveat.

@@ -51,7 +51,7 @@ This project follows strict frontend coding standards. Before writing or reviewi
 | Auth | Auth.js v5 (NextAuth). Credentials → NestJS. JWT in encrypted session. `proxy.ts` (renamed from `middleware.ts` in Next 16) protects routes. |
 | Bot protection | Invisible Turnstile (`appearance: "interaction-only"`). Disable submit until token ready. |
 | Analytics | PostHog JS. `PostHogProvider` at root. `PostHogPageView` for App Router. `useIdentifyUser` hook. |
-| Notifications | `EventSource` with `?token=` query param. `useNotifications` hook. Mount at root layout. |
+| Notifications | `EventSource` authed with a short-lived single-use ticket (never the token in `?token=`). `useNotifications` hook. Mount at root layout. |
 | CI/CD | Conventional Commits · GitHub Actions · Docker standalone → GHCR → SSH deploy. |
 | Dependency isolation | Swappable libs behind a `lib/` wrapper (`lib/api` axios, `lib/notify` Sonner, `lib/analytics` PostHog). Import the wrapper, never the package. Excludes Tailwind/framework. |
 | Dev tooling | Prettier (+ `prettier-plugin-tailwindcss`) + ESLint (`eslint-config-prettier`). Husky: `lint-staged` pre-commit, commitlint commit-msg, typecheck + test + build pre-push. |
