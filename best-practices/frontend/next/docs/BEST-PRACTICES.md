@@ -1719,8 +1719,8 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       // Turnstile renders inside an iframe — without frame-src the challenge is blocked.
       "frame-src 'self' https://challenges.cloudflare.com",
-      // API + the origins the documented stack actually calls (PostHog ingestion, Sentry).
-      `connect-src 'self' ${process.env.NEXT_PUBLIC_API_URL ?? ""} https://us.i.posthog.com https://*.ingest.sentry.io`,
+      // API + the origins the documented stack actually calls (Turnstile, PostHog ingestion, Sentry).
+      `connect-src 'self' ${process.env.NEXT_PUBLIC_API_URL ?? ""} https://challenges.cloudflare.com https://us.i.posthog.com https://*.ingest.sentry.io`,
     ].join("; "),
   },
 ];
@@ -1735,7 +1735,7 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 ```
 
-- The directives above already cover the documented stack (Turnstile in `script-src`/`frame-src`, PostHog + Sentry in `connect-src`). Adjust the PostHog/Sentry hosts to your region/DSN, and add any other origin your app calls — start strict, widen only as needed. (`X-Frame-Options: DENY` is unaffected — it controls who may frame *your* pages, not the iframes you embed, so it does not block Turnstile.)
+- The directives above already cover the documented stack (Turnstile in `script-src`/`frame-src`/`connect-src`, PostHog + Sentry in `connect-src`). Adjust the PostHog/Sentry hosts to your region/DSN, and add any other origin your app calls — start strict, widen only as needed. (`X-Frame-Options: DENY` is unaffected — it controls who may frame *your* pages, not the iframes you embed, so it does not block Turnstile.)
 - `'unsafe-inline'` on `script-src` is a pragmatic default; for a hardened CSP, generate a per-request nonce in `proxy.ts` and drop `'unsafe-inline'`.
 - HSTS only takes effect over HTTPS — browsers ignore it on `http://localhost`, so it is safe to leave enabled.
 

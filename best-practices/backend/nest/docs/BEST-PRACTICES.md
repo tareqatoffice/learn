@@ -1727,6 +1727,9 @@ import { NestFactory } from "@nestjs/core";
 
 ```ts
 // app.module.ts
+import { APP_FILTER } from "@nestjs/core";
+import { SentryGlobalFilter } from "@sentry/nestjs/setup"; // NOT "@sentry/nestjs"
+
 providers: [
   { provide: APP_FILTER, useClass: SentryGlobalFilter }, // first — reports to Sentry, then delegates
   { provide: APP_FILTER, useClass: HttpExceptionFilter }, // shapes the client-facing response
