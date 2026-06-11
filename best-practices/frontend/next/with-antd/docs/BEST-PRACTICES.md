@@ -42,6 +42,8 @@ project-root/
 │   └── copilot-instructions.md  # → CLAUDE.md  (GitHub Copilot)
 ├── .env.example                 # Every env var, keys only — committed
 ├── .nvmrc                       # Pinned Node version
+├── auth.ts                      # Auth.js v5 config — exports { handlers, auth, signIn, signOut }
+├── proxy.ts                     # Route protection (Next 16 — replaces middleware.ts)
 ├── docs/
 │   ├── BEST-PRACTICES.md        # This file
 │   ├── CICD.md                  # CI/CD & git workflow
@@ -75,12 +77,14 @@ project-root/
 │           │   └── error.tsx    # Segment-scoped error boundary
 │           └── error.tsx
 ├── components/
-│   ├── ui/                      # Generic, reusable primitives (shadcn)
+│   ├── ui/                      # Generic, reusable app-owned primitives
 │   └── features/                # Feature-scoped components
 ├── hooks/                       # Custom React hooks
 ├── lib/
-│   ├── api/                     # Axios instance + per-domain fetch functions
+│   ├── api/                     # Axios instance + per-domain fetch functions (client-only)
 │   │   ├── client.ts            # axios instance, interceptors
+│   │   └── users.ts
+│   ├── server/                  # "server-only" data functions for Server Components
 │   │   └── users.ts
 │   ├── antdTheme.ts             # AntD ThemeConfig — single source of truth for tokens
 │   └── utils.ts                 # cn() and other pure utilities
@@ -107,19 +111,39 @@ project-root/
 ```tsx
 // Good — Server Component prefetches into the cache; Client Component reads from it
 // app/users/page.tsx
-import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { UserTable } from "@/components/features/UserTable";
-import { getUsers } from "@/lib/api/users";
+import { getQueryClient } from "@/lib/queryClient";
+import { getUsersServer } from "@/lib/server/users";
 import { userKeys } from "@/queries/users.keys";
 
 export default async function UsersPage() {
-  const queryClient = new QueryClient();
-  await queryClient.prefetchQuery({ queryKey: userKeys.lists(), queryFn: getUsers });
+  const queryClient = getQueryClient(); // per-request client — see React Query Setup
+  await queryClient.prefetchQuery({ queryKey: userKeys.lists(), queryFn: getUsersServer });
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <UserTable />
     </HydrationBoundary>
   );
+}
+```
+
+The prefetch goes through a **server-only** data module — never the client axios layer (`lib/api/*`), whose interceptor reads the session via `getSession()` and only works in the browser; importing it here compiles but silently prefetches unauthenticated. The `import "server-only"` marker turns that mistake into a build error:
+
+```ts
+// lib/server/users.ts — server-side data layer for Server Components
+import "server-only";
+import { auth } from "@/auth";
+import type { User } from "@/types/user";
+
+export async function getUsersServer(): Promise<User[]> {
+  const session = await auth();
+  if (!session) throw new Error("Unauthorized"); // proxy.ts is optimistic — re-verify here
+  const res = await fetch(`${process.env.API_URL}/users`, {
+    headers: { Authorization: `Bearer ${session.accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Failed to load users (${res.status})`);
+  return res.json();
 }
 ```
 
@@ -129,6 +153,7 @@ export default async function UsersPage() {
 
 - Use `<Link>` for all internal navigation. Never `<a>`.
 - Use `useRouter().push()` for programmatic navigation inside Client Components only. Import `useRouter` from `next/navigation`, not `next/router` (Pages Router).
+- Enable typed routes (`typedRoutes: true` in `next.config.ts`) so `<Link href>` and `router.push()` are type-checked. Run `npx next typegen` to regenerate the route types without a full build.
 - In Next.js 15+, `params` and `searchParams` are Promises. Always type and await them:
 
 ```tsx
@@ -176,6 +201,7 @@ export default function Page() {
 ```
 
 - Wrap components that use runtime APIs (`cookies()`, `headers()`, `searchParams`) in `<Suspense>` so they don't block the static shell.
+- Use `connection()` from `next/server` when a component must wait for an incoming request (e.g. fresh randomness or time) without reading `cookies()`/`headers()` — it marks the component dynamic the same way.
 
 ### Caching & Revalidation
 
@@ -198,7 +224,7 @@ export async function getProducts() {
 }
 ```
 
-- `revalidateTag("products", "max")` — stale-while-revalidate (use in Server Actions or Route Handlers). In Next.js 16 the cache-profile second arg drives SWR behaviour; the single-arg `revalidateTag("products")` form is deprecated and now does a blocking expire (without `updateTag`'s read-your-writes refresh).
+- `revalidateTag("products", "max")` — stale-while-revalidate (use in Server Actions or Route Handlers). In Next.js 16 the cache-profile second arg drives SWR behaviour; the single-arg `revalidateTag("products")` form is deprecated and now performs a blocking expire. Unlike `updateTag`, it does not also refresh the data within the same request — when the user must immediately see their own write, use `updateTag` in the Server Action.
 - `updateTag("products")` — immediately expires the cache, user sees their change right away (Server Actions only).
 - Prefer tag-based invalidation over `revalidatePath` — it is more precise.
 
@@ -236,16 +262,34 @@ export const getUser = cache(async (id: string) => db.users.findById(id));
 
 ### Server Actions
 
-- Use Server Actions for form submissions and mutations that don't need optimistic UI.
+- Use Server Actions for form submissions and mutations. For optimistic UI, pair them with `useOptimistic` (below).
+- **Re-verify the session in every action.** `proxy.ts` is an optimistic, UX-level check that can be bypassed (cf. CVE-2025-29927) — every Server Action and server data function is a public endpoint and must check auth itself. Use a shared helper; see the [Next.js data security guide](https://nextjs.org/docs/app/guides/data-security).
 - Validate all input with Zod before any database or API call.
+
+```ts
+// lib/server/requireUser.ts — shared session guard for actions & server data functions
+import "server-only";
+import { unauthorized } from "next/navigation";
+import { auth } from "@/auth";
+
+export async function requireUser() {
+  const session = await auth();
+  // Renders app/unauthorized.tsx (requires experimental.authInterrupts in next.config.ts).
+  // Without the flag, throw instead — an auth failure is not a validation error.
+  if (!session?.user) unauthorized();
+  return session;
+}
+```
 
 ```ts
 "use server";
 import { z } from "zod";
+import { requireUser } from "@/lib/server/requireUser";
 
 const schema = z.object({ name: z.string().min(1) });
 
-export async function createItem(formData: FormData) {
+export async function createItem(_prevState: unknown, formData: FormData) {
+  await requireUser(); // never trust proxy.ts alone
   const parsed = schema.safeParse({ name: formData.get("name") });
   if (!parsed.success) return { success: false as const, errors: parsed.error.flatten() };
   // ... perform action
@@ -254,6 +298,38 @@ export async function createItem(formData: FormData) {
 ```
 
 > Never `throw` on validation failure inside a Server Action. A thrown error propagates to the nearest `error.tsx` boundary — a full-page crash screen. Return a structured result object instead so the calling component can display inline field errors.
+
+**Consume results with the React 19 form hooks** — don't hand-roll pending/result state:
+
+```tsx
+"use client";
+import { useActionState } from "react";
+import { Alert, Button } from "antd";
+import { createItem } from "@/app/items/actions";
+
+export function CreateItemForm() {
+  // useActionState expects the (prevState, formData) signature used above
+  const [result, formAction, isPending] = useActionState(createItem, null);
+  return (
+    <form action={formAction}>
+      {/* fields */}
+      {result && !result.success && <Alert type="error" message="Please fix the highlighted fields." />}
+      <Button type="primary" htmlType="submit" loading={isPending}>Create</Button>
+    </form>
+  );
+}
+```
+
+> A form that posts to a Server Action via `action={...}` is a native `<form>` — AntD `Form` drives `onFinish`, which pairs with client-side mutations instead. AntD inputs and buttons still work inside a native form.
+
+- `useFormStatus()` reads the pending state of the nearest parent `<form>` — use it inside shared submit-button components instead of prop-drilling `isPending`.
+- `useOptimistic` handles optimistic UI for Server Actions: render the optimistic value immediately; React reverts it automatically if the action fails.
+- Run post-response side effects (analytics capture, audit logging) with `after()` from `next/server` — it executes after the response has streamed, so it never delays the user.
+
+**Hardening:**
+
+- Behind a reverse proxy or multi-domain setup, set `serverActions.allowedOrigins` in `next.config.ts` so actions can't be invoked cross-origin.
+- Closure variables captured by inline actions are encrypted but still round-trip through the client; bound arguments (`.bind(null, value)`) are serialized to the client **unencrypted**. Never put secrets in either.
 
 ### Metadata & SEO
 
@@ -303,6 +379,7 @@ export const getPost = cache(async (slug: string) => db.posts.findBySlug(slug));
 | `robots.txt` | Crawler rules |
 | `sitemap.xml` | Sitemap for search engines |
 
+- Prefer the dynamic conventions `app/robots.ts` and `app/sitemap.ts` (returning `MetadataRoute.Robots` / `MetadataRoute.Sitemap`) over the static files when routes are data-driven.
 - Generate dynamic OG images per route with `opengraph-image.tsx` and `ImageResponse`:
 
 ```tsx
@@ -337,18 +414,18 @@ Automatically wraps the segment's `page.tsx` in a `<Suspense>` boundary. Shown w
 
 ```tsx
 // app/(dashboard)/dashboard/loading.tsx
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "antd";
 
 export default function DashboardLoading() {
   return (
     <div className="space-y-4 p-6">
-      <Skeleton className="h-8 w-48" />
+      <Skeleton.Input active size="large" />
       <div className="grid grid-cols-3 gap-4">
-        <Skeleton className="h-32 rounded-xl" />
-        <Skeleton className="h-32 rounded-xl" />
-        <Skeleton className="h-32 rounded-xl" />
+        <Skeleton.Node active style={{ width: "100%", height: 128 }} />
+        <Skeleton.Node active style={{ width: "100%", height: 128 }} />
+        <Skeleton.Node active style={{ width: "100%", height: 128 }} />
       </div>
-      <Skeleton className="h-64 rounded-xl" />
+      <Skeleton active paragraph={{ rows: 6 }} />
     </div>
   );
 }
@@ -356,17 +433,13 @@ export default function DashboardLoading() {
 
 ```tsx
 // app/(dashboard)/[resource]/[id]/loading.tsx — detail page skeleton
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "antd";
 
 export default function DetailLoading() {
   return (
     <div className="space-y-6 p-6">
-      <Skeleton className="h-9 w-64" />
-      <div className="space-y-3">
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-3/4" />
-      </div>
+      <Skeleton.Input active size="large" />
+      <Skeleton active title={false} paragraph={{ rows: 3 }} />
     </div>
   );
 }
@@ -381,7 +454,7 @@ Must be a `"use client"` component — React error boundaries require client-sid
 "use client";
 
 import { useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, Result } from "antd";
 
 interface ErrorProps {
   error: Error & { digest?: string };
@@ -395,13 +468,16 @@ export default function SegmentError({ error, reset }: ErrorProps) {
   }, [error]);
 
   return (
-    <div className="flex flex-col items-center justify-center gap-4 p-12 text-center">
-      <h2 className="text-xl font-semibold">Something went wrong</h2>
-      <p className="text-sm text-muted-foreground max-w-md">
-        {error.message || "An unexpected error occurred. Please try again."}
-      </p>
-      <Button onClick={reset}>Try again</Button>
-    </div>
+    <Result
+      status="500"
+      title="Something went wrong"
+      subTitle={error.message || "An unexpected error occurred. Please try again."}
+      extra={
+        <Button type="primary" onClick={reset}>
+          Try again
+        </Button>
+      }
+    />
   );
 }
 ```
@@ -411,29 +487,32 @@ export default function SegmentError({ error, reset }: ErrorProps) {
 "use client";
 
 import { useEffect } from "react";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { Button, Result } from "antd";
 
 export default function RootError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => { console.error(error); }, [error]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 text-center">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold">Something went wrong</h1>
-        <p className="text-muted-foreground">
-          We encountered an unexpected error. Our team has been notified.
-        </p>
-        {error.digest && (
-          <p className="text-xs text-muted-foreground font-mono">Error ID: {error.digest}</p>
-        )}
-      </div>
-      <div className="flex gap-3">
-        <Button onClick={reset}>Try again</Button>
-        <Button variant="outline" asChild>
-          <Link href="/">Go home</Link>
-        </Button>
-      </div>
+    <div className="flex min-h-screen items-center justify-center">
+      <Result
+        status="500"
+        title="Something went wrong"
+        subTitle={
+          <>
+            We encountered an unexpected error. Our team has been notified.
+            {error.digest && <div className="mt-2 font-mono text-xs">Error ID: {error.digest}</div>}
+          </>
+        }
+        extra={[
+          <Button key="retry" type="primary" onClick={reset}>
+            Try again
+          </Button>,
+          <Button key="home">
+            <Link href="/">Go home</Link>
+          </Button>,
+        ]}
+      />
     </div>
   );
 }
@@ -446,21 +525,21 @@ Rendered when `notFound()` is called anywhere within the segment tree, or when t
 ```tsx
 // app/not-found.tsx
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button, Result } from "antd";
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 text-center">
-      <div className="space-y-2">
-        <h1 className="text-6xl font-bold text-muted-foreground">404</h1>
-        <h2 className="text-2xl font-semibold">Page not found</h2>
-        <p className="text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
-        </p>
-      </div>
-      <Button asChild>
-        <Link href="/">Go home</Link>
-      </Button>
+    <div className="flex min-h-screen items-center justify-center">
+      <Result
+        status="404"
+        title="Page not found"
+        subTitle="The page you're looking for doesn't exist or has been moved."
+        extra={
+          <Button type="primary">
+            <Link href="/">Go home</Link>
+          </Button>
+        }
+      />
     </div>
   );
 }
@@ -488,7 +567,21 @@ Replaces the entire root layout (including `app/layout.tsx`) when it itself thro
 // app/global-error.tsx
 "use client";
 
-export default function GlobalError({ reset }: { reset: () => void }) {
+import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
+
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  useEffect(() => {
+    // Nothing else can report this — the root layout (and its providers) crashed.
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <html lang="en">
       <body>
@@ -531,7 +624,7 @@ export default function GlobalError({ reset }: { reset: () => void }) {
 }
 ```
 
-> `global-error.tsx` renders without `app/layout.tsx` — your `globals.css` and all CSS custom properties (shadcn/ui theme tokens, Tailwind `@theme` values) may not be loaded. Use plain inline styles only.
+> `global-error.tsx` renders without `app/layout.tsx` — your `globals.css`, the AntD registry/`ConfigProvider`, and Tailwind `@theme` tokens are not loaded. Use plain inline styles only — no AntD components or Tailwind classes here.
 
 ### Coverage rules
 
@@ -542,18 +635,21 @@ export default function GlobalError({ reset }: { reset: () => void }) {
 | `not-found.tsx` | `app/` root | Once — covers all `notFound()` calls |
 | `global-error.tsx` | `app/` root | Once — last-resort only |
 
+> With `experimental.authInterrupts` enabled in `next.config.ts`, two more special files join this list: `unauthorized.tsx` and `forbidden.tsx` — rendered when server code calls `unauthorized()` / `forbidden()` from `next/navigation` (the 401/403 counterparts of `notFound()`).
+
 ---
 
 ## Axios Instance
 
 All Client Component data fetching goes through a singleton Axios instance defined in `lib/api/client.ts`. Server Components use `fetch()` directly.
 
-> **`apiClient` and every `lib/api/*` domain function are client-only.** The request interceptor reads the session via `getSession()` from `next-auth/react`, which only runs in the browser — importing a domain function into a Server Component compiles but silently sends an unauthenticated request. In Server Components, call `fetch()` directly and attach the token from `auth()` (see [Server Component Data Fetching](#data-fetching)). Keep the two paths separate; don't share the axios layer across the server/client boundary.
+> **`apiClient` and every `lib/api/*` domain function are client-only.** The request interceptor reads the session via `getSession()` from `next-auth/react`, which only runs in the browser — importing a domain function into a Server Component compiles but silently sends an unauthenticated request. In Server Components, call `fetch()` directly and attach the token from `auth()` via a `lib/server/*` module (see [Server Component Data Fetching](#data-fetching)). Keep the two paths separate; don't share the axios layer across the server/client boundary — and enforce it at build time: `lib/api/client.ts` starts with `import "client-only"`, server data modules start with `import "server-only"` (`npm install client-only server-only`), so a wrong-side import fails the build instead of failing silently.
 
 ### Setup
 
 ```ts
 // lib/api/client.ts
+import "client-only"; // build error if this module is ever imported server-side
 import axios from "axios";
 
 export const apiClient = axios.create({
@@ -590,10 +686,18 @@ Throw a typed `ApiError` so query hooks have a consistent error shape:
 
 ```ts
 // types/api.ts
-export interface ApiError {
-  message: string;
-  statusCode: number;
-  errors?: Record<string, string[]>;
+// An Error subclass — NOT a plain object. Rejecting a plain object from the
+// interceptor loses the stack trace, breaks `instanceof ApiError` narrowing,
+// and ruins Sentry grouping.
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+    public readonly errors?: Record<string, string[]>,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
 }
 
 // Mirrors the backend `Paginated<T>` envelope for list endpoints.
@@ -605,18 +709,18 @@ export interface Paginated<T> {
 
 ```ts
 // lib/api/client.ts (continued)
-import type { ApiError } from "@/types/api";
+import { ApiError } from "@/types/api";
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    const apiError: ApiError = {
-      message: error.response?.data?.message ?? "An unexpected error occurred",
-      statusCode: error.response?.status ?? 500,
-      errors: error.response?.data?.errors,
-    };
-    return Promise.reject(apiError);
-  }
+  (error) =>
+    Promise.reject(
+      new ApiError(
+        error.response?.data?.message ?? "An unexpected error occurred",
+        error.response?.status ?? 500,
+        error.response?.data?.errors,
+      ),
+    ),
 );
 ```
 
@@ -670,21 +774,58 @@ These functions are then called inside React Query hooks in `queries/` — never
 
 ### Setup
 
-- Create a single `QueryClient` instance with sensible defaults:
+- Never create a `QueryClient` at module scope — during SSR that single instance is shared by every server request, leaking one user's cached data into another's HTML. Use TanStack's Advanced SSR pattern: a new client per server request, a lazy singleton in the browser:
 
 ```ts
 // lib/queryClient.ts
-import { QueryClient } from "@tanstack/react-query";
+import { isServer, QueryClient } from "@tanstack/react-query";
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5,   // 5 minutes
-      retry: 1,
-      refetchOnWindowFocus: false,
+function makeQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 1000 * 60 * 5,   // 5 minutes
+        retry: 1,
+        refetchOnWindowFocus: false,
+      },
     },
-  },
-});
+  });
+}
+
+let browserQueryClient: QueryClient | undefined;
+
+export function getQueryClient() {
+  // Server: always a fresh client per request — never shared across users.
+  if (isServer) return makeQueryClient();
+  // Browser: lazy singleton — survives suspends/re-renders without refetch storms.
+  return (browserQueryClient ??= makeQueryClient());
+}
+```
+
+```tsx
+// providers/QueryProvider.tsx
+"use client";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { getQueryClient } from "@/lib/queryClient";
+
+export function QueryProvider({ children }: { children: React.ReactNode }) {
+  return <QueryClientProvider client={getQueryClient()}>{children}</QueryClientProvider>;
+}
+```
+
+- Server Components that prefetch (see [App Router](#app-router)) call the same `getQueryClient()` before `dehydrate`.
+- Register the API error type once, so every hook's `error` is typed without per-call generics:
+
+```ts
+// types/react-query.d.ts
+import "@tanstack/react-query";
+import type { ApiError } from "@/types/api";
+
+declare module "@tanstack/react-query" {
+  interface Register {
+    defaultError: ApiError;
+  }
+}
 ```
 
 ### Query Key Conventions
@@ -697,7 +838,8 @@ export const userKeys = {
   all: ["users"] as const,
   lists: () => [...userKeys.all, "list"] as const,
   list: (filters: UserFilters) => [...userKeys.lists(), filters] as const,
-  detail: (id: string) => [...userKeys.all, "detail", id] as const,
+  // Widened to accept undefined — useUser may be called before the id exists
+  detail: (id: string | undefined) => [...userKeys.all, "detail", id] as const,
 };
 ```
 
@@ -710,33 +852,32 @@ export const userKeys = {
 import { useQuery } from "@tanstack/react-query";
 import { userKeys } from "./users.keys";
 import { fetchUsers } from "@/lib/api/users";
-import type { ApiError } from "@/types/api";
 
 export function useUsers(filters: UserFilters) {
-  return useQuery<User[], ApiError>({
+  return useQuery({
     queryKey: userKeys.list(filters),
-    queryFn: () => fetchUsers(filters),
+    queryFn: () => fetchUsers(filters), // data inferred as User[]; error is ApiError via Register
   });
 }
 ```
 
 ```ts
 // queries/useUser.ts
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { userKeys } from "./users.keys";
 import { fetchUser } from "@/lib/api/users";
-import type { ApiError } from "@/types/api";
 
 export function useUser(id: string | undefined) {
-  return useQuery<User, ApiError>({
+  return useQuery({
     queryKey: userKeys.detail(id),
-    queryFn: () => fetchUser(id!),
-    enabled: !!id, // don't fire for an undefined/empty id (e.g. /users/undefined)
+    // skipToken disables the query until id exists — the type-safe `enabled: !!id`,
+    // with no `fetchUser(id!)` assertion (which our TypeScript rules forbid).
+    queryFn: id ? () => fetchUser(id) : skipToken,
   });
 }
 ```
 
-- Always type both data and error generics on `useQuery<TData, TError>`. This makes `error` typed without any cast at the call site.
+- Don't pass per-call generics to `useQuery` — let `data` infer from `queryFn`, and let the global `Register { defaultError: ApiError }` augmentation (see Setup) type `error` everywhere. No casts, no generics at the call site.
 
 ### Mutations
 
@@ -771,23 +912,46 @@ export function useCreateUser() {
 
 ### Setup
 
-Wrap the app in `<ConfigProvider>` at the root layout. Define the theme token once:
+```bash
+npm install antd @ant-design/icons @ant-design/nextjs-registry
+```
+
+Wrap the app in `<AntdRegistry>` at the root layout — it extracts AntD's styles during SSR so server-rendered pages don't flash unstyled (still required in v6 / CSS-variables mode). Put `ConfigProvider` + `App` in a `"use client"` providers file: a theme object can only cross the server/client boundary while it holds plain tokens — the moment you add `algorithm: theme.darkAlgorithm` (a function), it must live in a Client Component.
 
 ```tsx
-// app/layout.tsx
-import { ConfigProvider } from "antd";
-import { theme } from "@/lib/antdTheme";
+// app/layout.tsx — Server Component
+import { AntdRegistry } from "@ant-design/nextjs-registry";
+import { Providers } from "@/providers/Providers";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html>
       <body>
-        <ConfigProvider theme={theme}>{children}</ConfigProvider>
+        <AntdRegistry>
+          <Providers>{children}</Providers>
+        </AntdRegistry>
       </body>
     </html>
   );
 }
 ```
+
+```tsx
+// providers/Providers.tsx — client boundary for ConfigProvider + App
+"use client";
+import { App, ConfigProvider } from "antd";
+import { theme } from "@/lib/antdTheme";
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <ConfigProvider theme={theme}>
+      <App>{children}</App>
+    </ConfigProvider>
+  );
+}
+```
+
+Define the theme token once:
 
 ```ts
 // lib/antdTheme.ts
@@ -862,12 +1026,13 @@ Use Tailwind for layout inside forms (`flex`, `gap`, `grid`) — not AntD `Space
 
 ### Tables
 
-Use `Table` with `columns` typed as `ColumnsType<T>`. Always define a `rowKey`:
+Use `Table` with `columns` typed as `TableColumnsType<T>` — import it from the `antd` root, not the `antd/es/table` deep path. Always define a `rowKey`:
 
 ```tsx
-import type { ColumnsType } from "antd/es/table";
+import { Table } from "antd";
+import type { TableColumnsType } from "antd";
 
-const columns: ColumnsType<User> = [
+const columns: TableColumnsType<User> = [
   { key: "name", title: "Name", dataIndex: "name" },
   { key: "email", title: "Email", dataIndex: "email" },
 ];
@@ -875,7 +1040,7 @@ const columns: ColumnsType<User> = [
 <Table columns={columns} dataSource={users} rowKey="id" />
 ```
 
-- Use `placement` prop on columns (not `position` — renamed in v6).
+- Control pager placement with `pagination={{ position: ["bottomRight"] }}` on the `Table` itself.
 
 ### Component Structure
 
@@ -889,17 +1054,19 @@ if (isPending) return <Skeleton active />;
 
 ### Component Usage Rules (v6 API changes)
 
-- Use `Space.Compact` instead of the removed `Button.Group` and `Input.Group`.
-- Use `FloatButton.BackTop` instead of the removed `BackTop` component.
+v6 is fully compatible with v5: the legacy APIs below still work but are **deprecated** (removal planned for v7). Use the replacements in new code.
+
+- Use `Space.Compact` instead of `Button.Group` and `Input.Group` (deprecated in v6).
+- Use `FloatButton.BackTop` instead of the `BackTop` component (deprecated in v6).
 - In `notification.open()`, use `title` (not `message`) and `actions` (not `btn`) — both renamed in v6.
 - `Tag` no longer has a default trailing margin in v6 — add spacing explicitly.
-- Use `styles.header` / `styles.body` on Card, Modal, Drawer — `headStyle` / `bodyStyle` were removed in v6.
-- Use `popupRender` on Select, Cascader, DatePicker — `dropdownRender` was removed in v6.
-- Use `onOpenChange` on Select, Cascader, AutoComplete, DatePicker — `onDropdownVisibleChange` was removed in v6.
-- Modal and Drawer show a mask blur by default. Disable via `ConfigProvider` if needed:
+- Use `styles.header` / `styles.body` on Card, Modal, Drawer — `headStyle` / `bodyStyle` are deprecated in v6.
+- Use `popupRender` on Select, Cascader, DatePicker — `dropdownRender` is deprecated in v6.
+- Use `onOpenChange` on Select, Cascader, AutoComplete, DatePicker — `onDropdownVisibleChange` is deprecated in v6.
+- Modal and Drawer mask blur is **opt-in** in v6 (the blur-by-default from early v6 betas was reverted for GPU performance). Enable it explicitly if the design calls for it:
 
 ```tsx
-<ConfigProvider modal={{ styles: { mask: { backdropFilter: "none" } } }}>
+<ConfigProvider modal={{ styles: { mask: { backdropFilter: "blur(4px)" } } }}>
 ```
 
 ### Styling Rules
@@ -934,8 +1101,7 @@ AntD v6 uses CSS variables. Tailwind utilities and AntD styles generally do not 
 
 ```tsx
 // 1. Imports (external → internal → types)
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button, Skeleton } from "antd";
 import { useUser } from "@/queries/useUser";
 import type { User } from "@/types";
 
@@ -959,7 +1125,7 @@ export function UserCard({ userId, onSelect }: UserCardProps) {
   };
 
   // 7. Render
-  if (isPending) return <Skeleton className="h-9 w-32" />;
+  if (isPending) return <Skeleton.Button active />;
 
   return (
     <Button onClick={handleClick}>{displayName}</Button>

@@ -83,6 +83,8 @@ project-root/
 │   ├── api/                     # Axios instance + per-domain fetch functions
 │   │   ├── client.ts            # axios instance, interceptors
 │   │   └── users.ts
+│   ├── auth/
+│   │   └── require-user.ts      # Server-side session guard for actions/data functions
 │   └── utils.ts                 # cn() and other pure utilities
 ├── queries/                     # React Query key factories + hooks
 ├── providers/                   # Client-side context providers
@@ -107,13 +109,14 @@ project-root/
 ```tsx
 // Good — Server Component prefetches into the cache; Client Component reads from it
 // app/users/page.tsx
-import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { UserTable } from "@/components/features/UserTable";
 import { getUsers } from "@/lib/api/users";
+import { getQueryClient } from "@/lib/queryClient";
 import { userKeys } from "@/queries/users.keys";
 
 export default async function UsersPage() {
-  const queryClient = new QueryClient();
+  const queryClient = getQueryClient(); // fresh client per server request — see React Query Setup
   await queryClient.prefetchQuery({ queryKey: userKeys.lists(), queryFn: getUsers });
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
@@ -129,6 +132,7 @@ export default async function UsersPage() {
 
 - Use `<Link>` for all internal navigation. Never `<a>`.
 - Use `useRouter().push()` for programmatic navigation inside Client Components only. Import `useRouter` from `next/navigation`, not `next/router` (Pages Router).
+- Enable typed routes (`typedRoutes: true` in `next.config.ts`) so `<Link href>` and `router.push()` are checked at compile time. Run `npx next typegen` to regenerate route types without a full build.
 - In Next.js 15+, `params` and `searchParams` are Promises. Always type and await them:
 
 ```tsx
@@ -146,7 +150,7 @@ export default async function UserPage({ params }: PageProps) {
 
 - Server Components: fetch directly via `async/await` with `fetch()` or a server-side service layer.
 - Client Components: use React Query (see below). Never `useEffect` + `fetch`.
-- Use `loading.tsx` for route-level loading UI and `error.tsx` for error boundaries.
+- Use `error.tsx` for error boundaries. For loading UI, prefer granular `<Suspense>` islands around dynamic content, with `loading.tsx` as a route-level safety net (see [App Router Special Files](#app-router-special-files)).
 - Initiate independent fetches in parallel with `Promise.all` — never await them sequentially:
 
 ```tsx
@@ -176,6 +180,7 @@ export default function Page() {
 ```
 
 - Wrap components that use runtime APIs (`cookies()`, `headers()`, `searchParams`) in `<Suspense>` so they don't block the static shell.
+- If a component must run at request time but reads no runtime API (e.g. `Math.random()` or time-based output), `await connection()` (from `next/server`) to opt it out of prerendering.
 
 ### Caching & Revalidation
 
@@ -188,18 +193,20 @@ Next.js 16 has two caching models. Use the new model for new projects.
 
 ```ts
 // lib/data.ts
+import "server-only"; // importing this module from client code is a build error
 import { cacheLife, cacheTag } from "next/cache";
 
 export async function getProducts() {
   "use cache";
-  cacheLife("hours");   // profiles: seconds | minutes | hours | days | weeks | max
+  cacheLife("hours");   // built-in profiles: default | seconds | minutes | hours | days | weeks | max — or a custom profile defined under `cacheLife` in next.config.ts
   cacheTag("products");
   return db.query("SELECT * FROM products");
 }
 ```
 
-- `revalidateTag("products", "max")` — stale-while-revalidate (use in Server Actions or Route Handlers). In Next.js 16 the cache-profile second arg drives SWR behaviour; the single-arg `revalidateTag("products")` form is deprecated and now does a blocking expire (without `updateTag`'s read-your-writes refresh).
-- `updateTag("products")` — immediately expires the cache, user sees their change right away (Server Actions only).
+- `revalidateTag("products", "max")` — stale-while-revalidate (use in Server Actions or Route Handlers). In Next.js 16 the cache-profile second arg drives SWR behaviour. The legacy single-arg `revalidateTag("products")` is deprecated: it expires the tag immediately (blocking, no SWR), but it is **not** interchangeable with `updateTag` — it lacks `updateTag`'s same-request read-your-writes refresh, and unlike `updateTag` it can be called from Route Handlers.
+- `updateTag("products")` — expires *and* refreshes the cache within the same request, so the user sees their own change right away (Server Actions only).
+- In a revalidation webhook (a Route Handler, where `updateTag` is unavailable) that must not serve stale data, use `revalidateTag("products", { expire: 0 })` as the hard-expire escape hatch.
 - Prefer tag-based invalidation over `revalidatePath` — it is more precise.
 
 **Previous model** (default, no config change needed):
@@ -236,16 +243,33 @@ export const getUser = cache(async (id: string) => db.users.findById(id));
 
 ### Server Actions
 
-- Use Server Actions for form submissions and mutations that don't need optimistic UI.
+- Use Server Actions for form submissions and mutations.
+- **Re-verify the session inside every Server Action and server data function.** `proxy.ts` checks are optimistic UX only — proxy/middleware can be bypassed (cf. CVE-2025-29927), so it must never be the sole auth layer. Use a shared `requireUser()` helper. See the [Next.js data security guide](https://nextjs.org/docs/app/guides/data-security).
 - Validate all input with Zod before any database or API call.
+
+```ts
+// lib/auth/require-user.ts
+import "server-only";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+
+export async function requireUser() {
+  const session = await auth();
+  // Auth failure is not a validation error — interrupt, don't return a result.
+  if (!session?.user) redirect("/login");
+  return session;
+}
+```
 
 ```ts
 "use server";
 import { z } from "zod";
+import { requireUser } from "@/lib/auth/require-user";
 
 const schema = z.object({ name: z.string().min(1) });
 
-export async function createItem(formData: FormData) {
+export async function createItem(_prevState: unknown, formData: FormData) {
+  await requireUser(); // never trust proxy.ts alone
   const parsed = schema.safeParse({ name: formData.get("name") });
   if (!parsed.success) return { success: false as const, errors: parsed.error.flatten() };
   // ... perform action
@@ -254,6 +278,32 @@ export async function createItem(formData: FormData) {
 ```
 
 > Never `throw` on validation failure inside a Server Action. A thrown error propagates to the nearest `error.tsx` boundary — a full-page crash screen. Return a structured result object instead so the calling component can display inline field errors.
+
+- Consume action results with React 19's `useActionState` — it returns the last result, a wrapped action, and pending state (the `_prevState` first parameter above exists for this signature):
+
+```tsx
+"use client";
+import { useActionState } from "react";
+import { createItem } from "@/app/actions";
+
+export function CreateItemForm() {
+  const [result, formAction, isPending] = useActionState(createItem, null);
+
+  return (
+    <form action={formAction}>
+      <input name="name" aria-label="Name" />
+      {result && !result.success && (
+        <p className="text-sm text-destructive">{result.errors.fieldErrors.name}</p>
+      )}
+      <button type="submit" disabled={isPending}>Create</button>
+    </form>
+  );
+}
+```
+
+- Use `useFormStatus` inside shared children (e.g. a generic `<SubmitButton>`) for pending state without prop drilling, and `useOptimistic` to render the expected result immediately and reconcile when the action settles — Server Actions support optimistic UI fine; don't avoid them for it.
+- Run post-response side effects (audit logs, server-side analytics) inside `after()` from `next/server` so they don't delay the response.
+- Hardening: when serving behind a proxy or multiple hostnames, set `serverActions.allowedOrigins` in `next.config.ts`. Variables closed over by an action (and `.bind()` arguments) are encrypted but still round-trip through the client — never put secrets in them.
 
 ### Metadata & SEO
 
@@ -303,6 +353,7 @@ export const getPost = cache(async (slug: string) => db.posts.findBySlug(slug));
 | `robots.txt` | Crawler rules |
 | `sitemap.xml` | Sitemap for search engines |
 
+- When routes are data-driven, prefer the dynamic conventions `app/robots.ts` and `app/sitemap.ts` (default-export a function returning a typed `MetadataRoute.Robots` / `MetadataRoute.Sitemap`) over the static files.
 - Generate dynamic OG images per route with `opengraph-image.tsx` and `ImageResponse`:
 
 ```tsx
@@ -329,11 +380,11 @@ export default async function Image({ params }: { params: Promise<{ slug: string
 
 ## App Router Special Files
 
-Next.js App Router uses special filenames to define loading, error, and 404 states at every level of the route tree. Every route segment that loads data **must** have a `loading.tsx`. Every segment that can error **must** have an `error.tsx`.
+Next.js App Router uses special filenames to define loading, error, and 404 states at every level of the route tree. Every segment that can error **must** have an `error.tsx`. For loading UI under the `cacheComponents` model this document recommends, prefer granular `<Suspense>` islands around the dynamic parts of a page — a route-level `loading.tsx` replaces the *entire* prerendered shell and re-triggers on every navigation, throwing away static content that could have rendered instantly. Keep a `loading.tsx` per data-fetching segment as the safety net for navigations where no static shell can show.
 
 ### `loading.tsx` — Suspense fallback
 
-Automatically wraps the segment's `page.tsx` in a `<Suspense>` boundary. Shown while the page's async work completes. Always use skeleton shapes that match the real layout to avoid layout shift.
+Automatically wraps the segment's `page.tsx` in a `<Suspense>` boundary. Shown while the page's async work completes. Always use skeleton shapes that match the real layout to avoid layout shift. Because it covers the whole page, reach for in-page `<Suspense>` boundaries around dynamic content first and let `loading.tsx` catch only what they don't.
 
 ```tsx
 // app/(dashboard)/dashboard/loading.tsx
@@ -480,6 +531,8 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
 }
 ```
 
+> With the experimental `authInterrupts` flag, `unauthorized()` and `forbidden()` work the same way for auth: they render `app/unauthorized.tsx` (401) and `app/forbidden.tsx` (403) — call them from server-side guards like `requireUser()` when showing a page beats redirecting.
+
 ### `global-error.tsx` — last-resort error boundary
 
 Replaces the entire root layout (including `app/layout.tsx`) when it itself throws. Must include `<html>` and `<body>` tags. This is the rarest error state — only triggered if your root providers crash.
@@ -488,7 +541,22 @@ Replaces the entire root layout (including `app/layout.tsx`) when it itself thro
 // app/global-error.tsx
 "use client";
 
-export default function GlobalError({ reset }: { reset: () => void }) {
+import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
+
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  useEffect(() => {
+    // This boundary replaces the root layout — if the error isn't captured
+    // here, root-layout crashes are never reported at all.
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <html lang="en">
       <body>
@@ -537,7 +605,7 @@ export default function GlobalError({ reset }: { reset: () => void }) {
 
 | File | Where to place | When required |
 |---|---|---|
-| `loading.tsx` | Every segment that fetches data | Always — even if loading is fast |
+| `loading.tsx` | Every segment that fetches data | As a safety net — prefer `<Suspense>` islands for primary loading UI |
 | `error.tsx` | Every segment that can error | Any segment making API calls or DB queries |
 | `not-found.tsx` | `app/` root | Once — covers all `notFound()` calls |
 | `global-error.tsx` | `app/` root | Once — last-resort only |
@@ -548,12 +616,13 @@ export default function GlobalError({ reset }: { reset: () => void }) {
 
 All Client Component data fetching goes through a singleton Axios instance defined in `lib/api/client.ts`. Server Components use `fetch()` directly.
 
-> **`apiClient` and every `lib/api/*` domain function are client-only.** The request interceptor reads the session via `getSession()` from `next-auth/react`, which only runs in the browser — importing a domain function into a Server Component compiles but silently sends an unauthenticated request. In Server Components, call `fetch()` directly and attach the token from `auth()` (see [Server Component Data Fetching](#data-fetching)). Keep the two paths separate; don't share the axios layer across the server/client boundary.
+> **`apiClient` and every `lib/api/*` domain function are client-only.** The request interceptor reads the session via `getSession()` from `next-auth/react`, which only runs in the browser — importing a domain function into a Server Component compiles but silently sends an unauthenticated request. In Server Components, call `fetch()` directly and attach the token from `auth()` (see [Server Component Data Fetching](#data-fetching)). Keep the two paths separate; don't share the axios layer across the server/client boundary. Enforce this mechanically rather than by convention: `import "client-only"` at the top of `lib/api/client.ts` turns any server-side import into a build error, and `import "server-only"` does the same for server data modules (`npm install client-only server-only`).
 
 ### Setup
 
 ```ts
 // lib/api/client.ts
+import "client-only"; // importing this module on the server is a build error
 import axios from "axios";
 
 export const apiClient = axios.create({
@@ -565,13 +634,13 @@ export const apiClient = axios.create({
 
 ### Request interceptor — attach bearer token
 
-The interceptor reads the Auth.js session on every request so the token is always fresh. `getSession()` makes an HTTP call to `/api/auth/session` with no built-in cache, so concurrent requests in the same tick are deduplicated to a single session fetch:
+The interceptor reads the Auth.js session on every request so the token is always fresh. `getSession()` makes an HTTP call to `/api/auth/session` with no built-in cache, so concurrent requests are coalesced onto a single in-flight session fetch:
 
 ```ts
 import { getSession, type Session } from "next-auth/react";
 
 // Deduplicate concurrent session fetches so a page with multiple parallel
-// queries only pays for one /api/auth/session round-trip per tick.
+// queries shares one /api/auth/session round-trip while it is in flight.
 let sessionFetch: Promise<Session | null> | null = null;
 
 apiClient.interceptors.request.use(async (config) => {
@@ -586,14 +655,19 @@ apiClient.interceptors.request.use(async (config) => {
 
 ### Response interceptor — normalize errors
 
-Throw a typed `ApiError` so query hooks have a consistent error shape:
+Reject with a typed `ApiError` so query hooks have a consistent error shape. It must be a real `Error` subclass — rejecting a plain object loses the stack trace, breaks `instanceof` narrowing, and ruins Sentry's error grouping:
 
 ```ts
 // types/api.ts
-export interface ApiError {
-  message: string;
-  statusCode: number;
-  errors?: Record<string, string[]>;
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+    public readonly errors?: Record<string, string[]>,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
 }
 
 // Mirrors the backend `Paginated<T>` envelope for list endpoints.
@@ -605,18 +679,18 @@ export interface Paginated<T> {
 
 ```ts
 // lib/api/client.ts (continued)
-import type { ApiError } from "@/types/api";
+import { ApiError } from "@/types/api";
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    const apiError: ApiError = {
-      message: error.response?.data?.message ?? "An unexpected error occurred",
-      statusCode: error.response?.status ?? 500,
-      errors: error.response?.data?.errors,
-    };
-    return Promise.reject(apiError);
-  }
+  (error) =>
+    Promise.reject(
+      new ApiError(
+        error.response?.data?.message ?? "An unexpected error occurred",
+        error.response?.status ?? 500,
+        error.response?.data?.errors,
+      ),
+    ),
 );
 ```
 
@@ -670,22 +744,48 @@ These functions are then called inside React Query hooks in `queries/` — never
 
 ### Setup
 
-- Create a single `QueryClient` instance with sensible defaults:
+- **Never export a module-level `QueryClient`.** A file-root instance is created once per server process, so during SSR it is shared across requests — one user's cached data can leak into another user's HTML. Use TanStack's Advanced SSR pattern instead: a `makeQueryClient()` factory plus an `isServer`-aware getter (new client per server request, lazy singleton in the browser):
 
 ```ts
 // lib/queryClient.ts
-import { QueryClient } from "@tanstack/react-query";
+import { isServer, QueryClient } from "@tanstack/react-query";
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5,   // 5 minutes
-      retry: 1,
-      refetchOnWindowFocus: false,
+function makeQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 1000 * 60 * 5,   // 5 minutes
+        retry: 1,
+        refetchOnWindowFocus: false,
+      },
     },
-  },
-});
+  });
+}
+
+let browserQueryClient: QueryClient | undefined;
+
+export function getQueryClient() {
+  // Server: always a fresh client per request — never share cache between users.
+  if (isServer) return makeQueryClient();
+  // Browser: lazy singleton — reused across renders so React doesn't discard
+  // the cache when a render suspends.
+  browserQueryClient ??= makeQueryClient();
+  return browserQueryClient;
+}
 ```
+
+```tsx
+// providers/QueryProvider.tsx
+"use client";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { getQueryClient } from "@/lib/queryClient";
+
+export function QueryProvider({ children }: { children: React.ReactNode }) {
+  return <QueryClientProvider client={getQueryClient()}>{children}</QueryClientProvider>;
+}
+```
+
+- Server Components that prefetch (the `HydrationBoundary` example in [App Router](#app-router)) call the same `getQueryClient()` — on the server it returns a fresh client per request, which is exactly what `dehydrate` needs.
 
 ### Query Key Conventions
 
@@ -697,7 +797,7 @@ export const userKeys = {
   all: ["users"] as const,
   lists: () => [...userKeys.all, "list"] as const,
   list: (filters: UserFilters) => [...userKeys.lists(), filters] as const,
-  detail: (id: string) => [...userKeys.all, "detail", id] as const,
+  detail: (id: string | undefined) => [...userKeys.all, "detail", id] as const, // widened — useUser may run before the id exists
 };
 ```
 
@@ -710,33 +810,41 @@ export const userKeys = {
 import { useQuery } from "@tanstack/react-query";
 import { userKeys } from "./users.keys";
 import { fetchUsers } from "@/lib/api/users";
-import type { ApiError } from "@/types/api";
 
 export function useUsers(filters: UserFilters) {
-  return useQuery<User[], ApiError>({
+  return useQuery({
     queryKey: userKeys.list(filters),
-    queryFn: () => fetchUsers(filters),
+    queryFn: () => fetchUsers(filters), // data type infers from fetchUsers' return type
   });
 }
 ```
 
 ```ts
 // queries/useUser.ts
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { userKeys } from "./users.keys";
 import { fetchUser } from "@/lib/api/users";
-import type { ApiError } from "@/types/api";
 
 export function useUser(id: string | undefined) {
-  return useQuery<User, ApiError>({
+  return useQuery({
     queryKey: userKeys.detail(id),
-    queryFn: () => fetchUser(id!),
-    enabled: !!id, // don't fire for an undefined/empty id (e.g. /users/undefined)
+    // skipToken disables the query until `id` exists — type-safe, no `enabled`
+    // flag, and no `id!` assertion (which our TypeScript standards forbid).
+    queryFn: id ? () => fetchUser(id) : skipToken,
   });
 }
 ```
 
-- Always type both data and error generics on `useQuery<TData, TError>`. This makes `error` typed without any cast at the call site.
+- Do not pass per-call `useQuery<TData, TError>` generics — let the data type infer from the `queryFn` return type, and register `ApiError` once as the app-wide default error type via TanStack's `Register` interface. `error` is then typed at every call site with no generics and no casts:
+
+```ts
+// types/api.ts (continued) — Register makes ApiError the default TError everywhere
+declare module "@tanstack/react-query" {
+  interface Register {
+    defaultError: ApiError;
+  }
+}
+```
 
 ### Mutations
 
@@ -847,7 +955,7 @@ export function CreateUserForm() {
 
 ### Tables
 
-Use **TanStack Table v8** for data tables. The shadcn/ui `DataTable` wraps it with Tailwind styling:
+Use **TanStack Table v8** for data tables. shadcn/ui does not ship a `DataTable` component — its docs provide a `DataTable` *recipe* that you copy into your own codebase and own, built on TanStack Table with Tailwind styling:
 
 ```tsx
 import { useReactTable, getCoreRowModel, flexRender, type ColumnDef } from "@tanstack/react-table";
@@ -860,11 +968,11 @@ const columns: ColumnDef<User>[] = [
 
 ### Notifications
 
-Use **Sonner** for toast notifications. Add `<Toaster>` to the root layout once:
+Use **Sonner** for toast notifications. Add `<Toaster>` to the root layout once — imported via the re-export from `lib/notify.ts` (below), so even the layout never touches `sonner` directly:
 
 ```tsx
 // app/layout.tsx
-import { Toaster } from "sonner";
+import { Toaster } from "@/lib/notify";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -883,6 +991,9 @@ Wrap Sonner so call sites never import it directly — swapping the toast librar
 ```ts
 // lib/notify.ts — the only module that imports the toast library
 import { toast, type ExternalToast } from "sonner";
+
+// Re-export the host component so the root layout also goes through this module.
+export { Toaster } from "sonner";
 
 export const notify = {
   success: (message: string, opts?: ExternalToast) => toast.success(message, opts),
@@ -996,9 +1107,10 @@ async function fetchUser(id: string): Promise<User> { ... }
 - Use `next/image` for all images. Never `<img>`.
 - Use `next/font` for all fonts. Never load fonts via `<link>` in `<head>`.
 - Lazy-load heavy Client Components with `next/dynamic`. Note: `dynamic(() => import(...), { ssr: false })` is **only allowed inside a Client Component** — calling it with `ssr: false` from a Server Component throws in the App Router (Next 15+). To defer a client-only chunk from a Server Component, wrap it in a small `"use client"` boundary (or use `React.lazy` + `<Suspense>` there). Server-rendered lazy chunks (`dynamic(() => import(...))` without `ssr: false`) are fine anywhere.
-- Memoize expensive computations with `useMemo`. Memoize stable callbacks with `useCallback` only when passed to memoized children.
-- Do not over-memoize. Profile before adding `React.memo`.
-- Keep bundle size in check — run `next build` and review the output before each release.
+- With the React Compiler enabled (`reactCompiler: true` in `next.config.ts`), components and hooks are auto-memoized — skip manual `useMemo`/`useCallback`/`React.memo` and add them only where profiling shows the compiler missed a spot.
+- Without the compiler: memoize expensive computations with `useMemo`, and stable callbacks with `useCallback` only when passed to memoized children. Do not over-memoize — profile before adding `React.memo`.
+- Keep bundle size in check — review the `next build` route-size / First Load JS output before each release. Turbopack is the default bundler in Next.js 16, so webpack-only tooling such as `@next/bundle-analyzer` does not apply to its builds.
+- Track Core Web Vitals with `useReportWebVitals` in a small `"use client"` component mounted in the root layout, forwarding metrics through the analytics wrapper (`trackEvent`).
 - Load third-party scripts with `next/script` and the appropriate `strategy`:
 
 ```tsx
@@ -1025,12 +1137,12 @@ See [App Router Special Files](#app-router-special-files) for `error.tsx`, `glob
 
 **React Query errors:**
 
-- Type via `useQuery<TData, TError>` generic — never cast with `as` at the call site.
+- Errors are typed `ApiError` everywhere via the `Register` augmentation (see [React Query Guidelines](#react-query-guidelines)) — never cast with `as` at the call site.
 - Show user-facing errors via `notify.error()` (the Sonner wrapper) for async mutations, or inline `FormMessage` for form field errors.
 - Never swallow errors silently. At minimum, log to console in dev; send to Sentry in production.
 
 ```tsx
-// error is typed as ApiError — no cast needed because useUsers is useQuery<User[], ApiError>
+// error is typed as ApiError — no cast needed; Register sets the app-wide default error type
 const { data, isError, error } = useUsers(filters);
 
 if (isError) {
@@ -1043,7 +1155,7 @@ if (isError) {
 ```ts
 const { mutate } = useMutation({
   mutationFn: createUser,
-  onError: (error: ApiError) => {
+  onError: (error) => { // typed ApiError via the Register augmentation
     // Only surface the backend message for client errors (4xx, which are
     // intentional and safe to show). For 5xx, show generic copy — the raw
     // message can leak internal/stack detail.
@@ -1172,7 +1284,9 @@ test("user can log in and see the dashboard", async ({ page }) => {
 Auth.js v5 (NextAuth) manages the session. It calls the NestJS API to authenticate and stores the JWT inside Auth.js's encrypted session.
 
 ```bash
-npm install next-auth@beta
+# Pin an exact version — v5 is still pre-release, and betas can ship breaking changes.
+# Check the current tag with `npm view next-auth dist-tags` before installing.
+npm install next-auth@5.0.0-beta.29
 ```
 
 ```ts
@@ -1192,7 +1306,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           body: JSON.stringify(credentials),
         });
         if (!res.ok) return null;
-        return res.json(); // { accessToken, refreshToken, user }
+        return res.json(); // { accessToken, refreshToken, expiresIn, user }
       },
     }),
   ],
@@ -1204,7 +1318,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.refreshToken = user.refreshToken;
         token.userId = user.user.id;
         token.role = user.user.role;
-        token.expiresAt = Date.now() + 14 * 60 * 1000; // match NestJS JWT TTL
+        token.expiresAt = Date.now() + user.expiresIn * 1000; // TTL from the login response (`expires_in`) — never hardcode the backend's JWT lifetime
         return token;
       }
       // Previous refresh failed — stop retrying, let proxy.ts redirect to login
@@ -1239,11 +1353,13 @@ async function refreshAccessToken(token: JWT) {
     ...token,
     accessToken: data.accessToken,
     refreshToken: data.refreshToken ?? token.refreshToken, // use rotated token if provided
-    expiresAt: Date.now() + 14 * 60 * 1000,
+    expiresAt: Date.now() + data.expiresIn * 1000, // TTL from the refresh response
     error: undefined,
   };
 }
 ```
+
+> **Refresh-rotation race**: the `jwt` callback can run concurrently (multiple tabs, parallel requests). With rotating refresh tokens, the race's loser presents an already-rotated token, gets `RefreshAccessTokenError`, and the user is logged out — the Auth.js refresh-rotation guide flags exactly this. Mitigate by serializing refreshes (a shared in-flight promise or lock) or by having the backend allow a short reuse grace window for the previous refresh token.
 
 ```ts
 // app/api/auth/[...nextauth]/route.ts
@@ -1275,7 +1391,7 @@ export const proxy = auth((req) => {
 export const config = { matcher: ["/((?!api|_next|.*\\..*).*)"] };
 ```
 
-> The legacy `middleware.ts` still works in 16 but is deprecated. Keep `proxy.ts` lightweight — routing and auth checks only, no heavy business logic.
+> The legacy `middleware.ts` still works in 16 but is deprecated. Keep `proxy.ts` lightweight — routing and auth checks only, no heavy business logic. Treat these checks as **optimistic UX, not enforcement**: proxy/middleware can be bypassed (cf. CVE-2025-29927), so every Server Action and server data function must re-verify the session with `requireUser()` (see [Server Actions](#server-actions)).
 
 **Authenticated API calls:**
 
@@ -1311,6 +1427,7 @@ declare module "next-auth" {
   interface User {
     accessToken: string;
     refreshToken: string;
+    expiresIn: number; // access-token TTL in seconds, from the login response
     user: { id: string; role: string };
   }
 }
@@ -1347,6 +1464,7 @@ export function initAnalytics() {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
     // Ingestion endpoint — NOT app.posthog.com (that's the dashboard). EU: https://eu.i.posthog.com
     api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com",
+    defaults: "2025-05-24", // pin the SDK's behavioural defaults so upgrades don't silently change capture behaviour
     capture_pageview: false, // App Router navigation is captured manually (see PostHogPageView)
   });
 }
@@ -1386,6 +1504,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
 
 ```tsx
 // providers/PostHogPageView.tsx — tracks App Router navigation through the wrapper
+// (uses useSearchParams → must be mounted inside <Suspense>, see the layout below)
 "use client";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
@@ -1401,6 +1520,7 @@ export function PostHogPageView() {
 
 ```tsx
 // app/layout.tsx
+import { Suspense } from "react";
 import { PostHogProvider } from "@/providers/PostHogProvider";
 import { PostHogPageView } from "@/providers/PostHogPageView";
 
@@ -1408,7 +1528,11 @@ export default function RootLayout({ children }) {
   return (
     <html><body>
       <PostHogProvider>
-        <PostHogPageView />
+        {/* useSearchParams() requires a Suspense boundary — mounted bare,
+            `next build` fails on every static route (CSR bailout error). */}
+        <Suspense fallback={null}>
+          <PostHogPageView />
+        </Suspense>
         {children}
       </PostHogProvider>
     </body></html>
@@ -1591,8 +1715,8 @@ export function useNotifications() {
         backoff = 1000; // reset backoff once the stream is healthy
       };
       es.onmessage = (event) => {
-        const { type, payload } = JSON.parse(event.data);
-        handleNotification(type, payload);
+        // Cast from the wire format — validate with Zod instead if payloads grow.
+        handleNotification(JSON.parse(event.data) as NotificationEvent);
       };
       es.onerror = () => {
         // The current ticket is spent — close and reconnect with a new one.
@@ -1613,11 +1737,17 @@ export function useNotifications() {
   }, [userId, refreshFailed]);
 }
 
-function handleNotification(type: string, payload: unknown) {
-  switch (type) {
+// Discriminated union of the events the backend emits — payload access stays
+// fully typed; no `any`, no per-case casts.
+type NotificationEvent =
+  | { type: "report.ready"; payload: { downloadUrl: string } }
+  | { type: "order.shipped"; payload: Record<string, never> };
+
+function handleNotification(event: NotificationEvent) {
+  switch (event.type) {
     case "report.ready":
       notify.success("Your report is ready", {
-        action: { label: "Download", onClick: () => window.open((payload as any).downloadUrl) },
+        action: { label: "Download", onClick: () => window.open(event.payload.downloadUrl) },
       });
       break;
     case "order.shipped":
@@ -1659,6 +1789,8 @@ npm install -D openapi-typescript
   }
 }
 ```
+
+> `$NEXT_PUBLIC_API_URL` is POSIX shell expansion — it silently breaks on Windows (`cmd`/PowerShell don't expand it). Either document that scripts require a POSIX shell (Git Bash/WSL), or make it cross-platform with `cross-env`/`dotenv-cli` — or simply hardcode the dev URL, since this is a dev-only script.
 
 ```ts
 // lib/api/users.ts — consume generated types

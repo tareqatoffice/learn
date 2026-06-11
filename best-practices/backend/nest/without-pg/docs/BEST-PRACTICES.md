@@ -96,7 +96,7 @@ project-root/
 
 ```ts
 @Module({
-  imports: [TypeOrmModule.forFeature([User])],
+  imports: [MongooseModule.forFeature([{ name: User.name, schema: UserSchema }])],
   controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],
@@ -116,6 +116,18 @@ export class AppModule {}
 // Only use useGlobalXxx() for things with zero dependencies
 app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
 ```
+
+### Request Lifecycle Order
+
+Every request flows through the same fixed pipeline — keep it in mind when wondering "why didn't my guard see the transformed value":
+
+1. Middleware (helmet, body parsers, CLS)
+2. Guards (global → controller → route)
+3. Interceptors — pre-handler (global → controller → route)
+4. Pipes (global → controller → route → param)
+5. Route handler
+6. Interceptors — post-handler (reverse order)
+7. Exception filters — only when something above threw
 
 ### Circular Dependencies
 
@@ -148,7 +160,7 @@ export class FeatureService {
 
 - Controllers handle HTTP only: routing, input extraction, response shaping.
 - No business logic in controllers. Delegate everything to the service.
-- Always type the return value. Return the entity/document and let `ClassSerializerInterceptor` strip `@Exclude()` fields; document the wire shape as `UserResponseDto` in Swagger (see [Swagger / OpenAPI](#swagger--openapi)).
+- Always type the return value. Controllers return **response DTOs** (`UserResponseDto`), never raw persistence documents — map explicitly at the boundary with `UserResponseDto.from(doc)`. The same class is what Swagger documents, so the declared type, the runtime type, and the documented type all match (see [DTOs & Validation](#dtos--validation) and [Swagger / OpenAPI](#swagger--openapi)).
 
 ```ts
 @Controller("users")
@@ -156,38 +168,32 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get(":id")
-  getUser(@Param("id", ParseObjectIdPipe) id: string): Promise<UserDocument> {
-    return this.usersService.findById(id);
+  async getUser(@Param("id", ParseObjectIdPipe) id: Types.ObjectId): Promise<UserResponseDto> {
+    return UserResponseDto.from(await this.usersService.findById(id));
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  createUser(@Body() dto: CreateUserDto): Promise<UserDocument> {
-    return this.usersService.create(dto);
+  async createUser(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
+    return UserResponseDto.from(await this.usersService.create(dto));
   }
 }
 ```
 
-- Use built-in pipes (`ParseIntPipe`, `ParseEnumPipe`, `ParseBoolPipe`) for primitive path/query params. **`ParseUUIDPipe` is for UUID primary keys (the PostgreSQL variant) — it rejects MongoDB `ObjectId`s.** For Mongo `_id` params, use a small custom `ParseObjectIdPipe`:
+- Use built-in pipes (`ParseIntPipe`, `ParseEnumPipe`, `ParseBoolPipe`, and NestJS 11's `ParseDatePipe`) for primitive path/query params. **`ParseUUIDPipe` is for UUID primary keys (the PostgreSQL variant) — it rejects MongoDB `ObjectId`s.** For Mongo `_id` params, use the `ParseObjectIdPipe` that ships with `@nestjs/mongoose` — it validates **and transforms** the param to `Types.ObjectId`. Don't hand-roll one:
 
 ```ts
-// common/pipes/parse-object-id.pipe.ts
-import { BadRequestException, Injectable, PipeTransform } from "@nestjs/common";
-import { isValidObjectId } from "mongoose";
+import { ParseObjectIdPipe } from "@nestjs/mongoose";
+import { Types } from "mongoose";
 
-@Injectable()
-export class ParseObjectIdPipe implements PipeTransform<string, string> {
-  transform(value: string): string {
-    if (!isValidObjectId(value)) throw new BadRequestException(`Invalid id: ${value}`);
-    return value;
-  }
-}
+@Get(":id")
+getUser(@Param("id", ParseObjectIdPipe) id: Types.ObjectId) { ... }
 ```
 
 - Validate `ObjectId` fields inside DTOs with `@IsMongoId()` (from `class-validator`) for the same reason.
 - Use `@HttpCode()` explicitly when the default status code is wrong.
 - Apply guards and interceptors at the controller or route level, not globally, when they are route-specific.
-- NestJS 11 runs on Express 5 — catch-all route paths use named wildcards (`/*splat` or `/{*splat}`), not the bare `*` from Express 4.
+- NestJS 11 runs on Express 5 — catch-all route paths use named wildcards (`/*splat` or `/{*splat}`), not the bare `*` from Express 4. Express 5 also changed the default query parser — see [API Response Shape & Pagination](#api-response-shape--pagination).
 
 ---
 
@@ -230,7 +236,7 @@ export class UsersService {
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {}
 
-  async findById(id: string): Promise<UserDocument> {
+  async findById(id: Types.ObjectId): Promise<UserDocument> {
     const user = await this.userModel.findById(id).exec();
     if (!user) throw new NotFoundException(`User ${id} not found`);
     return user;
@@ -247,24 +253,32 @@ export class UsersService {
 ```
 
 - Throw NestJS HTTP exceptions (`NotFoundException`, `ConflictException`, etc.) from the service, not the controller. The global exception filter handles them.
+- Services return persistence types (`UserDocument`) so other services can reuse them; mapping to the wire shape (`UserResponseDto.from`) happens once, in the controller — response shaping is an HTTP concern.
 
 ---
 
 ## DTOs & Validation
 
 - Every incoming request body, query string, or param set must have a DTO.
-- Use `class-validator` decorators on DTOs. Enable `ValidationPipe` globally with `whitelist: true` and `forbidNonWhitelisted: true`.
+- Use `class-validator` decorators on DTOs. Enable `ValidationPipe` globally with `whitelist: true` and `forbidNonWhitelisted: true` — registered via `APP_PIPE` (not `app.useGlobalPipes()`), consistent with the rule in [Modules](#modules), so it participates in DI:
 
 ```ts
-// main.ts
-app.useGlobalPipes(
-  new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transform: true,
-    disableErrorMessages: process.env.NODE_ENV === "production",
-  }),
-);
+// app.module.ts
+import { APP_PIPE } from "@nestjs/core";
+
+providers: [
+  {
+    provide: APP_PIPE,
+    inject: [ConfigService],
+    useFactory: (config: ConfigService) =>
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        disableErrorMessages: config.get("nodeEnv") === "production",
+      }),
+  },
+],
 ```
 
 > `disableErrorMessages: true` in production prevents exposing validation field names and constraints to clients. **Trade-off:** it also hides legitimate messages the UI may want to surface (e.g. "email is invalid"). If the frontend relies on per-field messages, keep them enabled and instead avoid leaking internals by using explicit, user-safe DTO messages — don't depend on `disableErrorMessages` as your only guard.
@@ -288,7 +302,7 @@ export class CreateUserDto {
 ```
 
 - `whitelist: true` strips properties not in the DTO. `forbidNonWhitelisted: true` rejects requests with unknown properties.
-- `transform: true` auto-coerces primitive types (strings to numbers, etc.) based on TS types.
+- `transform: true` turns the validated payload into a real DTO class instance and auto-coerces **handler-signature primitives** (`@Param("page") page: number`, `@Query("active") active: boolean`). It does **not** coerce DTO members by itself — annotate them with `@Type(() => Number)` from `class-transformer` (as in `PaginationQueryDto`), or opt into `transformOptions: { enableImplicitConversion: true }`.
 - Never use `import type { CreateUserDto }` — TypeScript erases type-only imports at runtime, destroying the metadata `ValidationPipe` needs to validate. Use a regular `import { CreateUserDto }`.
 - Use `PartialType` / `OmitType` / `PickType` to build update DTOs — never duplicate property decorators manually. Import them from `@nestjs/mapped-types` in a plain app, but **when the app uses Swagger (it does — see [Swagger / OpenAPI](#swagger--openapi)) import the same helpers from `@nestjs/swagger`** so `@ApiProperty()` metadata is carried over to the derived DTO.
 
@@ -300,29 +314,40 @@ import { CreateUserDto } from "./create-user.dto";
 export class UpdateUserDto extends PartialType(OmitType(CreateUserDto, ["email"] as const)) {}
 ```
 
-- Use `@Exclude()` and `@Expose()` from `class-transformer` on response DTOs to control what is serialized. Enable `ClassSerializerInterceptor` globally.
+- **Response shaping — map documents to response DTOs explicitly.** A Mongoose `HydratedDocument` is not an instance of any DTO class, so `class-transformer` decorators placed on the `@Schema()` class (or on a parallel entity class the document isn't an instance of) are silently ignored by `ClassSerializerInterceptor` — `@Exclude()` does nothing and `passwordHash` leaks. The primary pattern: controllers return a real `UserResponseDto` instance built with `plainToInstance(..., { excludeExtraneousValues: true })`, so only `@Expose()`d fields can ever reach the wire.
 
 ```ts
-// entities/user.entity.ts
-import { Exclude } from "class-transformer";
+// dto/user-response.dto.ts — the explicit mapping IS the serialization boundary
+import { Expose, Transform, plainToInstance } from "class-transformer";
+import { Document, Types } from "mongoose";
 
-export class User {
+export class UserResponseDto {
+  @Expose()
+  @Transform(({ obj }) => String(obj._id))
   id: string;
-  email: string;
 
-  @Exclude()
-  passwordHash: string;
+  @Expose() email: string;
+  @Expose() role: Role;
+  @Expose() createdAt: Date;
+
+  // Accepts hydrated documents and .lean() results alike.
+  static from(user: UserDocument | (User & { _id: Types.ObjectId })): UserResponseDto {
+    const plain = user instanceof Document ? user.toObject() : user;
+    return plainToInstance(UserResponseDto, plain, { excludeExtraneousValues: true });
+  }
 }
 ```
 
+- Still register `ClassSerializerInterceptor` globally — via `APP_INTERCEPTOR`, consistent with [Modules](#modules) — so any returned class instance is serialized through `class-transformer`. Treat it as a convenience, not the safety mechanism: the explicit mapping above is what guarantees `passwordHash` never leaks.
+
 ```ts
-// main.ts
-app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+// app.module.ts
+import { APP_INTERCEPTOR } from "@nestjs/core";
+
+providers: [{ provide: APP_INTERCEPTOR, useClass: ClassSerializerInterceptor }],
 ```
 
-> **Mongoose caveat — `@Exclude()` on a `@Schema` class is NOT honored.** `ClassSerializerInterceptor` only applies `class-transformer` decorators to instances of the decorated class. A Mongoose `HydratedDocument` returned from a controller is **not** such an instance, so `@Exclude()` placed on the schema (or on a separate entity class the document isn't an instance of) silently does nothing — `passwordHash` leaks. Pick one of:
-> - **Schema-level transform** (simplest for Mongoose): strip sensitive fields in the schema's `toJSON` so every serialization path is safe — `@Schema({ toJSON: { transform: (_, ret) => { delete ret.passwordHash; return ret; } } })`. Combine with `.select("-passwordHash")` on reads so the field never loads in the first place.
-> - **Explicit DTO mapping**: return a real class instance — `plainToInstance(UserResponseDto, doc.toObject())` — so `@Exclude()`/`@Expose()` on `UserResponseDto` apply as intended. Use this when the wire shape diverges from the document.
+- **Defence in depth:** also strip secrets at the schema level so even an unmapped serialization path is safe — set a `toJSON` transform on the schema (shown in [Schema Definition](#schema-definition)) and use `.select("-passwordHash")` on reads so the field never loads in the first place.
 
 ---
 
@@ -337,12 +362,17 @@ app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 MongooseModule.forRootAsync({
   useFactory: (config: ConfigService) => ({
     uri: config.get<string>("database.uri"),
+    // Auto-build indexes only outside production — an index build on a large
+    // collection at startup eats IO and can block deploys. In production, create
+    // indexes deliberately via a migration/script (e.g. Model.syncIndexes()).
+    autoIndex: config.get("nodeEnv") !== "production",
   }),
   inject: [ConfigService],
 })
 ```
 
 - Add `database.uri` to the config factory and validate it at startup so a missing `MONGODB_URI` fails fast.
+- Set `autoIndex: false` in production and build indexes through a migration or release script — never rely on app startup to create them.
 
 ### Schema Definition
 
@@ -355,7 +385,17 @@ import { HydratedDocument } from "mongoose";
 
 export type UserDocument = HydratedDocument<User>;
 
-@Schema({ timestamps: true })
+@Schema({
+  timestamps: true,
+  // Defence in depth: even an unmapped serialization path never emits secrets.
+  toJSON: {
+    transform: (_, ret) => {
+      delete ret.passwordHash;
+      delete ret.__v;
+      return ret;
+    },
+  },
+})
 export class User {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email: string;
@@ -375,8 +415,10 @@ export const UserSchema = SchemaFactory.createForClass(User);
 - Add indexes at the schema level, not in service code:
 
 ```ts
-UserSchema.index({ email: 1 }, { unique: true });
+UserSchema.index({ createdAt: -1 });
 ```
+
+- Declare each index **once**. `unique: true` on `@Prop` already creates the unique `email` index — adding `UserSchema.index({ email: 1 }, { unique: true })` on top duplicates it and triggers Mongoose duplicate-index warnings.
 
 ### Module Registration
 
@@ -408,18 +450,15 @@ const user = await this.userModel.findById(id).exec();
 
 ### Transactions
 
-- Use MongoDB sessions for multi-document atomic operations (requires a replica set or Atlas):
+- Use MongoDB sessions for multi-document atomic operations (requires a replica set or Atlas). Use `session.withTransaction()` — it handles commit/abort and **automatically retries on `TransientTransactionError`**, which a hand-rolled `startTransaction`/`commitTransaction`/`abortTransaction` block does not:
 
 ```ts
 const session = await this.connection.startSession();
 try {
-  session.startTransaction();
-  await this.userModel.create([{ ...dto, passwordHash }], { session });
-  await this.auditModel.create([{ action: "user.created" }], { session });
-  await session.commitTransaction();
-} catch (error) {
-  await session.abortTransaction();
-  throw error;
+  await session.withTransaction(async () => {
+    await this.userModel.create([{ ...dto, passwordHash }], { session });
+    await this.auditModel.create([{ action: "user.created" }], { session });
+  });
 } finally {
   await session.endSession();
 }
