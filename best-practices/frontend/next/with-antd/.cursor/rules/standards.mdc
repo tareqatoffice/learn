@@ -1,0 +1,13 @@
+---
+description: Next.js frontend coding standards and agent working agreement
+alwaysApply: true
+---
+
+Follow all project standards in [CLAUDE.md](mdc:CLAUDE.md) and every document it links to under `docs/` (`BEST-PRACTICES.md`, `CICD.md`, `DECISIONS.md`, `FAQ.md`). These are the same team-wide rules shared via `AGENTS.md` — this file just makes Cursor load them on every request.
+
+Working agreement (also in CLAUDE.md):
+
+- Before completing a task, run `npm run typecheck`, `npm run lint`, and the relevant tests — all must pass.
+- Add or update tests for any new or changed logic.
+- Never commit or push without explicit approval; if on `main`, branch first.
+- Ask before destructive or outward-facing actions.
