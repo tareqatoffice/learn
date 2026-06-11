@@ -26,7 +26,6 @@ This project follows strict backend coding standards. Before writing or reviewin
 | `npm test` | Unit tests (Jest) · add `-- --coverage` to enforce thresholds |
 | `npm test -- users.service` | Run a single test file / pattern |
 | `npm run test:e2e` | E2E tests (`mongodb-memory-server`, no external DB needed) |
-| `npm run migration:run` | (PostgreSQL only) apply TypeORM migrations |
 
 > Exact script names live in `docs/CICD.md`. If a command is missing from `package.json`, add it there rather than inventing an ad-hoc invocation.
 
@@ -74,5 +73,3 @@ This project follows strict backend coding standards. Before writing or reviewin
 - Cloudflare Turnstile (invisible)
 - PostHog (`posthog-node`)
 - Email: SMTP via `nodemailer` (provider-agnostic — Resend/Brevo/Google) + React Email templates
-
-> For PostgreSQL projects, use `docs/BEST-PRACTICES-POSTGRESQL.md` instead.

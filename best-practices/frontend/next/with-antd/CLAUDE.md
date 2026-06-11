@@ -68,5 +68,3 @@ This project follows strict frontend coding standards. Before writing or reviewi
 - PostHog JS (`posthog-js`)
 - Cloudflare Turnstile (`@marsidev/react-turnstile`, invisible mode)
 - Sentry (optional observability for production)
-
-> For Ant Design v6 projects, use `docs/BEST-PRACTICES-ANTD.md` instead.

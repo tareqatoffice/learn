@@ -10,23 +10,34 @@ Team-wide coding standards for our **NestJS** backends and **Next.js** frontends
 
 ```
 best-practices/
-├── backend/nest/      NestJS standard (MongoDB default, PostgreSQL variant)
-│   ├── CLAUDE.md          single source of truth + working agreement + commands
-│   ├── .cursor/rules/     Cursor always-on rule (real file, MDC frontmatter)
-│   └── docs/              BEST-PRACTICES.md, BEST-PRACTICES-POSTGRESQL.md,
-│                          CICD.md, CONTRIBUTING.md, DECISIONS.md, FAQ.md, CHANGELOG.md
-└── frontend/next/     Next.js standard (Tailwind + shadcn/ui default, Ant Design variant)
-    ├── CLAUDE.md
-    ├── .cursor/rules/
-    └── docs/              BEST-PRACTICES.md, BEST-PRACTICES-ANTD.md,
-                           CICD.md, CONTRIBUTING.md, DECISIONS.md, FAQ.md, CHANGELOG.md
+├── backend/nest/
+│   ├── without-pg/    NestJS + MongoDB (default)
+│   │   ├── CLAUDE.md
+│   │   ├── .cursor/rules/standards.mdc
+│   │   └── docs/      BEST-PRACTICES.md, CICD.md, CONTRIBUTING.md,
+│   │                  DECISIONS.md, FAQ.md, CHANGELOG.md
+│   └── with-pg/       NestJS + PostgreSQL (TypeORM)
+│       ├── CLAUDE.md
+│       ├── .cursor/rules/standards.mdc
+│       └── docs/      BEST-PRACTICES.md, CICD.md, CONTRIBUTING.md,
+│                      DECISIONS.md, FAQ.md, CHANGELOG.md
+└── frontend/next/
+    ├── without-antd/  Next.js + Tailwind + shadcn/ui (default)
+    │   ├── CLAUDE.md
+    │   ├── .cursor/rules/standards.mdc
+    │   └── docs/      BEST-PRACTICES.md, CICD.md, CONTRIBUTING.md,
+    │                  DECISIONS.md, FAQ.md, CHANGELOG.md
+    └── with-antd/     Next.js + Ant Design v6 + Tailwind
+        ├── CLAUDE.md
+        ├── .cursor/rules/standards.mdc
+        └── docs/      BEST-PRACTICES.md, CICD.md, CONTRIBUTING.md,
+                       DECISIONS.md, FAQ.md, CHANGELOG.md
 ```
 
 | Doc | What it covers |
 |---|---|
 | `CLAUDE.md` | Working agreement (definition of done, no-commit-without-approval), canonical commands, a one-line-per-topic Quick Reference, and pinned stack versions. |
-| `docs/BEST-PRACTICES.md` | The full standard — every rule with rationale and a code example. |
-| `docs/BEST-PRACTICES-*.md` | Delta-only variant (PostgreSQL / Ant Design): only what differs from the base. |
+| `docs/BEST-PRACTICES.md` | The full standard for that variant — every rule with rationale and a code example. |
 | `docs/CICD.md` | Branch strategy, GitHub Actions, Docker, Dependabot, Husky/lint-staged, required `package.json` scripts. |
 | `docs/CONTRIBUTING.md` | How to propose/review/merge changes to the standard itself. |
 | `docs/DECISIONS.md` | ADRs — *why* each major choice was made, with trade-offs. |
@@ -39,22 +50,31 @@ best-practices/
 
 ### 1. Copy the standard for your stack
 
-From the **target project root**, pick the matching stack:
+From the **target project root**, pick the folder that matches your stack exactly:
 
 ```bash
-# Next.js frontend
-cp    /path/to/best-practices/frontend/next/CLAUDE.md  ./CLAUDE.md
-cp -r /path/to/best-practices/frontend/next/docs       ./docs
+# Next.js + Tailwind + shadcn/ui (default)
+VARIANT=/path/to/best-practices/frontend/next/without-antd
+cp    "$VARIANT/CLAUDE.md"  ./CLAUDE.md
+cp -r "$VARIANT/docs"       ./docs
 
-# NestJS backend
-cp    /path/to/best-practices/backend/nest/CLAUDE.md   ./CLAUDE.md
-cp -r /path/to/best-practices/backend/nest/docs        ./docs
+# Next.js + Ant Design v6
+VARIANT=/path/to/best-practices/frontend/next/with-antd
+cp    "$VARIANT/CLAUDE.md"  ./CLAUDE.md
+cp -r "$VARIANT/docs"       ./docs
+
+# NestJS + MongoDB (default)
+VARIANT=/path/to/best-practices/backend/nest/without-pg
+cp    "$VARIANT/CLAUDE.md"  ./CLAUDE.md
+cp -r "$VARIANT/docs"       ./docs
+
+# NestJS + PostgreSQL
+VARIANT=/path/to/best-practices/backend/nest/with-pg
+cp    "$VARIANT/CLAUDE.md"  ./CLAUDE.md
+cp -r "$VARIANT/docs"       ./docs
 ```
 
-Keep only the variant doc you use, and delete the other:
-
-- **Frontend** — Tailwind + shadcn/ui is the default; for Ant Design v6 keep `BEST-PRACTICES-ANTD.md`, otherwise delete it.
-- **Backend** — MongoDB is the default; for PostgreSQL keep `BEST-PRACTICES-POSTGRESQL.md`, otherwise delete it.
+No cleanup needed — each folder contains only what that stack uses.
 
 ### 2. Wire up the other AI tools
 
@@ -67,10 +87,10 @@ mkdir -p .github .cursor/rules
 ln -s ../CLAUDE.md .github/copilot-instructions.md     # GitHub Copilot
 
 # Cursor needs a real file (MDC frontmatter), not a symlink — copy the template:
-cp /path/to/best-practices/<stack>/.cursor/rules/standards.mdc .cursor/rules/standards.mdc
+cp "$VARIANT/.cursor/rules/standards.mdc" .cursor/rules/standards.mdc
 ```
 
-Replace `<stack>` with `frontend/next` or `backend/nest`.
+`$VARIANT` is the same path you set in step 1.
 
 > **Windows:** enable symlink support with `git config core.symlinks true`, or replace the symlinks with copies and keep them in sync.
 

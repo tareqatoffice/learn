@@ -3,7 +3,7 @@ description: Next.js frontend coding standards and agent working agreement
 alwaysApply: true
 ---
 
-Follow all project standards in [CLAUDE.md](mdc:CLAUDE.md) and every document it links to under `docs/` (`BEST-PRACTICES.md`, `BEST-PRACTICES-ANTD.md`, `CICD.md`, `DECISIONS.md`, `FAQ.md`). These are the same team-wide rules shared via `AGENTS.md` — this file just makes Cursor load them on every request.
+Follow all project standards in [CLAUDE.md](mdc:CLAUDE.md) and every document it links to under `docs/` (`BEST-PRACTICES.md`, `CICD.md`, `DECISIONS.md`, `FAQ.md`). These are the same team-wide rules shared via `AGENTS.md` — this file just makes Cursor load them on every request.
 
 Working agreement (also in CLAUDE.md):
 
