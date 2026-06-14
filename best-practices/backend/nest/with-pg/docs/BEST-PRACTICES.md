@@ -118,6 +118,18 @@ export class AppModule {}
 app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
 ```
 
+### Request Lifecycle Order
+
+Every request flows through the same fixed pipeline — keep it in mind when wondering "why didn't my guard see the transformed value":
+
+1. Middleware (helmet, body parsers, CLS)
+2. Guards (global → controller → route)
+3. Interceptors — pre-handler (global → controller → route)
+4. Pipes (global → controller → route → param)
+5. Route handler
+6. Interceptors — post-handler (reverse order)
+7. Exception filters — only when something above threw
+
 ### Circular Dependencies
 
 A circular dependency — module A imports module B while B imports A, or two providers inject each other — is almost always a sign that a responsibility lives in the wrong place, not something to work around. NestJS may fail to resolve one side and inject `undefined`, so the failure often surfaces at call time rather than at startup.
@@ -149,7 +161,7 @@ export class FeatureService {
 
 - Controllers handle HTTP only: routing, input extraction, response shaping.
 - No business logic in controllers. Delegate everything to the service.
-- Always type the return value. Return the entity/document and let `ClassSerializerInterceptor` strip `@Exclude()` fields; document the wire shape as `UserResponseDto` in Swagger (see [Swagger / OpenAPI](#swagger--openapi)).
+- Always type the return value. Controllers return **response DTOs** (`UserResponseDto`), never raw persistence entities — map explicitly at the boundary with `UserResponseDto.from(entity)`. The same class is what Swagger documents, so the declared type, the runtime type, and the documented type all match — they can't drift apart (see [DTOs & Validation](#dtos--validation) and [Swagger / OpenAPI](#swagger--openapi)). TypeORM's `ClassSerializerInterceptor` does honor `@Exclude()` on entities (unlike Mongoose documents), but an explicit DTO keeps the wire contract independent of the persistence shape.
 
 ```ts
 @Controller("users")
@@ -157,14 +169,14 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get(":id")
-  getUser(@Param("id", ParseUUIDPipe) id: string): Promise<User> {
-    return this.usersService.findById(id);
+  async getUser(@Param("id", ParseUUIDPipe) id: string): Promise<UserResponseDto> {
+    return UserResponseDto.from(await this.usersService.findById(id));
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  createUser(@Body() dto: CreateUserDto): Promise<User> {
-    return this.usersService.create(dto);
+  async createUser(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
+    return UserResponseDto.from(await this.usersService.create(dto));
   }
 }
 ```
@@ -172,7 +184,7 @@ export class UsersController {
 - Use built-in pipes (`ParseIntPipe`, `ParseEnumPipe`, `ParseBoolPipe`, `ParseUUIDPipe`) for primitive path/query params. Use `ParseUUIDPipe` for UUID primary keys and `@IsUUID()` on DTOs.
 - Use `@HttpCode()` explicitly when the default status code is wrong.
 - Apply guards and interceptors at the controller or route level, not globally, when they are route-specific.
-- NestJS 11 runs on Express 5 — catch-all route paths use named wildcards (`/*splat` or `/{*splat}`), not the bare `*` from Express 4.
+- NestJS 11 runs on Express 5 — catch-all route paths use named wildcards (`/*splat` or `/{*splat}`), not the bare `*` from Express 4. Express 5 also changed the default query parser — see [API Response Shape & Pagination](#api-response-shape--pagination).
 
 ---
 
@@ -214,6 +226,8 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @Inject(PASSWORD_HASHER)
+    private readonly passwordHasher: PasswordHasher,
   ) {}
 
   async findById(id: string): Promise<User> {
@@ -226,7 +240,7 @@ export class UsersService {
     const existing = await this.userRepo.findOne({ where: { email: dto.email } });
     if (existing) throw new ConflictException("Email already in use");
 
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const passwordHash = await this.passwordHasher.hash(dto.password); // behind a port — see below
     const user = this.userRepo.create({ ...dto, passwordHash });
     return this.userRepo.save(user);
   }
@@ -240,18 +254,25 @@ export class UsersService {
 ## DTOs & Validation
 
 - Every incoming request body, query string, or param set must have a DTO.
-- Use `class-validator` decorators on DTOs. Enable `ValidationPipe` globally with `whitelist: true` and `forbidNonWhitelisted: true`.
+- Use `class-validator` decorators on DTOs. Enable `ValidationPipe` globally with `whitelist: true` and `forbidNonWhitelisted: true` — registered via `APP_PIPE` (not `app.useGlobalPipes()`), consistent with the rule in [Modules](#modules), so it participates in DI:
 
 ```ts
-// main.ts
-app.useGlobalPipes(
-  new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transform: true,
-    disableErrorMessages: process.env.NODE_ENV === "production",
-  }),
-);
+// app.module.ts
+import { APP_PIPE } from "@nestjs/core";
+
+providers: [
+  {
+    provide: APP_PIPE,
+    inject: [ConfigService],
+    useFactory: (config: ConfigService) =>
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        disableErrorMessages: config.get("app.env") === "production",
+      }),
+  },
+],
 ```
 
 > `disableErrorMessages: true` in production prevents exposing validation field names and constraints to clients. **Trade-off:** it also hides legitimate messages the UI may want to surface (e.g. "email is invalid"). If the frontend relies on per-field messages, keep them enabled and instead avoid leaking internals by using explicit, user-safe DTO messages — don't depend on `disableErrorMessages` as your only guard.
@@ -275,7 +296,7 @@ export class CreateUserDto {
 ```
 
 - `whitelist: true` strips properties not in the DTO. `forbidNonWhitelisted: true` rejects requests with unknown properties.
-- `transform: true` auto-coerces primitive types (strings to numbers, etc.) based on TS types.
+- `transform: true` turns the validated payload into a real DTO class instance and auto-coerces **handler-signature primitives** (`@Param("page") page: number`, `@Query("active") active: boolean`). It does **not** coerce DTO members by itself — annotate them with `@Type(() => Number)` from `class-transformer` (as in `PaginationQueryDto`), or opt into `transformOptions: { enableImplicitConversion: true }`.
 - Never use `import type { CreateUserDto }` — TypeScript erases type-only imports at runtime, destroying the metadata `ValidationPipe` needs to validate. Use a regular `import { CreateUserDto }`.
 - Use `PartialType` / `OmitType` / `PickType` to build update DTOs — never duplicate property decorators manually. Import them from `@nestjs/mapped-types` in a plain app, but **when the app uses Swagger (it does — see [Swagger / OpenAPI](#swagger--openapi)) import the same helpers from `@nestjs/swagger`** so `@ApiProperty()` metadata is carried over to the derived DTO.
 
@@ -303,11 +324,13 @@ export class User {
 ```
 
 ```ts
-// main.ts
-app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+// app.module.ts
+import { APP_INTERCEPTOR } from "@nestjs/core";
+
+providers: [{ provide: APP_INTERCEPTOR, useClass: ClassSerializerInterceptor }],
 ```
 
-> **TypeORM note:** `ClassSerializerInterceptor` works correctly with TypeORM entities because `Repository.findOne()` returns a real instance of the entity class — `@Exclude()` decorators are honored as expected. For a clean wire shape that diverges from the entity (e.g. omitting internal fields, renaming), use an explicit response DTO with `plainToInstance(UserResponseDto, entity)`.
+> **TypeORM note:** `ClassSerializerInterceptor` works correctly with TypeORM entities because `Repository.findOne()` returns a real instance of the entity class — `@Exclude()` decorators are honored as expected (this is the key difference from Mongoose, where a `HydratedDocument` is not an instance of any decorated class). Even so, prefer returning an explicit response DTO via `UserResponseDto.from(entity)` (see [Controllers](#controllers)) so the wire contract is independent of the persistence shape; `@Exclude()` on the entity is then defence in depth, not the only guard.
 
 ---
 
@@ -327,15 +350,22 @@ TypeOrmModule.forRootAsync({
     username: config.get<string>("database.user"),
     password: config.get<string>("database.password"),
     database: config.get<string>("database.name"),
-    entities: [__dirname + "/**/*.entity{.ts,.js}"],
+    // Register entities automatically from the modules that import
+    // `TypeOrmModule.forFeature([...])` — avoids hand-maintained glob paths that
+    // silently break between `src` (ts-node) and `dist` (compiled) runs.
+    autoLoadEntities: true,
     synchronize: config.get<string>("app.env") === "development",
-    migrations: ["dist/migrations/*.js"],
+    // Resolve relative to this compiled file so it works in dist; the CLI uses the
+    // same directory via `data-source.ts` (see Migrations).
+    migrations: [__dirname + "/database/migrations/*{.ts,.js}"],
     migrationsRun: false, // run migrations as an explicit deploy step, not on boot
     ssl: config.get<string>("app.env") === "production" ? { rejectUnauthorized: true } : false,
   }),
   inject: [ConfigService],
 })
 ```
+
+> `autoLoadEntities: true` picks up every entity registered via `TypeOrmModule.forFeature()`. The TypeORM **CLI** can't use it (it has no running Nest app), so `data-source.ts` still lists explicit globs — see [Migrations](#migrations).
 
 > **Don't auto-run migrations on app boot in production.** `migrationsRun: true` runs pending migrations every time *any* instance starts — with multiple replicas they race, and a failed migration takes down every booting pod. Run `npm run migration:run` as a discrete pre-deploy step (one runner, gated before traffic shifts) and keep `migrationsRun: false`. `synchronize` stays `true` only in development; never in production (it silently alters the schema). Keeping both auto-behaviors off in prod leaves migrations as the single source of schema truth.
 
@@ -376,7 +406,9 @@ export class User {
   @Exclude()
   passwordHash: string;
 
-  @Column({ type: "varchar", length: 20, default: Role.USER })
+  // Use a native PG `enum` column for closed value sets — the database rejects
+  // invalid roles, not just the app. (`type: "varchar"` would accept anything.)
+  @Column({ type: "enum", enum: Role, default: Role.USER })
   role: Role;
 
   @CreateDateColumn()
@@ -388,10 +420,10 @@ export class User {
 ```
 
 - Keep entities clean: only persistence concerns (columns, relations, indexes). No business logic.
-- Define indexes on the entity, not in migration scripts, unless you need partial or expression indexes:
+- Define indexes on the entity, not in migration scripts, unless you need partial or expression indexes. Declare each index **once** — `unique: true` on a `@Column` already creates the unique index, so don't also add `@Index(["email"])` on top of it. Use `@Index` for **additional** (e.g. composite or non-unique) indexes:
 
 ```ts
-@Index(["email"])
+@Index(["role", "createdAt"]) // composite index for filtered, sorted list queries
 @Entity("users")
 export class User { ... }
 ```
@@ -419,6 +451,8 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @Inject(PASSWORD_HASHER)
+    private readonly passwordHasher: PasswordHasher,
   ) {}
 
   async findById(id: string): Promise<User> {
@@ -438,12 +472,35 @@ export class UsersService {
     const existing = await this.userRepo.findOne({ where: { email: dto.email } });
     if (existing) throw new ConflictException("Email already in use");
 
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+    // Hashing is behind a port — never call bcrypt/argon2 inline (see Authentication).
+    const passwordHash = await this.passwordHasher.hash(dto.password);
     const user = this.userRepo.create({ ...dto, passwordHash });
     return this.userRepo.save(user);
   }
 }
 ```
+
+> **Password hashing lives behind a `PasswordHasher` port, not inline in services.** A bare `bcrypt.hash(dto.password, 12)` scattered across `UsersService` contradicts the rule that the algorithm is a one-place change (see [Authentication](#authentication) and ADR-005), and makes the promised bcrypt→argon2id swap a multi-file edit. Define an interface + token and bind the implementation in the module:
+>
+> ```ts
+> // auth/password-hasher.ts
+> export const PASSWORD_HASHER = Symbol("PASSWORD_HASHER");
+> export interface PasswordHasher {
+>   hash(plaintext: string): Promise<string>;
+>   verify(hash: string, plaintext: string): Promise<boolean>;
+> }
+>
+> @Injectable()
+> export class Argon2PasswordHasher implements PasswordHasher {
+>   hash(plaintext: string) {
+>     return argon2.hash(plaintext, { type: argon2.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 });
+>   }
+>   verify(hash: string, plaintext: string) {
+>     return argon2.verify(hash, plaintext);
+>   }
+> }
+> // module providers: [{ provide: PASSWORD_HASHER, useClass: Argon2PasswordHasher }]
+> ```
 
 - For complex queries, use `createQueryBuilder`. Name all aliases explicitly:
 
@@ -462,7 +519,7 @@ const users = await this.userRepo
 
 ```ts
 await this.dataSource.transaction(async (manager) => {
-  const passwordHash = await bcrypt.hash(dto.password, 12);
+  const passwordHash = await this.passwordHasher.hash(dto.password); // injected port, not inline bcrypt
   const user = manager.create(User, { ...dto, passwordHash });
   await manager.save(user);
   await manager.save(AuditLog, { userId: user.id, action: "user.created" });
@@ -472,25 +529,37 @@ await this.dataSource.transaction(async (manager) => {
 ### Migrations
 
 - **Never use `synchronize: true` in production.** It can silently drop columns and destroy data when entities change.
-- Generate migrations with the TypeORM CLI after every entity change:
-
-```bash
-npx typeorm migration:generate src/migrations/UserAddRole -d dist/data-source.js
-npx typeorm migration:run -d dist/data-source.js
-```
-
-- Keep a `data-source.ts` at the project root for the TypeORM CLI:
+- Keep a `data-source.ts` at the project root for the TypeORM CLI. **It must match how you run the CLI:** run the CLI through ts-node so it loads `.ts` entities and the `.ts` data-source directly — no build step, no `src`/`dist` glob mismatch. (The alternative — build first, then point `-d dist/data-source.js` at `dist/**/*.entity.js` globs — also works, but mixing a `dist` data-source with `src` globs, as is easy to do by accident, loads **zero** entities and the CLI then "helpfully" regenerates the whole schema.)
 
 ```ts
-// data-source.ts
+// data-source.ts — CLI only; the app itself uses TypeOrmModule.forRootAsync (autoLoadEntities)
 import { DataSource } from "typeorm";
 
 export default new DataSource({
   type: "postgres",
   url: process.env.DATABASE_URL,
+  // .ts globs — resolved by ts-node. Keep the migrations dir identical to the
+  // runtime config above (`<root>/database/migrations`) so generate and run agree.
   entities: ["src/**/*.entity.ts"],
-  migrations: ["src/migrations/*.ts"],
+  migrations: ["src/database/migrations/*.ts"],
 });
+```
+
+- Generate and run migrations via the ts-node CLI wrapper. Wire them up as scripts so the glob path is never retyped:
+
+```jsonc
+// package.json
+"scripts": {
+  "typeorm": "typeorm-ts-node-commonjs -d data-source.ts",
+  "migration:generate": "npm run typeorm -- migration:generate src/database/migrations/Migration",
+  "migration:run": "npm run typeorm -- migration:run",
+  "migration:revert": "npm run typeorm -- migration:revert"
+}
+```
+
+```bash
+npm run migration:generate -- src/database/migrations/AddUserRole
+npm run migration:run
 ```
 
 - Review every generated migration before running it. TypeORM may generate `DROP COLUMN` on a rename — handle renames manually.
@@ -504,18 +573,44 @@ export default new DataSource({
 NestJS v11 supports two JWT authentication approaches — choose one per project and stay consistent:
 
 **Option A — Native `@nestjs/jwt` (recommended for new projects)**
-Simpler, no Passport dependency. Use `@nestjs/jwt` directly to sign and verify tokens in a custom `AuthGuard`.
+Simpler, no Passport dependency. Use `@nestjs/jwt` directly to sign and verify tokens in a custom `JwtAuthGuard`. (Name it `JwtAuthGuard` consistently — don't call it `AuthGuard`, which collides with Passport's `AuthGuard()` export.)
+
+Because this guard is registered **globally** (`APP_GUARD`, see [Authorization](#authorization)), it must skip routes marked `@Public()` — otherwise login, health, and the SSE stream all 401 and login is unreachable. The `@Public()` decorator and the `Reflector` check are two halves of the same mechanism:
 
 ```ts
-// auth.guard.ts
+// common/decorators/public.decorator.ts
+import { SetMetadata } from "@nestjs/common";
+export const IS_PUBLIC_KEY = "isPublic";
+export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
+```
+
+```ts
+// common/decorators/current-user.decorator.ts — read the user the guard attached to the request
+import { createParamDecorator, ExecutionContext } from "@nestjs/common";
+export const CurrentUser = createParamDecorator(
+  (_data: unknown, ctx: ExecutionContext): JwtPayload =>
+    ctx.switchToHttp().getRequest().user,
+);
+```
+
+```ts
+// common/guards/jwt-auth.guard.ts
 @Injectable()
-export class AuthGuard implements CanActivate {
+export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
+    private readonly reflector: Reflector,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Skip authentication for @Public() routes (checked at handler and class level).
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) return true;
+
     const request = context.switchToHttp().getRequest();
     const [scheme, token] = request.headers.authorization?.split(" ") ?? [];
     if (scheme !== "Bearer" || !token) throw new UnauthorizedException();
@@ -576,7 +671,9 @@ async refresh(presentedToken: string): Promise<{ accessToken: string; refreshTok
 }
 ```
 
-> **`argon2id` is OWASP's current first recommendation** for new projects (memory-hard, more GPU/ASIC-resistant than bcrypt). Use `argon2` (`npm i argon2`) with the OWASP-suggested parameters (`memoryCost: 19456`, `timeCost: 2`, `parallelism: 1`); bcrypt at cost 12 remains acceptable. Whichever you pick, keep it behind the auth service so the algorithm is a one-place change — see [ADR-005](./DECISIONS.md).
+> **`argon2id` is OWASP's current first recommendation** for new projects (memory-hard, more GPU/ASIC-resistant than bcrypt). Use `argon2` (`npm i argon2`) with the OWASP-suggested parameters (`memoryCost: 19456`, `timeCost: 2`, `parallelism: 1`); bcrypt at cost 12 remains acceptable. Whichever you pick, keep it behind the [`PasswordHasher` port](#repository-pattern) so the algorithm is a one-place change — see [ADR-005](./DECISIONS.md).
+
+**Refresh-token transport to the browser.** A refresh token is a long-lived credential — never return it in the JSON body for JS to store (XSS-readable). Send it as an `httpOnly; Secure; SameSite=Strict` cookie scoped to the refresh endpoint path, and return only the short-lived access token in the body. Because the cookie now rides along automatically, the refresh (and any other cookie-authenticated state-changing) route needs **CSRF protection** — a double-submit token or an `Origin`/`Sec-Fetch-Site` check. (A pure `Authorization: Bearer` access token in a header is not CSRF-able; the cookie is what introduces the requirement.)
 
 ### Authorization
 
@@ -696,7 +793,14 @@ export default () => ({
 ConfigModule.forRoot({ isGlobal: true, load: [configuration], validationSchema })
 ```
 
-- Validate environment variables at startup using `Joi` or `class-validator` schema in `ConfigModule.forRoot({ validationSchema })`. Fail fast on missing required variables.
+- Validate environment variables at startup and fail fast on missing required variables. **`validationSchema` is Joi-specific** — pass a Joi schema (`Joi.object({ ... })`) there. To validate with **class-validator** instead, use the separate `validate` function option (`ConfigModule.forRoot({ validate })`) that receives the raw env and returns the validated, transformed config — the two are different options, not interchangeable. Pick one:
+
+```ts
+// Joi
+ConfigModule.forRoot({ isGlobal: true, load: [configuration], validationSchema: envValidationSchema });
+// class-validator (validate fn that runs plainToInstance + validateSync over an EnvVars class)
+ConfigModule.forRoot({ isGlobal: true, load: [configuration], validate });
+```
 - Commit a `.env.example` listing **every** variable the app reads — keys only, no values. Keep it in sync with the validation schema; the real `.env` stays gitignored. It is the canonical list of required config for new developers and CI.
 - Use `registerAs()` to namespace related config, then inject the namespace directly for strong typing:
 
@@ -920,15 +1024,22 @@ describe("UsersController (e2e)", () => {
 ```
 
 - Apply the same global pipes and interceptors in the test app as in production.
-- Use a `.env.test` file for test database credentials. Load it in Jest config via `dotenv`:
+- Use a `.env.test` file for test database credentials. **`dotenv/config` does NOT pick `.env.test` from `NODE_ENV`** — plain `dotenv` always loads `.env` (the `NODE_ENV`-aware behaviour belongs to `dotenv-flow`/Next.js, not `dotenv`). Point a setup file at the file explicitly, or let `ConfigModule` load it:
+
+```ts
+// test/setup-env.ts — referenced by jest's setupFiles
+import { config } from "dotenv";
+config({ path: ".env.test", override: true });
+```
 
 ```js
-// jest.config.js
+// jest.config.js / jest-e2e.json
 module.exports = {
-  setupFiles: ["dotenv/config"],
-  // dotenv loads .env.test when NODE_ENV=test
+  setupFiles: ["<rootDir>/test/setup-env.ts"], // loads .env.test before anything else
 };
 ```
+
+> Alternatively, skip dotenv in tests entirely and load the file through Nest: `ConfigModule.forRoot({ envFilePath: ".env.test", ... })` in the test module. Either way, **verify** the e2e suite is hitting the test DB, not development — an unloaded `.env.test` silently runs migrations and `TRUNCATE` against your dev database.
 
 ### Rules
 
@@ -954,7 +1065,7 @@ const users = await this.userRepo.find({
 ```
 
 - For columns used together in `WHERE` / `JOIN` / `ORDER BY`, prefer one **composite** index over several single-column indexes.
-- Paginate with `findAndCount` — it returns `[rows, total]` in a single round-trip, so no separate count query is needed:
+- Paginate with `findAndCount` — it returns `[rows, total]` in one call. (It still issues **two** SQL statements — a `SELECT` for the page and a `SELECT COUNT(*)` for the total — but you don't hand-write the count query.) For very large tables where the `COUNT(*)` is the bottleneck, consider keyset/cursor pagination instead:
 
 ```ts
 const [users, total] = await this.userRepo.findAndCount({
@@ -965,7 +1076,7 @@ const [users, total] = await this.userRepo.findAndCount({
 ```
 
 - Enable SSL in production connections (`ssl: { rejectUnauthorized: true }` — see Connection section).
-- Tune `extra.max` (connection pool size) against your PostgreSQL `max_connections` setting.
+- Tune `extra.max` (per-process connection pool size) against PostgreSQL's `max_connections`: **replicas × pool size + headroom ≤ `max_connections`**, or instances starve each other and new connections error out. For serverless/high-replica deployments put **PgBouncer** (transaction pooling) in front and keep the app pool small — and disable prepared statements TypeORM-side when using transaction pooling.
 - Cache expensive, rarely-changing reads with `@nestjs/cache-manager` v3+. This version uses **Keyv** under the hood — the old `store` adapter pattern is gone. Redis setup:
 
 ```ts
@@ -995,9 +1106,22 @@ The first store is primary (in-memory), the second is fallback (Redis). For in-m
 - Enable `throttler` (`@nestjs/throttler`) globally. Apply stricter per-route limits on auth endpoints (login, register, password reset) using `@Throttle()`. Skip throttling on internal or health-check routes with `@SkipThrottle()`.
 
 ```ts
-// Global default — 100 req / minute
-ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }])
+// app.module.ts — importing the module is NOT enough; bind ThrottlerGuard globally
+// or every @Throttle()/limit below is silently inert and auth brute-force is unprotected.
+import { APP_GUARD } from "@nestjs/core";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 
+@Module({
+  imports: [ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }])], // global default — 100 req/min
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard }, // ← the binding that actually enforces it
+    { provide: APP_GUARD, useClass: JwtAuthGuard },   // order vs the JWT guard doesn't matter here:
+  ],                                                   // both must pass, and each throws its own error
+})
+export class AppModule {}
+```
+
+```ts
 // Stricter on auth routes
 @Throttle({ default: { ttl: 60_000, limit: 5 } })
 @Post("login")
@@ -1012,6 +1136,7 @@ health() { ... }
 > **Multi-instance deployments need shared storage.** `@nestjs/throttler`'s default storage is in-memory and **per-process**, so behind N replicas a limit of 5 becomes effectively 5×N — the brute-force protection on auth routes silently weakens as you scale. Configure a shared store (`@nest-lab/throttler-storage-redis`) via the `storage` option so counters are global across instances.
 
 - Sanitize and validate all user input via `ValidationPipe`. Never trust request data.
+- **Cap request body size.** Express 5 defaults to a 100 kB JSON limit, but set it explicitly so an oversized payload is rejected before it's parsed into memory: `app.use(json({ limit: "1mb" }))` (and a matching `urlencoded` limit). Raise it only on the specific routes that need it — never globally for file data, which should go through presigned R2 uploads, not the API.
 - Use parameterized queries or the ORM at all times. Never interpolate user input into SQL.
 - Rotate JWT secrets and never commit secrets to version control. Use environment variables or a secrets manager.
 - Set CORS policy explicitly in `main.ts`. Do not use `origin: "*"` in production.
@@ -1117,13 +1242,15 @@ export class HealthModule {}
 
 ```ts
 // health/health.controller.ts
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, VERSION_NEUTRAL } from "@nestjs/common";
 import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator } from "@nestjs/terminus";
 import { SkipThrottle } from "@nestjs/throttler";
 import { Public } from "@/common/decorators/public.decorator";
 
+// VERSION_NEUTRAL so probes hit `/health`, not `/v1/health` — orchestrators
+// shouldn't have to track the API version to know if the app is alive.
 @Public()
-@Controller("health")
+@Controller({ path: "health", version: VERSION_NEUTRAL })
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
@@ -1380,7 +1507,10 @@ export class SchedulerService {
   private readonly logger = new Logger(SchedulerService.name);
   private redlock: Redlock;
 
-  constructor(@InjectRedis() private readonly redis: Redis) {
+  constructor(
+    @InjectRedis() private readonly redis: Redis,
+    private readonly authService: AuthService, // ← must be injected; the @Cron below calls it
+  ) {
     this.redlock = new Redlock([redis], { retryCount: 0 });
   }
 
@@ -1404,7 +1534,9 @@ export class SchedulerService {
 }
 ```
 
-Use Redlock on every `@Cron` job when running multiple instances — without it, all instances execute the job simultaneously. If a job can fail and needs retry, use a BullMQ repeatable job instead.
+Use a distributed lock on every `@Cron` job when running multiple instances — without it, all instances execute the job simultaneously. If a job can fail and needs retry, use a BullMQ repeatable job instead (already distributed-safe — no lock needed).
+
+> **On `redlock` the package:** v5 has sat in beta for years with little maintenance. Prefer alternatives where you can: a **BullMQ repeatable job** for anything retry-worthy, or — since this is the PostgreSQL variant — `pg_try_advisory_lock(key)` for a leader-elect on a single cron, which needs no extra Redis dependency and releases automatically when the session ends.
 
 ---
 
@@ -1417,7 +1549,9 @@ npm install @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
 ```
 
 ```ts
-// files/r2.client.ts
+// files/r2.client.ts — provide the SDK client through DI, don't `new` it inside the service
+export const R2_CLIENT = Symbol("R2_CLIENT");
+
 export function createR2Client(config: ConfigService): S3Client {
   return new S3Client({
     region: "auto",
@@ -1428,17 +1562,22 @@ export function createR2Client(config: ConfigService): S3Client {
     },
   });
 }
+
+// files/files.module.ts
+// providers: [
+//   FilesService,
+//   { provide: R2_CLIENT, useFactory: createR2Client, inject: [ConfigService] },
+// ]
 ```
 
 ```ts
 // files/files.service.ts
 @Injectable()
 export class FilesService {
-  private r2: S3Client;
-
-  constructor(private readonly config: ConfigService) {
-    this.r2 = createR2Client(config);
-  }
+  constructor(
+    @Inject(R2_CLIENT) private readonly r2: S3Client, // injected, not constructed — trivially mockable in tests
+    private readonly config: ConfigService,
+  ) {}
 
   async getPresignedUploadUrl(userId: string, filename: string, contentType: string) {
     const ext = filename.split(".").pop();
@@ -1544,18 +1683,29 @@ npm install posthog-node
 ```
 
 ```ts
+// analytics/posthog.client.ts — SDK client behind a factory provider, injected (not `new`d in the service)
+export const POSTHOG_CLIENT = Symbol("POSTHOG_CLIENT");
+
+export function createPostHogClient(config: ConfigService): PostHog {
+  return new PostHog(config.get<string>("posthog.key")!, {
+    host: config.get("posthog.host") ?? "https://us.i.posthog.com", // ingestion host, not app.posthog.com (EU: https://eu.i.posthog.com)
+    flushAt: 20,
+    flushInterval: 10_000,
+  });
+}
+
+// analytics/analytics.module.ts
+// providers: [
+//   AnalyticsService,
+//   { provide: POSTHOG_CLIENT, useFactory: createPostHogClient, inject: [ConfigService] },
+// ]
+```
+
+```ts
 // analytics/analytics.service.ts
 @Injectable()
 export class AnalyticsService implements OnModuleDestroy {
-  private client: PostHog;
-
-  constructor(private readonly config: ConfigService) {
-    this.client = new PostHog(config.get<string>("posthog.key")!, {
-      host: config.get("posthog.host") ?? "https://us.i.posthog.com", // ingestion host, not app.posthog.com (EU: https://eu.i.posthog.com)
-      flushAt: 20,
-      flushInterval: 10_000,
-    });
-  }
+  constructor(@Inject(POSTHOG_CLIENT) private readonly client: PostHog) {}
 
   capture(distinctId: string, event: string, properties?: Record<string, unknown>) {
     this.client.capture({ distinctId, event, properties });
@@ -1570,7 +1720,7 @@ export class AnalyticsService implements OnModuleDestroy {
 ```ts
 // Usage — track meaningful business events from services
 async create(dto: CreateUserDto) {
-  const user = await this.userModel.create(dto);
+  const user = await this.userRepo.save(this.userRepo.create(dto));
   this.analytics.capture(user.id, "user_signed_up", { role: user.role });
   await this.mailService.sendWelcome(user.email, user.name);
   return user;
@@ -1585,24 +1735,30 @@ Always call `client.shutdown()` in `onModuleDestroy` — PostHog batches events 
 
 Server-Sent Events: unidirectional (server → client), HTTP/1.1, auto-reconnects. Use Redis pub/sub so any instance can push to any connected client.
 
+> `@InjectRedis()` / `Redis` come from `@nestjs-modules/ioredis` (`RedisModule.forRootAsync(...)`) — install and register it, or use your own `ioredis` provider token. The same connection backs caching, throttler storage, SSE tickets, and idempotency, so register it once globally.
+
 ```ts
 // notifications/notifications.service.ts
 @Injectable()
 export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   private events$ = new Subject<{ userId: string; type: string; payload: unknown }>();
+  private sub!: Redis;
 
-  constructor(
-    @InjectRedis() private readonly redis: Redis,
-    @InjectRedis() private readonly sub: Redis,
-  ) {}
+  // A single injected client is fine for publishing. The subscriber MUST be a
+  // separate connection: once a connection calls `subscribe()` it enters
+  // subscriber mode and rejects all normal commands — sharing it would break
+  // `publish`, the SSE ticket `GETDEL`, idempotency `SET NX`, everything.
+  constructor(@InjectRedis() private readonly redis: Redis) {}
 
   async onModuleInit() {
+    this.sub = this.redis.duplicate(); // dedicated subscriber connection
     await this.sub.subscribe("notifications");
     this.sub.on("message", (_, msg) => this.events$.next(JSON.parse(msg)));
   }
 
   async onModuleDestroy() {
     await this.sub.unsubscribe("notifications");
+    await this.sub.quit(); // close the duplicated connection
   }
 
   async publish(userId: string, type: string, payload: unknown) {
@@ -1692,10 +1848,12 @@ Accept pagination through query params with one shared DTO. Defaults: `page=1`, 
 GET /users?page=2&limit=20&sort=createdAt&order=desc
 ```
 
+> **Express 5 query-parser change (NestJS 11).** Express 5 defaults to the "simple" query parser, which does **not** parse nested/array syntax — `?filter[role]=admin` arrives as `undefined`, and `?id=1&id=2` no longer becomes an array. Flat params like the ones above are unaffected, but if a DTO relies on nested or repeated keys, opt back in explicitly: `app.set("query parser", "extended")` in `main.ts`.
+
 ```ts
-// common/dto/pagination-query.dto.ts
+// common/dto/pagination-query.dto.ts — page/limit/order are generic; `sort` is NOT here
 import { Type } from "class-transformer";
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsIn, IsInt, IsOptional, Max, Min } from "class-validator";
 
 export class PaginationQueryDto {
   @Type(() => Number)
@@ -1711,13 +1869,20 @@ export class PaginationQueryDto {
   @IsOptional()
   limit: number = 20;
 
-  @IsString()
-  @IsOptional()
-  sort: string = "createdAt";
-
   @IsIn(["asc", "desc"])
   @IsOptional()
   order: "asc" | "desc" = "desc";
+}
+```
+
+> **Never accept a free-text `sort` field.** A bare `@IsString() sort: string` flows straight into `order: { [sort]: ... }`, so a client can order by **any** column — `passwordHash` (a timing/ordering side channel), or an unindexed column (sequential-scan DoS) — and an unknown column 500s. Whitelist the sortable columns **per resource** with `@IsIn`, since the allowed set differs by entity:
+
+```ts
+// users/dto/user-query.dto.ts
+export class UserQueryDto extends PaginationQueryDto {
+  @IsIn(["createdAt", "email", "role"]) // only these columns are sortable — no passwordHash
+  @IsOptional()
+  sort: "createdAt" | "email" | "role" = "createdAt";
 }
 ```
 
@@ -1730,9 +1895,9 @@ export interface Paginated<T> {
 ```
 
 ```ts
-// service — build the envelope once; findAndCount returns rows + total in one round-trip
-async findAll(query: PaginationQueryDto): Promise<Paginated<User>> {
-  const { page, limit, sort, order } = query;
+// service — build the envelope once; findAndCount returns rows + total (one call, two SQL statements)
+async findAll(query: UserQueryDto): Promise<Paginated<User>> {
+  const { page, limit, sort, order } = query; // `sort` is whitelisted by UserQueryDto's @IsIn
   const [data, total] = await this.userRepo.findAndCount({
     take: limit,
     skip: (page - 1) * limit,
@@ -1828,18 +1993,30 @@ import "./instrument";
 import { NestFactory } from "@nestjs/core";
 ```
 
-- Register `SentryModule.forRoot()` in `AppModule`, **and** register `SentryGlobalFilter` via `APP_FILTER` — `Sentry.init` alone instruments the runtime but does not capture exceptions handled inside Nest's request lifecycle. Per Sentry's NestJS guide, `SentryGlobalFilter` must be registered **before** any other exception filter in the providers array; it reports the error and then delegates to the next filter, so your `HttpExceptionFilter` still owns the client-facing response shape.
+- Register `SentryModule.forRoot()` in `AppModule` — `Sentry.init` alone instruments the runtime but does not capture exceptions handled inside Nest's request lifecycle. **NestJS exception filters do not chain:** for any thrown error, Nest runs exactly **one** matching filter, and a global catch-all `@Catch()` filter (the `HttpExceptionFilter` this doc mandates for a consistent error shape) always wins. So adding `SentryGlobalFilter` "before" it does nothing — the catch-all swallows the error and Sentry never sees it. Per Sentry's NestJS guide, when you have a global catch-all filter, **do not register `SentryGlobalFilter`**; instead decorate your filter's `catch()` with `@SentryExceptionCaptured()` so it reports *and* shapes the response in one place:
 
 ```ts
-// app.module.ts
-import { APP_FILTER } from "@nestjs/core";
-import { SentryGlobalFilter } from "@sentry/nestjs/setup"; // NOT "@sentry/nestjs"
+// common/filters/http-exception.filter.ts
+import { ArgumentsHost, Catch, ExceptionFilter } from "@nestjs/common";
+import { SentryExceptionCaptured } from "@sentry/nestjs";
 
-providers: [
-  { provide: APP_FILTER, useClass: SentryGlobalFilter }, // first — reports to Sentry, then delegates
-  { provide: APP_FILTER, useClass: HttpExceptionFilter }, // shapes the client-facing response
-],
+@Catch()
+export class HttpExceptionFilter implements ExceptionFilter {
+  @SentryExceptionCaptured() // reports to Sentry, then your code shapes the client-facing response
+  catch(exception: unknown, host: ArgumentsHost) {
+    // ...map HttpException → normal body, everything else → sanitized 500
+  }
+}
 ```
+
+```ts
+// app.module.ts — a single global filter; no SentryGlobalFilter
+import { APP_FILTER } from "@nestjs/core";
+
+providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],
+```
+
+> `SentryGlobalFilter` is the right choice only when you **don't** have a catch-all filter and want Sentry to forward unhandled errors to Nest's default handler. With the catch-all this doc recommends, the `@SentryExceptionCaptured()` decorator is the correct pattern.
 - Never send PII — leave `sendDefaultPii: false` (the default). Scrub tokens, passwords, and emails from breadcrumbs and request bodies.
 - `SENTRY_DSN` is environment config like any other — load it through `ConfigService` and list it in `.env.example`.
 - For cross-service request tracing, add OpenTelemetry — `@sentry/nestjs` integrates with it. Optional until you run more than one service.
