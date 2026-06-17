@@ -17,6 +17,7 @@ This guide is current as of **Claude Code v2.1.x** (June 2026).
 | 3 | [**Core Concepts**](./03-core-concepts.md) | CLAUDE.md memory, subagents, skills, hooks, MCP, permission modes, settings |
 | 4 | [**CLI Flags & Headless Mode**](./04-cli-flags.md) | `-p`, `--continue`, `--resume`, `--model`, scripting & automation |
 | 5 | [**Best Practices**](./05-best-practices.md) | The workflows that separate beginners from power users |
+| 6 | [**Skills, Artifacts & More**](./06-skills.md) | How to add a skill, how skills load, bundling scripts/refs, Artifacts vs. CLI, plugins |
 
 ---
 
