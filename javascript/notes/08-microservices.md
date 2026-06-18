@@ -1231,3 +1231,112 @@ async relayOutbox() {
   `/admin/queues`.
 - Model the order flow as a **choreography saga** with a `payment` service and a compensating
   `order.cancelled` path.
+
+---
+
+## Interview Questions
+
+### Microservices Fundamentals
+
+1. What is the single most important rule about data ownership in a microservices architecture, and what breaks if you violate it?
+2. Why is a "distributed monolith" considered the worst of both worlds, and how do you recognise one in a codebase?
+3. How do bounded contexts from DDD map onto service boundaries, and what signal tells you a boundary is drawn in the wrong place?
+4. When should you NOT split a monolith into microservices, and what concrete criteria would make you pull the trigger on a split?
+5. If the Orders service needs the customer's name in its responses but owns no user data, how do you handle that without a cross-service JOIN, and what are the consistency trade-offs?
+6. What is polyglot persistence, what operational burden does it introduce, and when is that burden worth paying?
+7. How would you handle a schema migration in a service that is consumed by five other services without a coordinated deploy?
+8. What is the difference between a modular monolith and a microservices system, and why might you prefer the former as a starting point?
+9. How do you decide the granularity of a service — what makes a service too small, and what makes it too large?
+10. What problems arise when two services share a library that contains domain logic, and how would you handle shared code across services?
+
+### NestJS Microservices Transport
+
+11. What is the fundamental difference between `@MessagePattern` and `@EventPattern` in NestJS, and when would using the wrong one cause a silent failure?
+12. Why does calling `.send()` on a `ClientProxy` without subscribing result in no message being sent, and how does this differ from a traditional HTTP client call?
+13. How does `@nestjs/microservices` achieve transport portability, and what would you need to change in your handlers if you swapped from RabbitMQ to Kafka?
+14. What is a hybrid NestJS application, and what problem does it solve compared to running two separate processes?
+15. What are the trade-offs between NestJS's built-in RMQ transport and a library like `@golevelup/nestjs-rabbitmq` when you need topic exchanges and fine-grained bindings?
+16. How would you pass a correlation ID through a RabbitMQ message so that the consuming service can include it in its own logs?
+17. What happens if a `@MessagePattern` handler throws an unhandled exception — does the calling service get an error back or does the call hang, and how do you handle this gracefully?
+18. How do you register a `ClientProxy` for multiple different services in the same NestJS module without them colliding?
+19. Why is `firstValueFrom()` used to await an Observable from `ClientProxy.send()` rather than just `.toPromise()`, and what is the practical difference?
+20. How would you test a NestJS microservices controller that uses `@EventPattern` in isolation, without spinning up a real broker?
+
+### Messaging & Events (RabbitMQ)
+
+21. Walk through the AMQP model: publisher → exchange → binding → queue → consumer. What happens if no binding matches a message's routing key?
+22. What is the difference between `direct`, `topic`, and `fanout` exchange types, and give a concrete use case for each?
+23. What is the difference between `noAck: true` and `noAck: false`, and what guarantee does each provide about message delivery?
+24. Why does at-least-once delivery require consumers to be idempotent, and what breaks if they are not?
+25. What is a dead-letter exchange, how do you configure one in RabbitMQ, and what should happen to messages that land in the dead-letter queue?
+26. How would you implement a retry-with-delay loop using RabbitMQ's dead-letter mechanism and a TTL queue?
+27. What is a "poison message", and how do you prevent one from wedging an entire queue indefinitely?
+28. What is the difference between choreography and orchestration in a saga, and what are the failure-visibility trade-offs of each?
+29. In a choreography-based saga where payment fails after inventory was reserved, how does the compensating transaction get triggered, and what happens if the compensation itself fails?
+30. How would you add a timeout to a saga step — for example, if the Payment service never responds to an `order.created` event?
+
+### BullMQ & Job Queues
+
+31. What is the fundamental difference in use case between BullMQ and the NestJS RMQ transport, and when would using RabbitMQ for background jobs be the wrong choice?
+32. How does BullMQ's exponential backoff work, and why does it not protect you from thundering herds without jitter?
+33. What is the `jobId` option in BullMQ used for, and how does it provide deduplication?
+34. Why does a BullMQ repeatable job survive a restart when an `@Cron` decorator does not, and what mechanism makes the difference?
+35. If you have five replicas of a service each running a `@Cron` job, how many times will the job fire per tick, and how would you fix that using BullMQ?
+36. What is the `concurrency` option on a BullMQ `@Processor`, and what are the risks of setting it too high in a Node.js process?
+37. How does BullMQ's rate limiter differ from a per-request rate limit at the API gateway, and when do you need both?
+38. What is the difference between a job moving to `failed` state versus `delayed` state in BullMQ, and how does `attempts` interact with `backoff`?
+39. How would you drain a BullMQ queue safely during a deployment without losing in-flight jobs?
+40. Describe a scenario where Bull Board's visibility would reveal a production bug that structured logs alone would not surface quickly.
+
+### Resilience Patterns
+
+41. Explain the three states of a circuit breaker and what triggers each state transition in `opossum`.
+42. Why does the order matter when layering timeout, retry, and circuit breaker — what goes wrong if you put the circuit breaker inside the retry loop?
+43. What is the `errorThresholdPercentage` in `opossum` measuring, and why is a rolling window more useful than a cumulative counter?
+44. What is the dual-write problem, and why is a try/catch block around "save to DB then publish to broker" not an adequate solution?
+45. Walk through the outbox pattern step by step and explain why it provides at-least-once (not exactly-once) publishing.
+46. How does an idempotency key actually prevent duplicate orders when two concurrent requests arrive with the same key — what database-level mechanism is the real guard?
+47. What is the difference between an idempotency key and a message deduplication ID, and where does each live in your stack?
+48. If the outbox relay crashes after publishing to RabbitMQ but before marking the row as `sent`, what happens on restart, and how must downstream consumers handle it?
+49. What is a thundering herd, and how does jitter in exponential backoff prevent it?
+50. How would you make an HTTP `POST /orders` endpoint safe to retry, given that POST is not idempotent by default?
+
+### Service Discovery & API Gateway
+
+51. How does Docker Compose DNS-based service discovery work, and what are its limitations compared to a service mesh like Consul or Istio?
+52. What is the difference between client-side and server-side service discovery, and which model does Kubernetes' DNS service use?
+53. What concerns should live at the API gateway versus inside individual services, and what happens when business logic creeps into the gateway?
+54. What is the Backend for Frontend (BFF) pattern, and when does the added complexity of maintaining two gateways justify the split?
+55. How does `http-proxy-middleware` differ from NGINX as an API gateway, and what are the trade-offs in terms of performance, flexibility, and operational overhead?
+56. How would you implement JWT validation at the NGINX gateway level so that downstream services do not each need to re-validate the token?
+57. What is the risk of doing aggressive rate limiting only at the gateway when you have services that also receive internal traffic from other services?
+58. How would you propagate a `x-request-id` correlation header from NGINX to downstream services, and what configuration achieves that?
+
+### Distributed Tracing & Observability
+
+59. What is a trace, what is a span, and how does the `traceparent` header propagate context across service boundaries in OpenTelemetry?
+60. Why must the OpenTelemetry SDK be loaded via `node --require` before any other module, and what breaks if it loads after `express` or `@nestjs/core`?
+61. What is the difference between a trace and a correlation ID, and why do you need both in a production system?
+62. How does `AsyncLocalStorage` carry a correlation ID through an async call chain without passing it as a function argument, and what pitfall arises when you cross a callback-based boundary?
+63. What is the difference between liveness and readiness health probes, and what happens in Kubernetes if a service's readiness probe fails versus its liveness probe fails?
+64. Why should structured JSON be logged to stdout rather than to a file, and what collects and ships those logs in a typical ELK or Loki stack?
+65. How would you correlate a log line from the Orders service with the trace span that triggered it, given both OTel tracing and `pino` structured logging are in use?
+66. What are the three pillars of observability, and what specific gap does each pillar fill that the others cannot?
+67. How would you add a custom span attribute to an OpenTelemetry trace inside a NestJS service method without changing the auto-instrumentation setup?
+
+### gRPC & Service Communication
+
+68. What are the trade-offs between gRPC and REST for internal service-to-service communication, and which would you choose for a high-throughput internal API and why?
+69. What is a `.proto` file and what role does it play in gRPC's type safety guarantee across polyglot services?
+70. How does NestJS's gRPC transport differ from the TCP transport, and when would you reach for gRPC over the built-in TCP?
+71. What is gRPC server-streaming, and give a use case where it is a better fit than a polling REST endpoint?
+72. How would you handle backward-compatible `.proto` schema evolution — adding a new field to a message — without breaking existing clients?
+
+### CQRS & Event Sourcing
+
+73. What problem does CQRS solve, and why does splitting reads from writes become particularly valuable in a microservices context?
+74. How does `@nestjs/cqrs` separate command handlers from query handlers, and what is the benefit of that separation in terms of testability?
+75. What is eventual consistency in the context of CQRS read models, and how would you explain the read-your-own-writes problem to a frontend developer?
+76. What is event sourcing, how does it differ from storing only current state, and what are the recovery and auditability benefits?
+77. What is a projection in event sourcing, and how do you rebuild one after a bug is discovered in the original projection logic?
+78. What is the difference between a domain event and an integration event, and why should you not publish raw domain events directly to a message broker?

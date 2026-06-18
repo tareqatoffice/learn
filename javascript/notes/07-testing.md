@@ -861,3 +861,112 @@ Checklist:
 - Add a `OrderBuilder` test-data builder and use it across the order tests.
 - Measure and assert on the test pyramid shape: many unit, fewer integration, fewest E2E.
 - Add a per-test-transaction cleanup variant and observe where it breaks (handlers that commit their own transactions) — proving why truncate is the safer default with Prisma.
+
+---
+
+## Interview Questions
+
+### Jest Fundamentals
+
+1. What is the difference between `toBe` and `toEqual` in Jest, and when would using `toBe` on an object lead to a false negative?
+2. Why does `expect(promise).rejects.toThrow()` pass silently when you forget to `await` it, and what does that mean for test reliability?
+3. What is the execution order of `beforeAll`, `beforeEach`, `afterEach`, and `afterAll` hooks when `describe` blocks are nested two levels deep?
+4. How does `toMatchObject` differ from `toEqual`, and what are the trade-offs of using partial matching in assertions?
+5. When would you choose `toThrow(DomainError)` over `toThrow('message substring')`, and what are the risks of each approach?
+6. Explain how `expect.objectContaining` and `expect.any` work as asymmetric matchers, and give a scenario where they are the right tool.
+7. Why does Jest run test *files* in parallel but run tests within a file serially, and what does this mean for shared mutable state?
+8. What happens if a `beforeAll` hook throws — which tests in the describe block are skipped, and which (if any) lifecycle hooks still run?
+9. How does `test.each` (or `it.each`) work, and what types of test scenarios benefit most from it?
+10. What is the difference between `describe.skip` / `test.skip` and `describe.only` / `test.only`, and why should neither slip into a committed test suite?
+
+### Mocking & Spies
+
+11. Explain the difference between `jest.clearAllMocks()`, `jest.resetAllMocks()`, and `jest.restoreAllMocks()` — what does each reset, and what does it leave intact?
+12. Why does mock state (call counts, return values) bleed between tests in the same file, and what is the idiomatic way to prevent it?
+13. What is the difference between `mockReturnValue` and `mockImplementation`, and when is one preferable to the other?
+14. How does `mockReturnValueOnce` behave once the single-use return values are exhausted, and how does the sequence fall back?
+15. Explain why `jest.spyOn` without calling `mockRestore()` can cause test pollution across a file, especially when testing `Date.now` or `Math.random`.
+16. What is `jest.Mocked<T>` in TypeScript, and why is it safer to type a mock object as `jest.Mocked<UserRepository>` rather than a plain object literal?
+17. `jest.mock()` is hoisted above `import` statements by Jest — what constraint does this impose on variables referenced inside the factory function, and why does Jest enforce it?
+18. What is the difference between auto-mocking (`jest.mock('./module')`) and a factory mock (`jest.mock('./module', () => ({...}))`), and when would you need the factory form?
+19. How does `jest.requireActual` work inside a `jest.mock` factory, and why is it useful for partial mocks of a module?
+20. Why is it generally better to swap providers via NestJS DI (`useValue`) than to use `jest.mock()` for application service dependencies, and when would `jest.mock()` still be the right choice?
+21. Explain the difference between a stub, a spy, and a mock in the context of test doubles — how do `jest.fn()`, `jest.spyOn()`, and a hand-rolled object map to these categories?
+22. If `jest.spyOn(console, 'error')` is used to suppress noise in tests, what risk does it introduce, and how should you guard against it?
+
+### Fake Timers & Async Testing
+
+23. Why does mixing `jest.useFakeTimers()` with `await`-based promises sometimes cause a test to hang indefinitely, and what is the recommended fix?
+24. What is the difference between `jest.runAllTimers()` and `jest.runOnlyPendingTimers()`, and why does `runAllTimers()` risk an infinite loop with `setInterval`?
+25. How does `jest.advanceTimersByTimeAsync()` differ from `jest.advanceTimersByTime()`, and when is the async variant necessary?
+26. Why must `jest.useRealTimers()` be called in `afterEach` rather than just at the end of the test, and what can go wrong if it is omitted?
+27. How would you pin `Date.now()` to a specific timestamp in a test, and what is the Jest API to do this without injecting a clock abstraction?
+28. What is the risk of asserting on return values from `mockResolvedValue` vs asserting on side effects (e.g., `toHaveBeenCalledWith`) in async unit tests?
+
+### Integration Testing
+
+29. How does `supertest` make HTTP requests against a NestJS app without binding to a real port, and what is the equivalent mechanism in .NET's `WebApplicationFactory`?
+30. Why must `app.useGlobalPipes(new ValidationPipe(...))` be re-applied in the test setup, and what class of test failures silently disappears if you forget it?
+31. What is the difference between `.overrideProvider(TOKEN).useValue(mock)` and `.overrideProvider(TOKEN).useClass(FakeClass)` — when would you choose each?
+32. How does `overrideGuard` work in the NestJS testing module, and what is the risk of bypassing a guard globally across all tests in a suite?
+33. If a global exception filter maps a domain `NotFoundError` to a 404 response, how do you verify it is working correctly in a supertest integration test?
+34. Why is `await app.close()` in `afterAll` critical for Jest to exit cleanly, and what symptom appears if it is omitted?
+35. Explain the trade-off between placing the NestJS app bootstrap in `beforeAll` (once per file) vs `beforeEach` (once per test) in an integration test suite.
+36. When an integration test passes in isolation but fails when the full suite runs, what categories of root cause should you investigate first?
+37. How would you test that a request interceptor (e.g., one that attaches a correlation ID to every response) is correctly applied, using supertest?
+38. What does `request(app.getHttpServer()).post('/users').send({...}).expect(201)` actually assert, and what additional assertions should typically follow it?
+
+### NestJS Testing Module
+
+39. Why can't a TypeScript interface be used directly as a NestJS DI token, and what two alternatives does the ecosystem use instead?
+40. Explain the difference between `Test.createTestingModule({ providers: [...] })` used with a specific handler vs with `imports: [AppModule]` — what does each approach exercise?
+41. What is the purpose of `module.get(TOKEN)` in a test, and why must you pull the mock *out* of the module rather than referencing the mock object directly?
+42. When would you use `useFactory` instead of `useValue` for a mock provider in a test module, and what does `useFactory` let you do that `useValue` cannot?
+43. How do you test a NestJS `@nestjs/cqrs` command handler — should the full command bus be set up, or is there a lighter alternative, and why?
+44. What is the risk of not calling `.compile()` on a `TestingModuleBuilder`, and what error would you see?
+45. If a NestJS service has a circular dependency that is resolved with `forwardRef` in production, how does that complexity surface in the testing module setup?
+46. How does `overrideModule` differ from `overrideProvider` in the NestJS testing module, and when would module-level overriding be needed?
+
+### Database Testing & Testcontainers
+
+47. Why does running repository integration tests against an in-memory SQLite database give false confidence compared to a real PostgreSQL container?
+48. Explain the trade-off between the truncate-per-test cleanup strategy and the per-test transaction rollback strategy when using Prisma.
+49. Why does per-test transaction rollback break when the code under test manages its own transactions or issues explicit `COMMIT` calls?
+50. What does `RESTART IDENTITY CASCADE` do in a `TRUNCATE` statement, and why are both clauses important when cleaning up between tests?
+51. Why is the Jest default 5-second test timeout insufficient for the `beforeAll` that boots a Testcontainers PostgreSQL container, and how do you raise it?
+52. What is the Ryuk container in Testcontainers, and what problem does it solve in CI environments where test processes can be killed abruptly?
+53. Describe the CI/CD setup required to run Testcontainers tests on GitHub Actions — what must the runner have, and what pitfalls exist?
+54. Why should the Testcontainers test suite be in a separate Jest config and run under a separate npm script from the unit test suite?
+55. How would you test that a real unique-constraint violation at the database level is correctly caught and surfaced by your repository implementation?
+56. What is the difference between `prisma migrate deploy` and `prisma db push` when setting up a throwaway test database, and which is safer for CI?
+
+### Test Design Principles
+
+57. What does the test pyramid prescribe about the ratio of unit to integration to E2E tests, and why does violating it (e.g., an inverted pyramid) hurt CI feedback cycles?
+58. Explain the principle "don't mock what you don't own" — what does it mean in practice, and why does mocking a third-party ORM directly lead to brittle tests?
+59. Why is a domain entity test that requires a mock considered a design smell, and what does it reveal about the domain model's dependency structure?
+60. What is the difference between testing *state* (asserting on return values) and testing *behaviour* (asserting on interactions via `toHaveBeenCalledWith`), and when is each appropriate?
+61. Explain the "one logical assertion per test" principle — does it mean one `expect` call, and what is the practical consequence of asserting two unrelated behaviours in a single test?
+62. What is the Object Mother pattern, and how does it differ from the Test Data Builder pattern in terms of flexibility and use case?
+63. Why is using `faker` with unseeded randomness potentially dangerous in a test suite, and what specific failure mode does it introduce?
+64. Describe "test coupling" in the context of shared mutable state — give a concrete example of how test order dependence can cause intermittent failures.
+65. What is TDD's red-green-refactor cycle, and how does writing the test first change the design of the production code compared to writing tests after?
+66. Why does the principle "test behaviour, not implementation" suggest you should avoid asserting on private methods or internal state directly?
+
+### Test Doubles
+
+67. What are the five canonical types of test doubles (dummy, stub, spy, mock, fake), and give a one-line definition of each in the context of Jest?
+68. When is a fake (e.g., an in-memory repository implementation) preferable to a mock (`jest.fn()`), and what are the maintenance trade-offs of maintaining a fake?
+69. What is the difference between a stub that returns a canned value and a spy that records calls but delegates to the real implementation — when would you use each?
+70. Explain "over-specification" in mock assertions — why can asserting on every `toHaveBeenCalledWith` argument sometimes make tests brittle to refactoring?
+71. Why is `expect.objectContaining({...})` a useful tool for avoiding over-specified mock assertions, and what is the risk of making the partial match too loose?
+
+### Code Coverage & TDD
+
+72. What does line coverage measure, and why can a codebase with 95% line coverage still have critical untested paths?
+73. What is branch coverage, and how does it differ from line coverage — give an example of code with 100% line coverage but less than 100% branch coverage?
+74. What is mutation testing, and why does it reveal gaps that coverage metrics miss?
+75. Why is enforcing a coverage threshold in CI (e.g., `--coverage --coverageThreshold`) a useful gate, but not a sufficient indicator of test quality?
+76. In TDD, why does writing a failing test first (red phase) produce better-designed interfaces than retrofitting tests onto existing code?
+77. What is the difference between "inside-out" (classicist) TDD and "outside-in" (London school / mockist) TDD, and how do they differ in their use of test doubles?
+78. How does the `@swc/jest` transform affect the feedback loop during TDD compared to `ts-jest`, and what must you compensate for in CI?

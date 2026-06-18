@@ -1014,3 +1014,96 @@ scheduler.run(() => {
 // A: step 2
 // All done: { high: 1, normal: 1, low: 0 }
 ```
+
+---
+
+## Interview Questions
+
+### V8 & JIT
+
+1. Why does V8 use JIT compilation instead of ahead-of-time compilation, and what specific trade-offs does that choice introduce?
+2. What is the role of Ignition in V8's pipeline, and why does bytecode exist as an intermediate step rather than going straight to machine code?
+3. When does TurboFan kick in, and what criteria does V8 use to decide a function is "hot" enough to optimise?
+4. What exactly gets discarded during a deoptimisation, and how does V8 decide whether to attempt re-optimisation of the same function?
+5. Why does passing arguments of different types across multiple calls to the same function cause a deoptimisation, and how would you reproduce and confirm this with Node.js flags?
+6. What is a hidden class in V8, and why is it more efficient than treating an object as a hash map?
+7. Under what conditions do two objects share the same hidden class, and why does property insertion order matter?
+8. Why does using `delete` on an object property degrade V8 performance, and what should you do instead?
+9. What is an inline cache and what are the three states (monomorphic, polymorphic, megamorphic) — when does each occur and what are the performance implications?
+10. How would you identify a megamorphic function call site in a production codebase, and what refactoring would fix it?
+11. What optimisations does V8 skip when `eval()` is present in a function's scope, and why?
+12. Why does using the `arguments` object in a function hinder certain V8 optimisations, and how do rest parameters solve this?
+13. Explain how `Object.setPrototypeOf()` at runtime affects V8's ability to optimise property accesses on that object.
+14. How does V8's feedback vector work, and what role does it play in informing TurboFan's type assumptions?
+15. What does the `--trace-deopt` flag actually output, and how would you use it to locate a performance bottleneck in a Node.js server?
+
+### Event Loop
+
+16. Describe precisely what happens between two consecutive macrotask executions in the Node.js event loop — what queues are drained and in what order?
+17. Why does `process.nextTick` run before Promise microtasks, and what design decision in Node.js explains this ordering?
+18. Under what conditions is the ordering between `setTimeout(fn, 0)` and `setImmediate()` non-deterministic, and why does being inside an I/O callback make it deterministic?
+19. What does it mean to "starve the event loop" and what are three concrete ways it can happen in a Node.js server?
+20. Why does a long-running synchronous loop inside an HTTP handler affect all other in-flight requests, not just the current one?
+21. What is the poll phase responsible for in the Node.js event loop, and under what condition does it block?
+22. How would you break a CPU-intensive synchronous task into chunks to avoid blocking the event loop, and what are the trade-offs of using `setImmediate` vs `setTimeout(fn, 0)` for yielding?
+23. If a Promise `.then` callback schedules another `.then`, and that schedules another, could this theoretically starve the macrotask queue? Explain the mechanism.
+24. What is `queueMicrotask()` and how does its scheduling position compare to `Promise.resolve().then()` — are they on the same queue?
+25. Explain why `process.nextTick` recursion can block I/O in Node.js while the same pattern with `Promise.resolve()` would not block I/O indefinitely.
+26. What happens to the call stack between event loop ticks — is it completely empty, and what does "empty call stack" mean for the event loop's ability to process the next macrotask?
+27. How does libuv's thread pool relate to the event loop, and which Node.js APIs use the thread pool rather than OS-level async I/O?
+
+### Memory & GC
+
+28. Why does V8 use a generational garbage collector rather than a single-pass mark-sweep collector over the entire heap?
+29. What is the Scavenger algorithm and why is copying live objects to a new space (Cheney's algorithm) more efficient for short-lived objects than mark-sweep?
+30. When does an object get promoted from the young generation to the old generation, and what happens to its collection cost after promotion?
+31. How can a closure cause a memory leak even if it only references a single small variable from its enclosing scope?
+32. What is the difference between a `WeakMap` key being GC'd and a regular `Map` key being GC'd — what happens to the associated value in each case?
+33. When would you use `WeakRef` over `WeakMap`, and what is the key constraint you must code defensively against when using `WeakRef.deref()`?
+34. Why is `FinalizationRegistry` callback timing non-deterministic, and what category of problems is it appropriate for given that constraint?
+35. Describe three patterns that commonly cause memory leaks in long-running Node.js servers and explain the GC mechanism that prevents collection in each case.
+36. How does holding a reference to a DOM node inside a closure in a single-page application prevent the node from being GC'd even after it's removed from the DOM?
+37. What tools and techniques would you use to diagnose a gradual memory increase (slow leak) in a production Node.js service without causing downtime?
+38. Why does setting an object reference to `null` not immediately free the memory, and what does "eligible for collection" actually mean in practice?
+39. What is the difference between a memory leak and heap fragmentation, and which does V8's Mark-Compact phase address?
+
+### Closures & Scope
+
+40. Why does `let` in a `for` loop create a new binding per iteration while `var` does not — what is happening at the specification level with each iteration's lexical environment?
+41. What is the Temporal Dead Zone and why does the spec require it for `let`/`const` rather than just initialising them to `undefined` like `var`?
+42. A function is returned from a factory and holds a closure over a large array, but only ever reads one small integer from that scope. Under what V8 conditions might the large array still remain in memory, and how would you guarantee it's released?
+43. How do ES module exports differ from CommonJS exports in terms of live bindings vs value copies, and what closure mechanics underpin the ES module behaviour?
+44. Explain how the module pattern (IIFE with a returned API object) achieves private state, and what specific limitation does it have compared to `#privateField` class syntax?
+45. How does `var` hoisting interact with function declarations inside blocks in non-strict mode, and why is this a source of inconsistent behaviour across environments?
+
+### Closures & `this`
+
+46. Explain the four `this`-binding rules in priority order and give a scenario where each rule applies, including how `new` interacts with `bind`.
+47. Why does extracting a method from an object and assigning it to a variable cause `this` to become `undefined` in strict mode — what is the binding mechanism at play?
+48. What does an arrow function's `this` resolve to when it is defined inside a `constructor`, and how does this differ from a regular method on the class prototype?
+49. Why can't you use `call`, `apply`, or `bind` to change the `this` of an arrow function, even though they accept a `thisArg` argument?
+50. What is the difference between `Function.prototype.bind` returning a new function vs `call`/`apply` invoking immediately, and in what scenarios does each approach matter?
+51. When a class field arrow function (e.g., `handleClick = () => {}`) is used as an event listener, where does `this` come from and what is the memory cost compared to a prototype method?
+
+### Async/Await & Generators
+
+52. What does the JavaScript engine create under the hood when it encounters `await` inside an `async` function — in terms of Promises and generator-like suspension?
+53. Why does `await` inside a `try/catch` correctly catch rejected Promises, while `.then().catch()` chains can sometimes swallow errors silently?
+54. What is the difference between `Promise.all`, `Promise.allSettled`, `Promise.race`, and `Promise.any` in terms of failure semantics — when would you choose each in a microservice context?
+55. How does `for await...of` differ from `for...of` on a regular iterable — what protocol must the object implement and what happens if the async iterator throws?
+56. Explain two-way communication in a generator using `gen.next(value)` — what does the value sent into `next()` become inside the generator, and why does the first `next()` call's argument get discarded?
+57. What is a generator-based coroutine and how does it model cooperative multitasking — what is the generator analogue of a context switch?
+58. How would you implement `Promise.all`-like concurrency using async generators, and what backpressure problem can arise if you don't consume the generator fast enough?
+59. Why are generators lazy, and what are the memory advantages of using an infinite generator like `naturals()` over generating a large array upfront?
+60. How does `yield*` work when delegating to another generator, and how does `return` from the delegated generator interact with the outer generator's iteration?
+61. What happens to unhandled rejections inside an `async function` — how does the Node.js runtime surface them, and what changed between Node.js v14 and v15 regarding the default behaviour?
+
+### Prototype Chain
+
+62. How does `Object.create(null)` differ from `{}` in terms of the prototype chain, and in what use case would you deliberately want an object with no prototype?
+63. Why does `instanceof` fail to correctly identify objects created in a different V8 context (realm), and what is the reliable alternative for arrays?
+64. What is the difference between an object's `[[Prototype]]` and a constructor function's `.prototype` property — how do they relate when `new` is invoked?
+65. Why is calling `Object.setPrototypeOf()` on an existing object considered a performance anti-pattern in V8, even if done only once?
+66. How does property shadowing work on the prototype chain — what happens when you assign a property to an instance that already exists on its prototype, and does this always create an own property?
+67. What is the performance cost of a property lookup that must traverse three levels of the prototype chain compared to an own property access, and how do inline caches mitigate this?
+68. Why does `class Dog extends Animal` set up two prototype chains (one for instances and one for the constructor functions themselves), and what does `Dog.__proto__ === Animal` mean in practice?

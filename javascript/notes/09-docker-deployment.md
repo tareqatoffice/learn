@@ -747,6 +747,106 @@ Guidance for Node specifically:
 
 ---
 
+## Interview Questions
+
+### Dockerfile Best Practices
+
+1. Why should you copy `package*.json` before `COPY . .` in a Dockerfile, and what specifically breaks in the layer cache if you reverse the order?
+2. What is the difference between `CMD` shell form and exec form, and why does the choice directly affect whether graceful shutdown works?
+3. Why is it dangerous to pass a secret token via `--build-arg`, and how can you verify whether a secret leaked into a layer after the fact?
+4. What does the `syntax=docker/dockerfile:1` directive at the top of a Dockerfile actually enable, and why does it matter for caching strategies?
+5. Why should you never ship a Node app container as root, and what is the specific risk if you do in a Kubernetes environment?
+6. What is the purpose of `COPY --chown=node:node` and why is doing it in a single `COPY` instruction preferable to a follow-up `RUN chown`?
+7. How does Alpine Linux's musl libc differ from glibc, and what class of Node module failures does that cause if you copy native binaries from a glibc-based host into an Alpine image?
+8. What happens to a Docker image's layer cache when you bump a patch version in `package.json` without changing any dependencies?
+9. Why does including `dist/` in `.dockerignore` matter if the Dockerfile's build stage already runs `nest build` inside the image?
+10. How would you verify that your final runtime image does not contain devDependencies, and what command gives you that confirmation without pulling every layer?
+
+### Multi-stage Builds
+
+11. Explain the three-stage NestJS pattern (builder → deps → runtime) and what specific problem each stage boundary solves.
+12. Why is a separate `deps` stage that runs `npm ci --omit=dev` preferable to running `npm prune --production` after the build stage?
+13. What is the Prisma-specific gotcha when doing a prod-only `npm ci --omit=dev`, and how do you work around it in a multi-stage Dockerfile?
+14. How do you reference an artifact from a non-adjacent stage (e.g., stage 1 in a 3-stage file) using `COPY --from`, and what naming constraint must you observe?
+15. What is the `--mount=type=cache` directive in a `RUN` instruction, and how does it differ from a regular layer cache in terms of persistence and cross-build sharing?
+16. If you need to `npm ci` in two separate stages (builder and deps), how do you avoid downloading the registry twice, and what mechanism enables that?
+17. How would you build only a specific stage of a multi-stage Dockerfile, and when is that useful in a CI pipeline?
+18. What is the trade-off between using `node:20.11.0-alpine` vs a distroless Node base image for the runtime stage, specifically regarding health checks?
+19. Why does pinning to a digest (`node:20.11.0-alpine@sha256:...`) instead of a tag provide stronger reproducibility guarantees, and what operational burden does that introduce?
+20. How would you debug a multi-stage build where an artifact copied from an earlier stage causes a runtime crash due to a missing file?
+
+### Graceful Shutdown & Signals
+
+21. What is the PID 1 problem in Docker containers, and what are the two common solutions for Node.js apps?
+22. Why does a shell-form `CMD` break SIGTERM delivery to a Node process, and what exactly happens to the signal when `/bin/sh` is PID 1?
+23. What does `tini` do differently from running Node directly as PID 1, and when would you choose `tini` over exec-form CMD?
+24. Explain the drain order (readiness flip → server.close → resource teardown → exit) and what goes wrong if you skip the readiness flip step.
+25. Why is `server.closeIdleConnections()` necessary for `server.close()` to ever complete in a Node app with HTTP keep-alive enabled?
+26. What is the purpose of the `setTimeout(...).unref()` safety-net pattern in a graceful shutdown handler, and why must the timer value be strictly less than Docker's stop-timeout?
+27. What happens in NestJS if you call `app.listen()` without calling `app.enableShutdownHooks()`, and how would you detect that in production?
+28. Describe the NestJS shutdown lifecycle hook order — `onModuleDestroy`, `beforeApplicationShutdown`, `onApplicationShutdown` — and which one you should use to close a database pool and why.
+29. When closing a BullMQ worker on shutdown, why must you close the worker before closing the queue's connection, and what job-loss scenario does reversing the order cause?
+30. In Kubernetes, why can traffic still arrive at a Pod after SIGTERM is delivered, and what is the standard pattern to handle that race condition?
+31. How do you calculate the correct `terminationGracePeriodSeconds` budget given a `preStop` sleep and an app-internal drain timeout, and what happens if you get it wrong in each direction?
+32. How would you prove that graceful shutdown is actually working in a Compose stack — what observable evidence would you look for?
+33. What is the `MaxListenersExceededWarning` risk introduced by `app.enableShutdownHooks()` in test suites, and how do you mitigate it?
+
+### Docker Compose
+
+34. What is the difference between `depends_on: [postgres]` and `depends_on: postgres: { condition: service_healthy }`, and what real failure mode does the latter prevent?
+35. Explain the `node_modules` anonymous volume trick in a Compose dev setup — what problem does it solve and what would happen without it?
+36. How does `docker-compose.override.yml` merge with `docker-compose.yml`, and what is the correct invocation to run only the base file without the override?
+37. What is the purpose of Compose `profiles`, and how do you design a stack so that a monitoring sidecar (Prometheus/Grafana) is never started by a plain `docker compose up`?
+38. Why should internal microservices not have a `ports:` mapping in a production-shaped Compose file, and how does Docker's network segmentation enforce that boundary?
+39. How does Compose service DNS resolution work — what hostname resolves to the `users` service from within the `orders` service, and what layer of Docker provides that?
+40. What is the difference between a named volume and a bind-mount in Compose, and which should you use for a Postgres data directory and why?
+41. When two microservices share a RabbitMQ container in Compose, how do you ensure RabbitMQ is fully ready before either service tries to connect, given that the `starting` state can fire before the broker is accepting connections?
+42. If a service in Compose keeps restarting because its dependency's health check is too slow, what levers do you have to tune the startup sequencing without introducing arbitrary sleeps?
+43. How would you run database migrations in a Compose stack before the app service starts, and what Compose mechanism allows you to sequence a one-shot job?
+
+### Health Checks
+
+44. What is the functional difference between a liveness probe and a readiness probe, and what is the concrete production consequence of putting a database check in the liveness probe?
+45. Why does `@nestjs/terminus` expose separate `/health/live` and `/health/ready` endpoints rather than a single `/health` endpoint?
+46. Why can't you use `curl` in a `HEALTHCHECK` on an Alpine-based Node image, and what is the idiomatic replacement that requires no additional installed tools?
+47. What are the four HEALTHCHECK parameters (`interval`, `timeout`, `start-period`, `retries`) and how does the `start-period` prevent false-negative restarts during a slow cold-start?
+48. How does a readiness probe returning 503 interact with a load balancer during a rolling deploy — what must the load balancer be configured to do with that response?
+49. What is the "thundering herd" scenario that can result from a misconfigured liveness probe during a database hiccup, and how does separating concerns between live and ready prevent it?
+50. How would you design the readiness probe to automatically return 503 the moment a SIGTERM is received, and what NestJS lifecycle hook is the right place to flip that flag?
+51. In a Kubernetes deployment, what is the difference between a failing liveness probe and a failing readiness probe in terms of what the kubelet does next?
+52. How do you add a Redis or RabbitMQ health indicator to `@nestjs/terminus` alongside the Prisma indicator, and what timeout should you configure for each to avoid false positives?
+
+### CI/CD & GitHub Actions
+
+53. In a GitHub Actions workflow that both runs tests and builds a Docker image, why do you need two separate caching layers (`actions/setup-node` cache and `cache-from/to: type=gha`), and what does each one cache?
+54. Why should you never pass a private registry token as a Docker `--build-arg`, and what is the BuildKit-native alternative in `docker/build-push-action`?
+55. How does `GITHUB_TOKEN` differ from a personal access token when pushing to GitHub Container Registry, and what `permissions:` block must you add to the workflow job?
+56. What does `cache-to: type=gha,mode=max` do differently from `mode=min`, and when would the larger cache actually hurt pipeline performance rather than help it?
+57. Why does Testcontainers work on GitHub's hosted Ubuntu runners without any Docker-in-Docker setup, and what would you need to configure differently on a self-hosted runner?
+58. How would you structure a GitHub Actions workflow to build and push separate images for each microservice in a monorepo with three NestJS services, minimising redundant layer cache misses?
+59. What is the risk of tagging an image with `latest` in a CI push step, and what tag strategy gives you both traceability and the ability to roll back?
+60. If a `docker/build-push-action` step is slow even with `cache-from: type=gha`, how would you diagnose whether the cache is being hit, and what Dockerfile changes are the most common fix?
+61. How do you prevent a CI build from deploying if the test job's Testcontainers suite passes locally but fails in CI due to a flaky container startup race?
+
+### Production & Zero-downtime Deploys
+
+62. What is the Node.js heap-vs-cgroup trap, and how do you calculate the correct `--max-old-space-size` value for a container with a given memory limit?
+63. If a container exits with code 137, what are the two possible causes and how do you distinguish between them using `docker inspect`?
+64. Why is a bigger Postgres connection pool per Node instance not necessarily faster, and what metric would tell you that your pool is sized correctly vs. oversized?
+65. What is PgBouncer's transaction pooling mode and why is it particularly important when running many replicas of a Node service or serverless functions?
+66. Why does a naive `docker compose up -d` recreate cause a request-drop window even if your app handles SIGTERM correctly, and what deployment strategy eliminates it?
+67. What is the expand/contract migration pattern, and why must you use it for column renames or drops during a zero-downtime rolling deploy?
+68. What does setting `trust proxy 1` in an Express/NestJS app do, and what are the three things that break without it when the app is behind an Nginx reverse proxy?
+69. Why must you bind your Node server to `0.0.0.0` rather than `127.0.0.1` inside a Docker container, and what networking layer explains why localhost is inaccessible from outside?
+70. How would you do a manual blue/green deploy with two Compose replicas behind Nginx, and what single Nginx operation makes the cutover atomic?
+71. What is the `zod.parse(process.env)` pattern for environment validation at boot, and why is crashing at startup on a missing env var better than failing at runtime?
+72. Why should secrets never appear in a Dockerfile `ENV` or `ARG` instruction even if you delete them in a later layer, and what command reveals that the value is still there?
+73. What is the `database-per-service` rule in microservices, and what specific operational problem arises in Compose when two services share a single Postgres container with separate schemas instead of separate containers?
+74. How do you size `terminationGracePeriodSeconds` in Kubernetes relative to your app's internal drain timeout and any `preStop` sleep, and what happens in production if the app's drain takes longer than the total budget?
+75. Describe the full sequence of events from `docker stop <container>` to the process actually exiting, including every signal, timer, and kernel action involved.
+
+---
+
 ## Phase 9 Project
 
 **Task (from the plan):** Dockerize the Phase 8 microservices project, run it under Docker Compose with health checks, build a GitHub Actions CI/CD pipeline, and deploy to a VPS or Railway.

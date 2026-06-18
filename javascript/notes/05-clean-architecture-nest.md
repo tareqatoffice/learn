@@ -1140,3 +1140,104 @@ examples/phase5-clean-arch/
 - Every business rule lives in the domain or a handler — controllers contain no logic.
 - Domain unit tests pass with zero mocks; handler tests pass with a fake repository implementing the interface (preview of Phase 7).
 - Errors come back as RFC 7807 Problem Details with a correlation id, and every log line carries that same id.
+
+---
+
+## Interview Questions
+
+### Clean Architecture Principles
+
+1. What is the Dependency Rule in Clean Architecture, and why does violating it in even one place undermine the whole architecture?
+2. Explain the difference between the direction of control flow and the direction of source-code dependency in Clean Architecture, and why they can point in opposite directions.
+3. How does Dependency Inversion (the D in SOLID) make the inward-only dependency rule possible in practice?
+4. What distinguishes an anemic domain model from a rich domain model, and what concrete problems does each approach cause in a large codebase?
+5. Why does the domain layer define repository *interfaces* rather than letting the application layer call infrastructure directly?
+6. What is the "composition root" and why should it be the only place that knows every layer?
+7. If you find yourself importing a Prisma type inside a domain entity, what architectural boundary has been violated, and how would you fix it?
+8. How would you enforce the layer dependency rule automatically in a Node.js project that has no compiler to do it for you?
+9. What is the trade-off between putting domain-event dispatching in the domain entity itself versus letting the application layer pull and publish events after the save?
+10. Why does the domain layer in this architecture contain no `@Injectable()` decorators, and what happens if it does?
+
+### NestJS Core
+
+11. Explain the difference between a Module, a Provider, and a Service in NestJS, and how they relate to each other.
+12. What does `emitDecoratorMetadata: true` do in `tsconfig.json`, and what breaks if you leave it out?
+13. Walk through the full NestJS request lifecycle in order — which stage runs first and why does that order matter for real-world concerns like auth and validation?
+14. What is the difference between `exports` and `providers` in a `@Module()` decorator, and what happens if you forget to export a provider that another module needs?
+15. Why would you use `@Global()` on a module, and what are the risks of overusing it?
+16. What is the purpose of `OnModuleInit` and `OnModuleDestroy`, and what real-world problem do they solve for database connections?
+17. How does NestJS resolve constructor dependencies at startup, and what error do you get when a dependency cannot be resolved?
+18. What happens when two modules have a circular dependency, and what does `forwardRef` actually do to break the cycle?
+19. How does NestJS's DI container differ from ASP.NET Core's `IServiceCollection` in terms of default provider scope, and why does that difference matter?
+20. What is the role of `CqrsModule` in the composition root, and what would break if you forgot to import it?
+
+### Dependency Injection
+
+21. Why can you not inject a TypeScript interface by type in NestJS, even though you can in ASP.NET Core?
+22. What is the difference between using a `string` token, a `Symbol` token, and a class as a DI token, and when would you prefer each?
+23. Explain the difference between `useClass`, `useValue`, `useFactory`, and `useExisting` provider definitions — give a concrete use case for each.
+24. What is the `REQUEST` provider scope, why does it force the entire dependency chain to become request-scoped, and what is the recommended alternative for carrying per-request data?
+25. How would you inject a configuration value (e.g. a database URL) from `ConfigService` into an infrastructure provider without coupling the provider to `@nestjs/config`?
+26. What does `@Inject(TOKEN)` do differently from relying on type-based injection, and when is it required?
+27. How would you write a unit test for a command handler that depends on a `UserRepository` interface — what do you inject in place of the real repository?
+28. Explain what `AsyncLocalStorage` is, how it replaces request-scoped DI for carrying request context, and what the performance difference is.
+29. If two feature modules both need a `LoggerService`, how would you share it without repeating the provider registration?
+30. What is a "factory provider" (`useFactory`) and how would you use one to create a Redis client that requires async initialization?
+
+### Pipes, Guards & Interceptors
+
+31. Explain the architectural difference between a Guard and a Pipe — what question does each one answer, and why can't a Pipe do authorization?
+32. What does the `whitelist: true` option on `ValidationPipe` do, and what security problem does it prevent?
+33. Why does `ValidationPipe` need `transform: true` to work correctly with `class-validator` decorators, and what happens without it?
+34. How would you write a custom Pipe that converts a route param string into a domain Value Object, and at what point in the lifecycle does it run?
+35. What is the difference between applying a Guard at the method level with `@UseGuards()` versus registering it globally in `main.ts`?
+36. How do Interceptors differ from Middleware in NestJS, and what can an Interceptor do that Middleware cannot?
+37. Explain the RxJS `Observable` contract that an Interceptor's `intercept` method must return, and why wrapping `next.handle()` gives you both the pre- and post-handler execution points.
+38. How would you implement a response-transformation Interceptor that wraps every successful response in a `{ data: T, timestamp: string }` envelope without touching any controller?
+39. What is an Exception Filter, where does it sit in the request lifecycle relative to Interceptors, and what is the purpose of `@Catch()` with no arguments?
+40. How would you implement the RFC 7807 Problem Details shape in a global Exception Filter, and how does it map domain exceptions to HTTP status codes without the domain knowing HTTP?
+41. What is the difference between registering a filter with `app.useGlobalFilters()` in `main.ts` versus with `APP_FILTER` in a module's providers, and when does the difference matter for DI?
+42. If a Guard throws an exception, does the Interceptor's post-handler logic still run? Explain why or why not.
+
+### CQRS
+
+43. What does CQRS stand for, and what problem does separating Commands from Queries solve compared to a single service class with both read and write methods?
+44. What is the difference between a Command and a Query in `@nestjs/cqrs`, and what should each return?
+45. Explain how `@nestjs/cqrs` relates to MediatR in .NET — what is the equivalent of `ISender.Send()`, `INotification`, and `INotificationHandler`?
+46. Why does a controller dispatch a `Command` to `CommandBus` rather than calling a service method directly, and what does that indirection give you architecturally?
+47. What is the role of `EventPublisher` and `mergeObjectContext` in `@nestjs/cqrs`, and what problem would you have publishing domain events without them?
+48. Explain the read-side shortcut in CQRS: when is it acceptable for a query handler to bypass the domain entity and project Prisma rows directly into a DTO?
+49. What is the "Outbox Pattern" and why is it relevant when `@nestjs/cqrs`'s in-process `EventBus` is not sufficient for guaranteed domain-event delivery?
+50. How would you handle a domain event (`UserRegisteredEvent`) to send a welcome email without coupling the email logic to the `CreateUserHandler`?
+51. If a command handler and its domain event handler need to be atomic (both succeed or both roll back), how would you design that, given that the event bus runs after the save?
+52. What is the trade-off between having many small command handlers versus fewer larger ones that orchestrate multiple domain operations?
+
+### Repository Pattern
+
+53. Why does the `UserRepository` interface speak only in domain types (`UserId`, `Email`, `User`) and never in Prisma types, even though the implementation uses Prisma?
+54. Where does the mapping between a domain entity and a database row belong, and why is it wrong to put that mapping in the application layer?
+55. What is the difference between `save(user)` with an upsert versus having separate `create` and `update` methods on a repository, and what are the trade-offs?
+56. How would you handle a case where a query needs data from two aggregates — should the repository return both, or should the query handler call two repositories?
+57. Explain why using Prisma's generated types directly as return values from a repository method is an architectural violation, even if it's convenient.
+58. How would you implement a transactional `PlaceOrderHandler` that decrements stock on a `ProductRepository` and creates an order on an `OrderRepository` atomically using Prisma?
+59. What is a "read model" in the context of CQRS, and how does it differ from calling the same repository used on the write side?
+60. If you needed to swap Prisma for Drizzle ORM, which files would need to change and which would not, assuming the repository pattern is correctly applied?
+
+### Module Organization
+
+61. How would you decide whether to put a feature's command handlers, repository binding, and controller in a single "feature module" versus splitting them across separate application and infrastructure modules?
+62. What is the difference between a feature module and a shared/common module in a NestJS monolith, and when should a provider be extracted into a shared module?
+63. How does NestJS module scoping prevent provider name collisions between features, and what does that mean for token naming strategy?
+64. What are the risks of the `@Global()` decorator, and what patterns make it safe versus problematic?
+65. How would you organize a NestJS project to prepare it for extraction into separate microservices later — what folder boundaries would you draw today?
+
+### Domain Layer Design
+
+66. Why does a Value Object use a private constructor with a static factory method rather than a public constructor with validation in the body?
+67. What is the difference between a domain entity and a Value Object in terms of identity, mutability, and equality?
+68. Explain the two static factory methods on the `User` entity — `register` and `fromPersistence` — and why they must remain separate.
+69. Why do domain exceptions extend a base `DomainError` class rather than throwing plain `Error` objects, and how does the exception filter use that hierarchy?
+70. What does it mean for an entity to "record" a domain event versus "dispatch" it, and why is that distinction important for transactional safety?
+71. How would you design a `Money` Value Object to prevent floating-point precision errors, and what operations should it expose?
+72. If a domain entity's invariant depends on data that only a database query can provide (e.g. uniqueness), where does that check belong — in the entity, the application handler, or the repository — and why?
+73. What is a "branded" or "opaque" ID Value Object (like `UserId`), and how does it prevent passing a `ProductId` where a `UserId` is expected at compile time?

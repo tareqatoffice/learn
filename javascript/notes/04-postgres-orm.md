@@ -976,3 +976,116 @@ const report = await prisma.$queryRaw<{ id: number; name: string; revenue: Prism
 - For the order transaction, do all reads + writes inside the `$transaction` callback; do nothing slow (no HTTP) in there.
 - Run `EXPLAIN ANALYZE` on the reporting query against seeded data; add an index on `OrderItem(order_id)` / `Order(created_at)` and confirm the plan switches off a Seq Scan.
 - **Stretch:** rebuild just the `GET /orders` and the report in **Drizzle** alongside the Prisma version, and compare the generated SQL and the bundle size. This sets you up to make an informed Prisma-vs-Drizzle call in Phase 5.
+
+---
+
+## Interview Questions
+
+### Prisma
+
+1. What is the fundamental difference between a schema-first ORM like Prisma and a code-first ORM like EF Core, and what are the practical trade-offs of each approach?
+2. Why does Prisma not have a change tracker or a `SaveChanges()` equivalent, and how does this affect how you reason about data consistency across multiple operations?
+3. What happens when you call `prisma.user.findUnique()` with a field that is not marked `@unique` or `@id` in the schema?
+4. Why should you never instantiate a new `PrismaClient` on every request, and what exact Postgres resource gets exhausted when you do?
+5. Explain the `globalThis` singleton pattern used for `PrismaClient` in hot-reload environments — what problem does it solve and why does module re-evaluation cause it?
+6. What is the difference between `findFirst` and `findUnique`, and in what situations would using `findFirst` with a unique field be a subtle mistake?
+7. How does Prisma infer the TypeScript return type of a query, and how does using `select` vs `include` change the inferred type at compile time?
+8. What is `Prisma.UserGetPayload<...>` used for, and when would you need it over letting TypeScript infer the type directly from the query call?
+9. What SQL does Prisma actually emit when you use `include: { posts: true }` on a `findMany` — is it a JOIN or a second query — and what is the reason for that design choice?
+10. What is the difference between `connect`, `create`, and `connectOrCreate` in a nested write, and when would you choose `connectOrCreate` over `upsert`?
+11. Why are `select` and `include` mutually exclusive at the same nesting level in Prisma, and how do you do a nested projection when you need both a scalar field selection and a relation?
+12. How does `upsert` differ from calling `findUnique` followed by `create` or `update` manually, and what Postgres construct does it map to under the hood?
+13. What does `updateMany` return, and why does it not return the updated rows — what are the performance implications of this design?
+14. What is the Prisma error code `P2025`, when is it thrown, and how would you distinguish it from a generic unexpected error in a catch block?
+15. How do Client Extensions differ from the deprecated `$use()` middleware, and what specific advantages do they offer in terms of type safety?
+16. How would you implement a global soft-delete filter using a Prisma Client Extension, and what escape hatch would you need for admin endpoints that must see deleted rows?
+17. Why does a PgBouncer connection string require `?pgbouncer=true` in Prisma, and what specifically breaks without that flag when using transaction-mode pooling?
+18. What is the default connection pool size Prisma uses, and how would you tune it for a serverless environment with many short-lived instances?
+
+### Migrations
+
+19. What is the exact difference between `prisma migrate dev` and `prisma migrate deploy`, and why is it dangerous to run `migrate dev` against a production database?
+20. What does `prisma db push` do, when is it appropriate to use it, and what data-safety risk does it carry compared to `migrate dev`?
+21. If you run `prisma migrate dev` and Prisma detects schema drift (the DB state doesn't match the migration history), what does it offer to do and why is that dangerous?
+22. How does Prisma track which migrations have already been applied to a database, and what happens if someone manually modifies a migration SQL file after it has been applied?
+23. When would you manually edit a generated migration SQL file, and what risks does that introduce?
+24. How would you handle a migration that requires a data backfill — for example, splitting a `name` column into `firstName` and `lastName` — safely in production with zero downtime?
+25. What is the `prisma generate` command, when must you run it, and what happens to your application if you skip it after changing `schema.prisma`?
+26. How do Prisma migration files differ from EF Core migration classes, and what are the practical maintenance trade-offs between plain SQL migration files and C# migration code?
+27. How would you roll back a Prisma migration in production, and why doesn't Prisma have an automatic "down" migration unlike EF Core's `migrations remove`?
+
+### Transactions & Concurrency
+
+28. What is the difference between the array form and the interactive callback form of `prisma.$transaction`, and when must you use the interactive form?
+29. Why is it a serious mistake to perform a slow HTTP call (for example, sending an email) inside a `prisma.$transaction` callback, and what is the correct pattern instead?
+30. What does the `isolationLevel` option on `prisma.$transaction` map to in Postgres, and in what real-world scenario would you need `Serializable` instead of the default?
+31. What is a phantom read, and which Postgres isolation level prevents it?
+32. What is the difference between optimistic and pessimistic locking, and how would you implement each pattern with Prisma?
+33. How does Postgres handle two concurrent transactions both trying to `UPDATE` the same row — what happens at the database level, and how does that surface in your application code?
+34. How would you implement an idempotent order-creation endpoint that prevents double-submission under concurrent requests, using only Prisma and Postgres?
+35. In the interactive `$transaction` pattern, you receive a `tx` parameter — why must all repository calls inside that callback use `tx` instead of the global `prisma` client?
+36. What is a deadlock in Postgres, how can it occur in a multi-step transaction that updates multiple rows, and how would you detect and prevent it?
+
+### Query Optimization & N+1
+
+37. Describe the N+1 problem precisely: what does the "1" refer to, what does the "N" refer to, and why is it not always caught in development but causes serious performance issues in production?
+38. How would you detect an N+1 problem in a Prisma application in production, and what logging or tooling setup would make it visible during development?
+39. When Prisma resolves an `include` with a `findMany`, it uses a batched `WHERE id IN (...)` query rather than a JOIN — what specific problem does this solve that a JOIN would not?
+40. What is the Prisma `_count` select, how does it avoid loading relation rows, and when is it preferable to `include` + `.length`?
+41. How would you use `groupBy` in Prisma to compute aggregated data without loading all rows into memory, and what is the equivalent SQL?
+42. If a `select` projection on a Prisma query is missing a field that the calling code later accesses, what happens at compile time vs runtime?
+43. What is an index-only scan in Postgres, when does it occur, and how would you design a `select` projection in Prisma to take advantage of it?
+44. How would you debug a query that is slow in production but fast in development — what factors differ between environments that affect query performance?
+45. What does `EXPLAIN ANALYZE` tell you that `EXPLAIN` alone does not, and which specific nodes in the output indicate a performance problem you should act on?
+46. What does the `loops` value in an `EXPLAIN ANALYZE` output signify, and when does a high `loops` value on an inner node indicate an application-level problem rather than a missing index?
+
+### PostgreSQL Internals
+
+47. What is the difference between a B-tree index and a GIN index in Postgres, and for which types of queries is each appropriate?
+48. Explain the leftmost-prefix rule for composite indexes — given an index on `(author_id, created_at)`, list all the `WHERE` clauses that can use it and those that cannot.
+49. What is a partial index, and what are two concrete scenarios from this file where a partial index is significantly better than a full index?
+50. What is the difference between `tsvector` and `tsquery` in Postgres full-text search, and why is storing a generated `tsvector` column preferable to calling `to_tsvector()` inline in the `WHERE` clause?
+51. How does a GIN index accelerate JSONB `@>` (containment) queries, and why would a regular B-tree index not work for that operator?
+52. What is the difference between `->` and `->>` when querying JSONB columns, and what type error occurs when you forget the distinction in a comparison?
+53. What is a CTE (Common Table Expression), and in what situation does using a CTE with `WITH` instead of a subquery affect the query plan in Postgres?
+54. What is the difference between `RANK()` and `DENSE_RANK()` window functions — give a concrete example where the results differ?
+55. What does `PARTITION BY` do inside an `OVER()` clause, and how is it different from `GROUP BY`?
+56. What are the implications of running `ANALYZE table` vs `VACUUM ANALYZE table`, and why might stale statistics cause Postgres to choose a Seq Scan over an index?
+57. What is connection multiplexing in PgBouncer's session mode vs transaction mode, and why does transaction mode require disabling prepared statements?
+58. How does Postgres `SERIAL` differ from `IDENTITY` columns, and which should you prefer in a new schema and why?
+59. What is a covering index in Postgres (`INCLUDE`), and how would you use one to turn an Index Scan into an Index Only Scan for a frequently-run reporting query?
+60. What is the MVCC (Multi-Version Concurrency Control) model in Postgres, and why does it mean that `DELETE` does not immediately free disk space?
+
+### DrizzleORM
+
+61. What is the fundamental philosophical difference between Drizzle and Prisma, and how does that difference manifest in the generated bundle size and cold-start behavior?
+62. In Drizzle, what is the difference between `$inferSelect` and `$inferInsert` on a table definition, and why do they produce different types?
+63. How does Drizzle's query-builder API map to SQL — if you write `.select().from().where().orderBy().limit()`, what does each method correspond to in the generated SQL?
+64. What is Drizzle's relational query API (`db.query.users.findMany({ with: ... })`) and how does it differ from the query-builder API in terms of the SQL it generates and when you would prefer it?
+65. How does Drizzle handle the N+1 problem when you use `with:` in the relational API — does it use a JOIN or a batched second query?
+66. When would you use the `sql` template literal in Drizzle, and how does it differ from using `$queryRaw` in Prisma in terms of type safety and composability?
+67. How does Drizzle's migration workflow with `drizzle-kit` compare to Prisma's — what is the equivalent of `prisma migrate dev`, `migrate deploy`, and `db push`?
+68. What are the trade-offs of Drizzle's "no Rust binary engine" approach — what capabilities does Prisma's engine provide that Drizzle cannot replicate in pure TypeScript?
+
+### Connection Pooling
+
+69. Why does running Prisma in a serverless environment (AWS Lambda, Vercel Edge) cause Postgres `max_connections` to be exhausted, even if each individual function instance has a small pool?
+70. What is the difference between PgBouncer's session mode, transaction mode, and statement mode pooling, and which mode does Prisma recommend and why?
+71. What is Prisma Accelerate, what problem does it solve beyond what a self-hosted PgBouncer solves, and what is the trade-off of using a managed pooler?
+72. How would you set the connection pool size on a Prisma connection string, and what heuristics would you use to choose the right value for a given workload?
+73. What happens if `pool_timeout` is exceeded while waiting for a connection from the Prisma pool — how does that surface in your application, and how would you handle it gracefully?
+
+### Raw SQL vs ORM
+
+74. When should you drop from Prisma's query API to `$queryRaw`, and what do you lose (in terms of type safety and portability) when you do?
+75. What is the difference between `$queryRaw` (tagged template) and `$queryRawUnsafe` in terms of SQL injection prevention, and in what scenario might someone incorrectly reach for `$queryRawUnsafe`?
+76. How do you safely build a dynamic `IN (...)` clause with a variable-length array of IDs in Prisma raw SQL, and why is string concatenation the wrong approach?
+77. If you need a window function or a recursive CTE in Prisma, what is the recommended approach, and how do you preserve type safety on the result?
+78. What are the portability implications of writing raw SQL in an ORM-backed application — what breaks if you switch from Postgres to another database, and how would you mitigate that risk architecturally?
+
+### Seeding & Data Management
+
+79. How would you implement a deterministic, idempotent database seed script in Prisma that can be safely re-run without creating duplicates?
+80. What is the difference between using `upsert` and `createMany({ skipDuplicates: true })` in a seed script, and when would each be preferable?
+81. How would you seed related data (for example, users with posts) in the correct order to satisfy foreign key constraints, and how does a nested write simplify this?
+82. What is the risk of running a seed script against a production database, and how would you guard against that in code?

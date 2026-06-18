@@ -1293,3 +1293,100 @@ typed config, structured logging, and centralised error handling.
 - Swap the single process for `cluster` (or run multiple container replicas) and
   confirm `/ping` latency under load improves across cores.
 - Add an HTTP/2 variant of the server (§3.6) and compare with `autocannon`.
+
+---
+
+## Interview Questions
+
+### Node.js Architecture
+
+1. Explain the difference between how Node.js handles network I/O versus file system I/O under the hood, and why that distinction matters in production.
+2. Why does Node.js use the OS kernel's async notification (epoll/kqueue/IOCP) for TCP sockets instead of the libuv thread pool?
+3. What exactly happens inside libuv when you call `fs.readFile` — walk through the path from JavaScript call to callback execution.
+4. Why does `dns.lookup` use the thread pool while `dns.resolve` does not, and what are the production implications of this difference?
+5. How can a flood of `dns.lookup` calls stall your entire application even when it has nothing to do with file I/O?
+6. If you have 4 thread pool threads and fire 10 concurrent `crypto.pbkdf2` calls, what exactly does the execution timeline look like and why?
+7. What is the "staircase" pattern you see when benchmarking thread-pool-bound operations, and how do you diagnose it?
+8. When does setting `process.env.UV_THREADPOOL_SIZE` inside your application code have no effect, and why?
+9. Why does increasing `UV_THREADPOOL_SIZE` beyond the number of CPU cores hurt CPU-bound thread-pool operations rather than help them?
+10. What does `os.availableParallelism()` return, and how does it differ from `os.cpus().length` for production use?
+11. If network I/O doesn't use the thread pool, why would a Node.js server handling only HTTP requests ever be affected by `UV_THREADPOOL_SIZE`?
+12. Describe the relationship between the V8 heap and the libuv event loop — what does each own, and what crosses the boundary between them?
+13. What is a V8 isolate, and why does each `worker_threads` worker have its own isolate rather than sharing the main thread's?
+
+### Streams & Backpressure
+
+14. What happens to memory when you call `readable.on('data', chunk => writable.write(chunk))` and the writable is slower than the readable?
+15. Walk through what `pipe()` does internally — what does it subscribe to, and what signals does it respond to?
+16. Why does `pipe()` not forward errors, and what resource leak does that cause in practice?
+17. What is `highWaterMark` and what does it represent differently for byte streams versus object-mode streams?
+18. Explain the `write() returns false` → `pause()` → `'drain'` → `resume()` cycle in your own words, and why skipping any step leads to problems.
+19. In a custom `Transform` stream, what is the role of the `callback` parameter in `_transform`, and how does calling it late affect upstream throughput?
+20. What is the purpose of `_flush` in a Transform stream, and give a concrete example of when you'd need it.
+21. How does consuming a Readable with `for await...of` apply backpressure, and how does that differ from using `'data'` events?
+22. When streaming a file download with `fs.createReadStream().pipe(res)`, what happens if the client disconnects mid-download — are file descriptors leaked?
+23. Why would you tune `highWaterMark` upward on a file read stream, and what is the trade-off?
+24. What is the difference between a Duplex and a Transform stream, and when would you choose one over the other?
+25. Describe a production scenario where using `fs.readFile` instead of `fs.createReadStream` caused an outage, and what the symptoms looked like.
+26. How does `stream/promises` `pipeline` differ from `pipe()` in terms of error handling and stream cleanup?
+27. If one stage in a `pipeline` throws asynchronously, what happens to every other stream in the pipeline?
+
+### Clustering & Worker Threads
+
+28. What is the fundamental architectural difference between `cluster` and `worker_threads`, and what class of problem is each designed to solve?
+29. How does the `cluster` module share a single listening port across multiple worker processes — what does the OS actually do?
+30. What is the blast radius of an unhandled exception in a `worker_threads` worker versus a `cluster` worker process?
+31. Why is spawning a new `Worker` per request considered an anti-pattern, and what does `piscina` do to address it?
+32. When would you use `SharedArrayBuffer` between worker threads instead of structured-clone message passing, and what synchronisation primitive do you need alongside it?
+33. What is the cost of transferring an `ArrayBuffer` via the transfer list versus structured-clone, and what constraint does the transfer impose on the sender?
+34. You have a CPU-bound image resizing operation. Describe the architecture you would use — what pool size, how would you pass data, and how would you prevent the main event loop from stalling?
+35. Why is running `cluster` inside a container considered an anti-pattern in a Kubernetes environment, and what should you do instead?
+36. Explain the zero-downtime reload mechanism in PM2's `pm2 reload` — how does it drain connections without dropping requests?
+37. What does PM2 offer over raw `cluster` that makes it worth the dependency in a bare-metal or VPS deployment?
+38. If a cluster worker exits with code 1, how would you implement self-healing in raw `cluster` code, and what is the risk of always restarting unconditionally?
+39. You are running a Node.js service with 4 cluster workers on a 4-core machine. A new request that requires a shared in-memory cache comes in — what are your options for sharing state across workers?
+40. What is the IPC channel between a cluster primary and its workers, what is its performance characteristic, and when does it become a bottleneck?
+
+### Memory & Performance
+
+41. How would you diagnose a memory leak in a long-running Node.js process — what tools would you use and in what order?
+42. What is the difference between a V8 heap snapshot and a heap sampling profile, and when do you reach for each?
+43. Explain event-loop delay as a metric: what causes it to increase, how do you measure it, and what threshold should trigger an alert?
+44. Why is `monitorEventLoopDelay` with a histogram more accurate than the naive "schedule a timer and measure lateness" approach?
+45. What does a "sawtooth" memory graph with GC spikes in clinic.js Doctor indicate, and how do you trace it to source code?
+46. Describe how to read a CPU flamegraph: what does the x-axis represent, what does the width of a frame mean, and how do you find the optimisation target?
+47. You run `clinic doctor` and it reports "I/O issue" despite the server not doing file I/O — what are the likely suspects?
+48. Why is `Date.now()` unsuitable for measuring function execution time in production, and what should you use instead?
+49. What is `Error.captureStackTrace` and why do you call it in a custom Error constructor — what does it actually do to the stack?
+50. Explain the `global.gc()` trick used during heap-dump analysis — why do you force GC before taking a snapshot?
+51. A Node.js service's memory grows steadily over 24 hours but heap snapshots show the heap is stable — where else could the memory be going?
+52. What is the difference between resident set size (RSS) and heap used in `process.memoryUsage()`, and which one do you alert on?
+53. How does allocating many short-lived objects affect GC pause times in V8, and what coding patterns minimise allocation churn?
+
+### Graceful Shutdown & Process Management
+
+54. Walk through a complete graceful shutdown sequence for a Fastify server — what events do you listen for, in what order do you perform actions, and why does the order matter?
+55. Why should you call `server.close()` before closing database connections during shutdown?
+56. What is the difference between `SIGTERM` and `SIGKILL`, and why can you not write a signal handler for `SIGKILL`?
+57. How do you give in-flight HTTP requests time to complete during shutdown without leaving the process running forever if something stalls?
+58. What does `.unref()` do on a timer or server handle, and why is it important in shutdown and health-monitoring code?
+59. Why does `process.exit(1)` inside `uncaughtException` need a short `setTimeout` before it fires in some patterns, and what is the risk of skipping it?
+60. What is the difference between `process.exitCode = 1` and `process.exit(1)`, and when is the former preferable?
+61. How does a Kubernetes readiness probe differ from a liveness probe in terms of what they should check in a Node.js application?
+62. Explain why the "let it crash" philosophy from Erlang/OTP applies directly to `uncaughtException` in Node.js.
+
+### Production Patterns
+
+63. You notice that `JSON.stringify` is showing up as a hot path in your flamegraph. What is the Fastify-specific solution and how does it work mechanically?
+64. Why does Fastify's Ajv-based request validation outperform hand-written validation code, even well-written hand-written code?
+65. Explain Fastify's plugin encapsulation model — what is the default scope of a decorator, and how do you break out of it intentionally?
+66. What is `AsyncLocalStorage` and how does it avoid the "prop-drilling" problem for request correlation IDs without using globals?
+67. Why does `JSON.stringify(new Error('boom'))` return `{}`, and how do you correctly serialize an Error to JSON?
+68. What is the difference between an operational error and a programmer error, and why is it dangerous to handle a programmer error with a `try/catch` that lets the process continue?
+69. You deploy a new version of your Node.js service and `DATABASE_URL` is missing from the environment. With a zod-validated config, when does the process fail — at startup or at the first database query — and why does the timing matter?
+70. Explain how `keepAliveTimeout` and `headersTimeout` relate to each other on an `http.Server`, and what happens if `headersTimeout` is set lower than `keepAliveTimeout`.
+71. What is a slow-loris attack and how does `headersTimeout` mitigate it?
+72. In a microservices architecture, why is using a keep-alive `Agent` for outbound HTTP requests critical for performance, and what happens if you omit it?
+73. When would you terminate TLS in Node.js directly versus upstream at a load balancer or reverse proxy, and what are the trade-offs for each approach?
+74. What is HTTP/2 multiplexing, and how does it solve the head-of-line blocking problem that exists in HTTP/1.1 keep-alive?
+75. You are writing a structured logging strategy for a production service. Why should every log line be a JSON object rather than an interpolated string, and what downstream systems benefit from this?

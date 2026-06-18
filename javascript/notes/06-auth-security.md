@@ -885,3 +885,110 @@ In production, source these from a secrets manager (AWS Secrets Manager, Vault, 
 - Swap role checks for **CASL** abilities and an ownership rule ("a user can read/update only their own resources").
 - Add an **API-key strategy** for a service-to-service endpoint.
 - Implement **JWT secret rotation** with a verify-against-many-secrets window (§6.2).
+
+---
+
+## Interview Questions
+
+### JWT & Token Management
+
+1. Why is the JWT payload Base64URL-encoded rather than encrypted, and what are the security implications of that choice?
+2. What is the difference between HS256 and RS256 signing algorithms, and when would you choose RS256 over HS256 in a distributed system?
+3. How would you design a token revocation system for JWTs given that they are stateless by nature?
+4. What happens when an access token expires mid-request in a client application, and how should the client handle that gracefully?
+5. Why should access tokens be kept short-lived (5–15 minutes) rather than making them last longer for user convenience?
+6. What is the `jti` claim in a JWT, and in what scenario does it become essential?
+7. How would you implement JWT secret rotation in a production system without causing a wave of 401 errors for active users?
+8. What is the trade-off between storing user roles in the JWT payload versus fetching them from the database on every request?
+9. How would you detect and respond to a JWT that has a valid signature but references a user that has since been deleted or banned?
+10. What security risk arises if you use the same secret for both access tokens and refresh tokens?
+11. How does the `aud` (audience) claim protect against a token issued for one service being used against a different service?
+12. What is the `kid` (key ID) header parameter in a JWT, and how does a JWKS endpoint use it during verification?
+13. Why is it dangerous to set `ignoreExpiration: true` in a JWT strategy even temporarily for debugging?
+14. What information should you never put into a JWT payload, and why?
+15. How would you implement a "logout from all devices" feature in a stateless JWT-based system?
+
+### Refresh Tokens & Session Management
+
+16. What is refresh token rotation, and how does it help detect token theft compared to a simple long-lived refresh token?
+17. When a refresh token reuse is detected, why is the correct response to revoke all of the user's refresh tokens rather than just the one being replayed?
+18. Why should refresh tokens be stored as hashes in the database rather than in plaintext?
+19. What is the security benefit of using a separate `JWT_REFRESH_SECRET` instead of reusing the access token secret for refresh tokens?
+20. How would you implement a "remember me" feature using refresh tokens while keeping the default session short-lived?
+21. What is the difference between revoking a refresh token on logout versus invalidating all sessions, and when would you choose each approach?
+22. How would you handle a race condition where a legitimate client and an attacker both try to use the same refresh token nearly simultaneously?
+23. Where is the safest place to store a refresh token on the client side in a browser application, and what are the trade-offs between `httpOnly` cookies and `localStorage`?
+24. What is a refresh token "family," and how does family-based revocation improve security against stolen tokens?
+
+### Passport & Guards
+
+25. What is the execution order of NestJS middleware, guards, interceptors, and pipes, and why does that order matter for authentication?
+26. Why does `RolesGuard` need to run after `JwtAuthGuard`, and what silent failure occurs if the order is reversed?
+27. What is `ExecutionContext` in NestJS, and why is it used instead of passing the raw request directly to a guard?
+28. How does `AuthGuard('jwt')` know which Passport strategy to invoke, and what happens if a strategy with that name is not registered?
+29. What is the purpose of subclassing `AuthGuard('jwt')` rather than using it directly, and what customisations does subclassing enable?
+30. How does `Reflector.getAllAndOverride` differ from `Reflector.get`, and why is the override behaviour important when `@Public()` is set at both the controller and the handler level?
+31. How would you write a guard that allows access only during business hours without touching the authentication layer?
+32. What does `canActivate` returning `false` produce versus throwing `UnauthorizedException`, and when would you choose each?
+33. How would you design a guard that supports multiple authentication schemes (JWT for users, API key for services) on the same endpoint?
+34. Why is registering `JwtAuthGuard` via `APP_GUARD` preferable to applying `@UseGuards` on every controller, and what pitfall does the `@Public()` pattern solve?
+35. How would you unit-test a custom guard that reads decorator metadata via `Reflector`?
+
+### Password Security
+
+36. Why is MD5 or SHA-256 unsuitable for hashing passwords even though they are cryptographic hash functions?
+37. What makes argon2id superior to bcrypt for password hashing, and what specific attack does its memory-hardness mitigate?
+38. What is a "timing attack" in the context of password verification, and how does `argon2.verify` defend against it?
+39. Why does bcrypt silently truncate passwords beyond 72 bytes, and what real-world risk does this create for users with long passphrases?
+40. What parameters (memory cost, time cost, parallelism) should you tune when configuring argon2, and how do you decide the right values for your hardware?
+41. How would you handle a password-hashing algorithm migration (e.g. bcrypt to argon2) for an existing user base without forcing a mass password reset?
+42. Why should the salt be embedded in the hash output rather than stored in a separate database column, and how does argon2 handle this?
+43. What is a pepper in the context of password hashing, and what threat does it mitigate that salting alone does not?
+44. How would you securely expose a "forgot password" flow without leaking whether a given email address is registered?
+
+### Authorization & RBAC
+
+45. What is the difference between role-based access control (RBAC) and attribute-based access control (ABAC), and when does the complexity of ABAC become justified?
+46. Why do permissions scale better than roles as a system grows, and what specific problem arises when you gate logic directly on coarse role names?
+47. Why are ownership checks ("is this the user's own resource?") awkward to implement purely in a guard, and where in the application layer should they live?
+48. How does CASL's `subject()` helper enable attribute-level authorization conditions, and what is the equivalent concept in ASP.NET Core policy handlers?
+49. What is privilege escalation, and how would you prevent a user from elevating their own role via a PUT `/users/:id` endpoint?
+50. How would you design a multi-tenant RBAC system where the same user can have different roles in different tenants?
+51. What is the principle of least privilege, and how would you apply it when deciding what claims to embed in an access token?
+52. How would you audit authorization decisions in a production system so that you can answer "who accessed what resource and when?"
+
+### OAuth 2.0
+
+53. What is the difference between the OAuth 2.0 Authorization Code flow and the Implicit flow, and why is the Implicit flow now deprecated?
+54. What is a PKCE (Proof Key for Code Exchange) challenge, and which class of attack does it prevent in public OAuth clients?
+55. When implementing "Sign in with Google" in NestJS via `passport-google-oauth20`, what does the `validate()` method receive and what should it return?
+56. What is the difference between an OAuth access token and an OpenID Connect ID token, and which one should you use to identify the user in your own system?
+57. How would you handle the case where an OAuth provider returns an email address that already exists in your database under a different authentication method?
+58. What is the `state` parameter in the OAuth Authorization Code flow, and what attack does it prevent?
+59. Why should you never use OAuth's access token as your own internal session token, and what should you do instead?
+
+### API Security & HTTPS
+
+60. What HTTP headers does `helmet` set by default, and which one is most critical for preventing clickjacking?
+61. What is `Strict-Transport-Security`, what does the `includeSubDomains` directive add, and what is the risk of setting a very long `max-age` prematurely?
+62. What is `X-Content-Type-Options: nosniff`, and what MIME-sniffing attack does it block?
+63. Why is `CORS origin: '*'` with `credentials: true` silently rejected by browsers, and how do you correctly configure cross-origin cookie or Authorization header requests?
+64. What is the difference between CORS and CSRF? Can CORS configuration alone protect against CSRF attacks?
+65. How does rate limiting at the application level differ from rate limiting at the API gateway level, and when do you need both?
+66. What happens to rate limiting accuracy when your Node app is behind a reverse proxy and `trust proxy` is not configured, and how do you fix it?
+67. How would you design a rate-limiting strategy that distinguishes between anonymous and authenticated users and applies different thresholds?
+68. What is TLS termination, and why is it considered a better practice to terminate TLS at the reverse proxy rather than inside the Node.js process?
+69. What does `app.set('trust proxy', 1)` do in Express/NestJS, and what security risk does blindly trusting all proxy headers introduce?
+
+### Common Vulnerabilities & Input Validation
+
+70. What is a mass-assignment (over-posting) vulnerability, and how does `ValidationPipe({ whitelist: true })` prevent it in NestJS?
+71. What is the difference between `whitelist: true` and `forbidNonWhitelisted: true` in a NestJS `ValidationPipe`, and when would you prefer one over the other?
+72. What is SQL injection, and why does Prisma's query API eliminate it even when passing user-supplied data as values?
+73. When is `$queryRawUnsafe` necessary in Prisma, and what developer discipline must be applied whenever it is used?
+74. What is a stored XSS attack, and what output-encoding or CSP strategy would you use to mitigate it in a NestJS API that returns user-supplied data?
+75. What is SSRF (Server-Side Request Forgery), and how would you prevent it in an endpoint that fetches a user-supplied URL?
+76. What is credential stuffing, and how does a tight rate limit on `/auth/login` combined with argon2 hashing reduce its effectiveness?
+77. Why is it important to validate and sanitise secrets at application startup rather than at the moment they are first used?
+78. What is the risk of logging JWT tokens or raw passwords in application logs, and what should you log instead to aid debugging without exposing credentials?
+79. How would you prevent an attacker from enumerating valid usernames through a login endpoint that returns different error messages for "user not found" vs "wrong password"?

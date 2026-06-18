@@ -980,3 +980,96 @@ class TypedEmitter<TEvents extends Record<string, any>> {
 ```
 
 **.NET parallel:** this is the typed-event equivalent of a C# `event EventHandler<TArgs>` — each event carries a fixed payload type the compiler enforces — except here a *single generic class* serves any event map, with the payload types flowing entirely from inference.
+
+---
+
+## Interview Questions
+
+### Type System Fundamentals
+
+1. What is the core difference between structural typing and nominal typing, and why did the TypeScript team choose structural typing over nominal typing?
+2. How does TypeScript's structural typing create a "footgun" when two distinct domain types like `Celsius` and `Fahrenheit` share the same shape, and how do you fix it?
+3. Explain what an excess property check is, why it only fires on fresh object literals, and why assigning through an intermediate variable bypasses it.
+4. Why do TypeScript classes with `private` fields behave nominally rather than structurally, even though the rest of the type system is structural?
+5. What is the practical difference between using `type` and `interface` for defining an object shape, and when would choosing the wrong one cause a compile-time failure?
+6. Why can't `type` aliases participate in declaration merging, and what architectural consequence does that have for library authors?
+7. Explain why `interface` is described as "slightly faster" for large object types compared to `type` aliases.
+8. When would you use an intersection type (`A & B`) versus `interface B extends A`, and what subtle differences can arise between the two approaches?
+9. How does a discriminated union replace a sealed class hierarchy from C#, and what is the role of the `never` type in enforcing exhaustiveness at compile time?
+10. What is literal type widening, when does it happen automatically, and how does `as const` prevent it?
+11. Explain the pattern `typeof ROLES[number]` with `as const` and why it is preferred over a TypeScript `enum` for keeping runtime values and types in sync.
+12. What are the trade-offs between using a TypeScript `enum`, a `const enum`, and an `as const` union for a set of named constants?
+13. Why does `keyof (A | B)` produce only the common keys, while `keyof (A & B)` produces all keys, and how can getting this backwards cause subtle type errors?
+
+### Generics
+
+14. What is the purpose of `K extends keyof T` as a generic constraint, and how does it enable type-safe property access with indexed access types?
+15. Explain how default type parameters in TypeScript work and why C# developers cannot directly transfer their mental model from C# generics to this feature.
+16. What does `const` on a type parameter (`<const T>`) do differently from a regular type parameter, and what problem does it solve at call sites?
+17. How would you design a generic function that returns a deep readonly version of any object type passed to it, and what limitations would you encounter?
+18. Why does constraining a generic with `extends object` rather than a more specific constraint sometimes lead to weaker inference, and what is the preferred alternative?
+19. What is the difference between `T extends any[]` and `T extends readonly any[]` in a generic constraint, and when does the distinction matter?
+20. How does `keyof T` change when `T` is a union type versus when `T` is an intersection type, and what does that mean for a generic that operates over `keyof T`?
+
+### Conditional & Mapped Types
+
+21. Explain distributive conditional types: what triggers distribution, what the result looks like for a union input, and how you disable it.
+22. Why does `T extends never ? 'yes' : 'no'` evaluate to `never` rather than `'yes'`, and what does that reveal about how conditional types handle the empty union?
+23. What is the `infer` keyword, where can it appear syntactically, and what would happen if you tried to use `infer` outside a conditional type's `extends` clause?
+24. Walk through how you would use `infer` to extract the element type of a nested array (e.g., `number[][]` → `number`).
+25. How does the built-in `Awaited<T>` utility type use recursive conditional types and `infer` to unwrap arbitrarily deep `Promise` chains?
+26. What are mapping modifiers (`+`/`-` with `readonly` and `?`), and how would you write a type that makes every property required AND mutable in a single mapped type?
+27. Explain key remapping with `as` in a mapped type: what does returning `never` for a key do, and give a use-case where you would filter keys based on their value type.
+28. How would you construct a mapped type that converts every method in an object type into a function that returns a `Promise` of the original return type?
+29. What is the difference between a homomorphic mapped type (one that iterates `keyof T`) and a non-homomorphic mapped type, and why does that distinction affect whether `readonly` and `?` modifiers are preserved?
+30. How does the `Omit` utility type work step by step, and why does it use `Pick<T, Exclude<keyof T, K>>` rather than a direct mapped type with key filtering?
+
+### Template Literal Types
+
+31. How do template literal types interact with union types to produce a cartesian product, and when can this product become a performance problem for the compiler?
+32. Explain how you would use `infer` inside a template literal type to parse out a named segment from a route string like `'/users/:id/posts/:postId'`.
+33. What are the four intrinsic string manipulation types built into the TypeScript compiler, and why are they compiler intrinsics rather than library-defined types?
+34. How would you design a type-level function that converts a `snake_case` string literal type to `camelCase`?
+35. Describe how combining mapped types with template literal key remapping enables generating an `on${EventName}` handler API entirely at the type level.
+
+### Utility Types
+
+36. Explain the implementation of `ReturnType<T>` using `infer` and why the constraint `T extends (...args: any) => any` is necessary rather than just `T extends Function`.
+37. What is the difference between `Partial<T>` and `{ [K in keyof T]?: T[K] | undefined }`, and under what `tsconfig` flag would the two behave differently?
+38. How does `NonNullable<T>` work in modern TypeScript using `T & {}`, and why does the empty object intersection strip `null` and `undefined`?
+39. When would you reach for `Extract<T, U>` versus a manual conditional type, and what does distributivity buy you in that context?
+40. Explain `InstanceType<T>` — what constraint does `T` have, how is the instance type inferred, and when would you use this utility in practice?
+41. How would you write a `DeepPartial<T>` utility type that recursively makes every nested property optional, and what edge cases (arrays, functions, primitives) must you handle?
+42. What is the difference between `Parameters<T>` returning a tuple type versus returning `any[]`, and how does the tuple enable writing type-safe wrapper functions?
+43. How would you implement a `RequireAtLeastOne<T>` utility type that enforces that an object must have at least one of its optional properties set?
+
+### Decorators
+
+44. What is the concrete difference in decorator signature between the legacy experimental system and the TC39 Stage 3 system, and why does mixing them break your code?
+45. Why do NestJS and TypeORM still require `experimentalDecorators: true` in 2025, and what specific feature of the legacy system they depend on is absent from Stage 3?
+46. Explain how `emitDecoratorMetadata` enables constructor injection in NestJS: what the compiler emits, which metadata key carries parameter types, and how the DI container reads it.
+47. How does a Stage 3 method decorator wrap a method without losing the correct `this` context, and what does the `context` object provide beyond just `kind` and `name`?
+48. What does `context.addInitializer()` do in a Stage 3 decorator, and what problem does it solve that cannot be solved by the decorator function body alone?
+49. Explain the Stage 3 metadata channel via `Symbol.metadata` and how it differs from the `reflect-metadata` polyfill approach used by the legacy system.
+50. What is an accessor decorator in Stage 3, what does the `accessor` keyword on a class field actually generate, and when would you prefer it over a manual getter/setter?
+51. How would you write a Stage 3 class decorator that enforces that decorated classes can only be instantiated once (singleton pattern), and what are the type constraints on the decorator function?
+
+### Module System & Declaration Merging
+
+52. What is the correct procedure for augmenting a third-party module's types without accidentally redeclaring the entire module, and what role does the ambient `import` play?
+53. Explain the difference between `declare module`, `declare global`, and a top-level `.d.ts` ambient declaration — when would you use each?
+54. Why does `declare module '*.svg'` in a `.d.ts` file make non-code asset imports type-check, and what prevents TypeScript from actually knowing the content of the file?
+55. What problem does `verbatimModuleSyntax` solve compared to `isolatedModules`, and why is the distinction between `import type` and a regular `import` load-bearing for single-file transpilers like esbuild?
+56. Explain the difference between `moduleResolution: "node"`, `"node16"`, and `"bundler"`, and what specific behavior each one has around `package.json` `exports` and relative import extensions.
+57. What does `composite: true` require and enable in a TypeScript project reference setup, and how does `tsc --build` use `.tsbuildinfo` files to achieve incremental compilation?
+58. Why does adding a `paths` alias in `tsconfig.json` fix type-checking but still cause a "module not found" runtime error in Node.js, and what are the two ways to close that gap?
+
+### Type-Safe Patterns & Advanced Design
+
+59. What is a branded type, how does the phantom `__brand` property work at the type level, and why is the property `readonly` in the type definition?
+60. Explain the difference between a phantom type parameter and a branded type — which one erases completely at runtime, and which one leaves a trace?
+61. How does the `satisfies` operator differ from a type annotation (`const x: T = ...`), and in what scenario would a type annotation cause a method call to fail that `satisfies` would allow?
+62. Walk through how the `QueryBuilder` accumulator pattern uses a union type parameter (`Set extends string`) and a `this:` parameter to enforce build-time state validation.
+63. Why is `as` a compile-time assertion rather than a runtime conversion, what category of bugs does it introduce, and when is it genuinely safe to use?
+64. How does `unknown` differ from `any` in practice, and why should `catch (e)` variables be `unknown` rather than `any` under strict mode?
+65. Explain why `Object.keys(obj)` returns `string[]` rather than `(keyof typeof obj)[]`, why the TypeScript team considers this the sound choice, and how you work around it when you need typed keys.
