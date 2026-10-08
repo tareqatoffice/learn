@@ -1,7 +1,6 @@
-'use strict';
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { parseFile, parseQuestionHeadings, parseNumberedSections } = require('./parse');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { parseFile, parseQuestionHeadings, parseNumberedSections } from '../src/lib/parse.js';
 
 const md = (...lines) => lines.join('\n');
 

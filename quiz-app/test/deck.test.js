@@ -1,7 +1,6 @@
-'use strict';
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const D = require('./deck');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as D from '../src/lib/deck.js';
 
 const Q = [
   { id: 'a1', book: 'CSS', part: 'P1' },

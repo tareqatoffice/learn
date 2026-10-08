@@ -1,7 +1,4 @@
-'use strict';
-
-// Pure deck/progress helpers. Inlined into quiz.html by build-quiz.js (so top-level
-// functions become globals in the page) and also loaded by node:test via module.exports.
+// Pure deck/progress helpers used by the Svelte app. No DOM, no storage.
 
 function shuffle(arr, rand) {
   const r = rand || Math.random;
@@ -52,6 +49,4 @@ function markSeen(p, id) {
   return { got: p.got, review: p.review, seen: addUnique(p.seen, id) };
 }
 
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { shuffle, filterQuestions, buildDeck, requeue, emptyProgress, markProgress, markSeen };
-}
+export { shuffle, filterQuestions, buildDeck, requeue, emptyProgress, markProgress, markSeen };

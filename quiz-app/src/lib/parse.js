@@ -1,5 +1,3 @@
-'use strict';
-
 // Parses the interview md books into question records. Pure functions, no I/O.
 // Record: { question, part, prompt, answer } — prompt is markdown shown with the
 // question before the answer is revealed ('' when there is none).
@@ -227,4 +225,4 @@ function parseFile(md, fileName) {
   return items;
 }
 
-module.exports = { parseFile, parseQuestionHeadings, parseNumberedSections };
+export { parseFile, parseQuestionHeadings, parseNumberedSections };
