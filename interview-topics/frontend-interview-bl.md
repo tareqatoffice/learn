@@ -1,0 +1,1332 @@
+# Frontend Developer Interview — Questions & Answers
+
+React.js · Next.js · TypeScript · Tailwind · REST APIs · State · Performance · SEO · Browser · AI-assisted development · Testing · Git · DevOps · Behavioral · Tricky questions
+
+151 questions with answers.
+
+## Contents
+
+- [0. Warm-up](#0-warm-up)
+- [1. JavaScript & TypeScript](#1-javascript--typescript)
+- [2. React.js](#2-reactjs)
+- [3. Next.js](#3-nextjs)
+- [4. HTML, CSS, Tailwind & Figma](#4-html-css-tailwind--figma)
+- [5. REST APIs & State](#5-rest-apis--state)
+- [6. Performance, SEO & Browsers](#6-performance-seo--browsers)
+- [6b. Browser & networking](#6b-browser--networking)
+- [7. AI-assisted development](#7-ai-assisted-development)
+- [8. Testing](#8-testing)
+- [9. Git, code review & clean code](#9-git-code-review--clean-code)
+- [10. Docker, CI/CD, cloud & Node](#10-docker-cicd-cloud--node)
+- [11. Behavioral (STAR)](#11-behavioral-star)
+- [12. Tricky & trap questions](#12-tricky--trap-questions)
+
+---
+
+## 0. Warm-up
+
+### Q1. Introduce yourself in 60 seconds.
+
+> "Hi, I'm [Name]. I'm a frontend developer with [X] years of experience building responsive web apps with React, Next.js and TypeScript. Most recently at [Company/Project], I [built a dashboard / e-commerce site / SaaS app] where I converted Figma designs into reusable Tailwind components, integrated REST APIs using TanStack Query, and improved Lighthouse performance from [X] to [Y].
+>
+> I use AI tools like GitHub Copilot and Claude daily — for scaffolding components, writing tests and debugging — but I always review the output for security, types and edge cases before it goes into a PR. I enjoy working closely with designers and backend developers, and I'm looking for a team where I can ship quality product fast. That's why this role caught my attention."
+
+**Why this works:** it touches every major keyword in the JD (React, Next.js, TypeScript, Figma, Tailwind, REST, state, performance, AI tools, collaboration) in under a minute, and ends with a reason you want the job.
+
+### Q2. What formula should you use to answer any technical question?
+
+1. **Define** it in one sentence.
+2. **Explain why** it exists or what problem it solves.
+3. **Give an example** from code or a project you did.
+4. **Mention a trade-off or pitfall** — this is what separates mid-level from senior answers.
+
+---
+
+## 1. JavaScript & TypeScript
+
+### Q1. What is the difference between `var`, `let` and `const`?
+
+**Say this:** `var` is function-scoped and hoisted with `undefined`; `let` and `const` are block-scoped and sit in a "temporal dead zone" until declared. `const` prevents reassignment, not mutation.
+
+**Deeper:** `const user = {name: 'A'}; user.name = 'B'` is allowed, because the binding is constant but the object is not. In modern code, default to `const`, use `let` when you must reassign, and avoid `var`.
+
+### Q2. Explain closures with a real use case.
+
+**Say this:** A closure is a function that remembers the variables from the scope where it was created, even after that scope has finished running.
+
+```javascript
+function createCounter() {
+  let count = 0;
+  return () => ++count;
+}
+const next = createCounter();
+next(); // 1
+next(); // 2
+```
+
+**Real use in React:** every event handler and `useEffect` callback is a closure. The classic bug is a **stale closure** — a `setInterval` inside `useEffect` with an empty dependency array keeps reading the first value of state. Fix it with the functional updater `setCount(c => c + 1)` or by adding dependencies.
+
+### Q3. How does the event loop work?
+
+**Say this:** JavaScript is single-threaded. Synchronous code runs on the call stack; async callbacks wait in queues. When the stack is empty, the event loop first drains the **microtask queue** (Promises, `queueMicrotask`), then takes one **macrotask** (`setTimeout`, I/O, events).
+
+```javascript
+console.log('A');
+setTimeout(() => console.log('B'), 0);
+Promise.resolve().then(() => console.log('C'));
+console.log('D');
+// Output: A, D, C, B
+```
+
+### Q4. `==` vs `===`?
+
+`===` compares value and type with no conversion; `==` coerces types first (`'1' == 1` is true). Always use `===` except for the deliberate `x == null` check that covers both `null` and `undefined`.
+
+### Q5. Explain `this`, and arrow functions vs regular functions.
+
+**Say this:** In a regular function, `this` depends on how the function is called. Arrow functions don't have their own `this`; they take it from the surrounding scope. Arrow functions also have no `arguments` object and can't be used as constructors.
+
+### Q6. Promises vs async/await, and how do you handle errors?
+
+`async/await` is syntax on top of Promises that makes async code read top-down. Handle errors with `try/catch`. Run independent requests in parallel with `Promise.all` (fails fast on any rejection) or `Promise.allSettled` (waits for all, reports each result).
+
+```javascript
+const [user, orders] = await Promise.all([getUser(id), getOrders(id)]);
+```
+
+### Q7. What are debounce and throttle? When do you use each?
+
+**Debounce** waits until calls stop for N ms (search input, autosave). **Throttle** runs at most once every N ms (scroll, resize, mouse move).
+
+```javascript
+function debounce(fn, delay) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
+```
+
+This is a very common live-coding question — practice writing it from memory.
+
+### Q8. Shallow copy vs deep copy?
+
+Spread (`{...obj}`) and `Object.assign` copy one level; nested objects are still shared. For a deep copy use `structuredClone(obj)` (modern browsers and Node 17+). This matters in React because state must be updated immutably.
+
+### Q9. Why TypeScript? What benefits have you seen?
+
+**Say this:** TypeScript catches bugs at compile time, documents the shape of data, and makes refactoring safe because the editor finds every broken usage. It also makes AI-generated code safer, since type errors expose many hallucinated properties immediately.
+
+### Q10. `interface` vs `type`?
+
+Both describe object shapes. `interface` can be extended and **merged** (declared twice, combined) — good for public APIs and objects. `type` can express unions, intersections, tuples and mapped types. Many teams use `type` by default and `interface` for extendable component props; the key is consistency.
+
+```typescript
+type Status = 'idle' | 'loading' | 'success' | 'error';
+interface ButtonProps { label: string; onClick: () => void; }
+```
+
+### Q11. `any` vs `unknown` vs `never`?
+
+- `any` turns off type checking — avoid it.
+- `unknown` is the safe "I don't know yet": you must narrow it (`typeof`, type guard, Zod parse) before using it. Use it for API responses and `catch` errors.
+- `never` means a value that can't exist; useful for exhaustive `switch` checks.
+
+### Q12. What are generics? Give an example.
+
+Generics let a function or component work with many types while staying type-safe.
+
+```typescript
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json() as Promise<T>;
+}
+const users = await fetchJson<User[]>('/api/users');
+```
+
+### Q13. Name utility types you use.
+
+`Partial<T>` (all optional — update forms), `Required<T>`, `Pick<T, K>`, `Omit<T, K>` (e.g. a create form without `id`), `Record<K, V>` (lookup maps), `ReturnType<typeof fn>`, and `ComponentProps<'button'>` to extend native element props.
+
+### Q14. How do you type API responses safely?
+
+Types vanish at runtime, so the server can still send something unexpected. Define the type and validate at the boundary with a schema library like **Zod**, then infer the type from the schema: `type User = z.infer<typeof UserSchema>`. Mentioning runtime validation is a strong signal of maturity.
+
+---
+
+## 2. React.js
+
+### Q1. What is the Virtual DOM and how does reconciliation work?
+
+**Say this:** React keeps a lightweight in-memory tree of the UI. When state changes, it builds a new tree, compares it to the old one (diffing), and applies only the minimal changes to the real DOM. It assumes elements of different types produce different trees, and it uses `key` to match list items between renders.
+
+### Q2. Why are keys important in lists? Why not use the index?
+
+Keys tell React which item is which between renders. Using the array index breaks when items are inserted, removed or reordered: React reuses the wrong component, so input values, focus or local state jump to the wrong row. Use a stable unique id from the data. Index is acceptable only for static lists that never change order.
+
+### Q3. What causes a component to re-render?
+
+A component re-renders when (1) its own state changes, (2) its parent re-renders, or (3) a context it consumes changes. Props changing is not a separate cause — it happens because the parent re-rendered. A re-render is not automatically a DOM update; React only touches the DOM if output differs.
+
+### Q4. Explain `useState` and why state updates look "async".
+
+State updates are scheduled and **batched**, so the new value is available on the next render, not on the next line. When the new value depends on the old one, use the functional form:
+
+```tsx
+setCount(prev => prev + 1); // safe even if called multiple times
+```
+
+### Q5. Explain `useEffect` — dependencies and cleanup.
+
+**Say this:** `useEffect` synchronizes a component with something outside React (subscriptions, timers, manual DOM, analytics). It runs after paint. The dependency array controls when it re-runs, and the returned function cleans up before the next run and on unmount.
+
+```tsx
+useEffect(() => {
+  const controller = new AbortController();
+  fetch(`/api/users/${id}`, { signal: controller.signal })
+    .then(r => r.json())
+    .then(setUser)
+    .catch(() => {});
+  return () => controller.abort(); // avoids race conditions
+}, [id]);
+```
+
+**Pitfalls to mention:** missing dependencies (stale data), objects/functions in dependencies causing infinite loops, and using effects for things that should be derived during render. In real apps, prefer TanStack Query or Server Components for data fetching instead of raw `useEffect`.
+
+### Q6. Why does `useEffect` run twice in development?
+
+React 18+ **Strict Mode** mounts, unmounts and re-mounts components in development to expose effects that are missing cleanup. It does not happen in production. The fix is a correct cleanup function, not disabling Strict Mode.
+
+### Q7. `useMemo` vs `useCallback` vs `React.memo`?
+
+- `useMemo` caches a **computed value** (expensive filtering or sorting).
+- `useCallback` caches a **function reference** so a memoized child doesn't re-render.
+- `React.memo` wraps a **component** so it skips re-render when props are shallowly equal.
+
+They work together: `React.memo` on a child is useless if you pass a new inline function every render. **Trade-off:** memoization has a cost; measure with React DevTools Profiler first. Also mention that the **React Compiler** (stable in React 19 era) can auto-memoize, reducing manual use.
+
+### Q8. What is `useRef` used for?
+
+Two things: accessing DOM nodes (focus an input, measure size, scroll) and storing a mutable value that persists across renders **without** causing a re-render (timer ids, previous values).
+
+### Q9. What are custom hooks? Give an example.
+
+A custom hook is a function starting with `use` that reuses stateful logic across components. It shares logic, not state — each component gets its own copy.
+
+```tsx
+function useDebounce<T>(value: T, delay = 300): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+```
+
+### Q10. What are the Rules of Hooks?
+
+Call hooks only at the top level (not inside loops, conditions or nested functions) and only from React components or custom hooks. React tracks hooks by call order, so conditional calls break that order.
+
+### Q11. Controlled vs uncontrolled components?
+
+Controlled inputs keep their value in React state (`value` + `onChange`) — good for live validation. Uncontrolled inputs keep value in the DOM, read via `ref` or `FormData` — less re-rendering. **React Hook Form** uses uncontrolled inputs for performance, often paired with Zod for validation.
+
+### Q12. How do you design a reusable component?
+
+Walk through these principles with a `Button` or `Modal` example:
+
+1. **Typed, minimal props API** — extend native props so it behaves like a real element.
+2. **Variants instead of booleans** — `variant="primary"` instead of `isPrimary`, `isDanger`.
+3. **Composition over configuration** — accept `children` or compound parts (`<Card.Header>`) instead of 20 props.
+4. **Forward refs and spread rest props** — so it works with forms, focus and tooltips.
+5. **Accessible by default** — semantic element, focus styles, ARIA where needed.
+6. **Style override** — accept `className` and merge with `tailwind-merge`.
+
+```tsx
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '@/lib/utils';
+
+const button = cva('inline-flex items-center rounded-md font-medium transition focus-visible:ring-2 disabled:opacity-50', {
+  variants: {
+    variant: { primary: 'bg-blue-600 text-white hover:bg-blue-700', outline: 'border border-gray-300 hover:bg-gray-50' },
+    size: { sm: 'h-8 px-3 text-sm', md: 'h-10 px-4' },
+  },
+  defaultVariants: { variant: 'primary', size: 'md' },
+});
+
+type ButtonProps = React.ComponentProps<'button'> & VariantProps<typeof button>;
+
+export function Button({ className, variant, size, ...props }: ButtonProps) {
+  return <button className={cn(button({ variant, size }), className)} {...props} />;
+}
+```
+
+Mention that this is the pattern used by **shadcn/ui**, which is common in Next.js + Tailwind projects. (In React 19, `ref` is a normal prop, so `forwardRef` is no longer needed.)
+
+### Q13. How do you avoid prop drilling?
+
+Options, in order: restructure with composition (pass components as `children`), use **Context** for low-frequency global values (theme, auth, locale), use **Zustand/Redux** for frequently changing shared client state, and use **TanStack Query** for server data. Context is not a performance-optimized state manager — every consumer re-renders when its value changes.
+
+### Q14. What are Error Boundaries?
+
+Components that catch render errors in their child tree and show a fallback UI instead of a blank screen. They must be class components (or use the `react-error-boundary` library). They do not catch errors in event handlers or async code. In Next.js App Router, `error.tsx` creates one per route segment.
+
+### Q15. What is new in React 19 that you know about?
+
+Server Components and Server Actions as stable features, the `use()` hook for reading promises and context, `useActionState` and `useFormStatus` for forms, `useOptimistic` for optimistic UI, `ref` as a regular prop, and the React Compiler for automatic memoization. You don't need every detail — knowing the direction shows you keep up.
+
+---
+
+## 3. Next.js
+
+### Q1. Why use Next.js instead of plain React (Vite/CRA)?
+
+**Say this:** Next.js adds server-side rendering, static generation, file-based routing, image and font optimization, API routes, middleware and built-in SEO metadata. Plain React renders in the browser, so the first HTML is empty — worse for SEO and first load on slow devices.
+
+### Q2. Explain SSR, SSG, ISR and CSR.
+
+| Strategy | When HTML is built | Best for | App Router way |
+| --- | --- | --- | --- |
+| SSG (Static) | At build time | Marketing pages, blogs, docs | Default for routes with no dynamic data |
+| ISR (Incremental Static Regeneration) | At build, then re-built in background after N seconds | Product listings, CMS content | `export const revalidate = 60` or `fetch(url, { next: { revalidate: 60 } })` |
+| SSR (Dynamic) | On every request | Personalized pages, dashboards, auth data | Reading `cookies()`/`headers()`, or `cache: 'no-store'` |
+| CSR (Client) | In the browser after JS loads | Highly interactive widgets behind login | `'use client'` + TanStack Query |
+
+**Strong answer:** "I pick per page — static where possible for speed and cost, ISR for content that changes occasionally, dynamic only when the data is per-user." Note: caching defaults changed across Next.js 14 → 15 (fetch is no longer cached by default in 15), so always check the version the team uses.
+
+### Q3. App Router vs Pages Router?
+
+Pages Router (`pages/`) uses `getServerSideProps`/`getStaticProps`. App Router (`app/`, Next 13.4+) is built on React Server Components with nested layouts, `loading.tsx`, `error.tsx`, streaming, and fetch-in-component data loading. New projects use App Router; many existing codebases still have Pages Router, so knowing both is valuable.
+
+### Q4. Server Components vs Client Components?
+
+**Say this:** In the App Router, components are Server Components by default. They run only on the server, can fetch data directly or query a database, and send zero JavaScript to the browser. Client Components (marked `'use client'`) are needed for state, effects, event handlers and browser APIs.
+
+**Best practice:** keep `'use client'` as low in the tree as possible — make the page a Server Component and only the interactive pieces (a like button, a filter dropdown) client components. You can pass Server Components as `children` into Client Components.
+
+```tsx
+// app/products/page.tsx — Server Component
+export default async function ProductsPage() {
+  const products = await getProducts(); // runs on server
+  return <ProductGrid products={products} />;
+}
+```
+
+**Common mistake:** importing server-only code (DB clients, secrets) into a client file. Use the `server-only` package to make that a build error.
+
+### Q5. What are Server Actions?
+
+Async functions marked `'use server'` that run on the server and can be called directly from forms or client components — no separate API route needed for mutations. Always validate input (Zod) and check authorization inside them, because they are public HTTP endpoints under the hood.
+
+### Q6. Explain special files in the App Router.
+
+`layout.tsx` (shared UI that persists across navigation), `page.tsx` (the route), `loading.tsx` (Suspense fallback while streaming), `error.tsx` (error boundary), `not-found.tsx`, `route.ts` (API endpoint), and `middleware.ts` at the root (runs before requests — auth redirects, i18n, A/B tests).
+
+### Q7. How do you handle SEO in Next.js?
+
+- `export const metadata` or `generateMetadata()` for title, description, Open Graph and Twitter cards per page.
+- `app/sitemap.ts` and `app/robots.ts` to generate sitemap and robots files.
+- Server rendering so crawlers get full HTML.
+- Semantic HTML, one `h1` per page, descriptive `alt` text.
+- JSON-LD structured data for products, articles, FAQs.
+- Canonical URLs to avoid duplicate content.
+
+```tsx
+export async function generateMetadata({ params }): Promise<Metadata> {
+  const product = await getProduct(params.slug);
+  return {
+    title: `${product.name} | Store`,
+    description: product.summary,
+    openGraph: { images: [product.image] },
+  };
+}
+```
+
+### Q8. What does `next/image` do?
+
+It automatically resizes, serves modern formats (WebP/AVIF), lazy-loads below-the-fold images, and requires width/height (or `fill`) to prevent layout shift (CLS). Use `priority` on the hero/LCP image so it loads immediately.
+
+### Q9. What does `next/font` do?
+
+It self-hosts Google or local fonts at build time, removes external network requests, and avoids layout shift from font swapping.
+
+### Q10. How do you handle environment variables?
+
+Variables are server-only by default. Only those prefixed `NEXT_PUBLIC_` are bundled into browser code. Never put secrets in `NEXT_PUBLIC_` variables — anyone can read them in the JS bundle.
+
+### Q11. How do you protect routes / handle auth?
+
+Check the session in `middleware.ts` for fast redirects, and **also** re-check authorization on the server where data is read (Server Components, Server Actions, route handlers). Middleware alone is not enough. Libraries commonly used: Auth.js (NextAuth), Clerk, or a custom JWT/cookie flow with httpOnly cookies.
+
+### Q12. Dynamic routes and route groups?
+
+`app/blog/[slug]/page.tsx` for dynamic segments, `[...slug]` for catch-all, `generateStaticParams()` to pre-build dynamic pages at build time, and `(group)` folders to organize routes or share a layout without affecting the URL.
+
+---
+
+## 4. HTML, CSS, Tailwind & Figma
+
+### Q1. What is semantic HTML and why does it matter?
+
+Using elements that describe meaning — `header`, `nav`, `main`, `article`, `section`, `button`, `footer` — instead of `div` everywhere. It improves accessibility (screen readers navigate by landmarks), SEO (crawlers understand structure), and keyboard behavior (a real `button` is focusable and responds to Enter/Space; a `div` with `onClick` is not).
+
+### Q2. What accessibility (a11y) practices do you follow?
+
+Semantic elements, `alt` on images (empty `alt=""` for decorative), labels tied to inputs, visible focus states (`focus-visible:`), color contrast at least 4.5:1 for body text (WCAG AA), keyboard navigation and focus trapping in modals, and ARIA only when no native element works. Test with Lighthouse, axe DevTools and by tabbing through the page.
+
+### Q3. Explain the CSS box model and `box-sizing`.
+
+Every element is content + padding + border + margin. With `box-sizing: border-box`, width includes padding and border, which makes layout math predictable. Tailwind's Preflight sets this globally.
+
+### Q4. Flexbox vs Grid — when do you use each?
+
+**Flexbox** is one-dimensional (a row *or* a column): navbars, button groups, centering, aligning items in a card. **Grid** is two-dimensional (rows *and* columns): page layouts, card galleries, dashboards. Rule of thumb: content-driven sizing → flex; layout-driven structure → grid.
+
+```html
+<!-- Responsive card grid: 1 col mobile, 2 tablet, 4 desktop -->
+<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">...</div>
+```
+
+### Q5. CSS specificity and positioning?
+
+Specificity order: inline styles > IDs > classes/attributes/pseudo-classes > elements. `!important` overrides everything — avoid it. Position: `relative` (offset from itself, creates a positioning context), `absolute` (relative to nearest positioned ancestor), `fixed` (to viewport), `sticky` (scrolls until a threshold, then sticks — great for headers and table headers).
+
+### Q6. How do you approach responsive design?
+
+**Mobile-first:** write base styles for small screens, then add `sm:`, `md:`, `lg:`, `xl:` overrides for larger screens (Tailwind breakpoints are min-width: 640, 768, 1024, 1280, 1536 px). Use relative units (`rem`, `%`, `fr`), fluid typography with `clamp()`, `max-w-*` containers, responsive images (`srcset` or `next/image` `sizes`), and test on real devices plus DevTools device mode. Mention **container queries** (`@container`, Tailwind `@container`/`@md:`) for components that adapt to their parent's width, not the screen.
+
+### Q7. Why Tailwind? What are its downsides?
+
+**Pros:** fast development, no naming fatigue, consistent spacing/color scale from a design system, tiny production CSS (only used classes are generated), styles live with the markup, easy responsive and state variants.
+
+**Cons and how you handle them:** long class strings (extract components, use `cva` for variants), learning curve, and conflicting classes when overriding (solve with `tailwind-merge`). Avoid building class names dynamically like `text-${color}-500` — Tailwind can't detect them at build time; use a full-class lookup map instead.
+
+### Q8. How do you customize Tailwind to match a design system?
+
+Put the Figma tokens (colors, fonts, spacing, radii, shadows) into the theme. In **Tailwind v4** (released 2025) this is done in CSS with `@theme { --color-brand-500: #2563eb; }`; in v3 it's `tailwind.config.js` under `theme.extend`. Use CSS variables for theming so dark mode is just a variable swap.
+
+### Q9. How do you implement dark mode?
+
+Tailwind's `dark:` variant, driven either by `prefers-color-scheme` or a `class`/`data-theme` on `html` toggled by the user and saved. In Next.js, `next-themes` prevents the flash of wrong theme on load.
+
+### Q10. Walk me through converting a Figma design into a pixel-perfect, responsive UI.
+
+1. **Study the whole design first** — all screens, breakpoints (mobile/tablet/desktop frames), hover/focus/disabled/empty/loading/error states. Ask the designer about anything missing *before* coding.
+2. **Extract design tokens** — colors, typography scale, spacing, radius, shadows — from Figma styles/variables (Dev Mode shows them), and map them into the Tailwind theme.
+3. **Break the page into components** — identify repeated pieces (buttons, inputs, cards, navbar) and build them first as reusable components, ideally matching Figma component names and variants.
+4. **Build layout with Flex/Grid** using Figma's Auto Layout as a hint (Auto Layout ≈ flexbox: direction, gap, padding).
+5. **Make it responsive** — mobile-first, define behavior between the designed breakpoints, not just at them.
+6. **Export assets correctly** — SVG for icons/logos, WebP/AVIF for photos, use `next/image`.
+7. **Verify pixel accuracy** — compare side by side or with an overlay tool (e.g. PerfectPixel extension), check spacing in DevTools, and test real content lengths (long names, translations).
+8. **Review with the designer** — share a preview deployment (Vercel preview URL) for feedback.
+
+**Bonus to mention:** AI tools and Figma's Dev Mode / MCP integrations can generate a first draft of a component from a frame, but you always refactor the output to use your design tokens and existing components rather than hard-coded pixel values.
+
+### Q11. What do you do when a design isn't feasible or breaks on some screens?
+
+Don't silently change it. Flag it to the designer with a screenshot and a proposed alternative ("the 4-column table won't fit at 375px — can we switch to stacked cards on mobile?"). This shows collaboration, which the JD explicitly asks for.
+
+---
+
+## 5. REST APIs & State
+
+### Q1. What is REST? Explain HTTP methods and status codes.
+
+REST is an API style where URLs represent resources (`/users/42`) and HTTP methods represent actions: `GET` read, `POST` create, `PUT` replace, `PATCH` partial update, `DELETE` remove. `GET`, `PUT` and `DELETE` should be idempotent (same result if repeated).
+
+Status codes to know: `200` OK, `201` Created, `204` No Content, `400` Bad Request (validation), `401` Unauthorized (not logged in), `403` Forbidden (logged in, no permission), `404` Not Found, `409` Conflict, `422` Unprocessable, `429` Too Many Requests, `500` Server Error.
+
+### Q2. How do you structure API calls in a frontend app?
+
+Centralize them in an API layer instead of calling `fetch` inside components:
+
+```typescript
+// lib/api.ts
+const BASE = process.env.NEXT_PUBLIC_API_URL;
+
+export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    credentials: 'include',
+  });
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+  return res.json();
+}
+
+export const getUsers = () => api<User[]>('/users');
+```
+
+Benefits: one place for base URL, auth headers, error handling, token refresh and typing. With Axios you'd use interceptors for the same purpose.
+
+### Q3. How do you handle loading, error and empty states?
+
+Every data-driven component has four states: loading (skeleton, not just a spinner, to avoid layout shift), error (friendly message + retry button), empty (helpful message + call to action), and success. Interviewers like candidates who mention the empty state — it's often forgotten.
+
+### Q4. What is CORS?
+
+A browser security rule: a page on `app.com` can't read responses from `api.com` unless the server sends `Access-Control-Allow-Origin` headers allowing it. It's fixed on the **server**, not the frontend. For non-simple requests the browser sends an `OPTIONS` preflight first. In Next.js you can sidestep it by proxying through a route handler or `rewrites`.
+
+### Q5. Where do you store auth tokens?
+
+Prefer **httpOnly, Secure, SameSite cookies** set by the server — JavaScript can't read them, so XSS can't steal them. `localStorage` is readable by any script on the page, so it's riskier. Mention access token + refresh token flow and handling `401` by refreshing then retrying.
+
+### Q6. Server state vs client state?
+
+| | Server state | Client (UI) state |
+| --- | --- | --- |
+| Examples | Users, products, orders from the API | Modal open, selected tab, theme, form draft, cart before checkout |
+| Owner | The backend; you have a cached copy | The browser |
+| Problems | Caching, staleness, refetching, deduping, pagination, retries | Sharing across components |
+| Tool | TanStack Query, SWR, RTK Query, Server Components | `useState`, Context, Zustand, Redux |
+
+**Say this:** "I don't put API data into Redux anymore. TanStack Query handles server state, and I use Zustand or local state for the small amount of true client state."
+
+### Q7. What does TanStack Query give you?
+
+Caching by query key, automatic background refetching, request deduplication, retries, loading/error states, pagination and infinite scroll, mutations with cache invalidation, and optimistic updates.
+
+```tsx
+const { data, isPending, isError, refetch } = useQuery({
+  queryKey: ['users', page],
+  queryFn: () => getUsers(page),
+  staleTime: 60_000,
+});
+
+const qc = useQueryClient();
+const addUser = useMutation({
+  mutationFn: createUser,
+  onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+});
+```
+
+**Key concepts:** `staleTime` (how long data counts as fresh — no refetch), `gcTime` (formerly `cacheTime`, how long unused data stays in memory), and query keys as dependency arrays — when `page` changes, it fetches the new page automatically.
+
+### Q8. How do optimistic updates work?
+
+Update the UI immediately before the server responds, then roll back if it fails. In TanStack Query: in `onMutate`, cancel ongoing queries, snapshot the old cache, set the new value; in `onError`, restore the snapshot; in `onSettled`, invalidate to sync with the server. Good for likes, toggles, todo checkboxes.
+
+### Q9. Redux vs Zustand — when would you choose each?
+
+**Redux Toolkit:** structured (slices, actions, reducers), excellent DevTools with time-travel, middleware, strong conventions for large teams and complex state logic; RTK Query included for API caching. More boilerplate than Zustand.
+
+**Zustand:** tiny, minimal boilerplate, no provider needed, components subscribe to slices of state so they re-render only when that slice changes. Great for small-to-medium apps.
+
+```typescript
+import { create } from 'zustand';
+
+type CartState = {
+  items: CartItem[];
+  add: (item: CartItem) => void;
+  remove: (id: string) => void;
+};
+
+export const useCart = create<CartState>()((set) => ({
+  items: [],
+  add: (item) => set((s) => ({ items: [...s.items, item] })),
+  remove: (id) => set((s) => ({ items: s.items.filter((i) => i.id !== id) })),
+}));
+
+// Select only what you need to avoid extra re-renders
+const count = useCart((s) => s.items.length);
+```
+
+### Q10. Explain Redux data flow.
+
+UI dispatches an **action** → a **reducer** (pure function) computes new state from old state + action → the **store** updates → subscribed components re-render via `useSelector`. Redux Toolkit uses Immer, so you can write "mutating" code in reducers that is converted to immutable updates.
+
+### Q11. How would you implement search with an API?
+
+Debounce the input (300ms), put the term in the query key, keep previous results visible while loading (`placeholderData: keepPreviousData`), cancel outdated requests (TanStack passes an `AbortSignal`), and sync the term to the URL (`?q=`) so results are shareable and survive refresh. This combines several JD skills in one answer.
+
+### Q12. Pagination vs infinite scroll?
+
+Pagination: better for SEO, jumping to a page, and data tables. Infinite scroll: better for feeds on mobile; use `useInfiniteQuery` and an `IntersectionObserver` to load more; virtualize very long lists (TanStack Virtual).
+
+---
+
+## 6. Performance, SEO & Browsers
+
+### Q1. What are Core Web Vitals?
+
+| Metric | Measures | Good target | Common fixes |
+| --- | --- | --- | --- |
+| LCP (Largest Contentful Paint) | Loading — when the main content appears | ≤ 2.5 s | Optimize hero image (`next/image` + `priority`), SSR/SSG, CDN, preload fonts |
+| INP (Interaction to Next Paint) | Responsiveness — delay after clicks/typing | ≤ 200 ms | Less JS, split long tasks, `useTransition`, move work off the main thread |
+| CLS (Cumulative Layout Shift) | Visual stability — content jumping | ≤ 0.1 | Set image width/height, reserve space for ads/embeds, `next/font`, skeletons |
+
+INP replaced FID (First Input Delay) as a Core Web Vital in March 2024 — mentioning this shows you're current.
+
+### Q2. How would you approach a slow page?
+
+1. **Measure:** Lighthouse and PageSpeed Insights (lab + real-user field data), Chrome DevTools Performance tab, React DevTools Profiler, and `@next/bundle-analyzer` for bundle size.
+2. **Identify the bottleneck:** big JS bundle? slow API? huge images? too many re-renders? render-blocking resources?
+3. **Fix the biggest issue first**, then re-measure to prove the improvement with numbers.
+
+Then list fixes by category:
+
+- **Less JavaScript:** Server Components, code splitting with `next/dynamic` / `React.lazy` for heavy components (charts, editors, modals), tree-shakable imports (`import debounce from 'lodash/debounce'`, not all of lodash), remove unused dependencies.
+- **Assets:** `next/image`, WebP/AVIF, SVG icons, `next/font`, lazy-load below-the-fold media.
+- **Rendering:** avoid unnecessary re-renders (memoization where profiled, state colocation, Zustand selectors), virtualize long lists (TanStack Virtual), debounce expensive handlers.
+- **Network:** caching (ISR, TanStack Query `staleTime`, HTTP cache headers), CDN, prefetching (Next.js `Link` prefetches automatically), parallel requests instead of waterfalls.
+- **Third-party scripts:** load with `next/script` and `strategy="lazyOnload"` or `afterInteractive`.
+
+Have one real story ready: "Our product page LCP was 4.1s; the hero image was a 2MB PNG. Switching to `next/image` with `priority` and AVIF brought it to 1.9s."
+
+### Q3. What is code splitting and lazy loading?
+
+Splitting the JS bundle into chunks so users download only what the current page needs. Next.js splits by route automatically; you add manual splits for heavy components:
+
+```tsx
+const Chart = dynamic(() => import('@/components/Chart'), {
+  ssr: false,
+  loading: () => <Skeleton className="h-64" />,
+});
+```
+
+### Q4. What is hydration, and what causes hydration errors?
+
+Hydration is React attaching event handlers to server-rendered HTML so it becomes interactive. A **hydration mismatch** happens when server HTML differs from the first client render — common causes: `Date.now()`/`Math.random()` in render, reading `window`/`localStorage` during render, locale-specific date formatting, or invalid HTML nesting (a `div` inside a `p`). Fix by moving browser-only logic into `useEffect`, or using `dynamic(..., { ssr: false })`.
+
+### Q5. What else improves SEO beyond metadata?
+
+Fast Core Web Vitals (a ranking signal), mobile-friendliness, server-rendered content, clean URLs (`/products/blue-shoes` not `?id=123`), internal linking with real `<a>` tags (Next.js `Link` renders them), structured data (JSON-LD), sitemap, canonical tags, correct `lang` attribute, and proper 404/301 handling.
+
+### Q6. How do you ensure cross-browser compatibility?
+
+- Define target browsers with **Browserslist**; Next.js/SWC and Autoprefixer use it to transpile JS and prefix CSS.
+- Check feature support on **caniuse.com** before using newer APIs (e.g. `:has()`, container queries, `structuredClone`).
+- Use **progressive enhancement** and feature detection (`@supports`, `'IntersectionObserver' in window`) with fallbacks.
+- Test on real Safari/iOS — it's the most common source of bugs (`100vh` with the mobile address bar → use `100dvh`; date input styling; flex `gap` in very old versions).
+- Use cross-browser testing tools like **BrowserStack** or **Playwright** (which runs Chromium, Firefox and WebKit).
+- CSS reset/normalize (Tailwind Preflight already does this).
+
+### Q7. What are web performance quick wins you always apply?
+
+Image optimization, font optimization, lazy-loading heavy components, avoiding layout shift, compressing (Brotli/gzip, handled by Vercel/CDN), caching static assets with long `Cache-Control` and hashed filenames, and keeping dependencies lean (check size on bundlephobia before installing).
+
+---
+
+## 6b. Browser & networking
+
+### B1. What happens when you type a URL and press Enter?
+
+1. **URL parsing** — the browser checks whether it's a URL or a search term.
+2. **Cache check** — browser cache, then service worker; if a fresh copy exists, no network is needed.
+3. **DNS lookup** — the domain is resolved to an IP address (browser cache → OS → router → ISP/DNS resolver).
+4. **TCP connection** — a three-way handshake (SYN, SYN-ACK, ACK) with the server. HTTP/3 uses QUIC over UDP instead.
+5. **TLS handshake** — for HTTPS, the browser verifies the certificate and agrees on encryption keys.
+6. **HTTP request** — `GET /` with headers (cookies, `Accept`, `User-Agent`).
+7. **Server response** — status code, headers and the HTML body, often through a CDN.
+8. **Rendering** — the browser parses HTML, fetches CSS/JS/images, and paints the page (see B2).
+
+This is a classic question; a clear, ordered answer impresses more than extreme detail.
+
+### B2. How does the browser render (paint) HTML? Explain the critical rendering path.
+
+1. **Parse HTML → DOM** (Document Object Model), a tree of nodes. Parsing is incremental, so the browser starts before the whole file arrives.
+2. **Parse CSS → CSSOM** (CSS Object Model). CSS is **render-blocking**: the browser won't paint until it has the CSS, to avoid a flash of unstyled content.
+3. **JavaScript** — a normal `<script>` **blocks HTML parsing** while it downloads and runs, because JS can change the DOM.
+4. **Render tree** — DOM + CSSOM combined, containing only visible elements (`display: none` is excluded).
+5. **Layout (reflow)** — calculate the exact size and position of every element.
+6. **Paint** — fill in pixels: text, colors, borders, shadows, images, in layers.
+7. **Composite** — the GPU combines layers in the right order and shows them on screen.
+
+**How to optimize it:** inline or preload critical CSS, use `defer` on scripts, reduce render-blocking resources, and keep the DOM small. This is why SSR helps LCP: real HTML arrives in step 1.
+
+### B3. Reflow vs repaint vs composite — what's the difference?
+
+- **Reflow (layout):** geometry changes — width, height, margin, adding/removing elements, changing font size. Most expensive, because it can affect the whole page and is followed by paint.
+- **Repaint:** visual-only changes — color, background, visibility. No layout, but pixels are redrawn.
+- **Composite only:** `transform` and `opacity` changes can skip layout and paint and run on the GPU. Cheapest.
+
+**Practical tips:** animate `transform` and `opacity`, not `top`/`left`/`width`. Avoid **layout thrashing** — reading layout (`offsetHeight`, `getBoundingClientRect`) and writing styles in a loop forces repeated reflows; batch reads, then writes. Use `requestAnimationFrame` for visual updates.
+
+### B4. `<script>` vs `async` vs `defer`?
+
+| Attribute | Download | Execution | Order kept? | Use for |
+| --- | --- | --- | --- | --- |
+| none | Blocks parsing | Immediately, blocks parsing | Yes | Rarely — avoid in `<head>` |
+| `async` | In parallel | As soon as downloaded (may interrupt parsing) | No | Independent scripts: analytics, ads |
+| `defer` | In parallel | After HTML is parsed, before `DOMContentLoaded` | Yes | App scripts that need the DOM |
+
+ES modules (`type="module"`) are deferred by default. In Next.js, `next/script` handles this with `strategy`.
+
+### B5. Walk me through how an API call goes from this client (browser) to the API and back.
+
+Use a concrete example: `fetch('https://api.shop.com/products')` from a React component.
+
+1. **JS calls `fetch`** — it returns a Promise immediately; the request runs off the main thread, so the UI isn't blocked.
+2. **Same-origin check** — if the API is on a different origin (protocol, domain or port), CORS rules apply. For non-simple requests (custom headers like `Authorization`, JSON body, `PUT`/`DELETE`), the browser first sends an **`OPTIONS` preflight** asking permission.
+3. **Connection** — DNS lookup, TCP and TLS handshake, unless an existing connection is reused (keep-alive, HTTP/2).
+4. **Request sent** — method, URL, headers (`Content-Type`, `Authorization: Bearer …`), cookies (if `credentials: 'include'`), and a body for `POST`/`PUT`/`PATCH`.
+5. **Server side** — load balancer → API server → routing → auth middleware checks the token → controller runs business logic → database query → builds the response.
+6. **Response** — status code (`200`, `201`, `404`…), headers (`Content-Type: application/json`, `Cache-Control`, `Access-Control-Allow-Origin`) and body.
+7. **Browser checks CORS headers** — if they don't allow your origin, the browser blocks JS from reading the response (you see a CORS error, even though the server responded).
+8. **Promise resolves** with a `Response` object; you call `await res.json()` to parse the body stream into a JS object.
+9. **App updates** — set state (or TanStack Query cache), React re-renders, the UI shows the data.
+
+**Bonus point:** with Next.js Server Components or route handlers, the fetch happens **server-to-server**, so there's no CORS, secrets stay on the server, and the browser receives ready HTML.
+
+### B6. What does a REST API return? What is the return type?
+
+**Say this:** A REST API returns an **HTTP response**, made of three parts: a **status code**, **headers**, and an optional **body**. The body is most commonly **JSON**, indicated by the `Content-Type: application/json` header, but it can also be XML, plain text, HTML, binary files (images, PDFs) or empty (`204 No Content`).
+
+On the frontend, `fetch()` returns a `Promise<Response>`. The `Response` object has `status`, `ok` (true for 200–299), `headers`, and methods to read the body: `.json()` (returns a Promise of the parsed object), `.text()`, `.blob()`, `.arrayBuffer()`, `.formData()`. The body can only be read once.
+
+```typescript
+const res = await fetch('/api/users/42');   // Promise<Response>
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const user: User = await res.json();       // Promise<any> → typed as User
+```
+
+A typical JSON response shape:
+
+```json
+{
+  "data": [{ "id": 1, "name": "Asha" }],
+  "meta": { "page": 1, "pageSize": 20, "total": 134 }
+}
+```
+
+And a typical error response: `{ "error": { "code": "VALIDATION_ERROR", "message": "Email is invalid", "fields": { "email": "Invalid format" } } }` with status `400` or `422`.
+
+**Trap to mention:** `fetch` only rejects on **network failure**. A `404` or `500` still resolves successfully, so you must check `res.ok`. Axios, by contrast, rejects on any non-2xx status and parses JSON automatically.
+
+### B7. `fetch` vs Axios?
+
+`fetch` is built into browsers and Node 18+, no dependency, works with Next.js caching. You must check `res.ok` and call `.json()` yourself, and timeouts need `AbortController`. **Axios** adds automatic JSON parsing, rejects on HTTP errors, request/response **interceptors** (attach tokens, refresh on 401), timeouts, and upload progress. In Next.js App Router projects, `fetch` is usually preferred.
+
+### B8. Cookies vs localStorage vs sessionStorage vs IndexedDB?
+
+| Storage | Size | Lifetime | Sent with requests? | Readable by JS? | Use for |
+| --- | --- | --- | --- | --- | --- |
+| Cookies | ~4 KB each | Until expiry | Yes, automatically | Not if `httpOnly` | Sessions, auth tokens |
+| localStorage | ~5–10 MB | Until cleared | No | Yes (synchronous) | Preferences, theme, drafts |
+| sessionStorage | ~5 MB | Until the tab closes | No | Yes | Per-tab temporary state, multi-step forms |
+| IndexedDB | Large (hundreds of MB+) | Until cleared | No | Yes (async) | Offline data, large structured data |
+
+Never store sensitive tokens in localStorage — any XSS can read it.
+
+### B9. How does browser caching work?
+
+The server controls it with headers. `Cache-Control: max-age=31536000, immutable` caches a file for a year (used for hashed JS/CSS files like `main.a1b2c3.js`). `no-cache` means "check with the server before using" — the browser sends `If-None-Match` with the **ETag**, and the server replies `304 Not Modified` (no body) if unchanged. `no-store` means never cache (sensitive data). CDNs cache at the edge using similar rules.
+
+### B10. HTTP/1.1 vs HTTP/2 vs HTTP/3?
+
+**HTTP/1.1:** one request at a time per connection, so browsers open ~6 connections per domain; head-of-line blocking. **HTTP/2:** multiplexing many requests over one connection, header compression, binary protocol — bundling every file into one is less critical now. **HTTP/3:** runs over QUIC (UDP), faster connection setup and no TCP head-of-line blocking, better on unreliable mobile networks.
+
+### B11. What are XSS and CSRF, and how do you prevent them?
+
+**XSS (Cross-Site Scripting):** an attacker injects script into your page (e.g. through a comment field). React escapes text by default; dangers are `dangerouslySetInnerHTML`, `href="javascript:…"`, and third-party scripts. Prevent with sanitizing (DOMPurify), a **Content Security Policy** header, and httpOnly cookies.
+
+**CSRF (Cross-Site Request Forgery):** another site makes the user's browser send an authenticated request to your API using their cookies. Prevent with `SameSite=Lax/Strict` cookies, CSRF tokens, and checking the `Origin` header. Next.js Server Actions include origin checks.
+
+### B12. Explain event bubbling, capturing and delegation.
+
+A DOM event travels in three phases: **capturing** (window down to the target), **target**, then **bubbling** (back up to window). Listeners run in the bubbling phase by default. **Event delegation** attaches one listener to a parent and uses `event.target` to handle clicks from many children — efficient for long lists. `e.stopPropagation()` stops bubbling; `e.preventDefault()` stops the default action (form submit, link navigation). React attaches its listeners at the root and uses delegation internally.
+
+### B13. What are Web Workers and Service Workers?
+
+**Web Workers** run JavaScript on a background thread for heavy computation (parsing large files, image processing) so the UI stays responsive; they can't touch the DOM and communicate with `postMessage`. **Service Workers** sit between the page and the network as a programmable proxy: offline support, caching strategies, push notifications — the basis of **PWAs**. MSW uses a service worker to mock APIs in the browser.
+
+### B14. Why does a long JavaScript task freeze the page?
+
+The main thread handles JS, style calculation, layout, paint and user input. A task longer than **50 ms** (a "long task") blocks clicks and scrolling, which hurts INP. Fixes: split work into chunks and yield (`setTimeout`, `scheduler.yield()` where supported), move heavy work to a Web Worker, use `useTransition`/`useDeferredValue` in React for non-urgent updates, and virtualize long lists.
+
+---
+
+## 7. AI-assisted development
+
+### Q1. Which AI tools do you use, and for what?
+
+Name tools and match each to a task — concrete beats generic:
+
+| Tool | What you use it for |
+| --- | --- |
+| GitHub Copilot (inline + chat) | Autocomplete for boilerplate, repetitive JSX, types, small functions while typing |
+| Claude Code / Cursor (agentic, repo-aware) | Multi-file changes, refactors, scaffolding a feature, running tests and fixing failures, explaining unfamiliar parts of a codebase |
+| ChatGPT / Claude chat | Thinking through architecture, comparing approaches, debugging an error with context, writing docs and regex |
+| v0 / Figma Dev Mode / design-to-code tools | First draft of a UI from a design or description, which you then refactor into your components |
+
+**Sample answer:** "I use Copilot all day for autocomplete. For bigger tasks I use Claude Code — for example, I asked it to migrate our data fetching from `useEffect` to TanStack Query across 12 components. It did the bulk in minutes, and I spent my time reviewing each diff, fixing two places where it dropped error handling, and adding tests."
+
+### Q2. Walk me through your AI-assisted workflow on a feature.
+
+1. **Understand the task myself first** — I can't evaluate output for a problem I haven't thought about.
+2. **Give context** — relevant files, types, the API contract, existing components to reuse, coding conventions (many tools support a project rules file like `CLAUDE.md`, `.cursorrules` or Copilot custom instructions).
+3. **Ask for a plan before code** on anything non-trivial, and correct the plan.
+4. **Generate in small, reviewable chunks**, not a whole feature at once.
+5. **Review every line**, run the type checker, linter and tests.
+6. **Use AI for tests and docs too**, then verify those tests actually fail when the code is broken.
+7. **Commit with a clear message** and go through normal code review — AI code gets the same scrutiny as human code.
+
+### Q3. What is prompt engineering? How do you write a good prompt for code?
+
+**Say this:** It's structuring instructions and context so the model produces accurate, usable output. For code, the key ingredients are context, constraints, examples and a clear output format.
+
+**Weak prompt:** "Make a login form."
+
+**Strong prompt:**
+
+> "Create a `LoginForm` component in Next.js 15 App Router with TypeScript and Tailwind. Use React Hook Form with a Zod schema: email (valid email) and password (min 8 chars). Reuse our `Button` and `Input` from `@/components/ui`. On submit call the existing `login()` server action from `@/app/actions/auth.ts`, show field errors under inputs, disable the button while submitting, and show a server error message at the top. It must be keyboard accessible with proper labels. Don't add new dependencies. Return only the component file."
+
+Techniques worth naming: give a role and context, specify versions (models often default to outdated APIs like Pages Router), show an example of your existing code style, ask it to reason step by step or plan first, ask for edge cases and tests, and iterate with specific feedback ("the error state doesn't reset when the user types — fix only that").
+
+### Q4. How do you review and validate AI-generated code?
+
+- **Correctness:** Does it actually solve the requirement? Test edge cases: empty arrays, null/undefined, slow or failed network, very long text, double clicks.
+- **Hallucinations:** Do the imported packages, functions and API options really exist in our versions? (A classic: invented props or deprecated Next.js APIs.)
+- **Types:** No `any`, no unsafe `as` casts hiding problems; `tsc` passes.
+- **Security:** No secrets in client code, no `dangerouslySetInnerHTML` with user input, input validated on the server, auth checked in server actions/routes, no SQL/command injection.
+- **Performance:** No fetching in loops, unnecessary re-renders, effects without cleanup, or huge new dependencies.
+- **Accessibility:** Semantic elements, labels, keyboard support — AI often outputs clickable `div`s.
+- **Consistency/maintainability:** Matches our patterns, reuses existing components and utils instead of duplicating, readable naming, no dead code.
+- **Licensing/dependencies:** Any new package is justified, maintained and license-compatible.
+- **Tests:** Run existing tests; add new ones; make sure AI-written tests assert meaningful behavior and aren't just written to pass.
+
+**The golden rule to say out loud:** "If I can't explain a line in code review, it doesn't get merged — regardless of who or what wrote it."
+
+### Q5. Give an example where AI gave you wrong or bad code.
+
+Prepare a real story. Typical, believable examples:
+
+- It used `getServerSideProps` inside an App Router project (outdated API).
+- It wrote a `useEffect` fetch with no cleanup, causing a race condition when the user switched tabs quickly.
+- It suggested storing a JWT in `localStorage`.
+- It invented a prop on a library component that didn't exist.
+- It made tests pass by mocking the very function under test.
+
+Structure: what you asked → what it produced → how you caught it (types, test, review, docs) → what you changed → what you learned (e.g. "now I always state the Next.js version in my prompt").
+
+### Q6. How do you use AI for debugging?
+
+Give the full error message and stack trace, the relevant code, what you expected vs what happened, and what you already tried. Ask it for **possible causes ranked by likelihood** rather than a single fix, then verify each with logs or breakpoints. AI speeds up the hypothesis step; you still confirm the root cause. For agentic tools, let them run the failing test and iterate, but review the final diff.
+
+### Q7. How do you use AI for testing and documentation?
+
+Testing: generate test cases from a component, especially edge cases you may forget; generate mock data and MSW handlers. Then review that assertions check behavior. Documentation: JSDoc comments, README setup steps, PR descriptions, Storybook stories, and explaining legacy code to new teammates.
+
+### Q8. What are the risks of AI coding tools for a team, and how do you manage them?
+
+- **Security & privacy:** never paste secrets, credentials, customer data or proprietary code into tools the company hasn't approved; use enterprise versions with no-training data policies.
+- **Code quality drift:** inconsistent patterns and duplicate code → solve with shared rules files, linting, and code review.
+- **Over-reliance / skill atrophy:** keep understanding fundamentals; use AI as a pair programmer, not an autopilot.
+- **Hallucinated or vulnerable dependencies:** verify every package (typosquatting is real).
+- **License concerns:** check that generated code doesn't reproduce licensed code verbatim; many tools offer filters for this.
+
+### Q9. Does AI make developers less necessary?
+
+Good balanced answer: "It shifts the work. Typing code is faster, so more of the value is in understanding requirements, designing components, reviewing, testing and making judgment calls on trade-offs. A developer who uses AI well and reviews carefully ships much more than one who doesn't — but someone still has to own the quality."
+
+### Q10. Have you heard of MCP or agents?
+
+**MCP (Model Context Protocol)** is an open standard that lets AI tools connect to external systems — GitHub, Figma, databases, issue trackers — so an assistant can read a Figma frame or a Jira ticket directly. **Agentic tools** like Claude Code can plan, edit multiple files, run commands and tests, and iterate. Mention that you still keep them on a review loop: small tasks, clear instructions, inspect the diff.
+
+### Q11. Review this AI-generated component. What's wrong with it?
+
+```tsx
+'use client';
+export default function UserList() {
+  const [users, setUsers] = useState<any>([]);
+  useEffect(() => {
+    fetch('https://api.example.com/users?key=sk_live_123')
+      .then(res => res.json())
+      .then(data => setUsers(data));
+  });
+  return (
+    <div>
+      {users.map((u, i) => (
+        <div key={i} onClick={() => alert(u.name)}
+          dangerouslySetInnerHTML={{ __html: u.bio }} />
+      ))}
+    </div>
+  );
+}
+```
+
+**Answer:** missing dependency array → infinite fetch loop; API secret exposed in client code; `any` type; no `res.ok` check, loading, error or empty states; no abort/cleanup; index as key; clickable `div` (not accessible — use `button`); `dangerouslySetInnerHTML` with user data → XSS (sanitize with DOMPurify or render as text); could be a Server Component or use TanStack Query; missing imports for `useState`/`useEffect`.
+
+---
+
+## 8. Testing
+
+### Q1. What types of tests are there?
+
+- **Unit:** one function or component in isolation (utils, hooks, a `Button`). Fast, many of them.
+- **Integration:** several pieces together (a form + validation + mocked API). Often the best value for frontend.
+- **End-to-end (E2E):** a real browser running real user flows (login → add to cart → checkout) with **Playwright** or Cypress. Slower, fewer of them, cover critical paths.
+
+Mention the **testing trophy** idea (Kent C. Dodds): static checks (TypeScript, ESLint) at the base, most effort on integration tests.
+
+### Q2. Jest vs Vitest?
+
+Same API style (`describe`, `it`, `expect`, mocks). **Vitest** is built on Vite, faster, and has native ESM/TypeScript support — popular for new projects. **Jest** is the long-time standard with a large ecosystem; Next.js has an official `next/jest` setup. Switching between them is mostly changing `jest.fn()` to `vi.fn()`.
+
+### Q3. What is the philosophy of React Testing Library?
+
+"The more your tests resemble the way your software is used, the more confidence they give you." Test behavior the user sees, not implementation details (no checking internal state or component methods). Query elements the way a user or screen reader would.
+
+**Query priority:** `getByRole` (best — also verifies accessibility) → `getByLabelText` → `getByPlaceholderText` → `getByText` → `getByTestId` (last resort).
+
+**Query variants:** `getBy` (throws if missing — for elements that should exist), `queryBy` (returns null — to assert something is *not* there), `findBy` (async — waits for elements that appear after fetching).
+
+### Q4. Write a test for a Counter component.
+
+```tsx
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Counter } from './Counter';
+
+test('increments the count when the button is clicked', async () => {
+  const user = userEvent.setup();
+  render(<Counter />);
+
+  expect(screen.getByText('Count: 0')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /increment/i }));
+  expect(screen.getByText('Count: 1')).toBeInTheDocument();
+});
+```
+
+Prefer `userEvent` over `fireEvent` — it simulates real interactions (focus, typing key by key, hover).
+
+### Q5. How do you test components that call APIs?
+
+Mock at the network level with **MSW (Mock Service Worker)** rather than mocking `fetch` or your API module. Components run their real fetching code, and the same handlers can be reused in Storybook and development.
+
+```tsx
+server.use(
+  http.get('/api/users', () => HttpResponse.json([{ id: '1', name: 'Asha' }]))
+);
+render(<UserList />, { wrapper: QueryProvider });
+expect(await screen.findByText('Asha')).toBeInTheDocument();
+```
+
+Also test the error path by returning a 500 and asserting the error message and retry button appear.
+
+### Q6. How do you test custom hooks?
+
+With `renderHook` from React Testing Library, wrapping state changes in `act`.
+
+### Q7. What should and shouldn't you test?
+
+**Test:** user-visible behavior, conditional rendering, form validation, loading/error/empty states, utility functions with edge cases, critical flows with E2E. **Don't test:** library internals (that React's `useState` works), CSS details, or implementation details that change when you refactor. Code coverage is a guide, not a goal — 100% coverage with weak assertions is worse than 70% with meaningful tests.
+
+### Q8. What about snapshot tests?
+
+Useful for small, stable output, but large snapshots get blindly updated and stop catching bugs. Prefer explicit assertions. For visual regressions, use tools like Chromatic or Playwright screenshots.
+
+---
+
+## 9. Git, code review & clean code
+
+### Q1. Describe your Git workflow.
+
+A typical answer: "I create a feature branch from `main` (e.g. `feat/user-profile`), commit small logical changes with clear messages, push and open a pull request. CI runs lint, type check, tests and a preview deploy. After review and approval, it's squash-merged into `main`, which deploys automatically." This is **GitHub Flow**; mention **Git Flow** (develop/release/hotfix branches) if the team does scheduled releases.
+
+### Q2. `git merge` vs `git rebase`?
+
+**Merge** combines branches with a merge commit and keeps full history. **Rebase** replays your commits on top of the target branch, giving a clean linear history. Rule: rebase your own local/feature branch to update it; never rebase a shared branch others have pulled, because it rewrites history.
+
+### Q3. How do you resolve a merge conflict?
+
+Pull the latest `main`, run the merge or rebase, open the conflicted files, understand **both** changes (talk to the other developer if unclear), keep the correct combination, remove the conflict markers, run the app and tests, then commit. Never just pick "accept mine" without understanding the other change.
+
+### Q4. Which other Git commands should you know?
+
+- `git stash` / `git stash pop` — temporarily shelve uncommitted work.
+- `git cherry-pick <sha>` — apply one commit to another branch (e.g. a hotfix).
+- `git reset --soft HEAD~1` — undo the last commit but keep changes; `git revert <sha>` — undo a commit safely on a shared branch by creating a new commit.
+- `git commit --amend` — fix the last commit message or add a forgotten file (before pushing).
+- `git log --oneline --graph`, `git diff`, `git blame` — investigate history.
+- `git bisect` — binary search for the commit that introduced a bug.
+
+### Q5. What makes a good commit message and PR?
+
+Commits: **Conventional Commits** format — `feat: add product filters`, `fix: prevent double submit on checkout`, `refactor:`, `test:`, `docs:`, `chore:`. Small, focused PRs (ideally under ~400 lines) with a description covering what changed, why, how to test, screenshots or a video for UI changes, and a linked ticket.
+
+### Q6. What do you look for when reviewing someone's code?
+
+In priority order: correctness and edge cases → security → readability and naming → consistency with project patterns and reuse of existing components → performance → accessibility → tests. Automate style (Prettier, ESLint) so reviews focus on logic rather than formatting.
+
+### Q7. How do you give and receive code review feedback?
+
+**Giving:** be specific and kind, explain *why*, ask questions instead of commanding ("What happens if `items` is empty here?"), label minor points as `nit:`, and praise good solutions. **Receiving:** don't take it personally, ask for clarification, push back respectfully with reasoning when you disagree, and thank the reviewer. Interviewers want someone who is easy to work with.
+
+### Q8. What does "clean, maintainable, testable code" mean to you?
+
+- **Readable names** — `isLoading`, `fetchUserOrders`, not `flag`, `doStuff`.
+- **Small, single-purpose functions and components** — if a component is 400 lines, split it.
+- **Separation of concerns** — UI components separate from data fetching and business logic (custom hooks, service layer), which also makes them easy to test.
+- **DRY, but not too early** — extract on the second or third repetition, not the first.
+- **Strong types**, no magic numbers (named constants), early returns instead of deep nesting.
+- **Consistent folder structure** — e.g. feature-based: `features/cart/{components,hooks,api}`.
+- **Tooling** — ESLint, Prettier, TypeScript strict mode, Husky + lint-staged to run checks before commit.
+
+### Q9. What principles do you follow? (SOLID, KISS, YAGNI)
+
+**KISS** — keep it simple. **YAGNI** — don't build features or abstractions you don't need yet. **Single Responsibility** — each component/hook does one thing. **Composition over inheritance** — React's model. Briefly connecting these to your component design is enough.
+
+---
+
+## 10. Docker, CI/CD, cloud & Node
+
+### Q1. What is Docker and why use it for a frontend app?
+
+Docker packages an app with its runtime and dependencies into an **image** that runs the same everywhere as a **container**. It removes "works on my machine" problems and makes deploying to any cloud consistent. An image is the blueprint; a container is a running instance.
+
+### Q2. What does a Dockerfile for Next.js look like?
+
+A **multi-stage build** keeps the final image small:
+
+```dockerfile
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+EXPOSE 3000
+CMD ["node", "server.js"]
+```
+
+This requires `output: 'standalone'` in `next.config`. Also use a `.dockerignore` (exclude `node_modules`, `.next`, `.env`). Docker Compose runs multiple services together locally (frontend + API + database).
+
+### Q3. What is CI/CD? Describe a pipeline you'd set up.
+
+**CI (Continuous Integration):** every push/PR automatically installs, lints, type-checks, tests and builds. **CD (Continuous Delivery/Deployment):** passing code is automatically deployed to staging or production.
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+on: [pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm test -- --run
+      - run: npm run build
+```
+
+Vercel or Netlify add automatic **preview deployments** per PR — great for designer and QA review.
+
+### Q4. Which cloud platforms/hosting have you used?
+
+Common answers: **Vercel** (made by the Next.js team; zero-config, edge network, preview URLs), **Netlify**, **AWS** (Amplify, S3 + CloudFront for static sites, ECS/EC2 for Docker containers, Lambda), **GCP Cloud Run** or **Azure**. Know the basic idea of a **CDN** (caches assets on servers close to users) and **environment variables per environment** (dev/staging/prod).
+
+### Q5. What Node.js knowledge is relevant for a frontend developer?
+
+- npm/pnpm/yarn, `package.json` scripts, semantic versioning (`^1.2.3` allows minor updates), lockfiles and why `npm ci` is used in CI.
+- Node is the runtime for Next.js server code, route handlers and build tools.
+- Building simple REST APIs with **Express** or Next.js route handlers: routes, middleware, JSON parsing, error handling.
+- Async I/O and the event loop (same model as the browser, plus `process.nextTick`).
+- Environment variables via `process.env`.
+
+```typescript
+// app/api/users/route.ts — a Next.js route handler
+export async function GET() {
+  const users = await db.user.findMany();
+  return Response.json(users);
+}
+```
+
+### Q6. What is the difference between edge and Node.js runtime in Next.js?
+
+The **Node.js runtime** supports all Node APIs and is the default. The **Edge runtime** runs on lightweight servers close to users with faster cold starts but a limited API (no file system, many Node packages unsupported) — used for middleware and simple, latency-sensitive responses.
+
+---
+
+## 11. Behavioral (STAR)
+
+### Q1. Tell me about a challenging bug you solved.
+
+Use STAR: Situation, Task, Action (most of the answer), Result (with a number). Sample:
+
+> **S:** Users on iPhones reported the checkout button sometimes did nothing. **T:** I owned the checkout UI. **A:** I couldn't reproduce on desktop, so I used Safari remote debugging on a real device and found a hydration mismatch caused by formatting a date with the device locale during render. The mismatch broke event handlers. I moved the formatting into a client-only effect, added a test, and documented the pattern for the team. **R:** The issue disappeared and checkout completion on iOS rose about 6% the following week.
+
+### Q2. Tell me about a time you disagreed with a designer or backend developer.
+
+> **S:** A designer wanted a data table with 9 columns on mobile. **T:** I needed to ship a usable mobile view. **A:** I built a quick prototype showing horizontal scrolling was awkward, then proposed a stacked card layout with the 3 key fields visible and a details expand. I showed both on a preview URL instead of arguing in abstract. **R:** The designer agreed, updated the Figma, and we used that pattern for other tables too.
+
+Key message: disagree with evidence, stay respectful, focus on the user.
+
+### Q3. How do you work with backend developers when the API isn't ready?
+
+Agree on the API contract early (OpenAPI/Swagger spec or shared TypeScript types), build the UI against **mock data with MSW**, and switch to the real endpoint when it's ready. Raise contract issues early (missing fields, pagination format, error shapes) rather than working around them in the frontend.
+
+### Q4. How do you work with QA?
+
+Write clear PR descriptions with test steps, share preview deployments, reproduce reported bugs before fixing, add a regression test for each bug fixed, and treat QA as partners. Ask them about edge cases early during development, not just at the end.
+
+### Q5. Tell me about a time you missed a deadline or a task took longer than expected.
+
+Show ownership: you noticed early, communicated to the lead/PM with a revised estimate and options (cut scope, ship in phases), and learned something (e.g. "now I break tasks into smaller pieces and flag risk at standup"). Never blame others.
+
+### Q6. Tell me about a project you're proud of.
+
+Pick one that hits the JD: Next.js + TypeScript, reusable components, API integration, measurable performance or business results. Explain the problem, your architecture choices and **why**, a challenge, and the result. Prepare to go deep — interviewers often ask follow-ups on folder structure, state management choices and what you'd do differently.
+
+### Q7. How do you keep up with frontend changes?
+
+Name specific sources: official React and Next.js blogs/docs, release notes, newsletters (e.g. *This Week in React*, *JavaScript Weekly*), YouTube or podcasts you actually follow, and side projects where you try new features (React 19, Tailwind v4, Server Actions). Mention you also experiment with new AI coding tools.
+
+### Q8. How do you handle unclear requirements?
+
+Ask clarifying questions early, write down assumptions and confirm them with the PM, build a small version first, and get feedback quickly. A wrong assumption caught on day one costs much less than on the last day.
+
+### Q9. Why do you want this role / this company?
+
+Research the company's product beforehand. Connect three things: their product or mission, the tech stack (React/Next.js/TypeScript — your strength), and their emphasis on AI-assisted development (you already work this way and want a team that embraces it).
+
+### Q10. What is your biggest weakness?
+
+Pick a real, non-critical one with active improvement. Example: "I used to over-polish UI details before getting feedback. Now I share a preview early, get input from design and product, and polish afterwards — it's made me faster and reduced rework."
+
+---
+
+## 12. Tricky & trap questions
+
+### T1. What does this print?
+
+```javascript
+for (var i = 0; i < 3; i++) {
+  setTimeout(() => console.log(i), 0);
+}
+```
+
+**Answer:** `3, 3, 3`. `var` is function-scoped, so all three callbacks share one `i`. By the time the timeouts run, the loop has finished and `i` is 3. Change `var` to `let` and it prints `0, 1, 2`, because `let` creates a new binding for each loop iteration.
+
+### T2. What does this print?
+
+```javascript
+async function run() {
+  console.log(1);
+  await null;
+  console.log(2);
+}
+console.log(3);
+run();
+console.log(4);
+```
+
+**Answer:** `3, 1, 4, 2`. An async function runs synchronously until the first `await`. Everything after `await` is scheduled as a microtask, which runs only after the current synchronous code (`console.log(4)`) finishes.
+
+### T3. What are these values?
+
+```javascript
+typeof null;        // ?
+typeof NaN;         // ?
+NaN === NaN;        // ?
+0.1 + 0.2 === 0.3;  // ?
+```
+
+**Answer:** `"object"` (a famous historical bug in JavaScript), `"number"`, `false` (NaN is the only value not equal to itself — use `Number.isNaN()`), and `false` (floating-point rounding gives `0.30000000000000004`). For money, store integers like cents, or compare with `Math.abs(a - b) < Number.EPSILON`.
+
+### T4. What are these results?
+
+```javascript
+'5' + 3;    // ?
+'5' - 3;    // ?
+true + 1;   // ?
+[] + [];    // ?
+[] + {};    // ?
+```
+
+**Answer:** `"53"` (`+` with a string concatenates), `2` (`-` converts to numbers), `2` (true becomes 1), `""` (arrays become empty strings), `"[object Object]"`. The lesson: implicit type coercion is surprising, which is why we use `===` and TypeScript.
+
+### T5. What does this print?
+
+```javascript
+const user = {
+  name: 'Asha',
+  regular() { return this.name; },
+  arrow: () => this?.name,
+};
+console.log(user.regular());
+console.log(user.arrow());
+const fn = user.regular;
+console.log(fn());
+```
+
+**Answer:** `'Asha'`, then `undefined`, then `undefined` (or a TypeError in strict mode, where `this` is `undefined`). A regular method gets `this` from the object it's called on. The arrow function takes `this` from the outer scope, not the object. Pulling the method out into `fn` loses the object, so `this` is lost — this is why you bind handlers or use arrow functions in callbacks.
+
+### T6. What happens here?
+
+```javascript
+console.log(a);
+var a = 1;
+
+console.log(b);
+let b = 2;
+
+sayHi();
+function sayHi() { console.log('hi'); }
+
+sayBye();
+const sayBye = () => console.log('bye');
+```
+
+**Answer:** `undefined` (`var` is hoisted and initialized to undefined), then a `ReferenceError` for `b` (temporal dead zone). Taken separately: `sayHi()` works because function declarations are hoisted with their body, and `sayBye()` throws a ReferenceError because it's a `const` in the temporal dead zone.
+
+### T7. What does this return?
+
+```javascript
+[10, 1, 2].sort();
+['1', '2', '3'].map(parseInt);
+```
+
+**Answer:** `[1, 10, 2]` — the default sort compares values as **strings**. Use `.sort((a, b) => a - b)`. Note that `sort` also mutates the original array; use `toSorted()` or `[...arr].sort()` for React state. The second gives `[1, NaN, NaN]`, because `map` passes `(value, index)`, so it calls `parseInt('2', 1)` and `parseInt('3', 2)`, which are invalid radixes. Use `.map(Number)`.
+
+### T8. Is JavaScript pass-by-reference? What does this print?
+
+```javascript
+function update(obj) { obj.x = 2; obj = { x: 3 }; }
+const a = { x: 1 };
+update(a);
+console.log(a.x);
+```
+
+**Answer:** `2`. JavaScript is always pass-by-value, but for objects the value is a reference. Mutating through the reference (`obj.x = 2`) affects the original; reassigning the parameter (`obj = {...}`) only changes the local variable.
+
+### T9. What is the count after one click, and what is logged?
+
+```tsx
+const [count, setCount] = useState(0);
+const handleClick = () => {
+  setCount(count + 1);
+  setCount(count + 1);
+  setCount(count + 1);
+  console.log(count);
+};
+```
+
+**Answer:** The count becomes `1`, not 3, and the log prints `0`. Each call uses the same `count` captured by this render's closure, and updates are batched. The log shows the old value because state updates apply on the next render. Use `setCount(c => c + 1)` three times to get 3.
+
+### T10. Why doesn't this re-render?
+
+```tsx
+const [user, setUser] = useState({ name: 'Asha' });
+const rename = () => {
+  user.name = 'Ravi';
+  setUser(user);
+};
+```
+
+**Answer:** React compares old and new state with `Object.is`. Mutating the object keeps the same reference, so React thinks nothing changed and skips the render. Always create a new object: `setUser({ ...user, name: 'Ravi' })`.
+
+### T11. What renders when `items` is empty?
+
+```tsx
+{items.length && <List items={items} />}
+```
+
+**Answer:** It renders a literal `0` on the screen. `0 && ...` returns `0`, and React renders numbers. Use `items.length > 0 && ...` or a ternary.
+
+### T12. Why does this cause an infinite loop?
+
+```tsx
+function Products({ category }) {
+  const [data, setData] = useState([]);
+  const filters = { category, limit: 10 };
+  useEffect(() => {
+    fetchProducts(filters).then(setData);
+  }, [filters]);
+}
+```
+
+**Answer:** `filters` is a new object on every render, so the dependency always looks changed. The effect runs, sets state, which re-renders, which creates a new `filters`, and so on forever. Depend on primitives (`[category]`), create the object inside the effect, or `useMemo` it. Better still, use TanStack Query with `queryKey: ['products', category]`.
+
+### T13. In what order do these logs appear?
+
+```tsx
+function Child() {
+  console.log('child render');
+  useEffect(() => console.log('child effect'), []);
+  return null;
+}
+function Parent() {
+  console.log('parent render');
+  useEffect(() => console.log('parent effect'), []);
+  return <Child />;
+}
+```
+
+**Answer:** `parent render`, `child render`, `child effect`, `parent effect`. Rendering goes top-down, but effects run bottom-up — children's effects fire first because the parent isn't "mounted" until its children are. (In development Strict Mode, the effects then run a second time.)
+
+### T14. Why does the input lose focus after every keystroke?
+
+```tsx
+function Form() {
+  const [name, setName] = useState('');
+  const Field = () => <input value={name} onChange={e => setName(e.target.value)} />;
+  return <Field />;
+}
+```
+
+**Answer:** `Field` is defined inside `Form`, so every render creates a brand-new component type. React sees a different type, unmounts the old input and mounts a new one, losing focus. Define components at the top level of the module, never inside another component.
+
+### T15. Does `React.memo` prevent the re-render here?
+
+```tsx
+const Row = React.memo(({ onSelect }) => <button onClick={onSelect}>Pick</button>);
+// in parent:
+<Row onSelect={() => select(id)} />
+```
+
+**Answer:** No. The arrow function is a new reference every render, so the shallow prop comparison fails and `Row` re-renders anyway. Wrap the handler in `useCallback` (or rely on the React Compiler). Similarly, a Context `value={{ user, setUser }}` creates a new object each render and re-renders every consumer — memoize it with `useMemo`.
+
+### T16. How do you reset a component's state when a prop changes, without `useEffect`?
+
+**Answer:** Give it a `key`: `<ProfileForm key={userId} user={user} />`. When the key changes, React unmounts the old instance and mounts a fresh one with new initial state. This is cleaner than syncing state with an effect.
+
+### T17. Does changing `ref.current` re-render the component?
+
+**Answer:** No. Refs are mutable boxes React doesn't track. If the UI needs to show the value, it belongs in state. Corollary: don't read `ref.current` during render to decide what to display.
+
+### T18. Next.js traps — true or false?
+
+1. "A `'use client'` component only runs in the browser."
+2. "A Server Component can render a Client Component."
+3. "A Client Component can import a Server Component."
+4. "Changing a `NEXT_PUBLIC_` env variable on the server takes effect without rebuilding."
+5. "Checking auth in middleware is enough to protect data."
+
+**Answer:** (1) **False** — client components are still pre-rendered on the server for the first HTML, which is why `window is not defined` errors happen; use `useEffect` or `dynamic(..., { ssr: false })` for browser-only code. (2) **True.** (3) **False** — importing it turns it into client code; instead pass the Server Component in as `children` or a prop. (4) **False** — `NEXT_PUBLIC_` values are inlined into the JS bundle at build time, so a rebuild is required. (5) **False** — always re-check authorization where data is read or mutated (Server Components, Server Actions, route handlers).
+
+### T19. CSS traps
+
+1. "I set `z-index: 9999` but the element is still behind another one. Why?"
+2. "Two stacked paragraphs each have `margin: 20px`. Why is the gap 20px, not 40px?"
+3. "Center a div horizontally and vertically in one line of Tailwind."
+
+**Answer:** (1) `z-index` only works on positioned elements (or flex/grid children), and it only competes **within the same stacking context**. A parent with `transform`, `opacity < 1`, `filter` or its own `z-index` creates a new context, trapping the child beneath elements outside it. (2) **Margin collapsing** — vertical margins between block elements merge into the larger one. It doesn't happen in flex or grid containers, which is another reason to use `gap`. (3) `grid place-items-center` (or `flex items-center justify-center`) on the parent, with a height.
+
+### T20. What's wrong with this "optimized" code an AI suggested?
+
+```tsx
+const total = useMemo(() => a + b, [a, b]);
+const handleClick = useCallback(() => setOpen(true), []);
+// passed to a plain <button>, not a memoized component
+```
+
+**Answer:** Both memoizations cost more than they save. Adding two numbers is cheaper than `useMemo`'s bookkeeping, and `useCallback` only helps when the function goes to a memoized child or into a dependency array. It's a good example of "looks smart, adds noise" — measure with the Profiler before optimizing.
