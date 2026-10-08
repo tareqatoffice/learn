@@ -1,5 +1,7 @@
 # Interview Quiz Page Implementation Plan
 
+> **Superseded — historical record.** Executed on `feat/interview-quiz` (commits `26cd625`..`53fbfc1`). The files it created under `interview-topics/` are moved or deleted by `2026-10-08-quiz-app-svelte.md`; do not execute this plan again.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** One offline `interview-topics/quiz.html` that quizzes the user on every Q&A in the `interview-topics/*.md` books, as a random mix or filtered by book (and part).

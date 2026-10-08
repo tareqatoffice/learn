@@ -1,5 +1,7 @@
 # Interview Quiz Page — Design
 
+> **Superseded** for structure and tooling by `2026-10-08-quiz-app-svelte-design.md` (the app moves to `quiz-app/` and is rebuilt with Svelte + Vite). The parsing rules, record shape, counts and features below remain binding.
+
 Date: 2026-10-08 (revised after review: puzzle/`<details>` prompts, NestJS extras, safe inlining)
 Location: `interview-topics/`
 
