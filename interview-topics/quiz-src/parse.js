@@ -113,6 +113,7 @@ function questionRecord(title, part, body) {
 // ("- **"Tell me about…"** answer"), and "| Question | Answer |" tables.
 function sectionExtras(text, part) {
   const lines = text.split('\n');
+  const outside = fenceMask(lines);
   const out = [];
   let open = null;
   const flush = () => {
@@ -121,22 +122,28 @@ function sectionExtras(text, part) {
   };
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    let m = line.match(/^\*\*\d+\.\s+(.+?)\.?\*\*\s*$/);
-    if (m) {
-      flush();
-      open = { question: m[1].trim(), lines: [] };
-      continue;
+    if (outside[i]) {
+      let m = line.match(/^\*\*\d+\.\s+(.+?)\.?\*\*\s*$/);
+      if (m) {
+        flush();
+        open = { question: m[1].trim(), lines: [] };
+        continue;
+      }
+      m = line.match(/^[-*]\s+\*\*"(.+?)"\*\*\s*(.*)$/);
+      if (m) {
+        flush();
+        out.push({ question: m[1].trim(), part, prompt: '', answer: m[2].trim() });
+        continue;
+      }
     }
-    m = line.match(/^[-*]\s+\*\*"(.+?)"\*\*\s*(.*)$/);
-    if (m) {
-      flush();
-      out.push({ question: m[1].trim(), part, prompt: '', answer: m[2].trim() });
-      continue;
-    }
-    if (/^\|\s*(question|q)\s*\|\s*(answer|a)\s*\|\s*$/i.test(line) && /^\|[\s:|-]+\|\s*$/.test(lines[i + 1] || '')) {
+    if (
+      outside[i] && outside[i + 1] &&
+      /^\|\s*(question|q)\s*\|\s*(answer|a)\s*\|\s*$/i.test(line) &&
+      /^\|[\s:|-]+\|\s*$/.test(lines[i + 1] || '')
+    ) {
       flush();
       let j = i + 2;
-      for (; j < lines.length && /^\|.*\|\s*$/.test(lines[j]); j++) {
+      for (; j < lines.length && outside[j] && /^\|.*\|\s*$/.test(lines[j]); j++) {
         const cells = lines[j].trim().slice(1, -1).split('|').map((c) => c.trim());
         out.push({ question: cells[0], part, prompt: '', answer: cells.slice(1).join(' | ') });
       }
@@ -178,13 +185,15 @@ function parseQuestionHeadings(md) {
 }
 
 function splitRapidFire(text) {
+  const lines = text.split('\n');
+  const outside = fenceMask(lines);
   const items = [];
-  for (const line of text.split('\n')) {
-    const m = line.match(/^\d+\.\s+\*\*(.+?)\*\*\s*(.*)$/);
+  lines.forEach((line, i) => {
+    const m = outside[i] && line.match(/^\d+\.\s+\*\*(.+?)\*\*\s*(.*)$/);
     if (m) items.push({ question: m[1].trim(), answer: m[2].trim() });
-    else if (items.length && line.trim()) items[items.length - 1].answer += '\n' + line;
-  }
-  return items;
+    else if (items.length) items[items.length - 1].answer += '\n' + line;
+  });
+  return items.map((it) => ({ question: it.question, answer: cleanAnswer(it.answer) }));
 }
 
 function parseNumberedSections(md) {

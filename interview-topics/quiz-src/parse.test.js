@@ -168,6 +168,37 @@ test('numbered sections: topics, design problems, rapid-fire, skipped sections',
   ]);
 });
 
+test('extras ignore question markers inside fenced code in Q-less sections', () => {
+  const src = md(
+    '# Part 4 — Design', '',
+    '## Notes', '',
+    '**1. Real prompt.**', 'Real answer.', '',
+    '```md', '| Question | Answer |', '|---|---|', '| fake q | fake a |', '**2. Fake numbered.**', '- **"Fake quote"** x', '```', ''
+  );
+  const got = parseQuestionHeadings(src);
+  assert.deepEqual(got.map((q) => q.question), ['Real prompt']);
+  assert.match(got[0].answer, /^Real answer\./);
+  assert.match(got[0].answer, /\*\*2\. Fake numbered\.\*\*/);
+});
+
+test('rapid-fire items keep blank lines and fenced code; markers inside fences are not items', () => {
+  const src = md(
+    '## 41. Rapid-fire questions', '',
+    '1. **Real?** Yes.', '   Second line.', '', '   Second paragraph.',
+    '```js', '1. **Fake?** no', '', 'const a = 1;', '```',
+    '2. **Next?** ok'
+  );
+  assert.deepEqual(parseNumberedSections(src), [
+    {
+      question: 'Real?',
+      part: '',
+      prompt: '',
+      answer: 'Yes.\n   Second line.\n\n   Second paragraph.\n```js\n1. **Fake?** no\n\nconst a = 1;\n```',
+    },
+    { question: 'Next?', part: '', prompt: '', answer: 'ok' },
+  ]);
+});
+
 test('parseFile falls back to numbered sections and throws when nothing is found', () => {
   assert.equal(parseFile(md('## 1. Topic', '', 'Body.'), 'x.md').length, 1);
   assert.throws(() => parseFile('# Just a title\n\nprose', 'empty.md'), /No questions found in empty\.md/);
