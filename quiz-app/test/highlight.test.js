@@ -13,6 +13,17 @@ test('bash: # starts a comment and numbers are wrapped', () => {
   assert.equal(highlight('# note\nx=42', 'bash'), '<span class="hl-c"># note</span>\nx=<span class="hl-n">42</span>');
 });
 
+test('js: # is not a comment, so the rest of the line is still highlighted', () => {
+  assert.equal(
+    highlight('this.#count = "x"', 'js'),
+    '<span class="hl-k">this</span>.#count = <span class="hl-s">"x"</span>'
+  );
+});
+
+test('bash: // is not a comment, so a URL does not swallow the line', () => {
+  assert.equal(highlight('curl http://host 3', 'bash'), 'curl http://host <span class="hl-n">3</span>');
+});
+
 test('unknown languages are only escaped', () => {
   assert.equal(highlight('<a href="x">', 'html'), '&lt;a href="x"&gt;');
 });

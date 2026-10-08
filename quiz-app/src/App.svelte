@@ -151,20 +151,17 @@
         <button type="button" class="btn primary" onclick={newDeck}>Start again</button>
       </div>
     {:else}
-      <!-- Keyed per position so buttons are rebuilt and never keep focus from the previous card. -->
-      {#key pos}
-        <QuestionCard
-          q={current}
-          position={pos + 1}
-          total={deck.length}
-          {revealed}
-          gotBefore={progress.got.includes(current.id)}
-          reviewMarked={progress.review.includes(current.id)}
-          onReveal={reveal}
-          onMark={mark}
-          onNext={advance}
-        />
-      {/key}
+      <QuestionCard
+        q={current}
+        position={pos + 1}
+        total={deck.length}
+        {revealed}
+        gotBefore={progress.got.includes(current.id)}
+        reviewMarked={progress.review.includes(current.id)}
+        onReveal={reveal}
+        onMark={mark}
+        onNext={advance}
+      />
     {/if}
   </section>
 </main>

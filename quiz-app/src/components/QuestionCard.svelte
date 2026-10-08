@@ -1,5 +1,6 @@
 <script>
   import Markdown from './Markdown.svelte';
+  import { releasePointerFocus } from '../lib/focus.js';
 
   let { q, position, total, revealed, gotBefore, reviewMarked, onReveal, onMark, onNext } = $props();
 </script>
@@ -29,5 +30,5 @@
     <button type="button" class="btn review" onclick={() => onMark('review')}>Review again<kbd>R</kbd></button>
     <button type="button" class="btn got" onclick={() => onMark('got')}>Got it<kbd>G</kbd></button>
   {/if}
-  <button type="button" class="btn" onclick={onNext}>Next<kbd>→</kbd></button>
+  <button type="button" class="btn" onclick={(e) => { releasePointerFocus(e); onNext(); }}>Next<kbd>→</kbd></button>
 </div>

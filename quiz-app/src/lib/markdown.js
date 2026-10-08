@@ -5,6 +5,10 @@ import { escapeHtml, highlight } from './highlight.js';
 marked.use({
   gfm: true,
   renderer: {
+    // Raw HTML in a book is shown as text, never injected into the page.
+    html(html) {
+      return escapeHtml(html);
+    },
     code(code, infostring) {
       const lang = ((infostring || '').match(/^\S*/) || [''])[0];
       return '<pre><code class="lang-' + escapeHtml(lang) + '">' + highlight(code, lang) + '\n</code></pre>\n';

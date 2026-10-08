@@ -1,8 +1,11 @@
 <script>
+  import { releasePointerFocus as release } from '../lib/focus.js';
+
   let { books, counts, total, selected, parts, part, mode, onToggleBook, onAllBooks, onPart, onMode, onReset } = $props();
 
-  // Every control gives up focus after use so the card shortcuts (Space, arrows, G, R) keep working.
-  const release = (e) => e.currentTarget.blur();
+  // A mouse-used control gives up focus so the card shortcuts (Space, arrows, G, R) keep working;
+  // keyboard users keep their place. A select has no click detail, so remember how it was opened.
+  let selectViaPointer = false;
 </script>
 
 <section class="setup" aria-label="Choose questions">
@@ -21,7 +24,10 @@
   <div class="row">
     {#if parts.length > 1}
       <label>Part
-        <select value={part} onchange={(e) => { const v = e.currentTarget.value; release(e); onPart(v); }}>
+        <select value={part}
+          onpointerdown={() => { selectViaPointer = true; }}
+          onblur={() => { selectViaPointer = false; }}
+          onchange={(e) => { const v = e.currentTarget.value; if (selectViaPointer) e.currentTarget.blur(); onPart(v); }}>
           <option value="">All parts</option>
           {#each parts as p (p)}
             <option value={p}>{p}</option>
