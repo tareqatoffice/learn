@@ -356,13 +356,16 @@ const DATA = /*__DATA__*/[];
   }
 
   // ---------- wiring ----------
+  // Setup controls give up focus after use so the card shortcuts (Space, arrows, G, R) keep working.
   $('part').addEventListener('change', (e) => {
+    e.target.blur();
     state.part = e.target.value;
     newDeck();
   });
-  $('modeShuffle').addEventListener('click', () => { state.mode = 'shuffle'; renderMode(); newDeck(); });
-  $('modeBrowse').addEventListener('click', () => { state.mode = 'browse'; renderMode(); newDeck(); });
-  $('reset').addEventListener('click', () => {
+  $('modeShuffle').addEventListener('click', (e) => { e.currentTarget.blur(); state.mode = 'shuffle'; renderMode(); newDeck(); });
+  $('modeBrowse').addEventListener('click', (e) => { e.currentTarget.blur(); state.mode = 'browse'; renderMode(); newDeck(); });
+  $('reset').addEventListener('click', (e) => {
+    e.currentTarget.blur();
     if (!window.confirm('Reset all saved progress?')) return;
     state.progress = emptyProgress();
     saveProgress();
