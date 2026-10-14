@@ -1,0 +1,314 @@
+<title>{{TITLE}}</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: header + progress, track filter, top-to-bottom prerequisite graph (scrolls), detail panel beside it (below on phones). */
+:root {
+  --bg: #f2f4f7; --surface: #ffffff; --surface2: #e7ebf1; --fg: #131a25; --muted: #566175; --line: #c9d1dc;
+  --code-bg: #101722; --code-fg: #dbe5f3; --ok: #1b7f4b;
+  --t-0: #2563c9; --t-1: #b45309; --t-2: #0f7b6c; --t-3: #6b57c2; --t-4: #c2255c; --t-5: #4d7c0f;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e131b; --surface: #161d28; --surface2: #202a39; --fg: #e8eef7; --muted: #9aa8bd; --line: #33405a;
+    --code-bg: #0a0f16; --code-fg: #dbe5f3; --ok: #4cc58a;
+    --t-0: #6ea8ff; --t-1: #f0a14a; --t-2: #4fd1b8; --t-3: #a99cf0; --t-4: #ff7aa5; --t-5: #a3d65c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e131b; --surface: #161d28; --surface2: #202a39; --fg: #e8eef7; --muted: #9aa8bd; --line: #33405a;
+  --code-bg: #0a0f16; --code-fg: #dbe5f3; --ok: #4cc58a;
+  --t-0: #6ea8ff; --t-1: #f0a14a; --t-2: #4fd1b8; --t-3: #a99cf0; --t-4: #ff7aa5; --t-5: #a3d65c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1400px; margin: 0 auto; padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(26px, 4vw, 38px); letter-spacing: -0.01em; }
+.sub { color: var(--muted); margin: 8px 0 0; max-width: 70ch; }
+.top { display: flex; flex-wrap: wrap; gap: 20px 40px; align-items: flex-end; justify-content: space-between; }
+.prog { min-width: min(100%, 280px); }
+.prog-num { font-family: var(--f-mono); font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; gap: 12px; }
+.bar { height: 8px; border-radius: 4px; background: var(--surface2); margin-top: 6px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .25s; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 22px 0 14px; }
+.chip { font: 500 13px var(--f-body); padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--c, var(--line)); background: transparent; color: var(--fg); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--c); color: var(--bg); }
+.chip:focus-visible, .btn:focus-visible, .node:focus-visible, .pill:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+.btn { font: 500 13px var(--f-body); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+.spacer { flex: 1; }
+.ready { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-bottom: 14px; font-size: 13px; color: var(--muted); }
+.pill { font: 500 12.5px var(--f-body); padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 18px; align-items: start; }
+.graph { min-width: 0; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.panel { position: sticky; top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px; min-width: 0; max-height: calc(100vh - 32px); overflow: auto; }
+@media (max-width: 1000px) { .main { grid-template-columns: minmax(0, 1fr); } .panel { position: static; max-height: none; } }
+.tier-label { font: 500 11px var(--f-mono); fill: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+.edge { fill: none; stroke: var(--line); stroke-width: 1.4; transition: opacity .15s; }
+.edge.up { stroke: var(--fg); stroke-width: 2; }
+.edge.down { stroke: var(--muted); stroke-width: 2; stroke-dasharray: 5 4; }
+.node { cursor: pointer; transition: opacity .15s; }
+.node rect.box { fill: var(--surface); stroke: var(--c); stroke-width: 1.8; }
+.node.done rect.box { fill: color-mix(in srgb, var(--c) 18%, var(--surface)); }
+.node.sel rect.box { stroke: var(--fg); stroke-width: 3; }
+.node text { font: 500 12.5px var(--f-body); fill: var(--fg); pointer-events: none; }
+.node .tick { font: 600 13px var(--f-body); fill: var(--ok); }
+.node .rdy { fill: var(--c); }
+.dim { opacity: .22; }
+.crumb { font: 500 12px var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--c); }
+.panel h2 { font-size: 24px; margin: 6px 0 10px; }
+.panel p { margin: 0 0 12px; }
+.panel h3 { font: 600 12px var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; }
+.panel ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+pre { background: var(--code-bg); color: var(--code-fg); font: 400 12.5px/1.55 var(--f-mono); border-radius: 8px; padding: 12px 14px; margin: 0; overflow-x: auto; }
+.pit { background: var(--surface2); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+.rel { display: flex; flex-wrap: wrap; gap: 6px; }
+.learned { display: flex; gap: 10px; align-items: center; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); font-weight: 500; }
+.learned input { width: 18px; height: 18px; accent-color: var(--ok); }
+.panel a { color: var(--fg); text-underline-offset: 3px; }
+.graph, .panel, pre { scrollbar-color: var(--line) transparent; }
+.hint { font-size: 12.5px; color: var(--muted); margin: 0 0 6px; }
+.back { display: none; margin-bottom: 12px; }
+@media (max-width: 1000px) { .back { display: inline-block; } }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--muted); margin-top: 12px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--fg); display: inline-block; }
+.foot { margin-top: 28px; color: var(--muted); font-size: 13px; max-width: 80ch; }
+.foot a { color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.panel h2:focus { outline: none; }
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>{{TITLE}}</h1>
+      <p class="sub">Each box is a topic. Lines point from a prerequisite to what it unlocks. Pick a topic to see what to learn first, what it opens up, and a short code example. {{SUB}}</p>
+    </div>
+    <div class="prog" aria-live="polite">
+      <div class="prog-num"><span id="progText">0 of 0 learned</span><span id="progPct">0%</span></div>
+      <div class="bar"><i id="progBar"></i></div>
+    </div>
+  </div>
+
+  <div class="controls" id="chips" role="group" aria-label="Highlight a track"></div>
+  <div class="ready" id="ready"></div>
+
+  <div class="main">
+    <div>
+      <p class="hint">Start at the top. On narrow screens the graph scrolls sideways.</p>
+      <div class="graph" id="graph" tabindex="-1"></div>
+      <div class="legend">
+        <span><svg width="14" height="14" aria-hidden="true"><rect x="1" y="1" width="12" height="12" rx="3" fill="none" stroke="var(--fg)" stroke-width="2"/></svg>Topic</span>
+        <span><span class="dot"></span>Ready: all prerequisites learned</span>
+        <span><svg width="22" height="6" aria-hidden="true"><line x1="0" y1="3" x2="22" y2="3" stroke="var(--fg)" stroke-width="2"/></svg>Needed first</span>
+        <span><svg width="22" height="6" aria-hidden="true"><line x1="0" y1="3" x2="22" y2="3" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/></svg>Unlocks</span>
+        <span>Progress is saved in this browser only.</span>
+      </div>
+    </div>
+    <aside class="panel" id="panel" aria-label="Topic details"></aside>
+  </div>
+
+  <p class="foot">{{FOOT}}</p>
+</div>
+
+<script>
+/*__DATA__*/
+var TRACKS = CONFIG.tracks, NODES = CONFIG.nodes;
+
+var byId = {}, kids = {};
+NODES.forEach(function (n) { byId[n.id] = n; kids[n.id] = []; n.tier = -1; });
+NODES.forEach(function (n) { n.pre.forEach(function (p) { kids[p].push(n.id); }); });
+function tierOf(n) {
+  if (n.tier >= 0) return n.tier;
+  n.tier = n.pre.length ? 1 + Math.max.apply(null, n.pre.map(function (p) { return tierOf(byId[p]); })) : 0;
+  return n.tier;
+}
+NODES.forEach(tierOf);
+
+var TRACK_IDX = {}; TRACKS.forEach(function (t, i) { TRACK_IDX[t.k] = i; });
+var TRACK_NAME = {}; TRACKS.forEach(function (t) { TRACK_NAME[t.k] = t.n; });
+
+var state = { sel: null, focus: null, done: {} };
+var KEY = CONFIG.key;
+try { state.done = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { state.done = {}; }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state.done)); } catch (e) {} }
+
+function ancestors(id, acc) { acc = acc || {}; byId[id].pre.forEach(function (p) { if (!acc[p]) { acc[p] = 1; ancestors(p, acc); } }); return acc; }
+function descendants(id, acc) { acc = acc || {}; kids[id].forEach(function (k) { if (!acc[k]) { acc[k] = 1; descendants(k, acc); } }); return acc; }
+function isReady(n) { return !state.done[n.id] && n.pre.every(function (p) { return state.done[p]; }); }
+
+/* ---------- layout ---------- */
+var NW = 176, NH = 44, GX = 14, GY = 52, TG = 14, PAD = 16, LBL = 66, MAXC = 4;
+var rows = [];
+NODES.forEach(function (n) { (rows[n.tier] = rows[n.tier] || []).push(n); });
+rows.forEach(function (r) { r.sort(function (a, b) { return TRACK_IDX[a.tr] - TRACK_IDX[b.tr]; }); });
+// a step with more than MAXC topics wraps onto balanced visual rows
+var vrows = [];
+rows.forEach(function (r, ti) {
+  var per = Math.ceil(r.length / Math.ceil(r.length / MAXC));
+  for (var i = 0; i < r.length; i += per) vrows.push({ tier: ti, items: r.slice(i, i + per), first: i === 0 });
+});
+function gap(r, i) { return i ? GX + (r[i].tr !== r[i - 1].tr ? TG : 0) : 0; }
+var rowW = vrows.map(function (v) { return v.items.reduce(function (w, n, i) { return w + gap(v.items, i) + NW; }, 0); });
+var maxW = Math.max.apply(null, rowW);
+vrows.forEach(function (v, ri) {
+  var x = LBL + PAD + (maxW - rowW[ri]) / 2, y = PAD + ri * (NH + GY);
+  v.items.forEach(function (n, i) { x += gap(v.items, i); n.x = x; n.y = y; x += NW; });
+});
+var W = LBL + PAD * 2 + maxW, H = PAD * 2 + vrows.length * NH + (vrows.length - 1) * GY;
+
+/* ---------- render graph ---------- */
+var SVGNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent) {
+  var e = document.createElementNS(SVGNS, tag);
+  for (var k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+var svg = el("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "group", "aria-label": "Prerequisite graph" });
+document.getElementById("graph").appendChild(svg);
+vrows.forEach(function (r, ri) {
+  if (!r.first) return;
+  var t = el("text", { x: PAD, y: PAD + ri * (NH + GY) + NH / 2 + 4, "class": "tier-label" }, svg);
+  t.textContent = "Step " + (r.tier + 1);
+});
+var edgeEls = [];
+NODES.forEach(function (n) {
+  n.pre.forEach(function (p) {
+    var a = byId[p], x1 = a.x + NW / 2, y1 = a.y + NH, x2 = n.x + NW / 2, y2 = n.y, dy = Math.max(24, (y2 - y1) / 2);
+    var path = el("path", { d: "M" + x1 + "," + y1 + " C" + x1 + "," + (y1 + dy) + " " + x2 + "," + (y2 - dy) + " " + x2 + "," + y2, "class": "edge" }, svg);
+    edgeEls.push({ el: path, from: p, to: n.id });
+  });
+});
+NODES.forEach(function (n) {
+  var g = el("g", { "class": "node", tabindex: 0, role: "button", "data-id": n.id, transform: "translate(" + n.x + "," + n.y + ")" }, svg);
+  g.style.setProperty("--c", "var(--t-" + TRACK_IDX[n.tr] + ")");
+  el("rect", { "class": "box", width: NW, height: NH, rx: 8 }, g);
+  var tx = el("text", { x: 12, y: NH / 2 + 4.5 }, g); tx.textContent = n.t;
+  var tick = el("text", { x: NW - 10, y: NH / 2 + 5, "text-anchor": "end", "class": "tick" }, g); tick.textContent = "✓";
+  el("circle", { cx: NW - 10, cy: NH / 2, r: 4.5, "class": "rdy" }, g);
+  n.g = g; n.tick = tick; n.rdy = g.lastChild;
+  g.addEventListener("click", function () { select(n.id); });
+  g.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(n.id); } });
+});
+
+/* ---------- controls ---------- */
+var chips = document.getElementById("chips");
+TRACKS.forEach(function (t) {
+  var b = document.createElement("button");
+  b.className = "chip"; b.type = "button"; b.textContent = t.n; b.setAttribute("aria-pressed", "false");
+  b.style.setProperty("--c", "var(--t-" + TRACK_IDX[t.k] + ")");
+  b.addEventListener("click", function () { state.focus = state.focus === t.k ? null : t.k; paint(); });
+  b.dataset.k = t.k; chips.appendChild(b);
+});
+var spacer = document.createElement("span"); spacer.className = "spacer"; chips.appendChild(spacer);
+var clr = document.createElement("button");
+clr.className = "btn"; clr.type = "button"; clr.textContent = "Clear progress";
+var clrTimer;
+clr.addEventListener("click", function () {
+  if (clr.dataset.arm) { state.done = {}; save(); clr.textContent = "Clear progress"; delete clr.dataset.arm; clearTimeout(clrTimer); paint(); return; }
+  clr.dataset.arm = "1"; clr.textContent = "Click again to confirm";
+  clrTimer = setTimeout(function () { clr.textContent = "Clear progress"; delete clr.dataset.arm; }, 3500);
+});
+chips.appendChild(clr);
+
+/* ---------- panel ---------- */
+var panel = document.getElementById("panel");
+function h(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function relRow(ids) {
+  var r = h("div", "rel");
+  ids.forEach(function (id) { var b = h("button", "pill", byId[id].t); b.type = "button"; b.addEventListener("click", function () { openTopic(id); }); r.appendChild(b); });
+  return r;
+}
+function renderPanel() {
+  panel.textContent = "";
+  var n = state.sel && byId[state.sel];
+  if (!n) {
+    panel.appendChild(h("div", "crumb", "How to use"));
+    panel.appendChild(h("h2", null, "Pick a topic"));
+    panel.appendChild(h("p", null, "Start at the top and work down. Tick a topic when you can explain it to a teammate and write the code without looking. Topics whose prerequisites are all ticked get a dot, so you always know what is next."));
+    panel.appendChild(h("p", null, "Suggested team routine: learn a topic, then explain the 'common mistake' in the next standup or code review."));
+    return;
+  }
+  panel.style.setProperty("--c", "var(--t-" + TRACK_IDX[n.tr] + ")");
+  var back = h("button", "btn back", "← Back to graph"); back.type = "button";
+  back.addEventListener("click", function () { document.getElementById("graph").scrollIntoView({ behavior: "smooth", block: "start" }); });
+  panel.appendChild(back);
+  panel.appendChild(h("div", "crumb", TRACK_NAME[n.tr]));
+  var title = h("h2", null, n.t); title.tabIndex = -1; panel.appendChild(title);
+  panel.appendChild(h("p", null, n.s));
+  panel.appendChild(h("h3", null, "Key points"));
+  var ul = h("ul"); n.p.forEach(function (x) { ul.appendChild(h("li", null, x)); }); panel.appendChild(ul);
+  panel.appendChild(h("h3", null, "Example"));
+  var pre = h("pre"); pre.appendChild(h("code", null, n.c)); panel.appendChild(pre);
+  panel.appendChild(h("h3", null, "Common mistake"));
+  panel.appendChild(h("div", "pit", n.pit));
+  if (n.pre.length) { panel.appendChild(h("h3", null, "Learn first")); panel.appendChild(relRow(n.pre)); }
+  if (kids[n.id].length) { panel.appendChild(h("h3", null, "Unlocks")); panel.appendChild(relRow(kids[n.id])); }
+  panel.appendChild(h("h3", null, "Official docs"));
+  var a = h("a", null, n.t + " on " + new URL(n.u).hostname.replace(/^www\./, "")); a.href = n.u; a.target = "_blank"; a.rel = "noopener"; panel.appendChild(a);
+  var lab = h("label", "learned");
+  var cb = document.createElement("input"); cb.type = "checkbox"; cb.id = "learnedBox"; cb.checked = !!state.done[n.id];
+  cb.addEventListener("change", function () { if (cb.checked) state.done[n.id] = 1; else delete state.done[n.id]; save(); paint(true); });
+  lab.appendChild(cb); lab.appendChild(document.createTextNode("I can explain and use this")); panel.appendChild(lab);
+}
+
+/* ---------- paint ---------- */
+function paint(keepPanel) {
+  var up = state.sel ? ancestors(state.sel) : {}, down = state.sel ? descendants(state.sel) : {};
+  NODES.forEach(function (n) {
+    var related = !state.sel || n.id === state.sel || up[n.id] || down[n.id];
+    var inFocus = !state.focus || n.tr === state.focus;
+    var cls = "node" + (state.done[n.id] ? " done" : "") + (n.id === state.sel ? " sel" : "") + (related && inFocus ? "" : " dim");
+    n.g.setAttribute("class", cls);
+    n.g.setAttribute("aria-pressed", n.id === state.sel ? "true" : "false");
+    n.g.setAttribute("aria-label", n.t + (state.done[n.id] ? ", learned" : isReady(n) ? ", ready to learn" : ""));
+    n.tick.style.display = state.done[n.id] ? "" : "none";
+    n.rdy.style.display = isReady(n) ? "" : "none";
+  });
+  edgeEls.forEach(function (e) {
+    var cls = "edge", on = state.sel;
+    if (on) {
+      var inUp = (up[e.from] || e.from === state.sel) && (up[e.to] || e.to === state.sel);
+      var inDown = (down[e.to] || e.to === state.sel) && (down[e.from] || e.from === state.sel);
+      if (inUp) cls += " up"; else if (inDown) cls += " down"; else cls += " dim";
+    }
+    // a highlighted track keeps only the lines whose both ends are in it
+    if (state.focus && (byId[e.from].tr !== state.focus || byId[e.to].tr !== state.focus)) cls = "edge dim";
+    e.el.setAttribute("class", cls);
+  });
+  Array.prototype.forEach.call(chips.querySelectorAll(".chip"), function (b) { b.setAttribute("aria-pressed", state.focus === b.dataset.k ? "true" : "false"); });
+  var total = NODES.length, n = NODES.filter(function (x) { return state.done[x.id]; }).length, pct = Math.round(100 * n / total);
+  document.getElementById("progText").textContent = n + " of " + total + " learned";
+  document.getElementById("progPct").textContent = pct + "%";
+  document.getElementById("progBar").style.width = pct + "%";
+  var ready = NODES.filter(isReady), box = document.getElementById("ready");
+  box.textContent = "";
+  box.appendChild(document.createTextNode(ready.length ? "Ready to learn:" : "Everything is learned. Nice work."));
+  ready.slice(0, 8).forEach(function (x) { var b = h("button", "pill", x.t); b.type = "button"; b.addEventListener("click", function () { openTopic(x.id); }); box.appendChild(b); });
+  if (ready.length > 8) box.appendChild(document.createTextNode("+" + (ready.length - 8) + " more"));
+  if (!keepPanel) renderPanel();
+}
+// graph nodes toggle; pills always open the topic and move focus to its heading,
+// because re-rendering the panel removes the pill that had focus
+function select(id) {
+  state.sel = state.sel === id ? null : id;
+  paint();
+  if (state.sel && window.matchMedia("(max-width: 1000px)").matches) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function openTopic(id) {
+  state.sel = id;
+  paint();
+  panel.querySelector("h2").focus({ preventScroll: true });
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+paint();
+</script>
+

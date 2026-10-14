@@ -1,0 +1,317 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Frontend Engineering Learning Graph</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: header + progress, track filter, top-to-bottom prerequisite graph (scrolls), detail panel beside it (below on phones). */
+:root {
+  --bg: #f2f4f7; --surface: #ffffff; --surface2: #e7ebf1; --fg: #131a25; --muted: #566175; --line: #c9d1dc;
+  --code-bg: #101722; --code-fg: #dbe5f3; --ok: #1b7f4b;
+  --t-0: #2563c9; --t-1: #b45309; --t-2: #0f7b6c; --t-3: #6b57c2; --t-4: #c2255c; --t-5: #4d7c0f;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e131b; --surface: #161d28; --surface2: #202a39; --fg: #e8eef7; --muted: #9aa8bd; --line: #33405a;
+    --code-bg: #0a0f16; --code-fg: #dbe5f3; --ok: #4cc58a;
+    --t-0: #6ea8ff; --t-1: #f0a14a; --t-2: #4fd1b8; --t-3: #a99cf0; --t-4: #ff7aa5; --t-5: #a3d65c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e131b; --surface: #161d28; --surface2: #202a39; --fg: #e8eef7; --muted: #9aa8bd; --line: #33405a;
+  --code-bg: #0a0f16; --code-fg: #dbe5f3; --ok: #4cc58a;
+  --t-0: #6ea8ff; --t-1: #f0a14a; --t-2: #4fd1b8; --t-3: #a99cf0; --t-4: #ff7aa5; --t-5: #a3d65c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1400px; margin: 0 auto; padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(26px, 4vw, 38px); letter-spacing: -0.01em; }
+.sub { color: var(--muted); margin: 8px 0 0; max-width: 70ch; }
+.top { display: flex; flex-wrap: wrap; gap: 20px 40px; align-items: flex-end; justify-content: space-between; }
+.prog { min-width: min(100%, 280px); }
+.prog-num { font-family: var(--f-mono); font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; gap: 12px; }
+.bar { height: 8px; border-radius: 4px; background: var(--surface2); margin-top: 6px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .25s; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 22px 0 14px; }
+.chip { font: 500 13px var(--f-body); padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--c, var(--line)); background: transparent; color: var(--fg); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--c); color: var(--bg); }
+.chip:focus-visible, .btn:focus-visible, .node:focus-visible, .pill:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+.btn { font: 500 13px var(--f-body); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+.spacer { flex: 1; }
+.ready { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-bottom: 14px; font-size: 13px; color: var(--muted); }
+.pill { font: 500 12.5px var(--f-body); padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 18px; align-items: start; }
+.graph { min-width: 0; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.panel { position: sticky; top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px; min-width: 0; max-height: calc(100vh - 32px); overflow: auto; }
+@media (max-width: 1000px) { .main { grid-template-columns: minmax(0, 1fr); } .panel { position: static; max-height: none; } }
+.tier-label { font: 500 11px var(--f-mono); fill: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+.edge { fill: none; stroke: var(--line); stroke-width: 1.4; transition: opacity .15s; }
+.edge.up { stroke: var(--fg); stroke-width: 2; }
+.edge.down { stroke: var(--muted); stroke-width: 2; stroke-dasharray: 5 4; }
+.node { cursor: pointer; transition: opacity .15s; }
+.node rect.box { fill: var(--surface); stroke: var(--c); stroke-width: 1.8; }
+.node.done rect.box { fill: color-mix(in srgb, var(--c) 18%, var(--surface)); }
+.node.sel rect.box { stroke: var(--fg); stroke-width: 3; }
+.node text { font: 500 12.5px var(--f-body); fill: var(--fg); pointer-events: none; }
+.node .tick { font: 600 13px var(--f-body); fill: var(--ok); }
+.node .rdy { fill: var(--c); }
+.dim { opacity: .22; }
+.crumb { font: 500 12px var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--c); }
+.panel h2 { font-size: 24px; margin: 6px 0 10px; }
+.panel p { margin: 0 0 12px; }
+.panel h3 { font: 600 12px var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; }
+.panel ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+pre { background: var(--code-bg); color: var(--code-fg); font: 400 12.5px/1.55 var(--f-mono); border-radius: 8px; padding: 12px 14px; margin: 0; overflow-x: auto; }
+.pit { background: var(--surface2); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+.rel { display: flex; flex-wrap: wrap; gap: 6px; }
+.learned { display: flex; gap: 10px; align-items: center; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); font-weight: 500; }
+.learned input { width: 18px; height: 18px; accent-color: var(--ok); }
+.panel a { color: var(--fg); text-underline-offset: 3px; }
+.graph, .panel, pre { scrollbar-color: var(--line) transparent; }
+.hint { font-size: 12.5px; color: var(--muted); margin: 0 0 6px; }
+.back { display: none; margin-bottom: 12px; }
+@media (max-width: 1000px) { .back { display: inline-block; } }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--muted); margin-top: 12px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--fg); display: inline-block; }
+.foot { margin-top: 28px; color: var(--muted); font-size: 13px; max-width: 80ch; }
+.foot a { color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.panel h2:focus { outline: none; }
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Frontend Engineering Learning Graph</h1>
+      <p class="sub">Each box is a topic. Lines point from a prerequisite to what it unlocks. Pick a topic to see what to learn first, what it opens up, and a short code example. Framework-agnostic core, with React as the example where a framework is needed.</p>
+    </div>
+    <div class="prog" aria-live="polite">
+      <div class="prog-num"><span id="progText">0 of 0 learned</span><span id="progPct">0%</span></div>
+      <div class="bar"><i id="progBar"></i></div>
+    </div>
+  </div>
+
+  <div class="controls" id="chips" role="group" aria-label="Highlight a track"></div>
+  <div class="ready" id="ready"></div>
+
+  <div class="main">
+    <div>
+      <p class="hint">Start at the top. On narrow screens the graph scrolls sideways.</p>
+      <div class="graph" id="graph" tabindex="-1"></div>
+      <div class="legend">
+        <span><svg width="14" height="14" aria-hidden="true"><rect x="1" y="1" width="12" height="12" rx="3" fill="none" stroke="var(--fg)" stroke-width="2"/></svg>Topic</span>
+        <span><span class="dot"></span>Ready: all prerequisites learned</span>
+        <span><svg width="22" height="6" aria-hidden="true"><line x1="0" y1="3" x2="22" y2="3" stroke="var(--fg)" stroke-width="2"/></svg>Needed first</span>
+        <span><svg width="22" height="6" aria-hidden="true"><line x1="0" y1="3" x2="22" y2="3" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/></svg>Unlocks</span>
+        <span>Progress is saved in this browser only.</span>
+      </div>
+    </div>
+    <aside class="panel" id="panel" aria-label="Topic details"></aside>
+  </div>
+
+  <p class="foot">Links go to MDN, web.dev, react.dev, W3C WAI and the TypeScript docs.</p>
+</div>
+
+<script>
+var CONFIG = {"key":"frontend-engineering-learning-graph-v1","tracks":[{"k":"web","n":"Web platform"},{"k":"css","n":"CSS & layout"},{"k":"comp","n":"Components & state"},{"k":"data","n":"Data & rendering"},{"k":"perf","n":"Build & performance"},{"k":"quality","n":"Quality"}],"nodes":[{"id":"html-semantics","tr":"web","t":"Semantic HTML","pre":[],"s":"HTML describes what content is, not how it looks. The right element gives you meaning, keyboard behavior and accessibility for free.","p":["Use landmarks: header, nav, main, aside, footer.","Headings form an outline; do not skip levels for styling.","A button does something, a link goes somewhere. Pick the element by behavior."],"c":"<main>\n  <h1>Orders<\/h1>\n  <nav aria-label=\"Pagination\">\n    <a href=\"?page=2\">Next page<\/a>\n  <\/nav>\n  <button type=\"button\">Export CSV<\/button>\n<\/main>","pit":"Using a div with an onclick handler as a button: it is not focusable and does not respond to Enter or Space.","u":"https://developer.mozilla.org/en-US/docs/Glossary/Semantics"},{"id":"event-loop","tr":"web","t":"Event loop & async","pre":[],"s":"JavaScript in the browser runs on one main thread. Long tasks block input and rendering. Promises and async/await schedule work without blocking.","p":["Promise callbacks run as microtasks, before the next task such as a timer.","await pauses the function, not the thread.","Rendering can only happen between tasks, so a long task freezes the page."],"c":"async function load() {\n  const res = await fetch(\"/api/user\");\n  if (!res.ok) throw new Error(`HTTP ${res.status}`);\n  return res.json();\n}\n\nload().then(console.log).catch(console.error);","pit":"Forgetting to await or catch a promise, so errors become silent unhandled rejections.","u":"https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Using_promises"},{"id":"dom-events","tr":"web","t":"DOM & events","pre":["html-semantics","event-loop"],"s":"The DOM is the live tree the browser builds from HTML. Events are dispatched to a target and then bubble up through its ancestors.","p":["event.target is where it happened; event.currentTarget is where the listener sits.","Event delegation: one listener on a parent handles many children.","preventDefault stops the browser action; stopPropagation stops bubbling."],"c":"const list = document.querySelector(\"#todo-list\");\n\nlist.addEventListener(\"click\", (event) => {\n  const btn = event.target.closest(\"button[data-id]\");\n  if (!btn) return;\n  removeTodo(btn.dataset.id);\n});","pit":"Calling stopPropagation everywhere, which breaks delegated handlers and analytics higher up the tree.","u":"https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener"},{"id":"css-cascade","tr":"css","t":"Cascade & specificity","pre":["html-semantics"],"s":"When several rules target the same element, the cascade decides which wins: origin and importance, then cascade layers, then specificity, then source order.","p":["Specificity is compared as (ids, classes/attributes/pseudo-classes, elements).","Some properties inherit (color, font); most layout properties do not.","@layer lets you order whole groups of styles, independent of specificity."],"c":"@layer base, components;\n\n@layer base {\n  a { color: blue; }\n}\n@layer components {\n  .link-muted { color: gray; } /* wins: later layer */\n}","pit":"Fixing a conflict with !important or an id selector, which starts a specificity arms race.","u":"https://developer.mozilla.org/en-US/docs/Web/CSS/Specificity"},{"id":"browser-rendering","tr":"web","t":"How browsers render","pre":["dom-events","css-cascade"],"s":"The critical rendering path turns HTML and CSS into pixels: DOM and CSSOM, render tree, layout, paint, composite. CSS and synchronous scripts block it.","p":["Layout (reflow) computes geometry; paint fills pixels; composite stacks layers.","Changing width or top triggers layout; transform and opacity can skip it.","Reading layout (offsetHeight) right after writing styles forces a synchronous reflow."],"c":"// Bad: read/write interleaved forces layout on every loop\nfor (const el of items) {\n  el.style.height = el.offsetHeight + 10 + \"px\";\n}\n\n// Better: read all, then write all\nconst heights = items.map((el) => el.offsetHeight);\nitems.forEach((el, i) => (el.style.height = heights[i] + 10 + \"px\"));","pit":"Animating top/left or width instead of transform, causing layout on every frame.","u":"https://developer.mozilla.org/en-US/docs/Web/Performance/Critical_rendering_path"},{"id":"forms","tr":"web","t":"Forms & validation","pre":["dom-events"],"s":"Native forms give you labels, submission, autofill and constraint validation. Client validation is for user experience; the server must validate again.","p":["Every input needs a label linked by for/id or by wrapping.","required, type, min, max and pattern give built-in validation.","Use the right type and autocomplete so mobile keyboards and password managers work."],"c":"<form action=\"/signup\" method=\"post\">\n  <label for=\"email\">Email<\/label>\n  <input id=\"email\" name=\"email\" type=\"email\"\n         autocomplete=\"email\" required>\n  <button>Sign up<\/button>\n<\/form>","pit":"Using placeholder text instead of a label; it disappears on typing and is not a reliable accessible name.","u":"https://developer.mozilla.org/en-US/docs/Web/HTML/Constraint_validation"},{"id":"http-fetch","tr":"web","t":"HTTP & fetch","pre":["event-loop"],"s":"The frontend talks to servers over HTTP. fetch returns a promise for a Response; you decide how to handle status codes, bodies and cancellation.","p":["fetch only rejects on network failure; a 404 or 500 still resolves. Check res.ok.","Know the methods (GET is safe and cacheable, POST is not) and status code classes.","AbortController cancels a request you no longer need."],"c":"const controller = new AbortController();\n\nconst res = await fetch(\"/api/orders\", {\n  method: \"POST\",\n  headers: { \"Content-Type\": \"application/json\" },\n  body: JSON.stringify({ sku: \"A-1\", qty: 2 }),\n  signal: controller.signal,\n});\nif (!res.ok) throw new Error(`HTTP ${res.status}`);","pit":"Assuming fetch throws on HTTP errors, so a 500 response is parsed as if it were data.","u":"https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch"},{"id":"storage-cookies","tr":"web","t":"Storage & cookies","pre":["http-fetch"],"s":"Cookies are sent with requests; localStorage and sessionStorage stay in the browser; IndexedDB holds larger structured data. Each has different scope and risk.","p":["HttpOnly cookies cannot be read by JavaScript, which protects session tokens from XSS.","SameSite and Secure attributes control when cookies are sent.","localStorage is synchronous, string-only and readable by any script on the origin."],"c":"// Server response header for a session cookie\nSet-Cookie: session=abc123; HttpOnly; Secure; SameSite=Lax; Path=/\n\n// Fine for a UI preference\nlocalStorage.setItem(\"theme\", \"dark\");","pit":"Storing auth tokens in localStorage, where any injected script can read and exfiltrate them.","u":"https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies"},{"id":"box-model","tr":"css","t":"Box model","pre":["css-cascade"],"s":"Every element is a box: content, padding, border, margin. box-sizing decides whether width includes padding and border.","p":["box-sizing: border-box makes widths predictable.","Vertical margins between blocks can collapse into one.","display (block, inline, inline-block) changes how a box sits in the flow."],"c":"*, *::before, *::after {\n  box-sizing: border-box;\n}\n\n.card {\n  width: 300px;      /* total width, padding included */\n  padding: 16px;\n  border: 1px solid #ddd;\n}","pit":"Setting width: 100% plus padding under content-box, causing horizontal overflow.","u":"https://developer.mozilla.org/en-US/docs/Web/CSS/box-sizing"},{"id":"flexbox","tr":"css","t":"Flexbox","pre":["box-model"],"s":"Flexbox lays out items along one axis. It is the default tool for rows of controls, toolbars and centering.","p":["justify-content works on the main axis, align-items on the cross axis.","flex: 1 means grow and shrink from a zero basis.","gap spaces items without margin hacks."],"c":".toolbar {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n.toolbar .spacer {\n  flex: 1; /* pushes the next items to the right */\n}","pit":"Long text overflowing a flex item because min-width defaults to auto; add min-width: 0.","u":"https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_flexible_box_layout/Basic_concepts_of_flexbox"},{"id":"grid","tr":"css","t":"Grid","pre":["box-model"],"s":"CSS Grid lays out in two dimensions. Use it for page structure and card grids where rows and columns must line up.","p":["fr units share leftover space.","repeat(auto-fill, minmax(...)) gives responsive columns without media queries.","Named grid areas make page layouts readable."],"c":".cards {\n  display: grid;\n  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));\n  gap: 16px;\n}","pit":"Reordering items visually with grid placement, so visual order and keyboard tab order no longer match.","u":"https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_grid_layout/Basic_concepts_of_grid_layout"},{"id":"responsive","tr":"css","t":"Responsive design","pre":["flexbox","grid"],"s":"One codebase must work from phone to wide desktop. Media queries react to the viewport; container queries react to the size of a component's container.","p":["Start with the viewport meta tag and a mobile-first base style.","Prefer fluid units (%, rem, clamp()) over fixed pixel widths.","Container queries let a component adapt wherever it is placed."],"c":".sidebar { container-type: inline-size; }\n\n.profile { display: block; }\n\n@container (min-width: 400px) {\n  .profile { display: flex; gap: 12px; }\n}\n\n@media (min-width: 768px) {\n  .layout { grid-template-columns: 240px 1fr; }\n}","pit":"Testing only at a few device widths, so layouts break at the sizes in between.","u":"https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_media_queries/Using_media_queries"},{"id":"css-tokens","tr":"css","t":"Tokens & CSS variables","pre":["css-cascade"],"s":"Design tokens are named design decisions: colors, spacing, radii, type scale. CSS custom properties carry them through the cascade at runtime.","p":["Custom properties inherit, so a parent can retheme a whole subtree.","Name tokens by role (--color-text-muted), not by value (--gray-500).","Dark mode becomes a token swap, not a second stylesheet."],"c":":root {\n  --color-bg: #fff;\n  --color-text: #1a1a1a;\n  --space-2: 8px;\n}\n[data-theme=\"dark\"] {\n  --color-bg: #121212;\n  --color-text: #eee;\n}\nbody { background: var(--color-bg); color: var(--color-text); }","pit":"Hard-coding hex values in components, so a theme change means editing every file.","u":"https://developer.mozilla.org/en-US/docs/Web/CSS/Using_CSS_custom_properties"},{"id":"typescript-ui","tr":"comp","t":"TypeScript in UI code","pre":["event-loop"],"s":"TypeScript catches wrong props, missing fields and null access before the code runs. Types describe the data your UI receives and the contracts between components.","p":["Type API responses at the boundary and validate untrusted data at runtime.","Use union types for states: 'loading' | 'error' | 'ready'.","Avoid any; prefer unknown and narrow it."],"c":"type User = { id: string; name: string; email?: string };\n\ntype Status =\n  | { kind: \"loading\" }\n  | { kind: \"error\"; message: string }\n  | { kind: \"ready\"; user: User };\n\nfunction label(s: Status) {\n  return s.kind === \"ready\" ? s.user.name : s.kind;\n}","pit":"Casting API responses with 'as User', which silences the compiler but proves nothing at runtime.","u":"https://react.dev/learn/typescript"},{"id":"components","tr":"comp","t":"Component model","pre":["dom-events","typescript-ui"],"s":"A component is a function that turns inputs into UI. You build screens by composing small components instead of manipulating the DOM by hand.","p":["Components must be pure during render: same inputs, same output, no side effects.","Composition with children beats deep configuration props.","Keep components small enough to name by what they do."],"c":"type CardProps = { title: string; children: React.ReactNode };\n\nfunction Card({ title, children }: CardProps) {\n  return (\n    <section className=\"card\">\n      <h2>{title}<\/h2>\n      {children}\n    <\/section>\n  );\n}","pit":"Defining a component inside another component, which remounts it and loses its state on every render.","u":"https://react.dev/learn/your-first-component"},{"id":"props-state","tr":"comp","t":"Props & state","pre":["components"],"s":"Props come from the parent and are read-only. State is data a component owns and changes over time; changing it schedules a re-render.","p":["Treat state as immutable: create new objects and arrays instead of mutating.","Derive values during render instead of storing them in extra state.","Lift state up to the closest common parent when siblings need it."],"c":"function Counter() {\n  const [count, setCount] = useState(0);\n  const isEven = count % 2 === 0; // derived, not state\n\n  return (\n    <button onClick={() => setCount((c) => c + 1)}>\n      {count} ({isEven ? \"even\" : \"odd\"})\n    <\/button>\n  );\n}","pit":"Mutating state in place (items.push(x); setItems(items)), so React sees the same reference and may skip the update.","u":"https://react.dev/learn/state-a-components-memory"},{"id":"lists-keys","tr":"comp","t":"Lists & keys","pre":["props-state"],"s":"When rendering lists, keys tell React which item is which between renders. Stable keys preserve state and DOM; bad keys cause bugs.","p":["Use a stable id from the data as the key.","Keys only need to be unique among siblings.","Changing a key on purpose resets a component's state."],"c":"function TodoList({ todos }: { todos: Todo[] }) {\n  return (\n    <ul>\n      {todos.map((todo) => (\n        <li key={todo.id}>{todo.text}<\/li>\n      ))}\n    <\/ul>\n  );\n}","pit":"Using the array index as key in a list that can be reordered or filtered, so input state jumps to the wrong row.","u":"https://react.dev/learn/rendering-lists"},{"id":"hooks-effects","tr":"comp","t":"Hooks & effects","pre":["props-state"],"s":"Hooks let function components hold state and connect to the outside world. Effects synchronize a component with an external system after render.","p":["Call hooks at the top level, never in conditions or loops.","List every reactive value an effect uses in its dependency array.","Return a cleanup function to undo subscriptions and timers."],"c":"function OnlineStatus() {\n  const [online, setOnline] = useState(navigator.onLine);\n\n  useEffect(() => {\n    const update = () => setOnline(navigator.onLine);\n    window.addEventListener(\"online\", update);\n    window.addEventListener(\"offline\", update);\n    return () => {\n      window.removeEventListener(\"online\", update);\n      window.removeEventListener(\"offline\", update);\n    };\n  }, []);\n\n  return <span>{online ? \"Online\" : \"Offline\"}<\/span>;\n}","pit":"Using an effect to compute derived data or respond to a click; that belongs in render or in the event handler.","u":"https://react.dev/learn/you-might-not-need-an-effect"},{"id":"react-forms","tr":"comp","t":"Forms in React","pre":["forms","props-state"],"s":"An input is controlled when React state drives its value, uncontrolled when the DOM keeps it. Both are valid; choose per form.","p":["Controlled inputs need value plus onChange, every keystroke goes through state.","Uncontrolled inputs with defaultValue and FormData are simpler for submit-only forms.","Keep native validation and labels; React does not replace them."],"c":"function Search({ onSearch }: { onSearch: (q: string) => void }) {\n  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {\n    e.preventDefault();\n    const q = new FormData(e.currentTarget).get(\"q\");\n    onSearch(String(q ?? \"\"));\n  }\n  return (\n    <form onSubmit={handleSubmit}>\n      <label htmlFor=\"q\">Search<\/label>\n      <input id=\"q\" name=\"q\" defaultValue=\"\" />\n    <\/form>\n  );\n}","pit":"Passing value without onChange, which makes the input read-only and triggers a warning.","u":"https://react.dev/reference/react-dom/components/input"},{"id":"state-mgmt","tr":"comp","t":"State management","pre":["hooks-effects"],"s":"Sort state by kind: local UI state, shared client state, server state (a cached copy of backend data) and URL state. Each kind has a better home.","p":["Keep state as local as possible; lift it only when needed.","Context passes values down without prop drilling; it is not a cache.","Server state belongs in a fetching/caching layer, filters often belong in the URL."],"c":"const ThemeContext = createContext<\"light\" | \"dark\">(\"light\");\n\nfunction App() {\n  const [theme, setTheme] = useState<\"light\" | \"dark\">(\"light\");\n  return (\n    <ThemeContext.Provider value={theme}>\n      <Page onToggle={() => setTheme((t) => (t === \"light\" ? \"dark\" : \"light\"))} />\n    <\/ThemeContext.Provider>\n  );\n}","pit":"Copying server data into a global store by hand, then fighting stale and duplicated data.","u":"https://react.dev/learn/managing-state"},{"id":"data-fetching","tr":"data","t":"Fetching & caching","pre":["hooks-effects","http-fetch"],"s":"Fetching data means handling loading, errors, races, caching and refetching. Frameworks and query libraries solve most of this; know what they do for you.","p":["Ignore or abort stale responses when inputs change quickly.","Cache by a key (such as the URL and params) and decide when data goes stale.","Avoid request waterfalls: start independent requests in parallel."],"c":"useEffect(() => {\n  let ignore = false;\n  fetch(`/api/users/${userId}`)\n    .then((r) => r.json())\n    .then((data) => {\n      if (!ignore) setUser(data);\n    });\n  return () => {\n    ignore = true; // drop the response if userId changed\n  };\n}, [userId]);","pit":"Fetching in an effect without cleanup, so a slow old response overwrites the newer one.","u":"https://react.dev/reference/react/useEffect#fetching-data-with-effects"},{"id":"routing","tr":"data","t":"Routing","pre":["components","http-fetch"],"s":"Routing maps URLs to screens. Client-side routers update the URL with the History API and render the matching view without a full page load.","p":["The URL is state: put shareable state such as filters and tabs in it.","Every route must also work on a hard refresh and a direct link.","Move focus and announce the new page after client navigation."],"c":"// What a client router does underneath\nfunction navigate(path: string) {\n  history.pushState({}, \"\", path);\n  render(matchRoute(path));\n}\n\nwindow.addEventListener(\"popstate\", () => {\n  render(matchRoute(location.pathname));\n});","pit":"Using onClick handlers instead of real links, which breaks open-in-new-tab, copy link and crawlers.","u":"https://developer.mozilla.org/en-US/docs/Web/API/History_API"},{"id":"loading-errors","tr":"data","t":"Loading & error states","pre":["data-fetching"],"s":"Every async view has at least three states: loading, error and success, often also empty. Design and code all of them, not just the happy path.","p":["Suspense shows a fallback while children are waiting for code or data.","Error boundaries catch render errors in a subtree and show a fallback.","Reserve space for loading content to avoid layout shift."],"c":"<ErrorBoundary fallback={<p>Could not load orders.<\/p>}>\n  <Suspense fallback={<OrdersSkeleton />}>\n    <Orders />\n  <\/Suspense>\n<\/ErrorBoundary>","pit":"Showing a blank screen or an endless spinner when a request fails, with no retry.","u":"https://react.dev/reference/react/Suspense"},{"id":"rendering-strategies","tr":"data","t":"CSR, SSR & SSG","pre":["routing","data-fetching"],"s":"Where HTML is produced shapes speed, SEO and cost. CSR renders in the browser, SSR renders per request on the server, SSG renders at build time.","p":["CSR: simple hosting, slower first content, needs JavaScript to show anything.","SSR: fast first content with fresh data, but server cost and time to first byte matter.","SSG: fastest and cacheable, only for content that does not change per request."],"c":"// SSR in plain terms\napp.get(\"/products/:id\", async (req, res) => {\n  const product = await db.getProduct(req.params.id);\n  const html = renderToString(<ProductPage product={product} />);\n  res.send(layout(html, product));\n});","pit":"Choosing SSR for an internal dashboard behind login where CSR would be simpler and good enough.","u":"https://web.dev/articles/rendering-on-the-web"},{"id":"hydration","tr":"data","t":"Hydration & streaming","pre":["rendering-strategies"],"s":"Hydration attaches event handlers to server-rendered HTML so it becomes interactive. Streaming sends HTML in chunks so the page can show before all data is ready.","p":["The first client render must match the server HTML exactly.","Until hydration finishes, the page is visible but may not respond to input.","Suspense boundaries mark where streamed HTML can arrive later."],"c":"// Bad: differs between server and client -> hydration mismatch\nfunction Clock() {\n  return <span>{new Date().toLocaleTimeString()}<\/span>;\n}\n\n// Better: render a stable value, update after mount\nfunction Clock() {\n  const [time, setTime] = useState<string | null>(null);\n  useEffect(() => setTime(new Date().toLocaleTimeString()), []);\n  return <span>{time ?? \"--:--\"}<\/span>;\n}","pit":"Reading window, localStorage or the current time during render, causing hydration mismatches.","u":"https://react.dev/reference/react-dom/client/hydrateRoot"},{"id":"modules-bundlers","tr":"perf","t":"Modules & bundlers","pre":["typescript-ui"],"s":"ES modules (import/export) are the standard module system. Bundlers resolve imports, compile TypeScript and JSX, and output optimized files for the browser.","p":["Static imports let tools tree-shake unused exports.","Side effects at module top level can prevent tree shaking.","Check bundle size with an analyzer before adding a dependency."],"c":"// utils.ts\nexport function formatPrice(cents: number) {\n  return (cents / 100).toFixed(2);\n}\nexport function unusedHelper() { /* dropped by tree shaking */ }\n\n// app.ts\nimport { formatPrice } from \"./utils\";","pit":"Importing a whole library (import _ from \"lodash\") for one function and shipping all of it.","u":"https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules"},{"id":"code-splitting","tr":"perf","t":"Code splitting","pre":["modules-bundlers","routing"],"s":"Code splitting breaks the bundle into chunks loaded on demand. Users download the code for the screen they are on, not the whole app.","p":["Dynamic import() creates a split point.","Split by route first; then by heavy, rarely used widgets.","Wrap lazy components in Suspense to show a fallback while the chunk loads."],"c":"import { lazy, Suspense } from \"react\";\n\nconst Reports = lazy(() => import(\"./Reports\"));\n\nfunction ReportsRoute() {\n  return (\n    <Suspense fallback={<p>Loading reports...<\/p>}>\n      <Reports />\n    <\/Suspense>\n  );\n}","pit":"Declaring lazy() inside a component, which creates a new component each render and resets its state.","u":"https://react.dev/reference/react/lazy"},{"id":"core-web-vitals","tr":"perf","t":"Core Web Vitals","pre":["browser-rendering","hydration","code-splitting"],"s":"Core Web Vitals measure real user experience: LCP for loading, INP for responsiveness, CLS for visual stability. Measure in the field, not only in a lab.","p":["Good thresholds at the 75th percentile: LCP within 2.5 s, INP within 200 ms, CLS within 0.1.","INP replaced FID as the responsiveness metric in 2024.","Lab tools (Lighthouse) help debug; field data (real users) is what counts."],"c":"// Field measurement with the web-vitals library\nimport { onLCP, onINP, onCLS } from \"web-vitals\";\n\nfunction send(metric) {\n  navigator.sendBeacon(\"/analytics\", JSON.stringify(metric));\n}\nonLCP(send);\nonINP(send);\nonCLS(send);","pit":"Optimizing only for a Lighthouse score on a fast laptop while real users on mid-range phones see poor INP.","u":"https://web.dev/articles/vitals"},{"id":"images-fonts","tr":"perf","t":"Images & fonts","pre":["core-web-vitals","responsive"],"s":"Images and fonts are often the heaviest bytes on a page and the usual LCP and CLS culprits. Size them, choose formats and load them with intent.","p":["Always set width and height (or aspect-ratio) to reserve space.","Use srcset and sizes so devices download an appropriate size.","Lazy-load below-the-fold images, never the LCP image; font-display controls text during font load."],"c":"<img src=\"hero-800.avif\"\n     srcset=\"hero-400.avif 400w, hero-800.avif 800w, hero-1600.avif 1600w\"\n     sizes=\"(min-width: 768px) 50vw, 100vw\"\n     width=\"800\" height=\"450\"\n     fetchpriority=\"high\" alt=\"Team at work\">\n\n<img src=\"chart.png\" loading=\"lazy\" width=\"600\" height=\"300\" alt=\"Sales by month\">","pit":"Adding loading=\"lazy\" to the hero image, which delays the LCP element.","u":"https://developer.mozilla.org/en-US/docs/Web/HTML/Responsive_images"},{"id":"render-perf","tr":"perf","t":"Re-render performance","pre":["state-mgmt","lists-keys"],"s":"React re-renders a component when its state changes or its parent re-renders. Usually that is cheap; measure with the Profiler before optimizing.","p":["Move state down so fewer components re-render.","memo skips re-rendering when props are equal; new objects or functions as props defeat it.","Virtualize long lists instead of rendering thousands of rows."],"c":"const Row = memo(function Row({ item, onSelect }: RowProps) {\n  return <li onClick={() => onSelect(item.id)}>{item.name}<\/li>;\n});\n\nfunction List({ items }: { items: Item[] }) {\n  const [selected, setSelected] = useState<string | null>(null);\n  const onSelect = useCallback((id: string) => setSelected(id), []);\n  return <ul>{items.map((i) => <Row key={i.id} item={i} onSelect={onSelect} />)}<\/ul>;\n}","pit":"Wrapping everything in useMemo and useCallback by default, adding complexity with no measured gain.","u":"https://react.dev/reference/react/memo"},{"id":"accessibility","tr":"quality","t":"ARIA, keyboard & focus","pre":["forms","dom-events"],"s":"Accessible UI works with a keyboard, a screen reader and zoom. Native HTML comes first; ARIA fills gaps for custom widgets and must match real behavior.","p":["No ARIA is better than bad ARIA: a role promises keyboard behavior you must implement.","Every interactive element needs a visible focus style and an accessible name.","Manage focus in dialogs: move it in, trap it, return it on close."],"c":"<button aria-expanded=\"false\" aria-controls=\"filters\">\n  Filters\n<\/button>\n<div id=\"filters\" hidden>...<\/div>\n\n<script>\n  const btn = document.querySelector(\"[aria-controls=filters]\");\n  btn.addEventListener(\"click\", () => {\n    const open = btn.getAttribute(\"aria-expanded\") === \"true\";\n    btn.setAttribute(\"aria-expanded\", String(!open));\n    document.getElementById(\"filters\").hidden = open;\n  });\n<\/script>","pit":"Removing focus outlines with outline: none and no replacement, leaving keyboard users lost.","u":"https://www.w3.org/WAI/ARIA/apg/"},{"id":"security","tr":"quality","t":"XSS, CSP, CSRF, CORS","pre":["storage-cookies","dom-events"],"s":"The browser runs whatever script reaches the page. Frontend security means never turning data into code, limiting what can run, and understanding which requests carry credentials.","p":["XSS: insert user data as text, not HTML. React escapes by default; dangerouslySetInnerHTML does not.","CSP restricts where scripts can load from and blocks inline script.","CSRF is mitigated by SameSite cookies and tokens; CORS is enforced by the browser and is not an auth mechanism."],"c":"// Unsafe: user input becomes HTML\nel.innerHTML = comment.text;\n\n// Safe: user input stays text\nel.textContent = comment.text;\n\n// Response header\nContent-Security-Policy: default-src 'self'; script-src 'self'","pit":"Setting Access-Control-Allow-Origin: * on an API and assuming CORS protects it; CORS only restricts browsers reading responses.","u":"https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP"},{"id":"i18n","tr":"quality","t":"Internationalization","pre":["components"],"s":"i18n prepares the UI for many languages and regions: translated strings, plural rules, number, date and currency formats, and right-to-left layout.","p":["Use Intl APIs for numbers, dates, currencies and plurals instead of string concatenation.","Translate whole messages with placeholders, not sentence fragments.","Use logical CSS properties (margin-inline-start) so RTL layouts work."],"c":"const price = new Intl.NumberFormat(\"de-DE\", {\n  style: \"currency\",\n  currency: \"EUR\",\n}).format(1234.5); // \"1.234,50 €\"\n\nconst rules = new Intl.PluralRules(\"en-US\");\nrules.select(1); // \"one\"\nrules.select(5); // \"other\"","pit":"Building messages like count + \" item\" + (count > 1 ? \"s\" : \"\"), which fails in most languages.","u":"https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl"},{"id":"component-tests","tr":"quality","t":"Unit & component tests","pre":["hooks-effects","accessibility"],"s":"Unit tests check logic; component tests render a component and interact with it like a user would. Query by role and label, assert on what the user sees.","p":["Test behavior, not implementation details such as internal state.","Querying by role and accessible name also checks accessibility.","Mock the network at the boundary, not your own components."],"c":"test(\"adds a todo\", async () => {\n  render(<TodoApp />);\n  await user.type(screen.getByRole(\"textbox\", { name: /new todo/i }), \"Buy milk\");\n  await user.click(screen.getByRole(\"button\", { name: /add/i }));\n  expect(screen.getByText(\"Buy milk\")).toBeInTheDocument();\n});","pit":"Snapshot-testing whole components, so every markup change breaks tests and reviewers just update snapshots.","u":"https://react.dev/reference/react/act"},{"id":"e2e-tests","tr":"quality","t":"End-to-end tests","pre":["component-tests","routing"],"s":"End-to-end tests drive a real browser through the real app. They are slow and costly, so keep them for critical user journeys.","p":["Cover a few key flows: sign in, checkout, core create/edit.","Wait for visible conditions, never for fixed timeouts.","Seed test data so each test is independent."],"c":"test(\"user can check out\", async ({ page }) => {\n  await page.goto(\"/products/a-1\");\n  await page.getByRole(\"button\", { name: \"Add to cart\" }).click();\n  await page.getByRole(\"link\", { name: \"Cart\" }).click();\n  await page.getByRole(\"button\", { name: \"Checkout\" }).click();\n  await expect(page.getByText(\"Order confirmed\")).toBeVisible();\n});","pit":"Adding sleep(2000) to fix flaky tests, which makes the suite slow and still flaky.","u":"https://developer.mozilla.org/en-US/docs/Learn/Tools_and_testing/Cross_browser_testing/Automated_testing"},{"id":"design-systems","tr":"quality","t":"Design systems","pre":["css-tokens","accessibility","props-state"],"s":"A design system is shared tokens, components and guidelines that keep products consistent. Accessibility and behavior are built in once and reused everywhere.","p":["Tokens are the foundation; components consume tokens, never raw values.","Components have documented props, states and accessibility behavior.","Version it and treat breaking changes like an API change."],"c":"type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {\n  variant?: \"primary\" | \"secondary\";\n};\n\nexport function Button({ variant = \"primary\", className, ...rest }: ButtonProps) {\n  return <button className={`btn btn-${variant} ${className ?? \"\"}`} {...rest} />;\n}","pit":"Letting teams fork components locally, so fixes and accessibility improvements never reach them.","u":"https://www.w3.org/WAI/ARIA/apg/patterns/"}]};
+var TRACKS = CONFIG.tracks, NODES = CONFIG.nodes;
+
+var byId = {}, kids = {};
+NODES.forEach(function (n) { byId[n.id] = n; kids[n.id] = []; n.tier = -1; });
+NODES.forEach(function (n) { n.pre.forEach(function (p) { kids[p].push(n.id); }); });
+function tierOf(n) {
+  if (n.tier >= 0) return n.tier;
+  n.tier = n.pre.length ? 1 + Math.max.apply(null, n.pre.map(function (p) { return tierOf(byId[p]); })) : 0;
+  return n.tier;
+}
+NODES.forEach(tierOf);
+
+var TRACK_IDX = {}; TRACKS.forEach(function (t, i) { TRACK_IDX[t.k] = i; });
+var TRACK_NAME = {}; TRACKS.forEach(function (t) { TRACK_NAME[t.k] = t.n; });
+
+var state = { sel: null, focus: null, done: {} };
+var KEY = CONFIG.key;
+try { state.done = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { state.done = {}; }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state.done)); } catch (e) {} }
+
+function ancestors(id, acc) { acc = acc || {}; byId[id].pre.forEach(function (p) { if (!acc[p]) { acc[p] = 1; ancestors(p, acc); } }); return acc; }
+function descendants(id, acc) { acc = acc || {}; kids[id].forEach(function (k) { if (!acc[k]) { acc[k] = 1; descendants(k, acc); } }); return acc; }
+function isReady(n) { return !state.done[n.id] && n.pre.every(function (p) { return state.done[p]; }); }
+
+/* ---------- layout ---------- */
+var NW = 176, NH = 44, GX = 14, GY = 52, TG = 14, PAD = 16, LBL = 66, MAXC = 4;
+var rows = [];
+NODES.forEach(function (n) { (rows[n.tier] = rows[n.tier] || []).push(n); });
+rows.forEach(function (r) { r.sort(function (a, b) { return TRACK_IDX[a.tr] - TRACK_IDX[b.tr]; }); });
+// a step with more than MAXC topics wraps onto balanced visual rows
+var vrows = [];
+rows.forEach(function (r, ti) {
+  var per = Math.ceil(r.length / Math.ceil(r.length / MAXC));
+  for (var i = 0; i < r.length; i += per) vrows.push({ tier: ti, items: r.slice(i, i + per), first: i === 0 });
+});
+function gap(r, i) { return i ? GX + (r[i].tr !== r[i - 1].tr ? TG : 0) : 0; }
+var rowW = vrows.map(function (v) { return v.items.reduce(function (w, n, i) { return w + gap(v.items, i) + NW; }, 0); });
+var maxW = Math.max.apply(null, rowW);
+vrows.forEach(function (v, ri) {
+  var x = LBL + PAD + (maxW - rowW[ri]) / 2, y = PAD + ri * (NH + GY);
+  v.items.forEach(function (n, i) { x += gap(v.items, i); n.x = x; n.y = y; x += NW; });
+});
+var W = LBL + PAD * 2 + maxW, H = PAD * 2 + vrows.length * NH + (vrows.length - 1) * GY;
+
+/* ---------- render graph ---------- */
+var SVGNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent) {
+  var e = document.createElementNS(SVGNS, tag);
+  for (var k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+var svg = el("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "group", "aria-label": "Prerequisite graph" });
+document.getElementById("graph").appendChild(svg);
+vrows.forEach(function (r, ri) {
+  if (!r.first) return;
+  var t = el("text", { x: PAD, y: PAD + ri * (NH + GY) + NH / 2 + 4, "class": "tier-label" }, svg);
+  t.textContent = "Step " + (r.tier + 1);
+});
+var edgeEls = [];
+NODES.forEach(function (n) {
+  n.pre.forEach(function (p) {
+    var a = byId[p], x1 = a.x + NW / 2, y1 = a.y + NH, x2 = n.x + NW / 2, y2 = n.y, dy = Math.max(24, (y2 - y1) / 2);
+    var path = el("path", { d: "M" + x1 + "," + y1 + " C" + x1 + "," + (y1 + dy) + " " + x2 + "," + (y2 - dy) + " " + x2 + "," + y2, "class": "edge" }, svg);
+    edgeEls.push({ el: path, from: p, to: n.id });
+  });
+});
+NODES.forEach(function (n) {
+  var g = el("g", { "class": "node", tabindex: 0, role: "button", "data-id": n.id, transform: "translate(" + n.x + "," + n.y + ")" }, svg);
+  g.style.setProperty("--c", "var(--t-" + TRACK_IDX[n.tr] + ")");
+  el("rect", { "class": "box", width: NW, height: NH, rx: 8 }, g);
+  var tx = el("text", { x: 12, y: NH / 2 + 4.5 }, g); tx.textContent = n.t;
+  var tick = el("text", { x: NW - 10, y: NH / 2 + 5, "text-anchor": "end", "class": "tick" }, g); tick.textContent = "✓";
+  el("circle", { cx: NW - 10, cy: NH / 2, r: 4.5, "class": "rdy" }, g);
+  n.g = g; n.tick = tick; n.rdy = g.lastChild;
+  g.addEventListener("click", function () { select(n.id); });
+  g.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(n.id); } });
+});
+
+/* ---------- controls ---------- */
+var chips = document.getElementById("chips");
+TRACKS.forEach(function (t) {
+  var b = document.createElement("button");
+  b.className = "chip"; b.type = "button"; b.textContent = t.n; b.setAttribute("aria-pressed", "false");
+  b.style.setProperty("--c", "var(--t-" + TRACK_IDX[t.k] + ")");
+  b.addEventListener("click", function () { state.focus = state.focus === t.k ? null : t.k; paint(); });
+  b.dataset.k = t.k; chips.appendChild(b);
+});
+var spacer = document.createElement("span"); spacer.className = "spacer"; chips.appendChild(spacer);
+var clr = document.createElement("button");
+clr.className = "btn"; clr.type = "button"; clr.textContent = "Clear progress";
+var clrTimer;
+clr.addEventListener("click", function () {
+  if (clr.dataset.arm) { state.done = {}; save(); clr.textContent = "Clear progress"; delete clr.dataset.arm; clearTimeout(clrTimer); paint(); return; }
+  clr.dataset.arm = "1"; clr.textContent = "Click again to confirm";
+  clrTimer = setTimeout(function () { clr.textContent = "Clear progress"; delete clr.dataset.arm; }, 3500);
+});
+chips.appendChild(clr);
+
+/* ---------- panel ---------- */
+var panel = document.getElementById("panel");
+function h(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function relRow(ids) {
+  var r = h("div", "rel");
+  ids.forEach(function (id) { var b = h("button", "pill", byId[id].t); b.type = "button"; b.addEventListener("click", function () { openTopic(id); }); r.appendChild(b); });
+  return r;
+}
+function renderPanel() {
+  panel.textContent = "";
+  var n = state.sel && byId[state.sel];
+  if (!n) {
+    panel.appendChild(h("div", "crumb", "How to use"));
+    panel.appendChild(h("h2", null, "Pick a topic"));
+    panel.appendChild(h("p", null, "Start at the top and work down. Tick a topic when you can explain it to a teammate and write the code without looking. Topics whose prerequisites are all ticked get a dot, so you always know what is next."));
+    panel.appendChild(h("p", null, "Suggested team routine: learn a topic, then explain the 'common mistake' in the next standup or code review."));
+    return;
+  }
+  panel.style.setProperty("--c", "var(--t-" + TRACK_IDX[n.tr] + ")");
+  var back = h("button", "btn back", "← Back to graph"); back.type = "button";
+  back.addEventListener("click", function () { document.getElementById("graph").scrollIntoView({ behavior: "smooth", block: "start" }); });
+  panel.appendChild(back);
+  panel.appendChild(h("div", "crumb", TRACK_NAME[n.tr]));
+  var title = h("h2", null, n.t); title.tabIndex = -1; panel.appendChild(title);
+  panel.appendChild(h("p", null, n.s));
+  panel.appendChild(h("h3", null, "Key points"));
+  var ul = h("ul"); n.p.forEach(function (x) { ul.appendChild(h("li", null, x)); }); panel.appendChild(ul);
+  panel.appendChild(h("h3", null, "Example"));
+  var pre = h("pre"); pre.appendChild(h("code", null, n.c)); panel.appendChild(pre);
+  panel.appendChild(h("h3", null, "Common mistake"));
+  panel.appendChild(h("div", "pit", n.pit));
+  if (n.pre.length) { panel.appendChild(h("h3", null, "Learn first")); panel.appendChild(relRow(n.pre)); }
+  if (kids[n.id].length) { panel.appendChild(h("h3", null, "Unlocks")); panel.appendChild(relRow(kids[n.id])); }
+  panel.appendChild(h("h3", null, "Official docs"));
+  var a = h("a", null, n.t + " on " + new URL(n.u).hostname.replace(/^www\./, "")); a.href = n.u; a.target = "_blank"; a.rel = "noopener"; panel.appendChild(a);
+  var lab = h("label", "learned");
+  var cb = document.createElement("input"); cb.type = "checkbox"; cb.id = "learnedBox"; cb.checked = !!state.done[n.id];
+  cb.addEventListener("change", function () { if (cb.checked) state.done[n.id] = 1; else delete state.done[n.id]; save(); paint(true); });
+  lab.appendChild(cb); lab.appendChild(document.createTextNode("I can explain and use this")); panel.appendChild(lab);
+}
+
+/* ---------- paint ---------- */
+function paint(keepPanel) {
+  var up = state.sel ? ancestors(state.sel) : {}, down = state.sel ? descendants(state.sel) : {};
+  NODES.forEach(function (n) {
+    var related = !state.sel || n.id === state.sel || up[n.id] || down[n.id];
+    var inFocus = !state.focus || n.tr === state.focus;
+    var cls = "node" + (state.done[n.id] ? " done" : "") + (n.id === state.sel ? " sel" : "") + (related && inFocus ? "" : " dim");
+    n.g.setAttribute("class", cls);
+    n.g.setAttribute("aria-pressed", n.id === state.sel ? "true" : "false");
+    n.g.setAttribute("aria-label", n.t + (state.done[n.id] ? ", learned" : isReady(n) ? ", ready to learn" : ""));
+    n.tick.style.display = state.done[n.id] ? "" : "none";
+    n.rdy.style.display = isReady(n) ? "" : "none";
+  });
+  edgeEls.forEach(function (e) {
+    var cls = "edge", on = state.sel;
+    if (on) {
+      var inUp = (up[e.from] || e.from === state.sel) && (up[e.to] || e.to === state.sel);
+      var inDown = (down[e.to] || e.to === state.sel) && (down[e.from] || e.from === state.sel);
+      if (inUp) cls += " up"; else if (inDown) cls += " down"; else cls += " dim";
+    }
+    // a highlighted track keeps only the lines whose both ends are in it
+    if (state.focus && (byId[e.from].tr !== state.focus || byId[e.to].tr !== state.focus)) cls = "edge dim";
+    e.el.setAttribute("class", cls);
+  });
+  Array.prototype.forEach.call(chips.querySelectorAll(".chip"), function (b) { b.setAttribute("aria-pressed", state.focus === b.dataset.k ? "true" : "false"); });
+  var total = NODES.length, n = NODES.filter(function (x) { return state.done[x.id]; }).length, pct = Math.round(100 * n / total);
+  document.getElementById("progText").textContent = n + " of " + total + " learned";
+  document.getElementById("progPct").textContent = pct + "%";
+  document.getElementById("progBar").style.width = pct + "%";
+  var ready = NODES.filter(isReady), box = document.getElementById("ready");
+  box.textContent = "";
+  box.appendChild(document.createTextNode(ready.length ? "Ready to learn:" : "Everything is learned. Nice work."));
+  ready.slice(0, 8).forEach(function (x) { var b = h("button", "pill", x.t); b.type = "button"; b.addEventListener("click", function () { openTopic(x.id); }); box.appendChild(b); });
+  if (ready.length > 8) box.appendChild(document.createTextNode("+" + (ready.length - 8) + " more"));
+  if (!keepPanel) renderPanel();
+}
+// graph nodes toggle; pills always open the topic and move focus to its heading,
+// because re-rendering the panel removes the pill that had focus
+function select(id) {
+  state.sel = state.sel === id ? null : id;
+  paint();
+  if (state.sel && window.matchMedia("(max-width: 1000px)").matches) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function openTopic(id) {
+  state.sel = id;
+  paint();
+  panel.querySelector("h2").focus({ preventScroll: true });
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+paint();
+</script>
+
+
+</body></html>
