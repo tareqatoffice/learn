@@ -1467,6 +1467,301 @@ const handleClick = useCallback(() => setOpen(true), []);
 ```
 
 **Answer:** Both memoizations cost more than they save. Adding two numbers is cheaper than `useMemo`'s bookkeeping, and `useCallback` only helps when the function goes to a memoized child or into a dependency array. It's a good example of "looks smart, adds noise" — measure with the Profiler before optimizing.
+
+## 13. Toffee & streaming (OTT) frontend
+
+### Q1. What is Toffee, and why do you want to work on it?
+
+> "Toffee is Banglalink's streaming platform — live TV channels, live sports like cricket and football, dramas, movies and its own originals — on web, Android, iOS and TV. The web app is built with Next.js. What excites me is that streaming is one of the hardest frontend problems: video has to start fast and keep playing on cheap phones and slow mobile data, while millions of people open the same match at the same second. I want to work on a product where frontend performance is directly visible to users — every second of buffering is someone closing the app."
+
+**Why this works:** it shows you looked at the product (live sports, Next.js, multi-platform), names the real engineering challenge (scale + weak devices + weak networks), and connects it to user impact. Before the interview, actually use the site and app for a few minutes and mention one concrete thing you noticed.
+
+### Q2. Progressive download vs adaptive streaming — what's the difference?
+
+**Progressive download** plays one MP4 file over HTTP: the browser downloads it from the start and plays while downloading. Simple, but there is one fixed quality — on a slow network it stalls, and on a fast one it can't improve. Seeking far ahead needs range requests.
+
+**Adaptive streaming (HLS/DASH)** encodes the video at several qualities (for example 240p, 480p, 720p, 1080p), cuts each into small segments of 2–6 seconds, and lists them in a manifest. The player downloads segment by segment and picks the quality of each next segment based on current network speed and buffer. That is how one stream can serve both a fast 4G user in Dhaka and a weak 3G user outside the city. Live TV is only possible this way.
+
+### Q3. HLS vs DASH? What are a manifest and segments?
+
+| | HLS | MPEG-DASH |
+|---|---|---|
+| Made by | Apple | MPEG standard |
+| Manifest | `.m3u8` text playlist | `.mpd` XML file |
+| Native browser support | Safari (macOS, iOS) | None — needs a JS player |
+| DRM usually paired | FairPlay (Apple), also Widevine | Widevine, PlayReady |
+
+The **manifest** is the table of contents. In HLS there is a **master playlist** listing each quality (bitrate, resolution, codecs) and a **media playlist** per quality listing its segments. For live streams the media playlist keeps changing — the player re-fetches it to discover new segments.
+
+**Segments** were traditionally `.ts` files; modern setups use **CMAF** (fragmented MP4), which lets one set of segment files serve both HLS and DASH, halving storage and CDN cache usage.
+
+### Q4. How does adaptive bitrate (ABR) decide which quality to play?
+
+The player measures how fast the last segments downloaded and how many seconds of video are already buffered, then chooses the next segment's quality.
+
+- **Throughput-based:** "the last segments came at 3 Mbps, so pick the highest rendition safely below that."
+- **Buffer-based (e.g. BOLA):** "the buffer is healthy, I can afford higher quality; the buffer is draining, drop down now."
+- Real players (hls.js, Shaka, dash.js) combine both and avoid switching up and down too often, because flickering quality looks worse than steady medium quality.
+
+Frontend levers: the **start quality** (start low for a fast first frame, then climb), capping quality to the player's size (no 1080p in a 360px-wide mini player — hls.js `capLevelToPlayerSize`), and a user-facing quality menu or data-saver mode.
+
+### Q5. How does a browser play HLS if only Safari supports it natively?
+
+Through **Media Source Extensions (MSE)**. A JavaScript player such as hls.js, Shaka Player or dash.js downloads the manifest and segments itself, then feeds the bytes into a `MediaSource` attached to a normal `<video>` element. The browser just decodes what it's given; the JS library does all the streaming logic (ABR, retries, live playlist refresh).
+
+Safari on macOS and iOS can play an `.m3u8` URL directly with `video.src = url`. Historically iPhone Safari had no MSE at all, so native HLS was the only option; newer iOS versions add `ManagedMediaSource`. That's why streaming sites keep **two code paths** — an MSE player for most browsers and native HLS for Apple — and why some bugs appear "only on iPhone".
+
+### Q6. Build a simple HLS video player component for a Next.js app.
+
+```tsx
+'use client';
+import { useEffect, useRef } from 'react';
+import Hls from 'hls.js';
+
+export function VideoPlayer({ src }: { src: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (Hls.isSupported()) {
+      const hls = new Hls({ capLevelToPlayerSize: true });
+      hls.loadSource(src);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (!data.fatal) return; // hls.js retries non-fatal errors itself
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+        else hls.destroy();
+      });
+      return () => hls.destroy(); // stop downloads when src changes or on unmount
+    }
+
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = src; // Safari: native HLS
+      return () => {
+        video.removeAttribute('src');
+        video.load();
+      };
+    }
+  }, [src]);
+
+  return <video ref={videoRef} controls playsInline muted autoPlay className="aspect-video w-full bg-black" />;
+}
+```
+
+**Points to say out loud:** it must be a Client Component (it touches the browser and the video element); the **cleanup** destroys the player so switching channels doesn't leave the old stream downloading in the background; `aspect-video` reserves space so there's no layout shift; `playsInline` stops iPhone from forcing fullscreen. Load the heavy player library lazily, e.g. `dynamic(() => import('./VideoPlayer'), { ssr: false })` from a Client Component, so it isn't in the home page bundle.
+
+### Q7. Why doesn't my video autoplay?
+
+Browsers block **autoplay with sound** until the user has interacted with the site. Muted autoplay is allowed. So:
+
+- Autoplay previews and hero banners **muted**, with a visible "tap to unmute" button.
+- `video.play()` returns a promise — always `.catch()` it. If it rejects with `NotAllowedError`, show a big play button instead of a frozen black box.
+- On iOS also add `playsInline`, or the video jumps to fullscreen.
+- Chrome uses a Media Engagement score, so autoplay may work on your machine (you visit often) but fail for a new user. Test in a fresh profile.
+
+### Q8. What is DRM, and how does it work in the browser?
+
+DRM encrypts the video so only an authorized player can decrypt it — required by studios and sports rights holders.
+
+Flow: segments are encrypted (usually **CENC**, common encryption) → the player reads the manifest and sees the content is protected → the browser's **EME** (Encrypted Media Extensions) API creates a key request → the player sends it to the **license server** with the user's auth token → the server checks entitlement and returns a license → the browser's **CDM** (content decryption module) decrypts and plays. JavaScript never sees the actual key.
+
+| DRM | Where |
+|---|---|
+| Widevine (Google) | Chrome, Firefox, Edge, Android, Android TV |
+| FairPlay (Apple) | Safari, iOS, Apple TV |
+| PlayReady (Microsoft) | Edge, Windows, many smart TVs |
+
+So a real OTT web app needs **multi-DRM**. Also know: Widevine has security levels — desktop browsers are usually **L3** (software only), so providers often cap browsers at a lower resolution and allow the highest quality only on hardware-secured devices.
+
+### Q9. Toffee's site registers your device before you can watch. Why, and how would you build that on the frontend?
+
+Reasons: limit **devices per account**, limit **concurrent streams** (stop login sharing), tie DRM licenses and entitlements to a device, and detect fraud.
+
+Frontend side:
+
+- Generate a stable **device ID** on first visit (random UUID, stored in `localStorage` or a long-lived cookie) — not browser fingerprinting, which is unreliable and privacy-hostile.
+- Send it with login and license requests; the server returns a device token.
+- During playback, send a **heartbeat** every ~30–60 seconds ("device X is still watching"). If the server says the limit is exceeded, stop the player and show a clear message: "You're watching on too many devices. Stop one to continue."
+- Handle the failure path well — a "Device Registration Failed" page should explain why and offer retry, not be a dead end.
+
+**Trade-off to mention:** the frontend can only *ask*; real enforcement must be on the API and license server, because anyone can edit client code.
+
+### Q10. How do you stop people from copying the stream URL and sharing it?
+
+The frontend alone can't — anything in the browser is visible in DevTools. The protection is server-side, and the frontend cooperates:
+
+- **Signed URLs or signed cookies** from the CDN with a short expiry (minutes), sometimes bound to the user. The player gets a fresh signed manifest URL from the API right before playback.
+- **DRM** for premium content, so even a downloaded segment is useless without a license.
+- **Token in the license request**, checked against the user's subscription.
+- Concurrency heartbeats (previous question).
+
+Frontend responsibilities: never hard-code stream URLs in the bundle, refresh tokens before they expire mid-match, and handle a 403 from the CDN by fetching a new signed URL instead of showing an error.
+
+### Q11. Why is a live stream 20–30 seconds behind TV, and how can it be reduced?
+
+Classic HLS uses ~6-second segments and the player wants about 3 segments buffered before starting, plus encoding, packaging and CDN time — that adds up to 20–30 seconds. During a cricket match, users hear the neighbours cheer before they see the wicket.
+
+Ways to reduce it:
+
+- **Shorter segments** (2s) — lower latency, but more requests and less efficient encoding.
+- **Low-Latency HLS / LL-DASH** — segments are split into small "parts" delivered as they're produced; can reach a few seconds.
+- Player settings: target latency, catching up by playing slightly faster (e.g. 1.05×) when behind, and a "Go live" button when the user drifts.
+
+**Trade-off:** lower latency means a smaller buffer, so more rebuffering on bad networks. For a mass-market audience on mobile data, a slightly higher but stable latency is often the right choice.
+
+### Q12. A big cricket match starts and millions open Toffee at the same time. What can the frontend do?
+
+The CDN and backend carry most of the load, but the frontend can make it much worse or much better:
+
+- **Make pages cacheable.** Serve the same HTML/JSON to everyone from the CDN (static or ISR pages), and fetch user-specific bits (profile, continue watching) separately. A page personalized on the server for every request can't be cached.
+- **Retry with exponential backoff and jitter**, never a fixed interval. If a million clients all retry every 2 seconds, they hit the server in synchronized waves (the "thundering herd").
+
+```ts
+function retryDelay(attempt: number) {
+  const base = Math.min(30_000, 1_000 * 2 ** attempt); // 1s, 2s, 4s… max 30s
+  return base * (0.5 + Math.random() / 2); // jitter spreads clients out
+}
+```
+
+- **Don't over-poll.** A score widget polling every second from millions of tabs is a self-made DDoS; use a sensible interval, SSE, or push.
+- **Degrade gracefully:** if recommendations fail, still show the player. Use feature flags to switch off non-essential widgets during the match.
+- **Pre-warm:** publish the match page and stream URL before the start so caches are already hot.
+
+### Q13. How would you show live match scores next to the player?
+
+Three options:
+
+- **Polling** (fetch every N seconds) — simplest and cache-friendly (the CDN can cache the score JSON for a few seconds and serve millions), slightly delayed.
+- **Server-Sent Events** — one-way server-to-client stream over HTTP; good fit for scores and commentary; reconnects automatically.
+- **WebSocket** — two-way; needed for chat, polls and reactions. Hardest to scale to millions of viewers.
+
+For scores alone, **CDN-cached polling or SSE** is usually the best trade-off. Remember the video is 20+ seconds behind — showing the score instantly can **spoil** the moment before the viewer sees it, so consider delaying score updates to match the stream latency.
+
+### Q14. How would you split rendering in Next.js for a streaming site like Toffee?
+
+- **Home / category pages:** server-rendered and cached (ISR with a short `revalidate`) for shared rows — Trending, Live now, Bangla dramas. Personalized rows (Continue watching, Recommended for you) load on the client after the shell, so the main page stays cacheable.
+- **Movie / show / channel detail pages:** Server Components with static generation or ISR — great for SEO and a fast first paint.
+- **Player:** Client Component, loaded lazily; it needs the browser, DRM and user auth anyway.
+- **Search:** client-side with debounce, results from an API.
+- **Account, subscription, payment:** dynamic, never cached, authorization checked on the server.
+
+The principle: **cache everything that's the same for all users, personalize at the edges.**
+
+### Q15. How do you do SEO for a movie or drama page?
+
+- `generateMetadata()` per page: title, description, canonical URL.
+- Open Graph and Twitter images (the poster), so shared links look good on Facebook and messaging apps.
+- **JSON-LD structured data:** `Movie`, `TVSeries`/`TVEpisode`, and `VideoObject` (name, thumbnail, upload date, duration). For live matches, `BroadcastEvent` with `isLiveBroadcast`.
+- `hreflang` alternates between the English and Bangla versions.
+- Sitemaps that include every title and episode, and real HTML content (synopsis, cast) rendered on the server — not an empty page that only fills in with JS.
+
+### Q16. The home page has 15 horizontal rows of posters. How do you keep it fast?
+
+- **Images:** `next/image` with correct `sizes` so phones get small posters; modern formats (AVIF/WebP); `priority` only on the hero banner (usually the LCP element); everything else lazy.
+- **Load rows lazily:** render the first 2–3 rows on the server, load the rest as the user scrolls (IntersectionObserver).
+- **Inside a row:** native horizontal scroll with CSS `scroll-snap` is lighter than a heavy carousel library; render a limited number of cards and add more as the user scrolls sideways.
+- **Reserve space:** fixed aspect-ratio poster boxes and skeletons, so there's no layout shift (CLS).
+- **Hover previews:** start a muted preview only after a short hover delay and only one at a time — never preload video for every card.
+- Measure with Lighthouse and real-user Core Web Vitals on a throttled mid-range Android, not only on a fast laptop.
+
+### Q17. Many users are on budget Android phones and mobile data. What changes in your approach?
+
+- **JavaScript budget:** low-end CPUs parse JS slowly. Code-split by route, keep the player and heavy libraries out of the initial bundle, prefer Server Components for static content.
+- **Data costs money:** default to a moderate quality on mobile networks, offer a **data saver** option, and show quality choices clearly. Respect the `Save-Data` header where available.
+- **Fast first frame:** start at a low bitrate and climb; `preconnect` to the video CDN and license server before the user presses play.
+- **Unreliable networks:** strong retry logic, resume playback instead of restarting, friendly offline messages.
+- **Test real conditions:** Chrome DevTools CPU slowdown + a slow network profile, and ideally a real cheap phone.
+
+### Q18. How do you measure whether video playback is good (QoE)?
+
+Key metrics:
+
+- **Video start time** — from pressing play to the first frame.
+- **Rebuffering ratio** — time spent buffering ÷ watch time; the metric most tied to people leaving.
+- **Exits before video start** — users who gave up while it was loading.
+- **Playback failures** — error rate by device, browser, network and DRM type.
+- **Average bitrate and number of quality switches.**
+
+Implementation: listen to `<video>` events (`playing`, `waiting`, `stalled`, `error`) and player-library events, batch them, and send with `navigator.sendBeacon` so data isn't lost when the tab closes. Page analytics can go through a tag manager, but player QoE usually needs its own pipeline because event volume is high. Then segment the data: "rebuffering is 3× higher on network X" is an actionable finding.
+
+### Q19. How do you handle player errors well?
+
+- Distinguish **network errors** (retry with backoff, maybe drop quality), **media/decode errors** (hls.js `recoverMediaError`), **DRM/license errors** (often entitlement — show "subscribe" or "log in again", not a generic error), **geo-blocking** (sports rights are often country-limited — say so clearly) and **auth expiry** (refresh the token silently).
+- User-facing messages must be specific and offer an action — Retry, Lower quality, Contact support — with an error code users can report.
+- Remember the position and **resume** at the same point after recovery.
+- Log the error with context (device, browser, content ID, CDN, error code) for monitoring.
+
+### Q20. What's different about building for smart TVs?
+
+- **No mouse or touch** — only the remote's arrow keys, OK and Back. You need **spatial navigation**: arrow keys move focus to the nearest item in that direction (libraries like Norigin Spatial Navigation help).
+- **Focus must always be visible** and predictable; remember the focus position when returning to a row.
+- **Remote key codes differ per platform** (Tizen for Samsung, webOS for LG), so map them in one place.
+- **Weak hardware:** limited memory and slow CPUs — fewer animations, virtualized lists, small bundles, careful image sizes.
+- **10-foot UI:** larger text, safe margins (TVs can crop edges), high contrast.
+
+### Q21. How do video ads work in a streaming app?
+
+- **VAST/VMAP** are standard XML formats describing an ad and when to play it (pre-roll, mid-roll, post-roll).
+- **Client-side ad insertion (CSAI):** the player pauses content and plays the ad through an SDK such as Google IMA. Easy and flexible targeting, but ad blockers can block it and switching streams can cause a black gap.
+- **Server-side ad insertion (SSAI):** ads are stitched into the stream itself. Smooth and hard to block — ideal for live sports breaks — but tracking and targeting are more complex.
+
+Frontend concerns: an ad failure must never break content playback, handle ad breaks during live streams, and report ad events accurately because they are revenue.
+
+### Q22. How do you build a subscription paywall and payment flow?
+
+- **Entitlement is decided on the server.** The UI can show a lock icon, but the stream URL and DRM license must only be issued if the server confirms the user's pack. Never trust a client-side `isPremium` flag.
+- **Clear content states:** free, premium-locked, included in your pack, expired, not available in your region.
+- **Purchase flow:** choose pack → pay (for a mobile operator, often **carrier billing** charged to the mobile balance, plus wallets or cards) → poll or receive the result → refresh entitlements → return the user to exactly the content they wanted.
+- Handle **pending** payments and **idempotency**: a double tap must not charge twice; show "processing" rather than an error while the payment is being confirmed.
+
+### Q23. Toffee uses `/en` routes. How do you handle Bangla and English?
+
+- Locale in the URL (`/en/...`, `/bn/...`) via a `[locale]` segment and a library like `next-intl`; middleware redirects based on a cookie or `Accept-Language`.
+- All UI strings in translation files, never hard-coded.
+- Bangla font: load a proper Bengali font with `next/font`; conjunct letters need correct shaping, so test with real Bangla text, not lorem ipsum.
+- Use `Intl.NumberFormat('bn-BD')` and `Intl.DateTimeFormat` for numbers and dates (Bangla digits), and plural rules from the i18n library.
+- Bangla text is often taller and longer — design cards that don't break with long titles.
+- `hreflang` tags and a language switcher that keeps the user on the same page.
+
+### Q24. How would you implement "Continue watching"?
+
+- Save the playback position periodically — e.g. every 10–15 seconds and on pause — not on every `timeupdate` event (it fires several times per second).
+- On `visibilitychange` to hidden (or `pagehide`), send the last position with `navigator.sendBeacon` so closing the tab doesn't lose it.
+- The server stores it per user + content, so it syncs across phone, web and TV.
+- On open: "Resume from 23:14" or "Start over". Mark content finished at ~90–95% (credits) and drop it from the row.
+- Live streams don't resume to a position — they jump to the live edge.
+
+### Q25. Design the frontend of a "watch" page for a live match.
+
+Use the structure: **requirements → components → data → performance → edge cases.**
+
+- **Requirements:** player, match info, live score, related matches and highlights, maybe chat or reactions; mobile-first; works for guests and logged-in users.
+- **Components:** server-rendered shell (title, teams, schedule — cacheable, SEO) + lazy Client Component player + score widget (polling/SSE) + related rows.
+- **Data flow:** page loads → check entitlement and get a signed stream URL → start the player with DRM → heartbeat for concurrency → QoE analytics.
+- **Performance:** reserve player space (no CLS), preconnect to the CDN, start at low quality, don't load chat until the user opens it.
+- **Edge cases:** not subscribed, geo-blocked, too many devices, match not started yet (countdown), match ended (switch to highlights), stream down (retry with backoff + status message), token expiry mid-match.
+
+### Q26. Trap: "The stream plays in Chrome but shows a black screen on iPhone." Where do you look?
+
+**Answer:** Likely causes, in order: (1) the code only uses hls.js/MSE and has no **native HLS fallback** for Safari; (2) DRM is Widevine-only but Apple devices need **FairPlay**; (3) `playsInline` is missing or autoplay with sound is blocked, so `play()` rejected silently; (4) the stream uses a codec or container Safari doesn't support. Debug with Safari Web Inspector on a real device — not Chrome's device emulation, which still uses Chrome's media stack.
+
+### Q27. Trap: users say data usage keeps growing after they switch channels. What's the bug?
+
+**Answer:** The previous player instance was never destroyed — the `useEffect` has no cleanup calling `hls.destroy()`, or the effect creates a new player on every render because of an unstable dependency (e.g. a config object created inline). The old instance keeps downloading segments in the background. Fix: create the player in an effect keyed on `src`, destroy it in the cleanup, and check the Network tab for segment requests from the old stream after switching. React Strict Mode's double effect run in development helps catch exactly this.
+
+### Q28. What questions should you ask the Toffee team?
+
+- "Which player do you use on web — hls.js, Shaka, or something in-house — and how do you handle DRM across browsers?"
+- "What does a big live match day look like for the frontend? What broke last time?"
+- "Which playback metrics do you track, and what's the biggest QoE problem right now?"
+- "How is the web codebase shared with the TV and mobile apps?"
+- "How do you test on low-end devices and slow networks?"
+- "What would success look like for this role in the first three months?"
+
+**Why ask:** good questions show you understand streaming is different from a normal website, and the answers tell you whether the team takes performance seriously.
 </script>
 
 <script>
