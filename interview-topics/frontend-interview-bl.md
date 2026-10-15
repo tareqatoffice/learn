@@ -2,7 +2,7 @@
 
 React.js · Next.js · TypeScript · Tailwind · REST APIs · State · Performance · SEO · Browser · AI-assisted development · Testing · Git · DevOps · Behavioral · Tricky questions · Streaming/OTT (Toffee)
 
-179 questions with answers, each with a short Bangla (বাংলা) explanation.
+180 questions with answers, each with a short Bangla (বাংলা) explanation.
 
 ## Contents
 
@@ -2554,3 +2554,174 @@ Bug হলো আগের player instance কখনো destroy হয়নি 
 - "প্রথম তিন মাসে এই role-এ success দেখতে কেমন হবে?"
 
 **কেন জিজ্ঞেস করবেন:** ভালো প্রশ্ন দেখায় যে আপনি বোঝেন streaming একটা সাধারণ website থেকে আলাদা, আর উত্তরগুলো থেকে আপনি বুঝবেন team performance-কে সত্যিই গুরুত্ব দেয় কিনা।
+
+### Q29. System design: design the frontend of Toffee (live TV + on-demand OTT) end to end.
+
+This is the full 45-minute system design round. Say the **RADIO** steps out loud (Requirements → Architecture → Data model → Interface/API → Optimizations) so the interviewer always knows where you are. Frame it as "a Toffee-like platform", not as inside knowledge of their system.
+
+```text
+0–5    Requirements, and what I'm descoping
+5–15   Architecture + component tree
+15–22  Data model + API shapes
+22–40  Deep dives: player state machine, EPG + channel switching, live vs VOD, match-day spike
+40–45  Trade-offs, metrics, what I'd build next
+```
+
+**R — Requirements (5 min)**
+
+- **Functional:** home page of rails (Live now, Sports, Dramas, Movies, Continue watching); live TV channels with a programme guide (EPG); live matches; on-demand movies and series with episodes; search; sign-in (e.g. phone number + OTP) and device registration; subscription paywall; continue watching; Bangla and English.
+- **Non-functional (targets I'd propose):** video starts in about 2 seconds on 4G; rebuffering under 1% of watch time; works on budget Android Chrome, iPhone Safari and desktop, with smart TVs later; SEO for title and match pages; WCAG 2.2 AA; `bn` and `en` routes.
+- **Scale:** I'd ask for real numbers. Assume a big cricket match brings millions of concurrent viewers who all arrive in the same few minutes, about 100+ live channels and thousands of on-demand titles.
+- **Descoped:** encoding and packaging, CDN internals, recommendation ML, payment gateway internals (we only redirect to bKash/Nagad/card), native apps.
+
+**A — Architecture (10 min)**
+
+```text
+Browser — Next.js App Router
+  ├─ Server Components: home rails, title/match pages, EPG shell   (cached, SEO)
+  ├─ Client islands: Player, live score, EPG "now" line, search, paywall
+  └─ Service worker (optional): app shell + posters only, never video segments
+          │
+          ▼
+BFF / API: catalog, EPG, entitlement, playback, progress, heartbeat
+          │
+          ├─ Playback service → signed manifest URL + DRM license URL + session token
+          ├─ Multi-CDN → HLS/DASH (CMAF) manifests and segments
+          └─ DRM license servers → Widevine / FairPlay / PlayReady
+```
+
+```text
+<AppShell>                header, language switch, auth state
+  <HomePage>              <Rail kind="live | vod | continue"> → <PosterCard>
+  <LiveTvPage>            <EpgGrid> (channels × time) + <MiniPlayer>
+  <WatchPage>             <Player> → <VideoSurface> + <Controls> + <GoLiveButton>
+                          + <ScoreWidget> + <RelatedRail>
+  <TitlePage>             hero, seasons/episodes, cast, JSON-LD (Server Component)
+```
+
+Server Components fetch catalog and EPG data with `'use cache'` + `cacheLife`, so pages come from the cache. The player is one Client Component loaded with `dynamic(..., { ssr: false })`. Its logic lives in a framework-free `PlayerController` (a state machine around hls.js or Shaka Player), so the same core can later run inside a smart TV shell.
+
+**D — Data model (5–8 min)**
+
+Server entities (times are ISO 8601 in UTC):
+
+```ts
+type Access = 'free' | 'ads' | 'subscription';
+type Channel = { id: string; number: number; name: string; logo: string; access: Access };
+type Programme = { id: string; channelId: string; title: string; start: string; end: string; catchupUntil?: string };
+type Title = {
+  id: string;
+  kind: 'movie' | 'series' | 'episode' | 'match';
+  name: { en: string; bn: string };
+  poster: string;
+  durationSec?: number;
+  access: Access;
+};
+type Rail = { id: string; kind: 'live' | 'vod' | 'continue'; title: string; items: Title[]; nextCursor?: string };
+type WatchProgress = { titleId: string; positionSec: number; durationSec: number; updatedAt: string };
+```
+
+Client side, say there are three kinds of state:
+
+- **Server state** (RSC or TanStack Query): rails, EPG windows keyed by `['epg', windowStart, channelIds]`, title details, entitlement.
+- **Player state** (inside `PlayerController` only): status, current source, bitrate, buffer level, last error. It changes several times a second, so it must not live in a global store, or the whole app re-renders.
+- **UI and preferences:** selected channel, EPG scroll position, open panels; language, quality cap and data saver in `localStorage`.
+
+Render all times in Dhaka time: `new Intl.DateTimeFormat('bn-BD', { timeZone: 'Asia/Dhaka', timeStyle: 'short' })`.
+
+**I — Interface / API (5–8 min)**
+
+```text
+GET  /v1/home?lang=bn                        → { rails: Rail[] }              public, CDN-cached
+GET  /v1/epg?from=<ISO>&hours=6&channels=…   → { programmes: Programme[] }    public, CDN-cached
+GET  /v1/titles/:id                          → Title + seasons + related      public, CDN-cached
+GET  /v1/me/continue-watching                → { items: WatchProgress[] }     private, no CDN cache
+POST /v1/playback      { contentId, type: 'live' | 'vod', deviceId }
+     → { sessionId, manifestUrl, drm: { scheme, licenseUrl }, token, expiresAt, startPositionSec?, heartbeatSec }
+POST /v1/playback/heartbeat  { sessionId, positionSec }  → 200 | 401 token expired | 409 too many devices
+PUT  /v1/progress/:titleId   { positionSec }             (also sent with sendBeacon on pagehide)
+```
+
+The key decision: split **public, shared, cacheable** data (home, EPG, title pages) from **private, per-user** data (continue watching, entitlement, playback). During a spike the CDN serves the heavy shared part, and only small per-user calls reach the origin.
+
+Component API for the player:
+
+```tsx
+<Player
+  source={{ kind: 'live', channelId: 'ch-12' }} // or { kind: 'vod', titleId, startAt }
+  autoPlay
+  muted
+  onStatusChange={(status) => track('player_status', { status })}
+  onBlocked={(reason) => openPaywallOrLogin(reason)}
+/>
+```
+
+**O — Deep dive 1: player state machine**
+
+```text
+idle → authorizing → loading → playing ⇄ buffering
+            │            │          │
+            ▼            ▼          ▼
+         blocked       error ──retry with backoff──→ loading
+   (login, paywall,      │
+    too many devices)    └──→ failed (message + Retry button)
+playing → ended   (VOD: "Up next"; live: event over → highlights)
+```
+
+- One explicit `status` makes impossible combinations (a spinner and an error at the same time) impossible.
+- Video events map to transitions: `waiting` → buffering, `playing` → playing, a fatal hls.js error → error, a `409` heartbeat → blocked.
+- Every transition is a natural place to log QoE events: startup time, rebuffer start and end, errors.
+- React subscribes with `useSyncExternalStore`, so only the controls re-render, not the page. A reducer is enough; XState is fine if the team already uses it.
+
+**O — Deep dive 2: EPG grid and channel switching**
+
+- The EPG is a grid of channels (rows) × time (columns). Server-render the "now" window for a fast first paint, then fetch more 6-hour windows as the user scrolls, cached per window.
+- Virtualize **both** directions — 100 channels × 24 hours is thousands of cells. A cell's width is its duration × pixels per minute; clip programmes that started before the window.
+- The "now" line and the LIVE badges move on a client timer once a minute; don't refetch the grid for that.
+- Keyboard: arrow keys move between cells (roving `tabindex`), Enter plays. The same code works for a TV remote later.
+- **Zap time** (how long a channel switch takes) is mostly network: playback API → manifest → first segment → DRM license. To cut it, prefetch the playback token and manifest of the neighbouring channels (or of an EPG row the user rests on for ~300 ms).
+- Keep the same `<video>` element, start the new channel at the lowest rendition and let ABR climb, and show the new channel's logo and name instantly so the switch *feels* fast.
+- Abort the old channel's requests on every switch — the data-usage bug from Q27.
+
+**O — Deep dive 3: live vs on-demand**
+
+| Aspect | Live (channel, match) | On-demand (movie, drama) |
+| --- | --- | --- |
+| Manifest | Sliding window, reloaded about every target duration; no `#EXT-X-ENDLIST` | Complete list, fetched once; ends with `#EXT-X-ENDLIST` |
+| Seek bar | Only the DVR window (e.g. last 2 hours) + a "Go live" button | Full duration, thumbnail previews |
+| Start position | Near the live edge (lower latency vs fewer stalls) | Saved position from continue watching |
+| Buffer | Small — the live edge is close | Larger, e.g. 30 s+ on Wi-Fi |
+| CDN caching | Manifest with a very short TTL (about half a segment); segments cached | Everything cached for a long time |
+| Progress | Don't save a position; remember the last channel | Save every ~10 s and on `pagehide` |
+| Ads | Server-side ad insertion at break markers | Pre-roll/mid-roll or server-side insertion |
+| SEO | Match page with `BroadcastEvent` JSON-LD | Title page with `Movie` / `TVEpisode` JSON-LD |
+
+Catch-up TV sits in between: a programme that has just ended plays like on-demand content from the archive until `catchupUntil`.
+
+**O — Deep dive 4: match-day spike**
+
+- **Serve the shared part from the CDN:** page shell (static, with Partial Prerendering for the dynamic bits), EPG, posters and score JSON. The origin sees only small per-user calls.
+- **Spread the herd:** don't let every client call `/playback` in the same second when the match starts — add random jitter to prefetching, use exponential backoff with jitter on retries, and respect `Retry-After` on `429`/`503`. Heartbeats get jitter too.
+- **Degrade, don't die:** feature flags or kill switches turn off chat, reactions and recommendation rails, or cap the top bitrate, when the backend says it's under load. The video must keep playing.
+- **Waiting room:** if the playback service sheds load, show a friendly queue page with a countdown instead of a broken player.
+- **CDN failover:** the playback API returns more than one CDN host; the player switches host on repeated segment errors (HLS redundant streams or Content Steering, DASH multiple `BaseURL`s).
+- **Live score:** one SSE stream, or polling a CDN-cached endpoint every 10–15 s — not a WebSocket per user.
+- **Rehearse:** load-test the APIs, test on a budget phone with throttled 3G, and practise flipping the kill switches before the match.
+
+**Other areas, one line each:** performance (virtualized rails, lazy AVIF/WebP posters, preconnect to the CDN); accessibility (WebVTT captions, keyboard controls, focus management in the player); i18n (`/en` and `/bn` routes, Bangla digits); security (signed URLs and DRM, entitlement always checked on the server); observability (QoE — startup time, rebuffer ratio, errors by device and CDN — plus real-user Core Web Vitals).
+
+**Close (40–45 min):** name the trade-offs — server-rendered shell + client player; hls.js (lighter, HLS-focused) vs Shaka Player (stronger DASH and DRM support); polling vs SSE for scores. Then say what you'd build next: downloads in the app, personalized rails, and the same `PlayerController` inside a smart TV shell. For detail, point to earlier answers: the player code (Q6), live latency (Q11), the spike (Q12), QoE (Q18) and the watch page (Q25).
+
+**বাংলায়:**
+
+এটা পুরো 45 মিনিটের system design round, তাই RADIO-র ধাপগুলো মুখে বলে বলে এগোন — Requirements → Architecture → Data model → Interface/API → Optimizations — যাতে interviewer সবসময় বোঝেন আপনি কোথায় আছেন। Toffee-র ভেতরের তথ্য হিসেবে না, "Toffee-র মতো একটা platform" design করছেন — এভাবে বলুন।
+
+- **Requirements:** home-এর rail (Live now, Sports, Drama, Movie, Continue watching), EPG-সহ live TV channel, live match, episode-সহ VOD, search, OTP login, device registration, subscription paywall আর Bangla/English। Non-functional target: 4G-তে ~2 সেকেন্ডে video start, rebuffering খুব কম, budget Android আর iPhone Safari-তে চলবে, SEO আর accessibility। Scale-এর আসল সংখ্যা জিজ্ঞেস করুন — ধরে নিন বড় cricket match-এ একই কয়েক মিনিটে লাখো viewer ঢোকে। Encoding, CDN-এর ভেতরের কাজ, recommendation ML আর payment gateway-এর ভেতরের অংশ descope করুন।
+- **Architecture:** Next.js App Router-এ home rail, title/match page আর EPG shell হলো Server Component (cache করা, SEO-friendly); player, live score, search আর paywall হলো Client island। Player একটা Client Component, `dynamic(..., { ssr: false })` দিয়ে load হয়, আর আসল logic একটা framework-free `PlayerController`-এ থাকে, যাতে পরে TV app-ও একই core ব্যবহার করতে পারে। পেছনে BFF/API → playback service (signed URL + DRM license URL), multi-CDN আর DRM license server।
+- **Data model:** server entity হলো `Channel`, `Programme` (UTC-তে start/end), `Title`, `Rail` আর `WatchProgress`। Client-এ rail, EPG window আর entitlement-এর মতো server state থাকে RSC বা TanStack Query-তে; player state শুধু `PlayerController`-এর ভেতরে, কারণ এটা সেকেন্ডে কয়েকবার বদলায় — global store-এ রাখলে পুরো app re-render হবে। Language, quality cap আর data saver-এর মতো preference `localStorage`-এ। সব সময় `Asia/Dhaka` timezone-এ দেখান।
+- **API:** public, cacheable data (home rail, EPG, title page) আর private, per-user data (continue watching, entitlement, playback) আলাদা endpoint-এ রাখুন, যাতে spike-এর সময় ভারী shared অংশটা CDN থেকে আসে আর origin-এ শুধু ছোট per-user call যায়। `POST /v1/playback` দেয় manifest URL, DRM info, token, expiry আর heartbeat interval; heartbeat-এ `409` মানে device বেশি হয়ে গেছে।
+- **Player state machine:** idle → authorizing → loading → playing ⇄ buffering, সাথে blocked (login, paywall, too many devices), error (backoff-সহ retry), failed আর ended। একটাই `status` থাকলে spinner আর error একসাথে দেখানোর মতো অসম্ভব অবস্থা তৈরি হয় না, প্রতিটা transition-এ QoE event log করা যায়, আর `useSyncExternalStore` দিয়ে শুধু controls re-render হয়, পুরো page না।
+- **EPG আর channel switching:** EPG হলো channel × সময়ের grid — "এখন"-এর window server-এ render হয়, বাকিটা scroll করলে 6 ঘণ্টার window ধরে fetch হয়, আর দুই দিকেই virtualize করতে হয়। "Now" line client timer দিয়ে প্রতি মিনিটে সরে। Arrow key দিয়ে cell-এ cell-এ যাওয়া যায় (roving `tabindex`), যেটা পরে TV remote-এও কাজে লাগে। Zap time-এর বেশিরভাগই network-এর সময়, তাই পাশের channel-এর (বা user যে EPG row-এ ~300 ms থেমেছে তার) token আর manifest prefetch করুন, একই `<video>` element রাখুন, সবচেয়ে কম quality-তে শুরু করুন, channel-এর logo আর নাম সাথে সাথে দেখান, আর প্রতিবার switch-এ পুরনো channel-এর request abort করুন।
+- **Live vs VOD:** live-এ manifest sliding window আর বারবার reload হয়, seek শুধু DVR window-এ আর "Go live" button লাগে, start হয় live edge-এর কাছে, buffer ছোট, আর position save হয় না। VOD-এ manifest সম্পূর্ণ, পুরো seek bar, continue watching-এর saved position থেকে start, buffer বড়, আর প্রতি ~10 সেকেন্ডে ও `pagehide`-এ position save হয়। সদ্য শেষ হওয়া programme catch-up হিসেবে `catchupUntil` পর্যন্ত VOD-এর মতো চলে।
+- **Match-day spike:** page shell, EPG, poster আর score JSON — shared সব কিছু CDN থেকে আসে। Match শুরুর মুহূর্তে সবাই যেন একই সেকেন্ডে `/playback` hit না করে, তাই prefetch আর retry-তে random jitter আর exponential backoff দিন, `429`/`503`-এ `Retry-After` মানুন, heartbeat-এও jitter দিন। Load বেশি হলে feature flag দিয়ে chat, reaction আর recommendation rail বন্ধ করুন বা সবচেয়ে বেশি bitrate cap করুন — video যেন চলতেই থাকে। দরকার হলে ভাঙা player-এর বদলে waiting room page দেখান; CDN host fail করলে player নিজেই অন্য host-এ যাবে; live score SSE বা CDN-cached polling দিয়ে, প্রতি user-এর জন্য WebSocket না। Match-এর আগে load test, throttled 3G-তে budget phone-এ test আর kill switch চালানোর practice করে রাখুন।
+- **শেষে:** trade-off বলুন (server-rendered shell + client player, hls.js বনাম Shaka Player, polling বনাম SSE), আর সময় পেলে কী বানাতেন — app-এ download, personalized rail, TV shell-এ একই `PlayerController`। বিস্তারিত দরকার হলে আগের উত্তরগুলো দেখান: player code (Q6), live latency (Q11), spike (Q12), QoE (Q18) আর watch page (Q25)।
