@@ -36,9 +36,9 @@ React.js · Next.js · TypeScript · Tailwind · REST APIs · State · Performan
 
 **বাংলায়:**
 
-"আসসালামু আলাইকুম, আমি [Name]। আমি একজন frontend developer, [X] বছর ধরে React, Next.js আর TypeScript দিয়ে responsive web app বানাচ্ছি। সবশেষে [Company/Project]-এ আমি একটা [dashboard / e-commerce site / SaaS app] বানিয়েছি, যেখানে Figma design থেকে reusable Tailwind component বানিয়েছি, TanStack Query দিয়ে REST API integrate করেছি, আর Lighthouse performance [X] থেকে [Y]-তে নিয়ে গেছি।
+"আসসালামু আলাইকুম, আমি [Name]। আমি একজন frontend developer, [X] বছর ধরে React, Next.js আর TypeScript দিয়ে responsive web app বানাচ্ছি। সম্প্রতি [Company/Project]-এ আমি একটা [dashboard / e-commerce site / SaaS app] বানিয়েছি, যেখানে Figma design থেকে reusable Tailwind component বানিয়েছি, TanStack Query দিয়ে REST API integrate করেছি, আর Lighthouse performance [X] থেকে [Y]-তে নিয়ে গেছি।
 
-আমি প্রতিদিন GitHub Copilot আর Claude-এর মতো AI tool ব্যবহার করি — component scaffold করা, test লেখা আর debug করার জন্য — কিন্তু PR-এ যাওয়ার আগে সবসময় output-টা security, type আর edge case-এর দিক থেকে review করি। Designer আর backend developer-দের সাথে close-ভাবে কাজ করতে আমার ভালো লাগে, আর আমি এমন একটা team খুঁজছি যেখানে quality product দ্রুত ship করতে পারব। এজন্যই এই role-টা আমার নজরে এসেছে।"
+আমি প্রতিদিন GitHub Copilot আর Claude-এর মতো AI tool ব্যবহার করি — component scaffold করা, test লেখা আর debug করার জন্য — কিন্তু PR-এ যাওয়ার আগে সবসময় output-টা security, type আর edge case-এর দিক থেকে review করি। Designer আর backend developer-দের সাথে closely কাজ করতে আমার ভালো লাগে, আর আমি এমন একটা team খুঁজছি যেখানে quality product দ্রুত ship করতে পারব। এজন্যই এই role-টা আমার নজরে এসেছে।"
 
 **কেন এটা কাজ করে:** এক মিনিটের মধ্যে JD-এর সব বড় keyword (React, Next.js, TypeScript, Figma, Tailwind, REST, state, performance, AI tool, collaboration) ছুঁয়ে যায়, আর শেষে বলে দেয় কেন আপনি job-টা চান।
 
@@ -210,9 +210,11 @@ async function fetchJson<T>(url: string): Promise<T> {
 const users = await fetchJson<User[]>('/api/users');
 ```
 
+Note: the cast is not checked at runtime — combine with Zod (see Q14).
+
 **বাংলায়:**
 
-Generics দিয়ে একটা function বা component অনেক রকম type-এর সাথে কাজ করতে পারে, আবার type-safe-ও থাকে। যেমন `fetchJson<T>` একবার লিখে `fetchJson<User[]>('/api/users')` call করলে result-এর type `User[]` হয়ে যায়। এতে প্রতিটা API-র জন্য আলাদা function লিখতে হয় না।
+Generics দিয়ে একটা function বা component অনেক রকম type-এর সাথে কাজ করতে পারে, আবার type-safe-ও থাকে। যেমন `fetchJson<T>` একবার লিখে `fetchJson<User[]>('/api/users')` call করলে result-এর type `User[]` হয়ে যায়। এতে প্রতিটা API-র জন্য আলাদা function লিখতে হয় না। তবে এটা শুধু cast, runtime-এ check হয় না — তাই Q14-এর মতো Zod দিয়ে validate করুন।
 
 ### Q13. Name utility types you use.
 
@@ -227,11 +229,11 @@ Generics দিয়ে একটা function বা component অনেক র
 
 ### Q14. How do you type API responses safely?
 
-Types vanish at runtime, so the server can still send something unexpected. Define the type and validate at the boundary with a schema library like **Zod**, then infer the type from the schema: `type User = z.infer<typeof UserSchema>`. Mentioning runtime validation is a strong signal of maturity.
+Types vanish at runtime, so the server can still send something unexpected. Define a schema with a library like **Zod**, validate at the boundary, then infer the type from it: `type User = z.infer<typeof UserSchema>`. Mentioning runtime validation is a strong signal of maturity.
 
 **বাংলায়:**
 
-Runtime-এ type থাকে না, তাই server অপ্রত্যাশিত কিছু পাঠাতেই পারে। এজন্য type define করার পাশাপাশি boundary-তে **Zod**-এর মতো schema library দিয়ে validate করুন। তারপর schema থেকেই type infer করুন: `type User = z.infer<typeof UserSchema>`। Interview-এ runtime validation-এর কথা বললে বোঝা যায় আপনি mature developer।
+Runtime-এ type থাকে না, তাই server অপ্রত্যাশিত কিছু পাঠাতেই পারে। এজন্য **Zod**-এর মতো library দিয়ে একটা schema define করুন, boundary-তে validate করুন, তারপর schema থেকেই type infer করুন: `type User = z.infer<typeof UserSchema>`। Interview-এ runtime validation-এর কথা বললে বোঝা যায় আপনি mature developer।
 
 ---
 
@@ -251,7 +253,7 @@ Keys tell React which item is which between renders. Using the array index break
 
 **বাংলায়:**
 
-Key দিয়ে React render-এর মাঝে বোঝে কোন item কোনটা। Array index key হলে item insert, remove বা reorder করলে React ভুল component reuse করে — input value, focus বা local state ভুল row-তে চলে যায়। তাই data থেকে একটা stable unique id ব্যবহার করুন। Index চলবে শুধু এমন static list-এ, যেটার order কখনো বদলায় না।
+Key দিয়ে React এক render থেকে আরেক render-এ বোঝে কোন item কোনটা। Array index key হলে item insert, remove বা reorder করলে React ভুল component reuse করে — input value, focus বা local state ভুল row-তে চলে যায়। তাই data থেকে একটা stable unique id ব্যবহার করুন। Index চলবে শুধু এমন static list-এ, যেটার order কখনো বদলায় না।
 
 ### Q3. What causes a component to re-render?
 
@@ -259,7 +261,7 @@ A component re-renders when (1) its own state changes, (2) its parent re-renders
 
 **বাংলায়:**
 
-Component re-render হয় চার কারণে: নিজের state change, parent re-render, consume করা context change, অথবা subscribe করা external store (`useSyncExternalStore`, যেমন Zustand/Redux) change। Parent re-render হলেও child skip করে শুধু যদি child `React.memo`-তে wrapped থাকে আর props equal হয়, বা একই element reference হয় (যেমন `children` হিসেবে পাঠানো)। Props change আলাদা কারণ না — সেটা parent re-render-এর জন্যই হয়। আর re-render মানেই DOM update না; output বদলালেই শুধু React DOM-এ হাত দেয়।
+Component re-render হয় চার কারণে: নিজের state change, parent re-render, consume করা context change, অথবা subscribe করা external store (`useSyncExternalStore`, যেমন Zustand/Redux) change। Parent re-render হলেও child-এর re-render skip হয় শুধু তখনই, যদি child `React.memo`-তে wrapped থাকে আর props equal হয়, বা একই element reference হয় (যেমন `children` হিসেবে পাঠানো)। Props change আলাদা কারণ না — সেটা parent re-render-এর জন্যই হয়। আর re-render মানেই DOM update না; output বদলালেই শুধু React DOM-এ হাত দেয়।
 
 ### Q4. Explain `useState` and why state updates look "async".
 
@@ -275,7 +277,7 @@ State update schedule আর batch হয়, তাই নতুন value প�
 
 ### Q5. Explain `useEffect` — dependencies and cleanup.
 
-**Say this:** `useEffect` synchronizes a component with something outside React (subscriptions, timers, manual DOM, analytics). It runs after paint. The dependency array controls when it re-runs, and the returned function cleans up before the next run and on unmount.
+**Say this:** `useEffect` synchronizes a component with something outside React (subscriptions, timers, manual DOM, analytics). It usually runs after the browser paints (effects caused by a click or keypress can run before paint). The dependency array controls when it re-runs, and the returned function cleans up before the next run and on unmount.
 
 ```tsx
 useEffect(() => {
@@ -295,7 +297,7 @@ useEffect(() => {
 
 **বাংলায়:**
 
-`useEffect` component-কে React-এর বাইরের জিনিসের সাথে sync রাখে — subscription, timer, manual DOM, analytics। এটা paint-এর পরে চলে। Dependency array ঠিক করে কখন আবার চলবে, আর return করা function পরের run-এর আগে ও unmount-এ cleanup করে — যেমন `AbortController` দিয়ে fetch abort করে race condition এড়ানো। Pitfall হলো missing dependency (stale data), dependency-তে object/function দিয়ে infinite loop, আর render-এ derive করা যেত এমন জিনিসে effect ব্যবহার। Real app-এ data fetching-এর জন্য raw `useEffect`-এর বদলে TanStack Query বা Server Component ভালো।
+`useEffect` component-কে React-এর বাইরের জিনিসের সাথে sync রাখে — subscription, timer, manual DOM, analytics। এটা সাধারণত paint-এর পরে চলে (click-এর মতো interaction থেকে হলে paint-এর আগেও চলতে পারে)। Dependency array ঠিক করে কখন আবার চলবে, আর return করা function পরের run-এর আগে ও unmount-এ cleanup করে — যেমন `AbortController` দিয়ে fetch abort করে race condition এড়ানো। Pitfall হলো missing dependency (stale data), dependency-তে object/function দিয়ে infinite loop, আর render-এ derive করা যেত এমন জিনিসে effect ব্যবহার। Real app-এ data fetching-এর জন্য raw `useEffect`-এর বদলে TanStack Query বা Server Component ভালো।
 
 ### Q6. Why does `useEffect` run twice in development?
 
@@ -303,7 +305,7 @@ React 18+ **Strict Mode** mounts, unmounts and re-mounts components in developme
 
 **বাংলায়:**
 
-React 18+ এর Strict Mode development-এ component mount, unmount, তারপর আবার mount করে, যাতে missing cleanup থাকা effect ধরা পড়ে। Production-এ এটা হয় না। Fix হলো সঠিক cleanup function লেখা, Strict Mode বন্ধ করা না।
+React 18+-এর Strict Mode development-এ component mount, unmount, তারপর আবার mount করে, যাতে missing cleanup থাকা effect ধরা পড়ে। Production-এ এটা হয় না। Fix হলো সঠিক cleanup function লেখা, Strict Mode বন্ধ করা না।
 
 ### Q7. `useMemo` vs `useCallback` vs `React.memo`?
 
@@ -326,7 +328,7 @@ Two things: accessing DOM nodes (focus an input, measure size, scroll) and stori
 
 **বাংলায়:**
 
-`useRef`-এর দুইটা কাজ। এক, DOM node access করা — input focus, size measure বা scroll। দুই, এমন mutable value রাখা যেটা render-এর পরেও থাকে কিন্তু বদলালে re-render হয় না, যেমন timer id বা previous value।
+`useRef`-এর দুইটা কাজ। এক, DOM node access করা — input focus, size measure বা scroll। দুই, এমন mutable value রাখা যেটা প্রতি render-এ একই থাকে কিন্তু বদলালে re-render হয় না, যেমন timer id বা previous value।
 
 ### Q9. What are custom hooks? Give an example.
 
@@ -413,11 +415,11 @@ Options, in order: restructure with composition (pass components as `children`),
 
 ### Q14. What are Error Boundaries?
 
-Components that catch render errors in their child tree and show a fallback UI instead of a blank screen. They must be class components (or use the `react-error-boundary` library). They do not catch errors in event handlers or async code. In Next.js App Router, `error.tsx` creates one per route segment; it must be a `'use client'` file, and it doesn't catch errors thrown in the same segment's `layout.tsx` (the parent's `error.tsx` does). Errors in the root layout need `app/global-error.tsx`.
+Components that catch render errors in their child tree and show a fallback UI instead of a blank screen. They must be class components (or use the `react-error-boundary` library). They do not catch errors in plain event handlers or `setTimeout`/unawaited async code (though in React 19, errors thrown in Actions/transitions and rejected `use()` promises do reach the boundary). In Next.js App Router, `error.tsx` creates one per route segment; it must be a `'use client'` file, and it doesn't catch errors thrown in the same segment's `layout.tsx` (the parent's `error.tsx` does). Errors in the root layout need `app/global-error.tsx`.
 
 **বাংলায়:**
 
-Error Boundary হলো এমন component, যেটা child tree-এর render error ধরে blank screen-এর বদলে fallback UI দেখায়। এটা class component হতে হয় (অথবা `react-error-boundary` library)। Event handler বা async code-এর error এটা ধরে না। Next.js App Router-এ `error.tsx` প্রতি route segment-এ একটা boundary বানায়; এটা `'use client'` file হতে হয়, আর একই segment-এর `layout.tsx`-এর error ধরে না (parent-এর `error.tsx` ধরে)। Root layout-এর error-এর জন্য `app/global-error.tsx` লাগে।
+Error Boundary হলো এমন component, যেটা child tree-এর render error ধরে blank screen-এর বদলে fallback UI দেখায়। এটা class component হতে হয় (অথবা `react-error-boundary` library)। সাধারণ event handler বা `setTimeout`-এর মতো async code-এর error এটা ধরে না (তবে React 19-এ Action/transition-এর error আর `use()`-এর rejected promise boundary-তে যায়)। Next.js App Router-এ `error.tsx` প্রতি route segment-এ একটা boundary বানায়; এটা `'use client'` file হতে হয়, আর একই segment-এর `layout.tsx`-এর error ধরে না (parent-এর `error.tsx` ধরে)। Root layout-এর error-এর জন্য `app/global-error.tsx` লাগে।
 
 ### Q15. What is new in React 19 that you know about?
 
@@ -447,21 +449,21 @@ Next.js হলো React-এর উপর একটা framework, যেটা se
 | Strategy | When HTML is built | Best for | App Router way |
 | --- | --- | --- | --- |
 | SSG (Static) | At build time | Marketing pages, blogs, docs | Default for routes with no dynamic data |
-| ISR (Incremental Static Regeneration) | At build, then re-built in background after N seconds | Product listings, CMS content | `export const revalidate = 60` or `fetch(url, { next: { revalidate: 60 } })` |
+| ISR (Incremental Static Regeneration) | At build; after N seconds the next request gets the stale page and triggers a background re-build | Product listings, CMS content | `export const revalidate = 60` or `fetch(url, { next: { revalidate: 60 } })` |
 | SSR (Dynamic) | On every request | Personalized pages, dashboards, auth data | Reading `searchParams`, `cookies()`, `headers()` or `connection()`, or `cache: 'no-store'` |
 | CSR (Client) | In the browser after JS loads | Highly interactive widgets behind login | `'use client'` + TanStack Query |
 
-**Strong answer:** "I pick per page — static where possible for speed and cost, ISR for content that changes occasionally, dynamic only when the data is per-user." For instant updates after a mutation, use on-demand revalidation: `revalidatePath('/products')` or `revalidateTag('products')` from a Server Action or webhook.
+**Strong answer:** "I pick per page — static where possible for speed and cost, ISR for content that changes occasionally, dynamic only when the data is per-user." For instant updates after a mutation, use on-demand revalidation: `revalidatePath('/products')` or `revalidateTag('products', 'max')` from a Server Action or webhook (Next 16 needs a cache profile as the 2nd argument; inside a Server Action use `updateTag('products')` so the user sees their own write immediately).
 
 **Next 16 (current):** with `cacheComponents: true` in `next.config.ts`, caching is explicit — mark a component or function with `'use cache'` and control it with `cacheLife('hours')` and `cacheTag('products')`. This enables **Partial Prerendering**: a static shell is served instantly and dynamic parts stream in inside `<Suspense>`. Caching defaults changed a lot from 14 → 15 → 16 (fetch is no longer cached by default since 15), so always check the version the team uses.
 
 **বাংলায়:**
 
 - SSG: build time-এ HTML তৈরি হয়, blog বা docs-এর জন্য ভালো।
-- ISR: static, কিন্তু N সেকেন্ড পর background-এ আবার build হয়, যেমন product listing।
+- ISR: static, কিন্তু N সেকেন্ড পার হওয়ার পর প্রথম request-টা পুরনো page পায় আর background-এ নতুন build শুরু হয়, যেমন product listing।
 - SSR: প্রতি request-এ HTML তৈরি হয়, per-user dashboard-এর জন্য।
 - CSR: browser-এ JS load হওয়ার পর render হয়, login-এর পেছনের interactive widget-এর জন্য।
-- আমি page অনুযায়ী বেছে নিই। Mutation-এর পর সাথে সাথে update চাইলে `revalidatePath` বা `revalidateTag` ব্যবহার করি। Next 16-এ `'use cache'` দিয়ে caching explicit, আর version ভেদে default বদলায়, তাই team-এর version দেখে নিতে হয়।
+- আমি page অনুযায়ী বেছে নিই। Mutation-এর পর সাথে সাথে update চাইলে `revalidatePath` বা `revalidateTag('products', 'max')` ব্যবহার করি, Next 16-এ দ্বিতীয় argument হিসেবে profile লাগে। Server Action-এর ভেতরে `updateTag` দিই, যাতে user নিজের change সাথে সাথে দেখে। Next 16-এ `'use cache'` দিয়ে caching explicit, আর version ভেদে default বদলায়, তাই team-এর version দেখে নিতে হয়।
 
 ### Q3. App Router vs Pages Router?
 
@@ -489,7 +491,7 @@ export default async function ProductsPage() {
 
 **বাংলায়:**
 
-App Router-এ component default-ভাবে Server Component, এগুলো শুধু server-এ চলে আর browser-এ কোনো JavaScript পাঠায় না। State, effect, event handler বা browser API লাগলে `'use client'` দিয়ে Client Component বানাতে হয়। Best practice হলো `'use client'` tree-এর যত নিচে সম্ভব রাখা, যেমন শুধু like button-টা client। Server থেকে Client-এ পাঠানো props serializable হতে হবে, সাধারণ function বা class instance চলবে না। আর DB client বা secret ভুল করে client file-এ import হওয়া ঠেকাতে `server-only` package ব্যবহার করুন।
+App Router-এ component default-ভাবে Server Component, এগুলো শুধু server-এ চলে আর browser-এ কোনো JavaScript পাঠায় না। State, effect, event handler বা browser API লাগলে `'use client'` দিয়ে Client Component বানাতে হয়। Best practice হলো `'use client'` tree-এর যত নিচে সম্ভব রাখা, যেমন শুধু like button-টা client। Server থেকে Client-এ পাঠানো props serializable হতে হবে, সাধারণ function বা class instance চলবে না, তবে Server Function পাঠানো যায়। আর DB client বা secret ভুল করে client file-এ import হওয়া ঠেকাতে `server-only` package ব্যবহার করুন।
 
 ### Q5. What are Server Actions?
 
@@ -539,15 +541,15 @@ export async function generateMetadata(
 
 **বাংলায়:**
 
-SEO-র জন্য প্রতিটা page-এ `metadata` বা `generateMetadata()` দিয়ে title, description আর Open Graph দিই। `app/sitemap.ts` আর `app/robots.ts` দিয়ে sitemap আর robots file তৈরি হয়। Server rendering থাকায় crawler পুরো HTML পায়। এর সাথে semantic HTML, একটা `h1`, ভালো `alt` text, JSON-LD structured data আর duplicate content এড়াতে canonical URL ব্যবহার করি। Next 15 থেকে `params` একটা Promise, তাই await করতে হয়।
+SEO-র জন্য প্রতিটা page-এ `metadata` বা `generateMetadata()` দিয়ে title, description আর Open Graph দিই। `app/sitemap.ts` আর `app/robots.ts` দিয়ে sitemap আর robots file তৈরি হয়। Server rendering থাকায় crawler পুরো HTML পায়। এর সাথে semantic HTML, প্রতি page-এ একটাই `h1`, ভালো `alt` text, JSON-LD structured data আর duplicate content এড়াতে canonical URL ব্যবহার করি। Next 15 থেকে `params` একটা Promise, তাই await করতে হয়।
 
 ### Q8. What does `next/image` do?
 
-It automatically resizes, serves modern formats (WebP/AVIF), lazy-loads below-the-fold images, and needs width/height (or `fill`) to prevent layout shift (CLS) — required for remote images, inferred automatically for static imports. Mark the hero/LCP image with `preload` (Next 16; replaces the deprecated `priority`) or `fetchPriority="high"` so it loads immediately.
+It automatically resizes, serves modern formats (WebP by default, AVIF if enabled in `images.formats`), lazy-loads below-the-fold images, and needs width/height (or `fill`) to prevent layout shift (CLS) — required for remote images, inferred automatically for static imports. Mark the hero/LCP image with `preload` (Next 16; replaces the deprecated `priority`) or `fetchPriority="high"` so it loads immediately.
 
 **বাংলায়:**
 
-`next/image` image-কে automatically resize করে, WebP/AVIF format দেয় আর নিচের image lazy-load করে। Width/height (বা `fill`) দিলে layout shift (CLS) হয় না। Remote image-এ এটা দিতে হয়, static import-এ নিজে থেকেই বুঝে নেয়। Hero বা LCP image-এ `preload` (Next 16, পুরনো `priority`-র বদলে) বা `fetchPriority="high"` দিন, যাতে সাথে সাথে load হয়।
+`next/image` image-কে automatically resize করে, WebP format দেয় (config-এ চালু করলে AVIF-ও) আর নিচের image lazy-load করে। Width/height (বা `fill`) দিলে layout shift (CLS) হয় না। Remote image-এ এটা দিতে হয়, static import-এ নিজে থেকেই বুঝে নেয়। Hero বা LCP image-এ `preload` (Next 16, পুরনো `priority`-র বদলে) বা `fetchPriority="high"` দিন, যাতে সাথে সাথে load হয়।
 
 ### Q9. What does `next/font` do?
 
@@ -559,11 +561,11 @@ It self-hosts Google or local fonts at build time, removes external network requ
 
 ### Q10. How do you handle environment variables?
 
-Variables are server-only by default. Only those prefixed `NEXT_PUBLIC_` are bundled into browser code. Never put secrets in `NEXT_PUBLIC_` variables — anyone can read them in the JS bundle. They are inlined at **build time**, so changing one needs a rebuild; to ship the same Docker image to staging and prod, read the value on the server at runtime (e.g. a Server Component or route handler) and pass it down.
+Variables are server-only by default. Only those prefixed `NEXT_PUBLIC_` are bundled into browser code. Never put secrets in `NEXT_PUBLIC_` variables — anyone can read them in the JS bundle. They are inlined at **build time**, so changing one needs a rebuild; to ship the same Docker image to staging and prod, read it at request time on the server (a dynamically rendered Server Component — call `await connection()` first, or a statically prerendered page freezes the build-time value — or a route handler) and pass it down.
 
 **বাংলায়:**
 
-Environment variable default-ভাবে server-only। শুধু `NEXT_PUBLIC_` prefix দেওয়াগুলো browser bundle-এ যায়, তাই সেখানে কখনো secret রাখবেন না, JS bundle থেকে যে কেউ পড়তে পারে। এগুলো build time-এ inline হয়, তাই value বদলালে rebuild লাগে। একই Docker image staging আর prod-এ চালাতে চাইলে runtime-এ server-এ value পড়ে নিচে পাঠান।
+Environment variable default-ভাবে server-only। শুধু `NEXT_PUBLIC_` prefix দেওয়াগুলো browser bundle-এ যায়, তাই সেখানে কখনো secret রাখবেন না, JS bundle থেকে যে কেউ পড়তে পারে। এগুলো build time-এ inline হয়, তাই value বদলালে rebuild লাগে। একই Docker image staging আর prod-এ চালাতে চাইলে request time-এ server-এ value পড়ুন (dynamic Server Component-এ আগে `await connection()`, নাহলে static page-এ build-এর value আটকে যায়, বা route handler), তারপর নিচে পাঠান।
 
 ### Q11. How do you protect routes / handle auth?
 
@@ -601,7 +603,7 @@ Semantic elements, `alt` on images (empty `alt=""` for decorative), labels tied 
 
 - Semantic element, image-এ `alt` (decorative হলে `alt=""`), input-এর সাথে label।
 - Visible focus state (`focus-visible:`), normal text-এ কমপক্ষে 4.5:1 আর বড় text ও icon-এ 3:1 contrast।
-- Target WCAG 2.2 AA, এতে 24×24px minimum target size আর sticky header-এ focus ঢাকা না পড়ার নিয়মও আছে।
+- লক্ষ্য WCAG 2.2 AA, এতে 24×24px minimum target size আর sticky header-এর নিচে focus ঢাকা না পড়ার নিয়মও আছে।
 - Keyboard navigation, modal-এ focus trap, আর native element না চললে তবেই ARIA।
 - Lighthouse, axe DevTools আর Tab চেপে page ঘুরে test করি।
 
@@ -727,8 +729,8 @@ export class ApiError extends Error {
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
-  if (init?.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json'); // FormData sets its own boundary
+  if (typeof init?.body === 'string' && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json'); // only JSON strings; FormData/Blob/URLSearchParams set their own
   }
   const res = await fetch(`${BASE}${path}`, { ...init, headers, credentials: 'include' });
   if (!res.ok) throw new ApiError(res.status, await res.text());
@@ -745,7 +747,7 @@ Benefits: one place for base URL, auth headers, error handling, token refresh an
 
 **বাংলায়:**
 
-Component-এর ভেতরে সরাসরি `fetch` না করে একটা আলাদা API layer-এ সব call রাখি। এতে base URL, auth header, error handling, token refresh আর typing এক জায়গায় থাকে। উদাহরণের `api()` function error হলে `ApiError` throw করে, `204`-এ body parse করে না, আর FormData-তে `Content-Type` নিজে set করে না। Axios হলে একই কাজ interceptor দিয়ে করা যায়।
+Component-এর ভেতরে সরাসরি `fetch` না করে একটা আলাদা API layer-এ সব call রাখি। এতে base URL, auth header, error handling, token refresh আর typing এক জায়গায় থাকে। উদাহরণের `api()` function error হলে `ApiError` throw করে, `204`-এ body parse করে না, আর শুধু JSON string body-তে `Content-Type` set করে, FormData বা Blob-এ করে না। Axios হলে একই কাজ interceptor দিয়ে করা যায়।
 
 ### Q3. How do you handle loading, error and empty states?
 
@@ -753,7 +755,7 @@ Every data-driven component has four states: loading (skeleton, not just a spinn
 
 **বাংলায়:**
 
-Data-নির্ভর প্রতিটা component-এর চারটা state থাকে: loading, error, empty আর success। Loading-এ শুধু spinner না, skeleton দেখাই যাতে layout shift না হয়। Error-এ friendly message আর retry button দিই। Empty state প্রায়ই ভুলে যাওয়া হয়, তাই এখানে helpful message আর call to action দিলে interviewer খুশি হন।
+Data-নির্ভর প্রতিটা component-এর চারটা state থাকে: loading, error, empty আর success। Loading-এ শুধু spinner না, skeleton দেখাই যাতে layout shift না হয়। Error-এ friendly message আর retry button দিই। Empty-তে helpful message আর call to action দিই। Empty state অনেকেই ভুলে যায়, তাই এটা mention করলে interviewer খুশি হন।
 
 ### Q4. What is CORS?
 
@@ -840,15 +842,19 @@ export const useCart = create<CartState>()((set) => ({
   remove: (id) => set((s) => ({ items: s.items.filter((i) => i.id !== id) })),
 }));
 
-// Select only what you need to avoid extra re-renders
-const count = useCart((s) => s.items.length);
-// Returning an object? Use useShallow so v5 doesn't loop
-const { add, remove } = useCart(useShallow((s) => ({ add: s.add, remove: s.remove })));
+// Hooks must be called inside a component
+export function CartBadge() {
+  // Select only what you need to avoid extra re-renders
+  const count = useCart((s) => s.items.length);
+  // Returning an object? Use useShallow so v5 doesn't loop
+  const { add, remove } = useCart(useShallow((s) => ({ add: s.add, remove: s.remove })));
+  return { count, add, remove }; // render your UI here
+}
 ```
 
 **বাংলায়:**
 
-- Redux Toolkit: structured (slice, action, reducer), time-travel সহ চমৎকার DevTools, বড় team আর complex logic-এর জন্য ভালো। RTK Query সাথেই আছে, কিন্তু boilerplate বেশি।
+- Redux Toolkit: structured (slice, action, reducer), time-travel সহ চমৎকার DevTools, বড় team আর complex logic-এর জন্য ভালো। RTK Query সাথেই আছে। তবে Zustand-এর তুলনায় boilerplate বেশি।
 - Zustand: ছোট, boilerplate কম, provider লাগে না, component শুধু নিজের slice বদলালে re-render হয়। ছোট-মাঝারি app-এর জন্য দারুণ।
 - Next.js App Router-এ module-level store সব server request-এ share হয়, ফলে এক user-এর data আরেকজনের render-এ leak করতে পারে। তাই context provider-এর ভেতরে per request store বানাতে হয়।
 - Zustand v5-এ selector যদি নতুন object/array return করে, `useShallow` দিয়ে wrap করতে হয়, নাহলে infinite re-render loop হয়।
@@ -863,7 +869,7 @@ UI একটা action dispatch করে। Reducer, যেটা pure function
 
 ### Q11. How would you implement search with an API?
 
-Debounce the input (300ms), put the term in the query key, keep previous results visible while loading (`placeholderData: keepPreviousData`), cancel outdated requests (TanStack passes an `AbortSignal`, but it only cancels if you forward it: `queryFn: ({ signal }) => getUsers(page, { signal })`), and sync the term to the URL (`?q=`) so results are shareable and survive refresh. This combines several JD skills in one answer.
+Debounce the input (300ms), put the term in the query key, keep previous results visible while loading (`placeholderData: keepPreviousData`), cancel outdated requests (TanStack passes an `AbortSignal`, but it only cancels if you forward it: `queryKey: ['users', debouncedTerm], queryFn: ({ signal }) => searchUsers(debouncedTerm, { signal })`), and sync the term to the URL (`?q=`) so results are shareable and survive refresh. This combines several JD skills in one answer.
 
 **বাংলায়:**
 
@@ -889,11 +895,11 @@ Pagination SEO, নির্দিষ্ট page-এ যাওয়া আর d
 | INP (Interaction to Next Paint) | Responsiveness — delay after clicks/typing | ≤ 200 ms | Less JS, split long tasks, `useTransition`, move work off the main thread |
 | CLS (Cumulative Layout Shift) | Visual stability — content jumping | ≤ 0.1 | Set image width/height, reserve space for ads/embeds, `next/font`, skeletons |
 
-INP replaced FID (First Input Delay) as a Core Web Vital in March 2024 — mentioning this shows you're current. INP = input delay + processing time + presentation delay. Google judges CWV on **field data** (real Chrome users, CrUX) at the 75th percentile; Lighthouse is lab-only, can't measure INP and shows TBT as a proxy. Collect your own field data with the `web-vitals` library.
+INP replaced FID (First Input Delay) as a Core Web Vital in March 2024 — mentioning this shows you're current. INP = input delay + processing time + presentation delay. Google judges CWV on **field data** (real Chrome users, CrUX) at the 75th percentile; Lighthouse is lab-only; its default navigation report can't measure INP and shows TBT as a proxy (timespan mode can record INP for interactions you perform). Collect your own field data with the `web-vitals` library.
 
 **বাংলায়:**
 
-Core Web Vitals হলো Google-এর তিনটা metric: LCP (main content কত দ্রুত দেখায়, ≤ 2.5 s), INP (click/typing-এর পর UI কত দ্রুত respond করে, ≤ 200 ms) আর CLS (content কতটা লাফায়, ≤ 0.1)। March 2024-এ INP, FID-কে replace করেছে — এটা বললে বোঝা যায় আপনি updated। Google **field data** (CrUX, p75) দিয়ে বিচার করে; Lighthouse শুধু lab tool, INP মাপতে পারে না, তাই TBT দেখায়। নিজের real-user data-র জন্য `web-vitals` library ব্যবহার করুন।
+Core Web Vitals হলো Google-এর তিনটা metric: LCP (main content কত দ্রুত দেখায়, ≤ 2.5 s), INP (click/typing-এর পর UI কত দ্রুত respond করে, ≤ 200 ms) আর CLS (content কতটা লাফায়, ≤ 0.1)। March 2024-এ INP, FID-কে replace করেছে — এটা বললে বোঝা যায় আপনি updated। Google **field data** (CrUX, p75) দিয়ে বিচার করে; Lighthouse শুধু lab tool; default navigation report INP মাপতে পারে না, তাই TBT দেখায় (timespan mode-এ নিজে interact করলে INP পাওয়া যায়)। নিজের real-user data-র জন্য `web-vitals` library ব্যবহার করুন।
 
 ### Q2. How would you approach a slow page?
 
@@ -922,6 +928,7 @@ Splitting the JS bundle into chunks so users download only what the current page
 ```tsx
 'use client'; // ssr: false is only allowed in a Client Component in the App Router
 import dynamic from 'next/dynamic';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const Chart = dynamic(() => import('@/components/Chart'), {
   ssr: false,
@@ -983,7 +990,7 @@ Image optimization, font optimization, lazy-loading heavy components, avoiding l
 2. **Service worker, then cache** — if the site registered a service worker, it intercepts the request first and may answer from its own cache; otherwise the browser checks its HTTP cache. If a fresh copy exists, no network is needed.
 3. **DNS lookup** — the domain is resolved to an IP address (browser cache → OS → router → ISP/DNS resolver).
 4. **TCP connection** — a three-way handshake (SYN, SYN-ACK, ACK) with the server. HTTP/3 uses QUIC over UDP instead.
-5. **TLS handshake** — for HTTPS, the browser verifies the certificate and agrees on encryption keys.
+5. **TLS handshake** — for HTTPS, the browser verifies the certificate and agrees on encryption keys (with HTTP/3, TLS 1.3 is built into the QUIC handshake, saving a round trip).
 6. **HTTP request** — `GET /` with headers (cookies, `Accept`, `User-Agent`).
 7. **Server response** — status code, headers and the HTML body, often through a CDN.
 8. **Rendering** — the browser parses HTML, fetches CSS/JS/images, and paints the page (see B2).
@@ -994,7 +1001,7 @@ This is a classic question; a clear, ordered answer impresses more than extreme 
 
 - Browser আগে দেখে এটা URL নাকি search term; তারপর service worker বা HTTP cache-এ fresh copy থাকলে network লাগে না।
 - না থাকলে DNS lookup করে domain থেকে IP বের করে, তারপর TCP handshake (SYN, SYN-ACK, ACK) — HTTP/3 হলে QUIC over UDP।
-- HTTPS-এ TLS handshake হয়: certificate verify আর encryption key ঠিক করা।
+- HTTPS-এ TLS handshake হয়: certificate verify আর encryption key ঠিক করা (HTTP/3-এ TLS আলাদা ধাপ না, QUIC handshake-এর ভেতরেই হয়)।
 - তারপর HTTP request যায়, server (প্রায়ই CDN হয়ে) status, header আর HTML পাঠায়, আর browser সেটা parse করে render করে।
 - Interview-এ অতিরিক্ত detail-এর চেয়ে পরিষ্কার, ক্রমানুসারে বলাটাই বেশি impress করে।
 
@@ -1024,7 +1031,7 @@ Browser HTML parse করে DOM বানায়, CSS parse করে CSSOM �
 
 **বাংলায়:**
 
-Reflow (layout) হয় geometry বদলালে — width, margin, element add/remove; এটা সবচেয়ে expensive, আর এরপর paint-ও হয়। Repaint শুধু visual change, যেমন color বা background; layout লাগে না। `transform` আর `opacity` শুধু composite হয়, GPU-তে চলে, সবচেয়ে সস্তা। তাই animation-এ `top`/`left`/`width` না, `transform` আর `opacity` ব্যবহার করুন। Loop-এ layout read আর style write মিশালে layout thrashing হয় — আগে সব read, তারপর write করুন, আর `requestAnimationFrame` ব্যবহার করুন।
+Reflow (layout) হয় geometry বদলালে — width, margin, element add/remove; এটা সবচেয়ে expensive, আর এরপর paint-ও হয়। Repaint শুধু visual change, যেমন color বা background; layout লাগে না। `transform` আর `opacity` শুধু composite হয়, GPU-তে চলে, performance-এর দিক থেকে সবচেয়ে cheap। তাই animation-এ `top`/`left`/`width` না, `transform` আর `opacity` ব্যবহার করুন। Loop-এ layout read আর style write মেশালে layout thrashing হয় — আগে সব read, তারপর write করুন, আর `requestAnimationFrame` ব্যবহার করুন।
 
 ### B4. `<script>` vs `async` vs `defer`?
 
@@ -1160,11 +1167,11 @@ Web Worker background thread-এ JavaScript চালায়, ভারী ক
 
 ### B14. Why does a long JavaScript task freeze the page?
 
-The main thread handles JS, style calculation, layout, paint and user input. A task longer than **50 ms** (a "long task") blocks clicks and scrolling, which hurts INP. Fixes: split work into chunks and yield (`setTimeout`, `scheduler.yield()` where supported), move heavy work to a Web Worker, use `useTransition`/`useDeferredValue` in React for non-urgent updates, and virtualize long lists.
+The main thread handles JS, style calculation, layout, paint and user input. A task longer than **50 ms** (a "long task") blocks clicks, typing and other input handling (and scrolling only if non-passive scroll/touch listeners are attached), which hurts INP. Fixes: split work into chunks and yield (`setTimeout`, `scheduler.yield()` where supported), move heavy work to a Web Worker, use `useTransition`/`useDeferredValue` in React for non-urgent updates, and virtualize long lists.
 
 **বাংলায়:**
 
-Main thread একসাথে JS, style, layout, paint আর user input সব handle করে। 50 ms-এর বেশি লম্বা task (long task) click আর scroll আটকে দেয়, ফলে INP খারাপ হয়। সমাধান: কাজ ছোট chunk-এ ভাগ করে yield করুন (`setTimeout`, support থাকলে `scheduler.yield()`), ভারী কাজ Web Worker-এ পাঠান। React-এ non-urgent update-এর জন্য `useTransition`/`useDeferredValue` আর লম্বা list virtualize করুন।
+Main thread একসাথে JS, style, layout, paint আর user input সব handle করে। 50 ms-এর বেশি লম্বা task (long task) click আর typing আটকে দেয় (non-passive scroll/touch listener থাকলে scroll-ও), ফলে INP খারাপ হয়। সমাধান: কাজ ছোট chunk-এ ভাগ করে yield করুন (`setTimeout`, support থাকলে `scheduler.yield()`), ভারী কাজ Web Worker-এ পাঠান। React-এ non-urgent update-এর জন্য `useTransition`/`useDeferredValue` আর লম্বা list virtualize করুন।
 
 ---
 
@@ -1185,7 +1192,7 @@ Name tools and match each to a task — concrete beats generic:
 
 **বাংলায়:**
 
-Tool-এর নাম বলুন আর প্রতিটা কোন কাজে ব্যবহার করেন সেটা মিলিয়ে বলুন — generic কথার চেয়ে concrete বেশি ভালো। যেমন: Copilot autocomplete-এর জন্য, Claude Code/Cursor multi-file refactor আর test চালানোর জন্য, ChatGPT/Claude chat architecture ভাবা বা debugging-এর জন্য, v0/Figma Dev Mode UI-র first draft-এর জন্য। একটা real উদাহরণ দিন: AI দিয়ে 12টা component `useEffect` থেকে TanStack Query-তে migrate করেছেন। আর জোর দিয়ে বলুন যে প্রতিটা diff review করে দুই জায়গায় হারানো error handling ঠিক করেছেন আর test লিখেছেন।
+Tool-এর নাম বলুন আর প্রতিটা কোন কাজে ব্যবহার করেন সেটা মিলিয়ে বলুন — generic কথার চেয়ে concrete বেশি ভালো। যেমন: Copilot autocomplete-এর জন্য, Claude Code/Cursor multi-file refactor আর test চালানোর জন্য, ChatGPT/Claude chat architecture ভাবা বা debugging-এর জন্য, v0/Figma Dev Mode UI-র first draft-এর জন্য। একটা real উদাহরণ দিন: AI দিয়ে 12টা component `useEffect` থেকে TanStack Query-তে migrate করেছেন। আর জোর দিয়ে বলুন যে প্রতিটা diff review করে যে দুই জায়গায় AI error handling বাদ দিয়ে ফেলেছিল সেগুলো ঠিক করেছেন আর test লিখেছেন।
 
 ### Q2. Walk me through your AI-assisted workflow on a feature.
 
@@ -1202,7 +1209,7 @@ Tool-এর নাম বলুন আর প্রতিটা কোন কা
 - আগে নিজে task-টা বুঝি, নাহলে AI-এর output evaluate করতে পারব না।
 - Context দিই: relevant file, type, API contract, existing component, আর `CLAUDE.md` বা `.cursorrules`-এর মতো rules file।
 - বড় কাজে আগে plan চাই, plan ঠিক করি, তারপর ছোট ছোট reviewable chunk-এ code generate করাই।
-- প্রতিটা line review করি, type checker, linter, test চালাই; AI-লেখা test code ভাঙলে আসলেই fail করে কিনা দেখি।
+- প্রতিটা line review করি, type checker, linter, test চালাই; test আর docs লেখাতেও AI ব্যবহার করি, তারপর code ভাঙলে AI-লেখা test আসলেই fail করে কিনা দেখি।
 - পরিষ্কার commit message দিয়ে normal code review-তে পাঠাই — AI code-ও human code-এর মতোই scrutiny পায়।
 
 ### Q3. What is prompt engineering? How do you write a good prompt for code?
@@ -1372,13 +1379,14 @@ Same API style (`describe`, `it`, `expect`, mocks). **Vitest** is built on Vite,
 
 **বাংলায়:**
 
-মূল কথা: test যত বেশি real ব্যবহারের মতো হবে, তত বেশি confidence দেবে। তাই user যা দেখে সেই behavior test করুন, internal state বা implementation detail না। Query priority: `getByRole` সবচেয়ে ভালো (accessibility-ও verify হয়), তারপর `getByLabelText`, `getByText`, আর শেষ উপায় `getByTestId`। `getBy` না পেলে throw করে, `queryBy` null দেয় (কিছু নেই সেটা assert করতে), `findBy` async — fetch-এর পরে আসা element-এর জন্য।
+মূল কথা: test যত বেশি real ব্যবহারের মতো হবে, তত বেশি confidence দেবে। তাই user যা দেখে সেই behavior test করুন, internal state বা implementation detail না। Query priority: `getByRole` সবচেয়ে ভালো (accessibility-ও verify হয়), তারপর `getByLabelText` → `getByPlaceholderText` → `getByText`, আর শেষ উপায় `getByTestId`। `getBy` না পেলে throw করে, `queryBy` null দেয় (কিছু নেই সেটা assert করতে), `findBy` async — fetch-এর পরে আসা element-এর জন্য।
 
 ### Q4. Write a test for a Counter component.
 
 ```tsx
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { test, expect } from 'vitest'; // or globals: true; toBeInTheDocument needs '@testing-library/jest-dom/vitest' in setupFiles
 import { Counter } from './Counter';
 
 test('increments the count when the button is clicked', async () => {
@@ -1409,11 +1417,11 @@ render(<UserList />, { wrapper: QueryProvider });
 expect(await screen.findByText('Asha')).toBeInTheDocument();
 ```
 
-Also test the error path by returning a 500 and asserting the error message and retry button appear.
+Also test the error path by returning a 500 and asserting the error message and retry button appear. Create the test `QueryClient` with `defaultOptions: { queries: { retry: false } }`, otherwise the default 3 retries make `findBy*` time out before the error UI appears.
 
 **বাংলায়:**
 
-`fetch` বা API module mock না করে MSW (Mock Service Worker) দিয়ে network level-এ mock করুন। এতে component নিজের real fetching code চালায়, আর একই handler Storybook আর development-এও reuse করা যায়। Data আসার পর `findByText` দিয়ে async-ভাবে element খুঁজুন। Error path-ও test করুন: 500 return করে error message আর retry button আসছে কিনা assert করুন।
+`fetch` বা API module mock না করে MSW (Mock Service Worker) দিয়ে network level-এ mock করুন। এতে component নিজের real fetching code চালায়, আর একই handler Storybook আর development-এও reuse করা যায়। Data আসার পর `findByText` দিয়ে async-ভাবে element খুঁজুন। Error path-ও test করুন: 500 return করে error message আর retry button আসছে কিনা assert করুন। Test-এর `QueryClient`-এ `retry: false` দিন, নাহলে default 3 বার retry-র কারণে `findBy` error UI আসার আগেই timeout হয়ে যাবে।
 
 ### Q6. How do you test custom hooks?
 
@@ -1429,7 +1437,7 @@ Custom hook test করা হয় React Testing Library-র `renderHook` দ�
 
 **বাংলায়:**
 
-Test করুন user-visible behavior, conditional rendering, form validation, loading/error/empty state, edge case সহ utility function, আর E2E দিয়ে critical flow। Test করবেন না library internals (React-এর `useState` কাজ করে কিনা), CSS detail, বা refactor করলে বদলে যায় এমন implementation detail। Code coverage একটা guide, goal না — weak assertion দিয়ে 100% coverage, meaningful test দিয়ে 70%-এর চেয়েও খারাপ।
+Test করুন user-visible behavior, conditional rendering, form validation, loading/error/empty state, edge case সহ utility function, আর E2E দিয়ে critical flow। Test করবেন না library internals (React-এর `useState` কাজ করে কিনা), CSS detail, বা refactor করলে বদলে যায় এমন implementation detail। Code coverage একটা guide, goal না — weak assertion-ওয়ালা 100% coverage, meaningful test-ওয়ালা 70% coverage-এর চেয়েও খারাপ।
 
 ### Q8. What about snapshot tests?
 
@@ -1461,11 +1469,11 @@ Merge একটা merge commit দিয়ে branch মিলায় আর
 
 ### Q3. How do you resolve a merge conflict?
 
-Pull the latest `main`, run the merge or rebase, open the conflicted files, understand **both** changes (talk to the other developer if unclear), keep the correct combination, remove the conflict markers, run the app and tests, then commit. Never just pick "accept mine" without understanding the other change.
+Pull the latest `main`, run the merge or rebase, open the conflicted files, understand **both** changes (talk to the other developer if unclear), keep the correct combination, remove the conflict markers, run the app and tests, then `git add` the files and `git commit` (or `git rebase --continue` if rebasing). Never just pick "accept mine" without understanding the other change.
 
 **বাংলায়:**
 
-Latest `main` pull করে merge বা rebase চালান, তারপর conflict হওয়া file খুলুন। **দুই দিকের** change-ই বুঝুন — পরিষ্কার না হলে অন্য developer-এর সাথে কথা বলুন। সঠিক combination রেখে conflict marker মুছুন, app আর test চালিয়ে তারপর commit করুন। অন্যের change না বুঝে শুধু "accept mine" চাপবেন না।
+Latest `main` pull করে merge বা rebase চালান, তারপর conflict হওয়া file খুলুন। **দুই দিকের** change-ই বুঝুন — পরিষ্কার না হলে অন্য developer-এর সাথে কথা বলুন। সঠিক combination রেখে conflict marker মুছুন, app আর test চালিয়ে file `git add` করে commit করুন (rebase হলে `git rebase --continue`)। অন্যের change না বুঝে শুধু "accept mine" চাপবেন না।
 
 ### Q4. Which other Git commands should you know?
 
@@ -1659,13 +1667,13 @@ The **Node.js runtime** supports all Node APIs and is the default. The **Edge ru
 
 Use STAR: Situation, Task, Action (most of the answer), Result (with a number). Sample:
 
-> **S:** Users on iPhones reported the checkout button sometimes did nothing. **T:** I owned the checkout UI. **A:** I couldn't reproduce on desktop, so I used Safari remote debugging on a real device and found a hydration mismatch caused by formatting a date with the device locale during render. The mismatch broke event handlers. I moved the formatting into a client-only effect, added a test, and documented the pattern for the team. **R:** The issue disappeared and checkout completion on iOS rose about 6% the following week.
+> **S:** Users on iPhones reported the checkout button sometimes did nothing. **T:** I owned the checkout UI. **A:** I couldn't reproduce on desktop, so I used Safari remote debugging on a real device and found a hydration mismatch caused by formatting a date with the device locale during render. React threw away the server HTML and re-rendered on the client, and taps during that slow re-render on older iPhones were lost. I moved the formatting into a client-only effect, added a test, and documented the pattern for the team. **R:** The issue disappeared and checkout completion on iOS rose about 6% the following week.
 
 **বাংলায়:**
 
 STAR মানে Situation, Task, Action (উত্তরের বেশিরভাগ অংশ এখানে), আর Result (একটা number সহ)। আমি এভাবে বলব:
 
-**S:** iPhone user-রা report করছিল যে checkout button মাঝে মাঝে কিছুই করে না। **T:** Checkout UI-এর দায়িত্ব আমার ছিল। **A:** Desktop-এ আমি reproduce করতে পারছিলাম না, তাই real device-এ Safari remote debugging দিয়ে দেখলাম। দেখা গেল render-এর সময় device locale দিয়ে date format করার কারণে একটা hydration mismatch হচ্ছিল, আর সেই mismatch event handler-গুলো ভেঙে দিচ্ছিল। আমি formatting-টা একটা client-only effect-এ সরিয়ে নিলাম, একটা test যোগ করলাম, আর team-এর জন্য pattern-টা document করলাম। **R:** Issue-টা চলে গেল, আর পরের সপ্তাহে iOS-এ checkout completion প্রায় 6% বেড়ে গেল।
+**S:** iPhone user-রা report করছিল যে checkout button মাঝে মাঝে কিছুই করে না। **T:** Checkout UI-এর দায়িত্ব আমার ছিল। **A:** Desktop-এ আমি reproduce করতে পারছিলাম না, তাই real device-এ Safari remote debugging দিয়ে দেখলাম। দেখা গেল render-এর সময় device locale দিয়ে date format করার কারণে একটা hydration mismatch হচ্ছিল, আর সেই mismatch-এর কারণে React server HTML বাদ দিয়ে client-এ আবার render করছিল, আর পুরনো iPhone-এ সেই সময়ের tap-গুলো হারিয়ে যাচ্ছিল। আমি formatting-টা একটা client-only effect-এ সরিয়ে নিলাম, একটা test যোগ করলাম, আর team-এর জন্য pattern-টা document করলাম। **R:** Issue-টা চলে গেল, আর পরের সপ্তাহে iOS-এ checkout completion প্রায় 6% বেড়ে গেল।
 
 ### Q2. Tell me about a time you disagreed with a designer or backend developer.
 
@@ -1685,7 +1693,7 @@ Agree on the API contract early (OpenAPI/Swagger spec or shared TypeScript types
 
 **বাংলায়:**
 
-আমি শুরুতেই backend-এর সাথে API contract ঠিক করে নিই — OpenAPI/Swagger spec বা shared TypeScript type দিয়ে। তারপর **MSW দিয়ে mock data**-র উপর UI বানাই, আর real endpoint ready হলে সেটাতে switch করি। Contract-এ কোনো issue থাকলে, যেমন missing field, pagination format বা error shape — সেটা আমি আগেভাগেই raise করি, frontend-এ workaround করে চুপচাপ বসে থাকি না।
+আমি শুরুতেই backend-এর সাথে API contract ঠিক করে নিই — OpenAPI/Swagger spec বা shared TypeScript type দিয়ে। তারপর **MSW দিয়ে mock data**-র উপর UI বানাই, আর real endpoint ready হলে সেটাতে switch করি। Contract-এ কোনো issue থাকলে, যেমন missing field, pagination format বা error shape — সেটা আমি আগেভাগেই raise করি, চুপচাপ frontend-এ workaround দিয়ে চালিয়ে দিই না।
 
 ### Q4. How do you work with QA?
 
@@ -1701,7 +1709,7 @@ Show ownership: you noticed early, communicated to the lead/PM with a revised es
 
 **বাংলায়:**
 
-এখানে ownership দেখাতে হবে। যেমন বলব: আমি আগেভাগেই বুঝতে পেরেছিলাম যে task-টা সময়মতো শেষ হবে না, তাই lead/PM-কে একটা revised estimate দিলাম, সাথে কিছু option — scope কমানো বা phase-এ ship করা। আর এখান থেকে আমি শিখেছি, এখন আমি task-গুলো ছোট ছোট ভাগে ভাগ করি আর standup-এ risk থাকলে আগেই flag করি। কখনো অন্য কাউকে blame করব না।
+এখানে ownership দেখাতে হবে। যেমন বলব: আমি আগেভাগেই বুঝতে পেরেছিলাম যে task-টা সময়মতো শেষ হবে না, তাই lead/PM-কে একটা revised estimate দিলাম, সাথে কিছু option — scope কমানো বা phase-এ ship করা। আর এখান থেকে আমি শিখেছি, এখন আমি task-গুলো ছোট ছোট ভাগে ভাগ করি আর standup-এ risk থাকলে আগেই flag করি। আর মনে রাখবেন, কখনো অন্য কাউকে blame করবেন না।
 
 ### Q6. Tell me about a project you're proud of.
 
@@ -1709,7 +1717,7 @@ Pick one that hits the JD: Next.js + TypeScript, reusable components, API integr
 
 **বাংলায়:**
 
-এমন একটা project বেছে নিন যেটা JD-এর সাথে মেলে: Next.js + TypeScript, reusable component, API integration, আর measurable performance বা business result। আমি বলব problem-টা কী ছিল, আমি কোন architecture choice নিয়েছি আর **কেন** নিয়েছি, কোন challenge এসেছিল, আর result কী হলো। গভীরে যাওয়ার জন্য প্রস্তুত থাকুন — interviewer প্রায়ই folder structure, state management choice আর এখন হলে কী অন্যভাবে করতেন, এসব নিয়ে follow-up করেন।
+এমন একটা project বেছে নিন যেটা JD-এর সাথে মেলে: Next.js + TypeScript, reusable component, API integration, আর measurable performance বা business result। বলুন problem-টা কী ছিল, কোন architecture choice নিয়েছেন আর **কেন** নিয়েছেন, কোন challenge এসেছিল, আর result কী হলো। গভীরে যাওয়ার জন্য প্রস্তুত থাকুন — interviewer প্রায়ই folder structure, state management choice আর এখন হলে কী অন্যভাবে করতেন, এসব নিয়ে follow-up করেন।
 
 ### Q7. How do you keep up with frontend changes?
 
@@ -1733,7 +1741,7 @@ Research the company's product beforehand. Connect three things: their product o
 
 **বাংলায়:**
 
-আগে থেকেই company-র product নিয়ে research করে যান। তারপর তিনটা জিনিস connect করে বলুন: তাদের product বা mission, তাদের tech stack (React/Next.js/TypeScript — যেটা আমার strength), আর AI-assisted development-এ তাদের জোর — আমি already এভাবে কাজ করি, আর এমন একটা team চাই যারা এটা embrace করে।
+আগে থেকেই company-র product নিয়ে research করে যান। তারপর তিনটা জিনিস connect করে বলুন: তাদের product বা mission, তাদের tech stack (React/Next.js/TypeScript — যেটা আপনার strength), আর AI-assisted development-এ তাদের জোর — আপনি already এভাবে কাজ করেন, আর এমন একটা team চান যারা এটা embrace করে।
 
 ### Q10. What is your biggest weakness?
 
@@ -1789,7 +1797,7 @@ NaN === NaN;        // ?
 0.1 + 0.2 === 0.3;  // ?
 ```
 
-**Answer:** `"object"` (a famous historical bug in JavaScript), `"number"`, `false` (NaN is the only value not equal to itself — use `Number.isNaN()`), and `false` (floating-point rounding gives `0.30000000000000004`). For money, store integers like cents. For other floats, compare with a tolerance — `Number.EPSILON` alone only works for values near 1, so use a relative one: `Math.abs(a - b) < Number.EPSILON * Math.max(Math.abs(a), Math.abs(b))`.
+**Answer:** `"object"` (a famous historical bug in JavaScript), `"number"`, `false` (NaN is the only value not equal to itself — use `Number.isNaN()`), and `false` (floating-point rounding gives `0.30000000000000004`). For money, store integers like cents. For other floats, compare with a tolerance — `Number.EPSILON` alone only works for values near 1, so use a relative one: `Math.abs(a - b) <= Number.EPSILON * Math.max(Math.abs(a), Math.abs(b))`.
 
 **বাংলায়:**
 
@@ -2048,11 +2056,11 @@ Component-কে একটা `key` দিন: `<ProfileForm key={userId} user={
 2. "Two stacked paragraphs each have `margin: 20px`. Why is the gap 20px, not 40px?"
 3. "Center a div horizontally and vertically in one line of Tailwind."
 
-**Answer:** (1) `z-index` only works on positioned elements (or flex/grid children), and it only competes **within the same stacking context**. A parent with `transform`, `opacity < 1`, `filter` or its own `z-index` creates a new context, trapping the child beneath elements outside it. (2) **Margin collapsing** — vertical margins between block elements merge into the larger one. It doesn't happen in flex or grid containers, which is another reason to use `gap`. (3) `grid place-items-center` (or `flex items-center justify-center`) on the parent, with a height.
+**Answer:** (1) `z-index` only works on positioned elements (or flex/grid children), and it only competes **within the same stacking context**. A parent with `transform`, `opacity < 1`, `filter`, `position: fixed/sticky`, `isolation: isolate`, or (when positioned or a flex/grid child) its own `z-index` creates a new context, trapping the child beneath elements outside it. (2) **Margin collapsing** — vertical margins between block elements merge into the larger one. It doesn't happen in flex or grid containers, which is another reason to use `gap`. (3) `grid place-items-center` (or `flex items-center justify-center`) on the parent, with a height.
 
 **বাংলায়:**
 
-- (1) `z-index` শুধু positioned element (বা flex/grid child)-এ কাজ করে, আর শুধু **একই stacking context**-এর ভেতরে compete করে। Parent-এ `transform`, `opacity < 1`, `filter` বা নিজের `z-index` থাকলে নতুন context তৈরি হয়, আর child বাইরের element-এর নিচে আটকে যায়।
+- (1) `z-index` শুধু positioned element (বা flex/grid child)-এ কাজ করে, আর শুধু **একই stacking context**-এর ভেতরে compete করে। Parent-এ `transform`, `opacity < 1`, `filter`, `position: fixed/sticky`, `isolation: isolate`, বা (positioned অথবা flex/grid child হলে) নিজের `z-index` থাকলে নতুন context তৈরি হয়, আর child বাইরের element-এর নিচে আটকে যায়।
 - (2) এটা **margin collapsing** — block element-এর মধ্যে vertical margin merge হয়ে বড়টা থাকে। Flex বা grid container-এ এটা হয় না, এটাও `gap` ব্যবহারের আরেকটা কারণ।
 - (3) Parent-এ `grid place-items-center` (বা `flex items-center justify-center`), সাথে একটা height।
 
@@ -2070,17 +2078,19 @@ const handleClick = useCallback(() => setOpen(true), []);
 
 দুটো memoization-ই যতটা save করে তার চেয়ে বেশি খরচ করে। দুটো number যোগ করা `useMemo`-এর bookkeeping-এর চেয়ে সস্তা। আর `useCallback` তখনই কাজে আসে যখন function-টা memoized child-এ বা dependency array-তে যায়, plain `<button>`-এ না। এটা "দেখতে smart, কিন্তু শুধু noise বাড়ায়"-এর ভালো উদাহরণ — optimize করার আগে Profiler দিয়ে measure করুন।
 
+---
+
 ## 13. Toffee & streaming (OTT) frontend
 
 ### Q1. What is Toffee, and why do you want to work on it?
 
-> "Toffee is Banglalink's streaming platform — live TV channels, live sports like cricket and football, dramas, movies and its own originals — on web, Android, iOS and TV. The web app is built with Next.js. What excites me is that streaming is one of the hardest frontend problems: video has to start fast and keep playing on cheap phones and slow mobile data, while millions of people open the same match at the same second. I want to work on a product where frontend performance is directly visible to users — every second of buffering is someone closing the app."
+> "Toffee is Banglalink's streaming platform — when I used it I saw live TV channels, live sports, dramas and movies, on the web and in the mobile app. The web app is built with Next.js. What excites me is that streaming is one of the hardest frontend problems: video has to start fast and keep playing on cheap phones and slow mobile data, while a huge number of people open the same match at the same moment. I want to work on a product where frontend performance is directly visible to users — every second of buffering is someone closing the app."
 
 **Why this works:** it shows you looked at the product (live sports, Next.js, multi-platform), names the real engineering challenge (scale + weak devices + weak networks), and connects it to user impact. Before the interview, actually use the site and app for a few minutes and mention one concrete thing you noticed.
 
 **বাংলায়:**
 
-"Toffee হলো Banglalink-এর streaming platform — live TV channel, cricket আর football-এর মতো live sports, drama, movie আর ওদের নিজেদের originals — web, Android, iOS আর TV-তে চলে। Web app-টা Next.js দিয়ে বানানো। আমাকে যেটা সবচেয়ে বেশি excite করে, সেটা হলো streaming frontend-এর সবচেয়ে কঠিন problem-গুলোর একটা: সস্তা phone আর slow mobile data-তেও video দ্রুত start হতে হবে আর থেমে না গিয়ে চলতে হবে, অথচ একই সেকেন্ডে লাখ লাখ মানুষ একই match খুলছে। আমি এমন একটা product-এ কাজ করতে চাই যেখানে frontend performance user সরাসরি দেখতে পায় — buffering-এর প্রতিটা সেকেন্ড মানে কেউ একজন app বন্ধ করে দিচ্ছে।"
+"Toffee হলো Banglalink-এর streaming platform — আমি ব্যবহার করে দেখেছি live TV channel, live sports, drama আর movie, web-এ আর mobile app-এ। Web app-টা Next.js দিয়ে বানানো। আমাকে যেটা সবচেয়ে বেশি excite করে, সেটা হলো streaming frontend-এর সবচেয়ে কঠিন problem-গুলোর একটা: সস্তা phone আর slow mobile data-তেও video দ্রুত start হতে হবে আর থেমে না গিয়ে চলতে হবে, অথচ একই মুহূর্তে বিপুল সংখ্যক মানুষ একই match খুলছে। আমি এমন একটা product-এ কাজ করতে চাই যেখানে frontend performance user সরাসরি দেখতে পায় — buffering-এর প্রতিটা সেকেন্ড মানে কেউ একজন app বন্ধ করে দিচ্ছে।"
 
 **কেন এটা কাজ করে:** এতে বোঝা যায় আপনি product-টা সত্যিই দেখেছেন (live sports, Next.js, multi-platform), আসল engineering challenge-টা ধরতে পেরেছেন (scale + দুর্বল device + দুর্বল network), আর সেটাকে user impact-এর সাথে connect করেছেন। Interview-এর আগে কয়েক মিনিট নিজে site আর app ব্যবহার করুন, আর নিজের চোখে খেয়াল করা একটা concrete জিনিস উল্লেখ করুন।
 
@@ -2109,7 +2119,7 @@ The **manifest** is the table of contents. In HLS there is a **master playlist**
 
 **বাংলায়:**
 
-HLS Apple-এর বানানো, manifest হলো `.m3u8` playlist, আর Safari ও Android Chrome-এ native চলে; DASH হলো MPEG standard, manifest `.mpd` XML, browser-এ চালাতে JS player লাগে। Manifest হলো table of contents — HLS-এ master playlist-এ সব quality থাকে, আর প্রতিটা quality-র media playlist-এ তার segment-গুলো; live-এ player বারবার playlist re-fetch করে নতুন segment খোঁজে। আগে segment ছিল `.ts`, এখন CMAF (fragmented MP4) দিয়ে একই segment HLS আর DASH দুটোতেই চলে, ফলে storage আর CDN cache অর্ধেক লাগে। DRM থাকলে এটা কাজ করে শুধু `cbcs` scheme-এ encrypt করলে; legacy device শুধু `cenc` বুঝলে দুইবার package করতে হয়।
+HLS Apple-এর বানানো, manifest হলো `.m3u8` playlist, আর Safari ও Android Chrome-এ native চলে (desktop Chrome-এ সম্প্রতি আসছে); DASH হলো MPEG standard, manifest `.mpd` XML, browser-এ চালাতে JS player লাগে। Manifest হলো table of contents — HLS-এ master playlist-এ সব quality থাকে, আর প্রতিটা quality-র media playlist-এ তার segment-গুলো; live-এ player বারবার playlist re-fetch করে নতুন segment খোঁজে। আগে segment ছিল `.ts`, এখন CMAF (fragmented MP4) দিয়ে একই segment HLS আর DASH দুটোতেই চলে, ফলে storage আর CDN cache অর্ধেক লাগে। DRM থাকলে এটা কাজ করে শুধু `cbcs` scheme-এ encrypt করলে; legacy device শুধু `cenc` বুঝলে দুইবার package করতে হয়।
 
 ### Q4. How does adaptive bitrate (ABR) decide which quality to play?
 
@@ -2117,25 +2127,25 @@ The player measures how fast the last segments downloaded and how many seconds o
 
 - **Throughput-based:** "the last segments came at 3 Mbps, so pick the highest rendition safely below that."
 - **Buffer-based (e.g. BOLA):** "the buffer is healthy, I can afford higher quality; the buffer is draining, drop down now."
-- Real players (hls.js, Shaka, dash.js) combine both and avoid switching up and down too often, because flickering quality looks worse than steady medium quality.
+- Real players are mostly throughput-based with buffer safeguards (hls.js, Shaka); dash.js switches between throughput and BOLA. All of them avoid switching up and down too often, because flickering quality looks worse than steady medium quality.
 
 Frontend levers: the **start quality** (start low for a fast first frame, then climb), capping quality to the player's size (no 1080p in a 360px-wide mini player — hls.js `capLevelToPlayerSize`), and a user-facing quality menu or data-saver mode.
 
 **বাংলায়:**
 
-ABR হলো player-এর logic, যেটা শেষ segment-গুলো কত দ্রুত download হলো আর কত সেকেন্ড buffer আছে দেখে পরের segment-এর quality ঠিক করে। Throughput-based ABR speed দেখে, আর buffer-based (যেমন BOLA) buffer ভরা নাকি খালি হচ্ছে সেটা দেখে; hls.js, Shaka, dash.js দুটো মিলিয়ে ব্যবহার করে আর বারবার quality ওঠানামা এড়ায়, কারণ flicker করা quality স্থির medium quality-র চেয়ে খারাপ লাগে। Frontend-এ আমরা start quality low রাখতে পারি যাতে first frame দ্রুত আসে, player size অনুযায়ী quality cap করতে পারি (hls.js `capLevelToPlayerSize`), আর quality menu বা data-saver mode দিতে পারি।
+ABR হলো player-এর logic, যেটা শেষ segment-গুলো কত দ্রুত download হলো আর কত সেকেন্ড buffer আছে দেখে পরের segment-এর quality ঠিক করে। Throughput-based ABR speed দেখে, আর buffer-based (যেমন BOLA) buffer ভরা নাকি খালি হচ্ছে সেটা দেখে; hls.js আর Shaka মূলত throughput-based (সাথে buffer safeguard), আর dash.js throughput আর BOLA-র মধ্যে switch করে; সবাই বারবার quality ওঠানামা এড়ায়, কারণ flicker করা quality স্থির medium quality-র চেয়ে খারাপ লাগে। Frontend-এ আমরা start quality low রাখতে পারি যাতে first frame দ্রুত আসে, player size অনুযায়ী quality cap করতে পারি (hls.js `capLevelToPlayerSize`), আর quality menu বা data-saver mode দিতে পারি।
 
 ### Q5. How does a browser play HLS if only Safari supports it natively?
 
 Through **Media Source Extensions (MSE)**. A JavaScript player such as hls.js, Shaka Player or dash.js downloads the manifest and segments itself, then feeds the bytes into a `MediaSource` attached to a normal `<video>` element. The browser just decodes what it's given; the JS library does all the streaming logic (ABR, retries, live playlist refresh).
 
-Safari on macOS and iOS (and Chrome on Android) can play an `.m3u8` URL directly with `video.src = url`. Historically iPhone Safari had no MSE at all, so native HLS was the only option. Since iOS 17.1 Safari has **`ManagedMediaSource`** (MMS), and hls.js 1.5+ uses it, so `Hls.isSupported()` is true on modern iPhones too. MMS needs `video.disableRemotePlayback = true` (or an AirPlay alternative source), otherwise playback may not start.
+Safari on macOS and iOS (and Chrome on Android) can play an `.m3u8` URL directly with `video.src = url`. Historically iPhone Safari had no MSE at all, so native HLS was the only option. Since iOS 17.1 Safari has **`ManagedMediaSource`** (MMS), and hls.js 1.5+ uses it, so `Hls.isSupported()` is true on modern iPhones too. With MMS, `disableRemotePlayback` must be true or an AirPlay alternative `<source>` must exist — hls.js sets this itself; you only handle it in custom MSE code or to keep AirPlay working.
 
 Many teams still keep **two code paths** — hls.js for most browsers and native HLS on Safari — mainly because FairPlay DRM, AirPlay and battery use are simplest with Apple's native player. That's why some bugs appear "only on iPhone".
 
 **বাংলায়:**
 
-বেশিরভাগ browser-এ HLS চলে Media Source Extensions (MSE) দিয়ে: hls.js, Shaka বা dash.js নিজেই manifest আর segment download করে `MediaSource`-এ bytes ঢুকিয়ে দেয়, browser শুধু decode করে। Safari (macOS, iOS) আর Android Chrome-এ `video.src = url` দিয়ে সরাসরি `.m3u8` চালানো যায়। আগে iPhone Safari-তে MSE ছিলই না, কিন্তু iOS 17.1 থেকে `ManagedMediaSource` আছে আর hls.js 1.5+ সেটা ব্যবহার করে; তবে এর জন্য `video.disableRemotePlayback = true` (বা AirPlay alternative source) লাগে। তবু অনেক team দুইটা code path রাখে, কারণ FairPlay DRM, AirPlay আর battery Apple-এর native player-এ সবচেয়ে সহজ — এজন্যই কিছু bug "শুধু iPhone-এ" দেখা যায়।
+বেশিরভাগ browser-এ HLS চলে Media Source Extensions (MSE) দিয়ে: hls.js, Shaka বা dash.js নিজেই manifest আর segment download করে `MediaSource`-এ bytes ঢুকিয়ে দেয়, browser শুধু decode করে। Safari (macOS, iOS) আর Android Chrome-এ `video.src = url` দিয়ে সরাসরি `.m3u8` চালানো যায়। আগে iPhone Safari-তে MSE ছিলই না, কিন্তু iOS 17.1 থেকে `ManagedMediaSource` আছে আর hls.js 1.5+ সেটা ব্যবহার করে; MMS-এ `disableRemotePlayback` true থাকতে হয় বা AirPlay alternative `<source>` লাগে — hls.js এটা নিজেই set করে, শুধু নিজের MSE code লিখলে বা AirPlay চালু রাখতে চাইলে আপনাকে handle করতে হবে। তবু অনেক team দুইটা code path রাখে, কারণ FairPlay DRM, AirPlay আর battery Apple-এর native player-এ সবচেয়ে সহজ — এজন্যই কিছু bug "শুধু iPhone-এ" দেখা যায়।
 
 ### Q6. Build a simple HLS video player component for a Next.js app.
 
@@ -2160,17 +2170,20 @@ export function VideoPlayer({ src }: { src: string }) {
 
       if (Hls.isSupported()) {
         const hls = new Hls({ capLevelToPlayerSize: true });
-        let attempts = 0;
+        let netRetries = 0;
+        let mediaRetries = 0;
+        // playback is healthy again: give the next failure a fresh budget
+        hls.on(Hls.Events.FRAG_BUFFERED, () => { netRetries = 0; mediaRetries = 0; });
         hls.on(Hls.Events.ERROR, (_, data) => {
           if (!data.fatal) return; // hls.js retries non-fatal errors itself
-          attempts += 1;
-          if (attempts <= 3 && data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && ++netRetries <= 3) {
             hls.startLoad();
-          } else if (attempts <= 3 && data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-            if (attempts > 1) hls.swapAudioCodec(); // repeated media error
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR && ++mediaRetries <= 3) {
+            if (mediaRetries > 1) hls.swapAudioCodec(); // repeated media error
             hls.recoverMediaError();
           } else {
             hls.destroy();
+            destroy = () => {}; // already torn down, make cleanup a no-op
             setError('Playback failed. Please try again.');
           }
         });
@@ -2178,8 +2191,14 @@ export function VideoPlayer({ src }: { src: string }) {
         hls.attachMedia(video);
         destroy = () => hls.destroy();
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        const onErr = () => setError('Playback failed. Please try again.');
+        video.addEventListener('error', onErr);
         video.src = src; // native HLS (older iOS Safari)
-        destroy = () => { video.removeAttribute('src'); video.load(); };
+        destroy = () => {
+          video.removeEventListener('error', onErr);
+          video.removeAttribute('src');
+          video.load();
+        };
       } else {
         setError('Your browser cannot play this stream.');
       }
@@ -2201,11 +2220,11 @@ export function VideoPlayer({ src }: { src: string }) {
 }
 ```
 
-**Points to say out loud:** it must be a Client Component (it touches the browser and the video element); hls.js is imported **inside the effect**, so it never runs during SSR and lives in its own chunk; check `Hls.isSupported()` first, because `canPlayType` also returns a value in browsers like Chrome on Android, and it is not a "Safari check"; fatal errors get a few recovery attempts (`swapAudioCodec()` then `recoverMediaError()` on a repeated media error), then the user sees a message instead of a dead black box; the **cleanup** sets `cancelled` and destroys the player so switching channels doesn't leave the old stream downloading in the background; `aspect-video` reserves space so there's no layout shift; `playsInline` stops iPhone from forcing fullscreen. To keep the whole component out of the home page bundle, load it from a Client Component with `dynamic(() => import('./VideoPlayer').then(m => m.VideoPlayer), { ssr: false })` — `.then` is needed because `VideoPlayer` is a named export.
+**Points to say out loud:** it must be a Client Component (it touches the browser and the video element); hls.js is imported **inside the effect**, so it never runs during SSR and lives in its own chunk; check `Hls.isSupported()` first, because `canPlayType` also returns a value in browsers like Chrome on Android, and it is not a "Safari check"; fatal errors get a few recovery attempts, counted separately for network and media errors and reset once a fragment buffers again, so a long live match doesn't run out of retries (`swapAudioCodec()` then `recoverMediaError()` on a repeated media error); after that the player is destroyed once (cleanup becomes a no-op, so no double destroy) and the user sees a message instead of a dead black box — the native-HLS path listens for the video `error` event for the same reason; the **cleanup** sets `cancelled`, removes listeners and destroys the player so switching channels doesn't leave the old stream downloading in the background; `aspect-video` reserves space so there's no layout shift; `playsInline` stops iPhone from forcing fullscreen. To keep the whole component out of the home page bundle, load it from a Client Component with `dynamic(() => import('./VideoPlayer').then(m => m.VideoPlayer), { ssr: false })` — `.then` is needed because `VideoPlayer` is a named export.
 
 **বাংলায়:**
 
-এটা একটা Client Component, কারণ browser আর video element লাগে; hls.js effect-এর ভেতরে dynamic import করা হয়, তাই SSR-এ চলে না আর আলাদা chunk-এ থাকে। আগে `Hls.isSupported()` check করা হয়, কারণ `canPlayType` Android Chrome-এও value দেয় — এটা "Safari check" না। Fatal error হলে কয়েকবার recovery চেষ্টা হয় (repeated media error-এ `swapAudioCodec()` তারপর `recoverMediaError()`), তারপর user একটা message দেখে, কালো box না। Cleanup-এ `cancelled` set করে player destroy করা হয়, যাতে channel বদলালে পুরনো stream background-এ download না হয়; `aspect-video` layout shift আটকায় আর `playsInline` iPhone-এ জোর করে fullscreen হওয়া থামায়। Home page bundle থেকে পুরো component বাইরে রাখতে `dynamic(..., { ssr: false })` দিয়ে load করুন — named export বলে `.then` লাগে।
+এটা একটা Client Component, কারণ browser আর video element লাগে; hls.js effect-এর ভেতরে dynamic import করা হয়, তাই SSR-এ চলে না আর আলাদা chunk-এ থাকে। আগে `Hls.isSupported()` check করা হয়, কারণ `canPlayType` Android Chrome-এও value দেয় — এটা "Safari check" না। Fatal error হলে কয়েকবার recovery চেষ্টা হয় — network আর media error আলাদা গোনা হয়, আর fragment আবার buffer হলে counter reset হয়, যাতে লম্বা live match-এ retry ফুরিয়ে না যায় (repeated media error-এ `swapAudioCodec()` তারপর `recoverMediaError()`); তারপর player একবারই destroy হয় (cleanup no-op হয়ে যায়, তাই double destroy হয় না) আর user একটা message দেখে, কালো box না — native HLS path-এও একই কারণে video-র `error` event শোনা হয়। Cleanup-এ `cancelled` set করে listener সরিয়ে player destroy করা হয়, যাতে channel বদলালে পুরনো stream background-এ download না হয়; `aspect-video` layout shift আটকায় আর `playsInline` iPhone-এ জোর করে fullscreen হওয়া থামায়। Home page bundle থেকে পুরো component বাইরে রাখতে `dynamic(..., { ssr: false })` দিয়ে load করুন — named export বলে `.then` লাগে।
 
 ### Q7. Why doesn't my video autoplay?
 
@@ -2225,7 +2244,7 @@ Browser sound সহ autoplay block করে যতক্ষণ না user sit
 
 DRM encrypts the video so only an authorized player can decrypt it — required by studios and sports rights holders.
 
-Flow: segments are encrypted (usually **CENC**, common encryption) → the player reads the manifest and sees the content is protected → the browser's **EME** (Encrypted Media Extensions) API — available only on HTTPS (a secure context) — creates a key request (for FairPlay, key system `com.apple.fps`, the player must first fetch the provider's **server certificate**) → the player sends it to the **license server** with the user's auth token → the server checks entitlement and returns a license → the browser's **CDM** (content decryption module) decrypts and plays. JavaScript never sees the actual key.
+Flow: segments are encrypted with **Common Encryption (CENC, ISO 23001-7)** — usually the `cbcs` scheme today so one file works for FairPlay, Widevine and PlayReady → the player reads the manifest and sees the content is protected → the browser's **EME** (Encrypted Media Extensions) API — available only on HTTPS (a secure context) — creates a key request (for FairPlay, key system `com.apple.fps`, the player must first fetch the provider's **server certificate**) → the player sends it to the **license server** with the user's auth token → the server checks entitlement and returns a license → the browser's **CDM** (content decryption module) decrypts and plays. JavaScript never sees the actual key.
 
 | DRM | Where |
 |---|---|
@@ -2237,11 +2256,11 @@ So a real OTT web app needs **multi-DRM**. Also know: Widevine has security leve
 
 **বাংলায়:**
 
-DRM video encrypt করে রাখে যাতে শুধু authorized player decrypt করতে পারে — studio আর sports rights holder-রা এটা চায়। Flow হলো: segment encrypted (সাধারণত CENC) → player দেখে content protected → browser-এর EME API (শুধু HTTPS-এ) key request বানায় (FairPlay-তে আগে provider-এর server certificate আনতে হয়) → player সেটা user-এর auth token সহ license server-এ পাঠায় → server entitlement check করে license দেয় → browser-এর CDM decrypt করে চালায়; JavaScript আসল key কখনো দেখে না। Chrome/Firefox/Android-এ Widevine, Apple-এ FairPlay, Edge/Windows/অনেক TV-তে PlayReady, তাই real OTT app-এ multi-DRM লাগে। Desktop Chrome/Firefox সাধারণত Widevine L3 (শুধু software), তাই প্রায়ই 720p-এ cap করা হয়, আর hardware-backed Edge PlayReady SL3000 বা Safari FairPlay বেশি resolution পায়।
+DRM video encrypt করে রাখে যাতে শুধু authorized player decrypt করতে পারে — studio আর sports rights holder-রা এটা চায়। Flow হলো: segment Common Encryption (CENC) দিয়ে encrypted — এখন সাধারণত `cbcs` scheme, যাতে FairPlay, Widevine, PlayReady সবাই এক file চালাতে পারে → player দেখে content protected → browser-এর EME API (শুধু HTTPS-এ) key request বানায় (FairPlay-তে আগে provider-এর server certificate আনতে হয়) → player সেটা user-এর auth token সহ license server-এ পাঠায় → server entitlement check করে license দেয় → browser-এর CDM decrypt করে চালায়; JavaScript আসল key কখনো দেখে না। Chrome/Firefox/Android-এ Widevine, Apple-এ FairPlay, Edge/Windows/অনেক TV-তে PlayReady, তাই real OTT app-এ multi-DRM লাগে। Desktop Chrome/Firefox সাধারণত Widevine L3 (শুধু software), তাই প্রায়ই 720p-এ cap করা হয়, আর hardware-backed Edge PlayReady SL3000 বা Safari FairPlay বেশি resolution পায়।
 
 ### Q9. Toffee's site registers your device before you can watch. Why, and how would you build that on the frontend?
 
-Reasons: limit **devices per account**, limit **concurrent streams** (stop login sharing), tie DRM licenses and entitlements to a device, and detect fraud.
+Phrase it as an observation, not inside knowledge: "When I used Toffee's site I saw a device-registration step — I assume it's for..." Likely reasons: limit **devices per account**, limit **concurrent streams** (stop login sharing), tie DRM licenses and entitlements to a device, and detect fraud.
 
 Frontend side:
 
@@ -2254,7 +2273,7 @@ Frontend side:
 
 **বাংলায়:**
 
-Device register করানো হয় account-প্রতি device limit, concurrent stream limit (login sharing আটকাতে), DRM license আর entitlement device-এর সাথে বাঁধতে, আর fraud ধরতে। Frontend-এ প্রথম visit-এ একটা stable device ID (random UUID, `localStorage` বা long-lived cookie-তে) বানাই — fingerprinting না, কারণ সেটা unreliable আর privacy-র জন্য খারাপ। Login আর license request-এ ID পাঠাই, server device token দেয়; playback-এর সময় প্রতি ~30–60 সেকেন্ডে heartbeat পাঠাই, limit পার হলে player থামিয়ে পরিষ্কার message দেখাই। Failure page-এ কারণ আর retry থাকা উচিত; আর মনে রাখবেন frontend শুধু *অনুরোধ* করতে পারে, আসল enforcement API আর license server-এ।
+এটা ভেতরের তথ্য হিসেবে না, নিজের observation হিসেবে বলুন: "Toffee-র site ব্যবহার করার সময় আমি একটা device-registration step দেখেছি — আমার ধারণা এটা..." সম্ভাব্য কারণ: device register করানো হয় account-প্রতি device limit, concurrent stream limit (login sharing আটকাতে), DRM license আর entitlement device-এর সাথে বাঁধতে, আর fraud ধরতে। Frontend-এ প্রথম visit-এ একটা stable device ID (random UUID, `localStorage` বা long-lived cookie-তে) বানাই — fingerprinting না, কারণ সেটা unreliable আর privacy-র জন্য খারাপ। Login আর license request-এ ID পাঠাই, server device token দেয়; playback-এর সময় প্রতি ~30–60 সেকেন্ডে heartbeat পাঠাই, limit পার হলে player থামিয়ে পরিষ্কার message দেখাই। Failure page-এ কারণ আর retry থাকা উচিত; আর মনে রাখবেন frontend শুধু *অনুরোধ* করতে পারে, আসল enforcement API আর license server-এ।
 
 ### Q10. How do you stop people from copying the stream URL and sharing it?
 
@@ -2273,7 +2292,7 @@ Frontend responsibilities: never hard-code stream URLs in the bundle, refresh to
 
 ### Q11. Why is a live stream 20–30 seconds behind TV, and how can it be reduced?
 
-Classic HLS uses ~6-second segments and the player wants about 3 segments buffered before starting, plus encoding, packaging and CDN time — that adds up to 20–30 seconds. During a cricket match, users hear the neighbours cheer before they see the wicket.
+Classic HLS uses ~6-second segments and the player starts about 3 segments behind the live edge (Apple's recommended hold-back), plus encoding, packaging and CDN time — that adds up to 20–30 seconds. During a cricket match, users hear the neighbours cheer before they see the wicket.
 
 Ways to reduce it:
 
@@ -2285,9 +2304,9 @@ Ways to reduce it:
 
 **বাংলায়:**
 
-Classic HLS-এ ~6 সেকেন্ডের segment, player start-এর আগে প্রায় 3টা segment buffer চায়, সাথে encoding, packaging আর CDN-এর সময় — সব মিলিয়ে 20–30 সেকেন্ড latency, তাই পাশের বাসার চিৎকার আগে শোনা যায়, wicket পরে দেখা যায়। কমাতে shorter segment (2s) ব্যবহার করা যায় (বেশি request, কম efficient encoding), অথবা Low-Latency HLS / LL-DASH, যেখানে partial segment, blocking playlist reload, preload hint আর delta playlist update দিয়ে কয়েক সেকেন্ডে নামানো যায়। Player-এ target latency, পিছিয়ে পড়লে একটু দ্রুত (যেমন 1.05×) চালানো আর "Go live" button — hls.js-এ `lowLatencyMode`, `liveSyncDuration`, `maxLiveSyncPlaybackRate`; native Safari এগুলো নিজে handle করে। Trade-off হলো কম latency মানে ছোট buffer, তাই খারাপ network-এ বেশি rebuffering — mass-market mobile audience-এর জন্য একটু বেশি কিন্তু stable latency প্রায়ই ঠিক choice।
+Classic HLS-এ ~6 সেকেন্ডের segment, player live edge থেকে প্রায় 3টা segment পিছনে start করে (Apple-এর recommended hold-back), সাথে encoding, packaging আর CDN-এর সময় — সব মিলিয়ে 20–30 সেকেন্ড latency, তাই পাশের বাসার চিৎকার আগে শোনা যায়, wicket পরে দেখা যায়। কমাতে shorter segment (2s) ব্যবহার করা যায় (বেশি request, কম efficient encoding), অথবা Low-Latency HLS / LL-DASH, যেখানে partial segment, blocking playlist reload, preload hint আর delta playlist update দিয়ে কয়েক সেকেন্ডে নামানো যায়। Player-এ target latency, পিছিয়ে পড়লে একটু দ্রুত (যেমন 1.05×) চালানো আর "Go live" button — hls.js-এ `lowLatencyMode`, `liveSyncDuration`, `maxLiveSyncPlaybackRate`; native Safari এগুলো নিজে handle করে। Trade-off হলো কম latency মানে ছোট buffer, তাই খারাপ network-এ বেশি rebuffering — mass-market mobile audience-এর জন্য একটু বেশি কিন্তু stable latency প্রায়ই ঠিক choice।
 
-### Q12. A big cricket match starts and millions open Toffee at the same time. What can the frontend do?
+### Q12. A big cricket match starts and a huge number of users open Toffee at once. What can the frontend do?
 
 The CDN and backend carry most of the load, but the frontend can make it much worse or much better:
 
@@ -2325,7 +2344,7 @@ For scores alone, **CDN-cached polling or SSE** is usually the best trade-off. R
 
 ### Q14. How would you split rendering in Next.js for a streaming site like Toffee?
 
-- **Home / category pages:** server-rendered and cached (ISR with a short `revalidate`) for shared rows — Trending, Live now, Bangla dramas. Personalized rows (Continue watching, Recommended for you) load after the shell, so the main page stays cacheable. With Next.js 16 **Cache Components** (Partial Prerendering), this fits in one page: a static shell plus shared rows marked `'use cache'`, and personalized rows streamed in inside `<Suspense>`. Fetching personalized rows on the client is the fallback.
+- **Home / category pages:** server-rendered and cached (ISR with a short `revalidate`) for shared rows — Trending, Live now, Bangla dramas. Personalized rows (Continue watching, Recommended for you) load after the shell, so the main page stays cacheable. With Next.js 16 **Cache Components** (Partial Prerendering), this fits in one page: a static shell plus shared rows marked `'use cache'` with `cacheLife('minutes')` (route-level `revalidate` config doesn't apply once Cache Components is enabled), and personalized rows streamed in inside `<Suspense>`. Fetching personalized rows on the client is the fallback.
 - **Movie / show / channel detail pages:** Server Components with static generation or ISR — great for SEO and a fast first paint.
 - **Player:** Client Component, loaded lazily; it needs the browser, DRM and user auth anyway.
 - **Search:** client-side with debounce, results from an API.
@@ -2335,7 +2354,7 @@ The principle: **cache everything that's the same for all users, personalize at 
 
 **বাংলায়:**
 
-Home আর category page server-rendered আর cached (short `revalidate`-সহ ISR) — Trending, Live now-এর মতো shared row; Continue watching-এর মতো personalized row shell-এর পরে load হয়, তাই page cacheable থাকে। Next.js 16-এর Cache Components (Partial Prerendering) দিয়ে এটা এক page-এ হয়: static shell আর `'use cache'` দেওয়া shared row, personalized row `<Suspense>`-এর ভেতরে stream হয়; client-এ fetch করা হলো fallback। Detail page Server Component-এ static বা ISR (SEO আর দ্রুত first paint), player lazy Client Component, search client-side debounce দিয়ে, আর account/subscription/payment dynamic, কখনো cached না, server-এ authorization check। মূল নীতি: যা সবার জন্য একই সেটা cache করুন, personalization কিনারায় রাখুন।
+Home আর category page server-rendered আর cached (short `revalidate`-সহ ISR) — Trending, Live now-এর মতো shared row; Continue watching-এর মতো personalized row shell-এর পরে load হয়, তাই page cacheable থাকে। Next.js 16-এর Cache Components (Partial Prerendering) দিয়ে এটা এক page-এ হয়: static shell আর `cacheLife('minutes')`-সহ `'use cache'` দেওয়া shared row (Cache Components চালু থাকলে route-level `revalidate` config কাজ করে না), personalized row `<Suspense>`-এর ভেতরে stream হয়; client-এ fetch করা হলো fallback। Detail page Server Component-এ static বা ISR (SEO আর দ্রুত first paint), player lazy Client Component, search client-side debounce দিয়ে, আর account/subscription/payment dynamic, কখনো cached না, server-এ authorization check। মূল নীতি: যা সবার জন্য একই সেটা cache করুন, আর personalization শুধু আলাদা ছোট অংশে রাখুন।
 
 ### Q15. How do you do SEO for a movie or drama page?
 
@@ -2384,11 +2403,11 @@ Key metrics:
 - **Playback failures** — error rate by device, browser, network and DRM type.
 - **Average bitrate and number of quality switches.**
 
-Implementation: listen to `<video>` events (`playing`, `waiting`, `error`) and player-library events. Count rebuffering as the time from a `waiting` event after playback has started until the next `playing` — not `stalled`, which only means data stopped arriving for a moment. Batch the events, and send with `navigator.sendBeacon` so data isn't lost when the tab closes. Page analytics can go through a tag manager, but player QoE usually needs its own pipeline because event volume is high. Then segment the data: "rebuffering is 3× higher on network X" is an actionable finding. Also mention **CMCD** (Common Media Client Data): the player attaches buffer length, bitrate and a session ID to each segment request (hls.js `cmcd` config), so the CDN logs can be joined with player QoE.
+Implementation: listen to `<video>` events (`playing`, `waiting`, `error`) and player-library events. Count rebuffering as the time from a `waiting` event after playback has started (ignoring waits caused by a seek, i.e. between `seeking` and `seeked`) until the next `playing` — not `stalled`, which only means data stopped arriving for a moment. Batch the events, and send with `navigator.sendBeacon` so data isn't lost when the tab closes. Page analytics can go through a tag manager, but player QoE usually needs its own pipeline because event volume is high. Then segment the data: "rebuffering is 3× higher on network X" is an actionable finding. Also mention **CMCD** (Common Media Client Data): the player attaches buffer length, bitrate and a session ID to each segment request (hls.js `cmcd` config), so the CDN logs can be joined with player QoE.
 
 **বাংলায়:**
 
-QoE-র মূল metric হলো video start time, rebuffering ratio (buffering time ÷ watch time — user চলে যাওয়ার সাথে সবচেয়ে বেশি জড়িত), video start-এর আগে exit, device/browser/network/DRM অনুযায়ী playback failure, আর average bitrate ও quality switch-এর সংখ্যা। `<video>`-এর `playing`, `waiting`, `error` event আর player library event শুনুন; rebuffering গুনুন playback শুরুর পরের `waiting` থেকে পরের `playing` পর্যন্ত — `stalled` না, কারণ সেটা শুধু মুহূর্তের জন্য data আসা বন্ধ বোঝায়। Event batch করে `navigator.sendBeacon` দিয়ে পাঠান যাতে tab বন্ধ হলেও data না হারায়, আর player QoE-র জন্য সাধারণত আলাদা pipeline লাগে কারণ event volume অনেক বেশি। Data segment করুন ("network X-এ rebuffering 3× বেশি"), আর CMCD-র কথা বলুন — player প্রতিটা segment request-এ buffer length, bitrate আর session ID জুড়ে দেয়, তাই CDN log আর QoE join করা যায়।
+QoE-র মূল metric হলো video start time, rebuffering ratio (buffering time ÷ watch time — user চলে যাওয়ার সাথে সবচেয়ে বেশি জড়িত), video start-এর আগে exit, device/browser/network/DRM অনুযায়ী playback failure, আর average bitrate ও quality switch-এর সংখ্যা। `<video>`-এর `playing`, `waiting`, `error` event আর player library event শুনুন; rebuffering গুনুন playback শুরুর পরের `waiting` থেকে পরের `playing` পর্যন্ত (seek-এর কারণে হওয়া waiting, মানে `seeking` আর `seeked`-এর মাঝেরটা বাদ দিয়ে) — `stalled` না, কারণ সেটা শুধু মুহূর্তের জন্য data আসা বন্ধ বোঝায়। Event batch করে `navigator.sendBeacon` দিয়ে পাঠান যাতে tab বন্ধ হলেও data না হারায়, আর player QoE-র জন্য সাধারণত আলাদা pipeline লাগে কারণ event volume অনেক বেশি। Data segment করুন ("network X-এ rebuffering 3× বেশি"), আর CMCD-র কথা বলুন — player প্রতিটা segment request-এ buffer length, bitrate আর session ID জুড়ে দেয়, তাই CDN log আর QoE join করা যায়।
 
 ### Q19. How do you handle player errors well?
 
@@ -2439,6 +2458,8 @@ Entitlement server-এ ঠিক হয় — UI lock icon দেখাতে �
 
 ### Q23. Toffee uses `/en` routes. How do you handle Bangla and English?
 
+Check the live site first and say "If Toffee uses locale routes like `/en`, ..." rather than stating it as fact.
+
 - Locale in the URL (`/en/...`, `/bn/...`) via a `[locale]` segment and a library like `next-intl`; proxy (middleware before Next.js 16) redirects based on a cookie or `Accept-Language`.
 - All UI strings in translation files, never hard-coded.
 - Bangla font: load a proper Bengali font with `next/font`; conjunct letters need correct shaping, so test with real Bangla text, not lorem ipsum.
@@ -2448,7 +2469,7 @@ Entitlement server-এ ঠিক হয় — UI lock icon দেখাতে �
 
 **বাংলায়:**
 
-URL-এ locale রাখুন (`/en/...`, `/bn/...`) `[locale]` segment আর `next-intl`-এর মতো library দিয়ে; proxy (Next.js 16-এর আগে middleware) cookie বা `Accept-Language` দেখে redirect করে। সব UI string translation file-এ, hard-code না; `next/font` দিয়ে ঠিকঠাক Bengali font load করুন আর যুক্তাক্ষরের shaping আসল Bangla text দিয়ে test করুন, lorem ipsum দিয়ে না। Number আর date-এর জন্য `Intl.NumberFormat('bn-BD')` আর `Intl.DateTimeFormat` (Bangla digit), plural rule i18n library থেকে। Bangla text প্রায়ই লম্বা আর উঁচু, তাই card এমনভাবে design করুন যাতে লম্বা title-এ না ভাঙে, আর `hreflang` ও এমন language switcher দিন যেটা user-কে একই page-এ রাখে।
+আগে live site check করুন, আর fact হিসেবে না বলে বলুন "Toffee যদি `/en`-এর মতো locale route ব্যবহার করে, ..."। URL-এ locale রাখুন (`/en/...`, `/bn/...`) `[locale]` segment আর `next-intl`-এর মতো library দিয়ে; proxy (Next.js 16-এর আগে middleware) cookie বা `Accept-Language` দেখে redirect করে। সব UI string translation file-এ, hard-code না; `next/font` দিয়ে ঠিকঠাক Bengali font load করুন আর যুক্তাক্ষরের shaping আসল Bangla text দিয়ে test করুন, lorem ipsum দিয়ে না। Number আর date-এর জন্য `Intl.NumberFormat('bn-BD')` আর `Intl.DateTimeFormat` (Bangla digit), plural rule i18n library থেকে। Bangla text প্রায়ই লম্বা আর উঁচু, তাই card এমনভাবে design করুন যাতে লম্বা title-এ না ভাঙে, আর `hreflang` ও এমন language switcher দিন যেটা user-কে একই page-এ রাখে।
 
 ### Q24. How would you implement "Continue watching"?
 
@@ -2478,11 +2499,11 @@ Structure হলো requirements → components → data → performance → edg
 
 ### Q26. Trap: "The stream plays in Chrome but shows a black screen on iPhone." Where do you look?
 
-**Answer:** Likely causes, in order: (1) the code only uses hls.js/MSE and has no **native HLS fallback** for Safari; (2) DRM is Widevine-only but Apple devices need **FairPlay**; (3) `playsInline` is missing or autoplay with sound is blocked, so `play()` rejected silently; (4) the stream uses a codec or container Safari doesn't support. Debug with Safari Web Inspector on a real device — not Chrome's device emulation, which still uses Chrome's media stack.
+**Answer:** Likely causes, in order: (1) the code only uses hls.js/MSE with no **native HLS fallback** — this only breaks iOS below 17.1, since newer iPhones use ManagedMediaSource; (2) DRM is Widevine-only but Apple devices need **FairPlay**; (3) `playsInline` is missing or autoplay with sound is blocked, so `play()` rejected silently; (4) the stream uses a codec or container Safari doesn't support. Debug with Safari Web Inspector on a real device — not Chrome's device emulation, which still uses Chrome's media stack.
 
 **বাংলায়:**
 
-সম্ভাব্য কারণ ক্রমানুসারে: (1) code শুধু hls.js/MSE ব্যবহার করে, Safari-র জন্য native HLS fallback নেই; (2) DRM শুধু Widevine, কিন্তু Apple device-এ FairPlay লাগে; (3) `playsInline` নেই বা sound-সহ autoplay block হয়েছে, তাই `play()` চুপচাপ reject করেছে; (4) stream-এর codec বা container Safari support করে না। Debug করুন আসল device-এ Safari Web Inspector দিয়ে — Chrome-এর device emulation দিয়ে না, কারণ সেটা এখনো Chrome-এর media stack ব্যবহার করে।
+সম্ভাব্য কারণ ক্রমানুসারে: (1) code শুধু hls.js/MSE ব্যবহার করে, native HLS fallback নেই — এটা শুধু iOS 17.1-এর নিচে ভাঙে, কারণ নতুন iPhone ManagedMediaSource ব্যবহার করে; (2) DRM শুধু Widevine, কিন্তু Apple device-এ FairPlay লাগে; (3) `playsInline` নেই বা sound-সহ autoplay block হয়েছে, তাই `play()` চুপচাপ reject করেছে; (4) stream-এর codec বা container Safari support করে না। Debug করুন আসল device-এ Safari Web Inspector দিয়ে — Chrome-এর device emulation দিয়ে না, কারণ সেটা এখনো Chrome-এর media stack ব্যবহার করে।
 
 ### Q27. Trap: users say data usage keeps growing after they switch channels. What's the bug?
 
