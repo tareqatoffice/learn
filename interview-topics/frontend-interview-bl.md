@@ -2,7 +2,7 @@
 
 React.js · Next.js · TypeScript · Tailwind · REST APIs · State · Performance · SEO · Browser · AI-assisted development · Testing · Git · DevOps · Behavioral · Tricky questions · Streaming/OTT (Toffee)
 
-180 questions with answers, each with a short Bangla (বাংলা) explanation.
+182 questions with answers, each with a short Bangla (বাংলা) explanation.
 
 ## Contents
 
@@ -1755,6 +1755,112 @@ Pick a real, non-critical one with active improvement. Example: "I used to over-
 **বাংলায়:**
 
 একটা real কিন্তু non-critical weakness বলুন, সাথে দেখান যে আপনি সেটা নিয়ে কাজ করছেন। যেমন: "আগে আমি feedback নেওয়ার আগেই UI detail অনেক বেশি polish করতাম। এখন আমি আগেভাগে একটা preview share করি, design আর product থেকে input নিই, তারপর polish করি — এতে আমি আরো fast হয়েছি আর rework কমেছে।"
+
+### Q11. Tell me about a recent problem you faced and how you solved it (real-time chess clock).
+
+Use STAR, and keep the Action technical. Sample from a real-time chess game:
+
+> **S:** I was building a real-time online chess game where each player has a countdown clock (for example 10 minutes each). Players reported that the clocks didn't agree: the same game showed different time left on Windows, Linux and iPhone, and the gap grew as the game went on. **T:** I owned the game UI, so I had to make the clock accurate and the same on every device. **A:** My first version used `setInterval` and subtracted 1000 ms on every tick. I learned that `setInterval` only promises a *minimum* delay: a tick fires late when the main thread is busy, when the OS or browser groups timers together to save power, and in background tabs, where browsers slow timers to once a second or less and iOS can pause them completely. Because every tick subtracted a fixed second, each late tick added drift, and every OS and power mode drifted differently. I rewrote the clock with `requestAnimationFrame`: I stored the moment the turn started (`performance.now()`) and the time left at that moment, and on every frame I computed the time left from those two numbers instead of counting ticks. The frame loop repaints in step with the screen, so the display is smooth and never stale, and it only runs for the player whose turn it is. **R:** Both clocks showed the same time on Windows, Linux and iOS, drift no longer built up in long games, and the complaints stopped.
+
+```ts
+// Runs the clock of the player whose turn it is.
+// Time left comes from timestamps, so a late frame or a paused tab never adds drift.
+function runClock(msLeftAtTurnStart: number, onFrame: (msLeft: number) => void, onFlag: () => void) {
+  const turnStart = performance.now(); // monotonic: not affected by system clock changes
+  let id = 0;
+  const tick = () => {
+    const msLeft = Math.max(0, msLeftAtTurnStart - (performance.now() - turnStart));
+    onFrame(msLeft); // update the UI only when the shown value changes
+    if (msLeft === 0) onFlag();
+    else id = requestAnimationFrame(tick);
+  };
+  id = requestAnimationFrame(tick);
+  return () => cancelAnimationFrame(id); // call it when the move is made, or on unmount
+}
+```
+
+**Follow-ups to expect:**
+
+- **"Why did `requestAnimationFrame` fix it?"** Be precise: rAF alone doesn't — computing the time from timestamps does. rAF only repaints in step with the screen. Never count frames either: the frame rate can be 60, 90 or 120 Hz, and iOS drops it to 30 in Low Power Mode.
+- **"What happens in a background tab?"** rAF pauses while the tab is hidden. That's fine for the display, because the first frame after the tab comes back computes the correct time. But the client must not decide that time ran out: the server should store each move's timestamp and both players' remaining time, send them with every move, and decide when a player loses on time. The client clock is only a display that re-syncs on every move.
+- **"Why `performance.now()` and not `Date.now()`?"** `performance.now()` is monotonic; `Date.now()` jumps if the user or the OS changes the system clock.
+- **"Isn't setState 60 times a second slow?"** Only set state when the shown value changes (whole seconds, or tenths in the last 10 seconds), or write to the DOM node through a ref.
+- **"Would `setInterval` with timestamps also work?"** Yes, for accuracy. rAF is smoother when you show tenths of a second, and it does no work while the tab is hidden.
+
+**Make it yours:** use your real details — the time control, how far apart the clocks were (e.g. how many seconds after a 10-minute game) and what the server sends on each move. Only claim what you actually built.
+
+**বাংলায়:**
+
+STAR-এ বলুন, আর Action অংশটা technical রাখুন:
+
+**S:** আমি একটা real-time online chess game বানাচ্ছিলাম, যেখানে প্রত্যেক player-এর একটা countdown clock আছে (যেমন দুজনের 10 মিনিট করে)। Player-রা report করল যে clock মিলছে না — একই game Windows, Linux আর iPhone-এ আলাদা সময় দেখাচ্ছে, আর game যত এগোয় পার্থক্য তত বাড়ে। **T:** Game UI আমার দায়িত্বে ছিল, তাই clock-কে সঠিক আর সব device-এ একই রকম করতে হতো। **A:** প্রথম version-এ আমি `setInterval` দিয়ে প্রতি tick-এ 1000 ms কমাতাম। পরে বুঝলাম `setInterval` শুধু *সর্বনিম্ন* delay-এর promise দেয়: main thread busy থাকলে, power বাঁচাতে OS বা browser timer একসাথে group করলে, আর background tab-এ tick দেরিতে আসে — সেখানে timer সেকেন্ডে একবার বা তারও কম চলে, আর iOS পুরোপুরি থামিয়েও দিতে পারে। প্রতি tick-এ নির্দিষ্ট 1 সেকেন্ড কমানোয় প্রতিটা দেরি drift হিসেবে জমছিল, আর প্রতিটা OS আর power mode আলাদাভাবে drift করছিল। তাই আমি `requestAnimationFrame` দিয়ে clock নতুন করে লিখলাম: turn শুরুর মুহূর্ত (`performance.now()`) আর সেই মুহূর্তে বাকি সময় store করলাম, আর প্রতি frame-এ tick না গুনে এই দুটো থেকে বাকি সময় হিসাব করলাম। Frame loop screen-এর repaint-এর সাথে মিলে চলে, তাই display smooth থাকে আর কখনো পুরনো value দেখায় না, আর এটা শুধু যার turn তার clock-এর জন্য চলে। **R:** Windows, Linux আর iOS-এ দুটো clock একই সময় দেখাল, লম্বা game-এও drift জমল না, আর complaint বন্ধ হলো।
+
+Follow-up-এর জন্য মনে রাখুন: rAF একা সমস্যার সমাধান করে না — timestamp থেকে সময় হিসাব করাটাই আসল fix, rAF শুধু screen-এর সাথে মিলিয়ে repaint করে। Frame-ও গুনবেন না, কারণ frame rate 60, 90 বা 120 Hz হতে পারে, আর iOS Low Power Mode-এ 30-এ নেমে যায়। Background tab-এ rAF থেমে যায়, ফিরে এলে প্রথম frame-এই সঠিক সময় দেখায় — কিন্তু সময় শেষ হয়েছে কিনা সেটা client ঠিক করবে না; server প্রতিটা move-এর timestamp আর দুজনের বাকি সময় রাখবে, প্রতি move-এ পাঠাবে, আর time-out ঠিক করবে। `Date.now()` system clock বদলালে লাফ দেয়, `performance.now()` monotonic। প্রতি frame-এ setState না করে শুধু দেখানো value বদলালে update করুন, বা ref দিয়ে সরাসরি DOM-এ লিখুন। নিজের আসল detail দিয়ে বলুন (time control, clock কতটা আলাদা ছিল, server প্রতি move-এ কী পাঠায়) — যা নিজে বানিয়েছেন শুধু সেটাই claim করুন।
+
+### Q12. Tell me about a complex feature you built (an Excel-style sheet in the browser with FortuneSheet).
+
+Sample STAR answer:
+
+> **S:** Our users worked with data in Excel files — they downloaded them, edited them and uploaded them again, which was slow and caused "which version is the latest?" problems. The product needed an Excel-style sheet inside the web app: formulas, cell formatting, merged cells, multiple sheets and frozen header rows. **T:** I had to choose a library and build the feature in our React/Next.js app. **A:** I compared the options and chose **FortuneSheet** (`@fortune-sheet/react`) — MIT-licensed, React + TypeScript, with an Excel-like UI. Then I solved the integration problems: it can't render on the server, it needs a sized container, `.xlsx` files have to be converted to its JSON format, and saving on every keystroke was too much. **R:** Users edit sheets directly in the browser instead of passing files around, the server keeps one saved version, and they can still download an `.xlsx` when they need one.
+
+**Why FortuneSheet — say the trade-off:**
+
+- Data grids such as AG Grid or TanStack Table are built for lists of records, not free-form sheets with formulas and formatting.
+- Handsontable needs a paid license for commercial use.
+- Luckysheet, which FortuneSheet is based on, is no longer maintained (its team moved on to Univer, which is more powerful but much heavier).
+- SheetJS only reads and writes files — it has no editing UI.
+
+**Technical details to explain:**
+
+- **Client-only:** FortuneSheet uses `window` and draws the grid on a canvas, so it fails during SSR. Load it with `dynamic(..., { ssr: false })` from a Client Component, only on the sheet page — this also keeps its large bundle off every other page.
+- **Sized container:** the workbook fills its parent, so the parent needs an explicit height, otherwise nothing shows.
+- **Data format:** FortuneSheet keeps each sheet as JSON (`name`, `celldata` cells like `{ r, c, v }`, merges, column widths). Convert uploaded `.xlsx` files with an import/export package such as FortuneExcel (`@corbe30/fortune-excel`), store the sheet JSON on the backend, and export back to `.xlsx` for downloads. Test with real files early — styles, merged cells and formulas are where conversions lose detail.
+- **Saving:** `onChange` fires on every edit, so debounce the save (about 1 s), show "Saving… / Saved", and flush pending changes on unmount and `pagehide`.
+- **Trust:** the browser calculates formulas for display, but totals the business relies on are recalculated or validated on the server.
+
+```tsx
+'use client';
+import dynamic from 'next/dynamic';
+import { useEffect, useMemo } from 'react';
+import debounce from 'lodash/debounce';
+import type { Sheet } from '@fortune-sheet/core';
+import '@fortune-sheet/react/dist/index.css';
+
+// FortuneSheet uses window and canvas, so it must never render on the server
+const Workbook = dynamic(() => import('@fortune-sheet/react').then((m) => m.Workbook), {
+  ssr: false,
+  loading: () => <div className="h-[70vh] w-full animate-pulse bg-gray-100" />,
+});
+
+// onSave should be stable (useCallback in the parent), or the debounce resets
+export function SheetEditor({ initial, onSave }: { initial: Sheet[]; onSave: (sheets: Sheet[]) => void }) {
+  const save = useMemo(() => debounce(onSave, 1000), [onSave]);
+  useEffect(() => () => save.flush(), [save]); // don't lose the last edit on unmount
+  return (
+    <div className="h-[70vh] w-full">
+      <Workbook data={initial} onChange={save} />
+    </div>
+  );
+}
+```
+
+**Follow-ups to expect:**
+
+- **"Why not build it yourself?"** A spreadsheet engine — formula parser, cell dependencies, selection, copy-paste from Excel, undo — is months of work. A library plus solid integration was the right call. Know the risk: FortuneSheet is a smaller open-source project, so pin the version and keep it behind your own `SheetEditor` component so it can be swapped later.
+- **"Could several people edit at once?"** FortuneSheet reports each change as an operation (`onOp`) and can apply remote ones (`applyOp`), so you can sync operations over a WebSocket. For heavy simultaneous editing you'd add conflict handling (OT or CRDT) on the server.
+- **"Any security concerns?"** Cell values are user input: never inject them as HTML elsewhere in the app, and validate values and formulas on the server.
+
+**Make it yours:** say what the sheet was for, which Excel features users needed, how big the files were, and what you actually did for import, export and saving.
+
+**বাংলায়:**
+
+**S:** আমাদের user-রা Excel file-এ data নিয়ে কাজ করত — download করত, edit করত, আবার upload করত; এটা ধীর ছিল আর "কোনটা latest version?" নিয়ে ঝামেলা হতো। Product-এর দরকার ছিল web app-এর ভেতরেই Excel-এর মতো sheet: formula, cell formatting, merged cell, একাধিক sheet আর freeze করা header row। **T:** একটা library বেছে নিয়ে আমাদের React/Next.js app-এ feature-টা বানানো ছিল আমার কাজ। **A:** Option-গুলো তুলনা করে আমি **FortuneSheet** (`@fortune-sheet/react`) বেছে নিলাম — MIT license, React + TypeScript, Excel-এর মতো UI। তারপর integration-এর সমস্যাগুলো সমাধান করলাম: এটা server-এ render হয় না, এর জন্য নির্দিষ্ট size-এর container লাগে, `.xlsx` file-কে এর JSON format-এ convert করতে হয়, আর প্রতি keystroke-এ save করা অতিরিক্ত ছিল। **R:** User-রা file আদান-প্রদান না করে সরাসরি browser-এ sheet edit করে, server-এ একটাই saved version থাকে, আর দরকার হলে এখনো `.xlsx` download করা যায়।
+
+কেন FortuneSheet: AG Grid বা TanStack Table-এর মতো data grid record-এর list-এর জন্য, formula-সহ free-form sheet-এর জন্য না; Handsontable commercial কাজে paid license চায়; Luckysheet (যার উপর FortuneSheet তৈরি) আর maintain হয় না; আর SheetJS শুধু file পড়ে-লেখে, এর কোনো editing UI নেই।
+
+Technical detail: FortuneSheet `window` আর canvas ব্যবহার করে, তাই SSR-এ ভাঙে — Client Component থেকে শুধু sheet page-এ `dynamic(..., { ssr: false })` দিয়ে load করুন, এতে বড় bundle অন্য page-এ যায় না। Parent container-এর নির্দিষ্ট height না দিলে কিছুই দেখায় না। Data প্রতি sheet-এ JSON (`celldata`-তে `{ r, c, v }` cell) — upload করা `.xlsx` FortuneExcel-এর মতো package দিয়ে convert করে backend-এ JSON রাখুন, download-এর সময় আবার `.xlsx`-এ export করুন, আর শুরুতেই real file দিয়ে test করুন, কারণ style, merged cell আর formula-তেই conversion-এ detail হারায়। `onChange` প্রতি edit-এ fire হয়, তাই save debounce করুন (~1 সেকেন্ড), "Saving… / Saved" দেখান, আর unmount ও `pagehide`-এ বাকি change flush করুন। Business যে total-এর উপর নির্ভর করে, সেটা server-এ আবার হিসাব বা validate করুন।
+
+Follow-up: নিজে না বানানোর কারণ — formula parser, cell dependency, selection, Excel থেকে copy-paste আর undo মিলিয়ে spreadsheet engine বানাতে কয়েক মাস লাগে; তবে FortuneSheet ছোট open-source project, তাই version pin করে নিজের `SheetEditor` component-এর পেছনে রাখুন, যাতে পরে বদলানো যায়। একসাথে কয়েকজন edit করতে চাইলে `onOp` দিয়ে change operation পাঠিয়ে `applyOp` দিয়ে অন্যদের change apply করা যায়, WebSocket-এর মাধ্যমে; বেশি conflict হলে server-এ OT বা CRDT লাগবে। Cell value user input, তাই কোথাও HTML হিসেবে inject করবেন না, আর server-এ validate করুন। নিজের আসল detail দিয়ে বলুন — sheet কী কাজে লাগত, কোন Excel feature লাগত, file কত বড় ছিল, আর import, export ও save-এর জন্য আসলে কী করেছিলেন।
 
 ---
 
