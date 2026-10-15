@@ -774,6 +774,54 @@ Check the session in `proxy.ts` (called `middleware.ts` before Next 16) for fast
 
 `[slug]` folder দিয়ে dynamic segment হয়, যেমন `app/blog/[slug]/page.tsx`। `[...slug]` হলো catch-all। `generateStaticParams()` দিয়ে dynamic page build time-এ আগেই তৈরি করা যায়। আর `(group)` folder দিয়ে route organize করা বা layout share করা যায়, URL-এ কোনো প্রভাব পড়ে না।
 
+### Q13. How do you structure a scalable React/Next.js app?
+
+**Say this:** "I organize by feature, not by file type, keep a small shared layer, and make the boundaries explicit — server vs client, feature vs shared, app code vs API contract — and enforce them with tooling, not just code review."
+
+```text
+src/
+  app/                          routes only: page, layout, loading, error — thin, composes features
+    (marketing)/                route groups: different layouts, same URL space
+    (app)/dashboard/page.tsx
+  features/
+    cart/
+      components/               CartDrawer.tsx, CartDrawer.test.tsx
+      hooks/                    useCartSummary.ts
+      api/                      cart.api.ts, cart.queries.ts (query keys + TanStack Query hooks)
+      server/                   cart.actions.ts ('use server'), cart.data.ts (import 'server-only')
+      types.ts
+      index.ts                  the feature's public API — other code imports only from here
+    checkout/
+  components/ui/                shared design-system pieces: Button, Input, Dialog — no business logic
+  lib/                          api client, env.ts, auth helpers, utils
+  styles/globals.css            Tailwind @theme tokens
+```
+
+- **Feature-based folders:** everything for one feature lives together, so a change touches one folder and a feature can be removed cleanly. `app/` only holds routing files that compose features. Keep tests next to the code they test.
+- **Shared UI and design tokens:** `components/ui` is generic — no data fetching, no business rules — and built on tokens defined once in Tailwind v4's `@theme` (colors, spacing, radius, fonts) that match the Figma variables. Document the pieces in Storybook so designers and developers share one vocabulary.
+- **Server/client boundaries:** Server Components by default; push `'use client'` down to the small interactive leaves. Modules with database access or secrets start with `import 'server-only'`, so importing one from client code fails the build. Server Actions live in their own `'use server'` files, and only serializable props cross the boundary.
+- **Typed API layer:** one `api()` client in `lib/` handles the base URL, auth and errors (section 5, Q2); each feature exposes typed functions on top of it. Generate types from the backend's OpenAPI spec (e.g. `openapi-typescript`) or share them, validate responses with Zod at the boundary, and keep TanStack Query keys in one factory per feature (`cartKeys.all`, `cartKeys.detail(id)`).
+- **Import rules:** absolute imports through the `@/` alias; features import each other only through their `index.ts`, never deep paths; `components/ui` and `lib` never import from `features`. Enforce it with ESLint (`no-restricted-imports`, `import/no-cycle` or `eslint-plugin-boundaries`). Keep `index.ts` files small — huge barrel files slow down dev builds and can hurt tree-shaking.
+- **Environment config:** one `lib/env.ts` validates `process.env` with Zod and exports typed values, so a missing variable fails at startup instead of in production. Server-only values stay in server-only modules; only `NEXT_PUBLIC_` values reach the browser, and they are inlined at build time (Q10). Commit `.env.example`, never real `.env` files.
+- **Code ownership:** a `.github/CODEOWNERS` file maps folders to people or teams (`/src/features/payments/ @acme/payments`), and branch protection requires their review. Feature folders make this mapping natural.
+- **When a monorepo helps:** when several apps share code — e.g. the customer site, an admin panel and a design system. Use pnpm workspaces with Turborepo or Nx: `apps/web`, `apps/admin`, `packages/ui`, `packages/api-types`, `packages/config` (shared ESLint, TypeScript and Tailwind presets). One PR can change the UI library and every app together, and builds are cached. For a single app it's overhead — a well-structured single repo is simpler.
+
+**Close with:** CI runs lint, type-check, tests and build on every PR, so these rules hold as the team grows.
+
+**বাংলায়:**
+
+File type অনুযায়ী না, feature অনুযায়ী organize করি, shared layer ছোট রাখি, আর boundary-গুলো পরিষ্কার রাখি — server বনাম client, feature বনাম shared, app code বনাম API contract — আর শুধু code review-এর উপর না ছেড়ে tooling দিয়ে enforce করি।
+
+- **Feature-based folder:** একটা feature-এর সব কিছু (component, hook, API, server code, type, test) এক folder-এ থাকে, তাই change এক জায়গায় হয় আর feature পরিষ্কারভাবে সরানো যায়। `app/`-এ শুধু routing file থাকে, যেগুলো feature-গুলো জুড়ে দেয়।
+- **Shared UI আর design token:** `components/ui` generic — data fetching বা business rule নেই — আর Tailwind v4-এর `@theme`-এ একবার define করা token (color, spacing, radius, font) দিয়ে বানানো, যেগুলো Figma variable-এর সাথে মেলে। Storybook-এ document করি, যাতে designer আর developer একই ভাষায় কথা বলে।
+- **Server/client boundary:** default-ভাবে Server Component; `'use client'` শুধু ছোট interactive leaf-এ। Database বা secret থাকা module-এ `import 'server-only'` দিই, ফলে client code থেকে import করলে build fail করে। Server Action আলাদা `'use server'` file-এ, আর boundary পার হয় শুধু serializable props।
+- **Typed API layer:** `lib/`-এ একটাই `api()` client (base URL, auth, error), তার উপর প্রতিটা feature-এর typed function। Backend-এর OpenAPI spec থেকে type generate করি, boundary-তে Zod দিয়ে response validate করি, আর প্রতি feature-এ TanStack Query key-এর একটা factory রাখি।
+- **Import rule:** `@/` alias দিয়ে absolute import; এক feature আরেকটাকে শুধু তার `index.ts` দিয়ে import করে, deep path দিয়ে না; `components/ui` আর `lib` কখনো `features` import করে না। ESLint দিয়ে enforce করি। `index.ts` ছোট রাখি — বড় barrel file dev build ধীর করে আর tree-shaking-এ সমস্যা করতে পারে।
+- **Environment config:** `lib/env.ts` Zod দিয়ে `process.env` validate করে typed value export করে, যাতে কোনো variable না থাকলে production-এ না, startup-এই fail করে। Server-only value server-only module-এ থাকে; browser-এ যায় শুধু `NEXT_PUBLIC_` value, আর সেগুলো build time-এ inline হয়। `.env.example` commit করি, আসল `.env` কখনো না।
+- **Code ownership:** `.github/CODEOWNERS` file folder-কে team-এর সাথে map করে, আর branch protection তাদের review বাধ্যতামূলক করে; feature folder থাকলে এই mapping সহজ হয়।
+- **Monorepo কখন:** যখন কয়েকটা app code share করে — যেমন customer site, admin panel আর design system। তখন pnpm workspace-এর সাথে Turborepo বা Nx: `apps/web`, `apps/admin`, `packages/ui`, `packages/api-types`, `packages/config`। এক PR-এ UI library আর সব app একসাথে বদলানো যায়, আর build cache হয়। একটা মাত্র app হলে এটা বাড়তি ঝামেলা — ভালোভাবে সাজানো single repo-ই সহজ।
+- শেষে বলুন: প্রতিটা PR-এ CI lint, type-check, test আর build চালায়, তাই team বড় হলেও এই নিয়মগুলো টিকে থাকে।
+
 ## 4. HTML, CSS, Tailwind & Figma
 
 ### Q1. What is semantic HTML and why does it matter?
