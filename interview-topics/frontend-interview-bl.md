@@ -113,7 +113,7 @@ This is a very common live-coding question — practice writing it from memory.
 
 ### Q8. Shallow copy vs deep copy?
 
-Spread (`{...obj}`) and `Object.assign` copy one level; nested objects are still shared. For a deep copy use `structuredClone(obj)` (modern browsers and Node 17+). This matters in React because state must be updated immutably.
+Spread (`{...obj}`) and `Object.assign` copy one level; nested objects are still shared. For a deep copy use `structuredClone(obj)` (modern browsers and Node 17+). It can't clone functions or DOM nodes (it throws), and class instances come back as plain objects (prototype lost). This matters in React because state must be updated immutably.
 
 ### Q9. Why TypeScript? What benefits have you seen?
 
@@ -169,7 +169,7 @@ Keys tell React which item is which between renders. Using the array index break
 
 ### Q3. What causes a component to re-render?
 
-A component re-renders when (1) its own state changes, (2) its parent re-renders, or (3) a context it consumes changes. Props changing is not a separate cause — it happens because the parent re-rendered. A re-render is not automatically a DOM update; React only touches the DOM if output differs.
+A component re-renders when (1) its own state changes, (2) its parent re-renders, (3) a context it consumes changes, or (4) an external store it subscribes to (`useSyncExternalStore`, e.g. Zustand/Redux) changes. A parent re-render skips a child only if the child is wrapped in `React.memo` with equal props, or is the same element reference (e.g. passed in as `children`). Props changing is not a separate cause — it happens because the parent re-rendered. A re-render is not automatically a DOM update; React only touches the DOM if output differs.
 
 ### Q4. Explain `useState` and why state updates look "async".
 
@@ -187,9 +187,12 @@ setCount(prev => prev + 1); // safe even if called multiple times
 useEffect(() => {
   const controller = new AbortController();
   fetch(`/api/users/${id}`, { signal: controller.signal })
-    .then(r => r.json())
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
     .then(setUser)
-    .catch(() => {});
+    .catch(e => { if (e.name !== 'AbortError') setError(e); }); // ignore only aborts
   return () => controller.abort(); // avoids race conditions
 }, [id]);
 ```
@@ -206,7 +209,7 @@ React 18+ **Strict Mode** mounts, unmounts and re-mounts components in developme
 - `useCallback` caches a **function reference** so a memoized child doesn't re-render.
 - `React.memo` wraps a **component** so it skips re-render when props are shallowly equal.
 
-They work together: `React.memo` on a child is useless if you pass a new inline function every render. **Trade-off:** memoization has a cost; measure with React DevTools Profiler first. Also mention that the **React Compiler** (stable in React 19 era) can auto-memoize, reducing manual use.
+They work together: `React.memo` on a child is useless if you pass a new inline function every render. **Trade-off:** memoization has a cost; measure with React DevTools Profiler first. Also mention the **React Compiler** (1.0 stable since Oct 2025): it auto-memoizes, reducing manual use, but it's an opt-in build plugin, not built into React 19 (in Next.js: `reactCompiler: true` in `next.config.ts`).
 
 ### Q8. What is `useRef` used for?
 
@@ -229,7 +232,7 @@ function useDebounce<T>(value: T, delay = 300): T {
 
 ### Q10. What are the Rules of Hooks?
 
-Call hooks only at the top level (not inside loops, conditions or nested functions) and only from React components or custom hooks. React tracks hooks by call order, so conditional calls break that order.
+Call hooks only at the top level (not inside loops, conditions or nested functions) and only from React components or custom hooks. React tracks hooks by call order, so conditional calls break that order. One exception: React 19's `use()` can be called inside conditions and loops.
 
 ### Q11. Controlled vs uncontrolled components?
 
@@ -242,7 +245,7 @@ Walk through these principles with a `Button` or `Modal` example:
 1. **Typed, minimal props API** — extend native props so it behaves like a real element.
 2. **Variants instead of booleans** — `variant="primary"` instead of `isPrimary`, `isDanger`.
 3. **Composition over configuration** — accept `children` or compound parts (`<Card.Header>`) instead of 20 props.
-4. **Forward refs and spread rest props** — so it works with forms, focus and tooltips.
+4. **Pass `ref` through (a plain prop in React 19) and spread rest props** — so it works with forms, focus and tooltips.
 5. **Accessible by default** — semantic element, focus styles, ARIA where needed.
 6. **Style override** — accept `className` and merge with `tailwind-merge`.
 
@@ -260,8 +263,9 @@ const button = cva('inline-flex items-center rounded-md font-medium transition f
 
 type ButtonProps = React.ComponentProps<'button'> & VariantProps<typeof button>;
 
-export function Button({ className, variant, size, ...props }: ButtonProps) {
-  return <button className={cn(button({ variant, size }), className)} {...props} />;
+export function Button({ className, variant, size, type = 'button', ...props }: ButtonProps) {
+  // default type="button" so it never submits a form by accident
+  return <button type={type} className={cn(button({ variant, size }), className)} {...props} />;
 }
 ```
 
@@ -273,11 +277,11 @@ Options, in order: restructure with composition (pass components as `children`),
 
 ### Q14. What are Error Boundaries?
 
-Components that catch render errors in their child tree and show a fallback UI instead of a blank screen. They must be class components (or use the `react-error-boundary` library). They do not catch errors in event handlers or async code. In Next.js App Router, `error.tsx` creates one per route segment.
+Components that catch render errors in their child tree and show a fallback UI instead of a blank screen. They must be class components (or use the `react-error-boundary` library). They do not catch errors in event handlers or async code. In Next.js App Router, `error.tsx` creates one per route segment; it must be a `'use client'` file, and it doesn't catch errors thrown in the same segment's `layout.tsx` (the parent's `error.tsx` does). Errors in the root layout need `app/global-error.tsx`.
 
 ### Q15. What is new in React 19 that you know about?
 
-Server Components and Server Actions as stable features, the `use()` hook for reading promises and context, `useActionState` and `useFormStatus` for forms, `useOptimistic` for optimistic UI, `ref` as a regular prop, and the React Compiler for automatic memoization. You don't need every detail — knowing the direction shows you keep up.
+Server Components and Server Functions/Actions as stable features; **Actions** — pass an async function to `<form action={...}>` and React handles pending state, errors and reset; `useActionState` and `useFormStatus` for forms; `useOptimistic` for optimistic UI; the `use()` hook for reading promises and context; `ref` as a regular prop; and native `<title>`/`<meta>`/`<link>` rendered anywhere and hoisted to `<head>`. React 19.2 added `<Activity>` (hide a subtree but keep its state) and `useEffectEvent` (read latest props/state in an effect without adding them as dependencies). The React Compiler (1.0) is a separate opt-in plugin for automatic memoization. You don't need every detail — knowing the direction shows you keep up.
 
 ---
 
@@ -285,7 +289,7 @@ Server Components and Server Actions as stable features, the `use()` hook for re
 
 ### Q1. Why use Next.js instead of plain React (Vite/CRA)?
 
-**Say this:** Next.js adds server-side rendering, static generation, file-based routing, image and font optimization, API routes, middleware and built-in SEO metadata. Plain React renders in the browser, so the first HTML is empty — worse for SEO and first load on slow devices.
+**Say this:** Next.js adds server-side rendering, static generation, file-based routing, image and font optimization, API routes, request interception (`proxy.ts`, called `middleware.ts` before Next 16) and built-in SEO metadata. Plain React renders in the browser, so the first HTML is empty — worse for SEO and first load on slow devices.
 
 ### Q2. Explain SSR, SSG, ISR and CSR.
 
@@ -293,10 +297,12 @@ Server Components and Server Actions as stable features, the `use()` hook for re
 | --- | --- | --- | --- |
 | SSG (Static) | At build time | Marketing pages, blogs, docs | Default for routes with no dynamic data |
 | ISR (Incremental Static Regeneration) | At build, then re-built in background after N seconds | Product listings, CMS content | `export const revalidate = 60` or `fetch(url, { next: { revalidate: 60 } })` |
-| SSR (Dynamic) | On every request | Personalized pages, dashboards, auth data | Reading `cookies()`/`headers()`, or `cache: 'no-store'` |
+| SSR (Dynamic) | On every request | Personalized pages, dashboards, auth data | Reading `searchParams`, `cookies()`, `headers()` or `connection()`, or `cache: 'no-store'` |
 | CSR (Client) | In the browser after JS loads | Highly interactive widgets behind login | `'use client'` + TanStack Query |
 
-**Strong answer:** "I pick per page — static where possible for speed and cost, ISR for content that changes occasionally, dynamic only when the data is per-user." Note: caching defaults changed across Next.js 14 → 15 (fetch is no longer cached by default in 15), so always check the version the team uses.
+**Strong answer:** "I pick per page — static where possible for speed and cost, ISR for content that changes occasionally, dynamic only when the data is per-user." For instant updates after a mutation, use on-demand revalidation: `revalidatePath('/products')` or `revalidateTag('products')` from a Server Action or webhook.
+
+**Next 16 (current):** with `cacheComponents: true` in `next.config.ts`, caching is explicit — mark a component or function with `'use cache'` and control it with `cacheLife('hours')` and `cacheTag('products')`. This enables **Partial Prerendering**: a static shell is served instantly and dynamic parts stream in inside `<Suspense>`. Caching defaults changed a lot from 14 → 15 → 16 (fetch is no longer cached by default since 15), so always check the version the team uses.
 
 ### Q3. App Router vs Pages Router?
 
@@ -306,7 +312,7 @@ Pages Router (`pages/`) uses `getServerSideProps`/`getStaticProps`. App Router (
 
 **Say this:** In the App Router, components are Server Components by default. They run only on the server, can fetch data directly or query a database, and send zero JavaScript to the browser. Client Components (marked `'use client'`) are needed for state, effects, event handlers and browser APIs.
 
-**Best practice:** keep `'use client'` as low in the tree as possible — make the page a Server Component and only the interactive pieces (a like button, a filter dropdown) client components. You can pass Server Components as `children` into Client Components.
+**Best practice:** keep `'use client'` as low in the tree as possible — make the page a Server Component and only the interactive pieces (a like button, a filter dropdown) client components. You can pass Server Components as `children` into Client Components. Props passed from a Server to a Client Component must be serializable (plain objects, arrays, strings, numbers, Dates, promises) — no regular functions (only Server Functions) and no class instances.
 
 ```tsx
 // app/products/page.tsx — Server Component
@@ -320,11 +326,11 @@ export default async function ProductsPage() {
 
 ### Q5. What are Server Actions?
 
-Async functions marked `'use server'` that run on the server and can be called directly from forms or client components — no separate API route needed for mutations. Always validate input (Zod) and check authorization inside them, because they are public HTTP endpoints under the hood.
+React's official name is **Server Functions**: async functions marked `'use server'` that run on the server and can be called directly from forms or client components — no separate API route needed for mutations. When used in a form `action` or a transition they're called **Server Actions**. Each one is a public POST endpoint under the hood, so always validate input (Zod) and check auth/authorization inside it.
 
 ### Q6. Explain special files in the App Router.
 
-`layout.tsx` (shared UI that persists across navigation), `page.tsx` (the route), `loading.tsx` (Suspense fallback while streaming), `error.tsx` (error boundary), `not-found.tsx`, `route.ts` (API endpoint), and `middleware.ts` at the root (runs before requests — auth redirects, i18n, A/B tests).
+`layout.tsx` (shared UI that persists across navigation), `page.tsx` (the route), `loading.tsx` (Suspense fallback while streaming), `error.tsx` (error boundary), `not-found.tsx`, `route.ts` (API endpoint), and `proxy.ts` at the root (called `middleware.ts` before Next 16; runs before requests on the Node runtime — auth redirects, i18n, A/B tests).
 
 ### Q7. How do you handle SEO in Next.js?
 
@@ -336,8 +342,14 @@ Async functions marked `'use server'` that run on the server and can be called d
 - Canonical URLs to avoid duplicate content.
 
 ```tsx
-export async function generateMetadata({ params }): Promise<Metadata> {
-  const product = await getProduct(params.slug);
+import type { Metadata } from 'next';
+
+// params is a Promise since Next 15 (sync access removed in 16)
+export async function generateMetadata(
+  { params }: { params: Promise<{ slug: string }> },
+): Promise<Metadata> {
+  const { slug } = await params;
+  const product = await getProduct(slug);
   return {
     title: `${product.name} | Store`,
     description: product.summary,
@@ -348,7 +360,7 @@ export async function generateMetadata({ params }): Promise<Metadata> {
 
 ### Q8. What does `next/image` do?
 
-It automatically resizes, serves modern formats (WebP/AVIF), lazy-loads below-the-fold images, and requires width/height (or `fill`) to prevent layout shift (CLS). Use `priority` on the hero/LCP image so it loads immediately.
+It automatically resizes, serves modern formats (WebP/AVIF), lazy-loads below-the-fold images, and needs width/height (or `fill`) to prevent layout shift (CLS) — required for remote images, inferred automatically for static imports. Mark the hero/LCP image with `preload` (Next 16; replaces the deprecated `priority`) or `fetchPriority="high"` so it loads immediately.
 
 ### Q9. What does `next/font` do?
 
@@ -356,11 +368,11 @@ It self-hosts Google or local fonts at build time, removes external network requ
 
 ### Q10. How do you handle environment variables?
 
-Variables are server-only by default. Only those prefixed `NEXT_PUBLIC_` are bundled into browser code. Never put secrets in `NEXT_PUBLIC_` variables — anyone can read them in the JS bundle.
+Variables are server-only by default. Only those prefixed `NEXT_PUBLIC_` are bundled into browser code. Never put secrets in `NEXT_PUBLIC_` variables — anyone can read them in the JS bundle. They are inlined at **build time**, so changing one needs a rebuild; to ship the same Docker image to staging and prod, read the value on the server at runtime (e.g. a Server Component or route handler) and pass it down.
 
 ### Q11. How do you protect routes / handle auth?
 
-Check the session in `middleware.ts` for fast redirects, and **also** re-check authorization on the server where data is read (Server Components, Server Actions, route handlers). Middleware alone is not enough. Libraries commonly used: Auth.js (NextAuth), Clerk, or a custom JWT/cookie flow with httpOnly cookies.
+Check the session in `proxy.ts` (called `middleware.ts` before Next 16) for fast redirects, and **also** re-check authorization on the server where data is read (Server Components, Server Actions, route handlers). Middleware/proxy alone is not enough — CVE-2025-29927 let attackers skip Next.js middleware entirely with a crafted header, so apps that only checked auth there were exposed. Libraries commonly used: Auth.js (NextAuth), Clerk, or a custom JWT/cookie flow with httpOnly cookies.
 
 ### Q12. Dynamic routes and route groups?
 
@@ -376,7 +388,7 @@ Using elements that describe meaning — `header`, `nav`, `main`, `article`, `se
 
 ### Q2. What accessibility (a11y) practices do you follow?
 
-Semantic elements, `alt` on images (empty `alt=""` for decorative), labels tied to inputs, visible focus states (`focus-visible:`), color contrast at least 4.5:1 for body text (WCAG AA), keyboard navigation and focus trapping in modals, and ARIA only when no native element works. Test with Lighthouse, axe DevTools and by tabbing through the page.
+Semantic elements, `alt` on images (empty `alt=""` for decorative), labels tied to inputs, visible focus states (`focus-visible:`), color contrast at least 4.5:1 for normal text and 3:1 for large text and UI components/icons (target **WCAG 2.2 AA**, which also adds a 24×24px minimum target size and "focus not obscured" by sticky headers), keyboard navigation and focus trapping in modals, and ARIA only when no native element works. Test with Lighthouse, axe DevTools and by tabbing through the page.
 
 ### Q3. Explain the CSS box model and `box-sizing`.
 
@@ -393,7 +405,7 @@ Every element is content + padding + border + margin. With `box-sizing: border-b
 
 ### Q5. CSS specificity and positioning?
 
-Specificity order: inline styles > IDs > classes/attributes/pseudo-classes > elements. `!important` overrides everything — avoid it. Position: `relative` (offset from itself, creates a positioning context), `absolute` (relative to nearest positioned ancestor), `fixed` (to viewport), `sticky` (scrolls until a threshold, then sticks — great for headers and table headers).
+The cascade decides in this order: origin and `!important` → cascade layers (`@layer`) → specificity → source order. Specificity: inline styles > IDs > classes/attributes/pseudo-classes > elements; `:where()` adds zero. Layers matter in Tailwind v4: its utilities live in `@layer utilities`, so any unlayered CSS you write beats them regardless of specificity. `!important` overrides normal rules — avoid it. Position: `relative` (offset from itself, creates a positioning context), `absolute` (relative to nearest positioned ancestor), `fixed` (to the viewport — unless an ancestor has `transform`/`filter`, which becomes its container), `sticky` (scrolls until a threshold, then sticks — great for headers and table headers).
 
 ### Q6. How do you approach responsive design?
 
@@ -411,7 +423,7 @@ Put the Figma tokens (colors, fonts, spacing, radii, shadows) into the theme. In
 
 ### Q9. How do you implement dark mode?
 
-Tailwind's `dark:` variant, driven either by `prefers-color-scheme` or a `class`/`data-theme` on `html` toggled by the user and saved. In Next.js, `next-themes` prevents the flash of wrong theme on load.
+Tailwind's `dark:` variant. In v4 it follows `prefers-color-scheme` by default; for a user toggle (a `.dark` class on `html`, saved), override it in CSS with `@custom-variant dark (&:where(.dark, .dark *));` — v3's `darkMode: 'class'` config is gone. In Next.js, `next-themes` prevents the flash of wrong theme on load.
 
 ### Q10. Walk me through converting a Figma design into a pixel-perfect, responsive UI.
 
@@ -448,17 +460,26 @@ Centralize them in an API layer instead of calling `fetch` inside components:
 // lib/api.ts
 const BASE = process.env.NEXT_PUBLIC_API_URL;
 
-export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-    credentials: 'include',
-  });
-  if (!res.ok) throw new ApiError(res.status, await res.text());
-  return res.json();
+export class ApiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
 }
 
-export const getUsers = () => api<User[]>('/users');
+export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  if (init?.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json'); // FormData sets its own boundary
+  }
+  const res = await fetch(`${BASE}${path}`, { ...init, headers, credentials: 'include' });
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+  if (res.status === 204) return undefined as T; // No Content
+  return res.json() as Promise<T>;
+}
+
+// init lets callers pass a signal (TanStack Query, AbortController)
+export const getUsers = (page: number, init?: RequestInit) =>
+  api<User[]>(`/users?page=${page}`, init);
 ```
 
 Benefits: one place for base URL, auth headers, error handling, token refresh and typing. With Axios you'd use interceptors for the same purpose.
@@ -469,11 +490,11 @@ Every data-driven component has four states: loading (skeleton, not just a spinn
 
 ### Q4. What is CORS?
 
-A browser security rule: a page on `app.com` can't read responses from `api.com` unless the server sends `Access-Control-Allow-Origin` headers allowing it. It's fixed on the **server**, not the frontend. For non-simple requests the browser sends an `OPTIONS` preflight first. In Next.js you can sidestep it by proxying through a route handler or `rewrites`.
+A browser security rule: a page on `app.com` can't read responses from `api.com` unless the server sends `Access-Control-Allow-Origin` headers allowing it. It's fixed on the **server**, not the frontend. For non-simple requests the browser sends an `OPTIONS` preflight first; simple requests still reach the server — the browser just blocks the page from reading the response, so CORS is not CSRF protection. With cookies (`credentials: 'include'`) the server must send `Access-Control-Allow-Credentials: true` and a specific origin, not `*`. In Next.js you can sidestep it by proxying through a route handler or `rewrites`.
 
 ### Q5. Where do you store auth tokens?
 
-Prefer **httpOnly, Secure, SameSite cookies** set by the server — JavaScript can't read them, so XSS can't steal them. `localStorage` is readable by any script on the page, so it's riskier. Mention access token + refresh token flow and handling `401` by refreshing then retrying.
+Prefer **httpOnly, Secure, SameSite cookies** set by the server — JavaScript can't read them, so XSS can't steal them (though XSS can still make requests as the user while they're on the page). Cookies are sent automatically, which brings CSRF risk: use `SameSite=Lax` or `Strict` plus a CSRF token for mutations. `localStorage` is readable by any script on the page, so it's riskier. A common pattern: short-lived access token in memory, refresh token in an httpOnly cookie, and handle `401` by refreshing then retrying.
 
 ### Q6. Server state vs client state?
 
@@ -493,7 +514,7 @@ Caching by query key, automatic background refetching, request deduplication, re
 ```tsx
 const { data, isPending, isError, refetch } = useQuery({
   queryKey: ['users', page],
-  queryFn: () => getUsers(page),
+  queryFn: ({ signal }) => getUsers(page, { signal }), // signal enables cancellation
   staleTime: 60_000,
 });
 
@@ -514,10 +535,11 @@ Update the UI immediately before the server responds, then roll back if it fails
 
 **Redux Toolkit:** structured (slices, actions, reducers), excellent DevTools with time-travel, middleware, strong conventions for large teams and complex state logic; RTK Query included for API caching. More boilerplate than Zustand.
 
-**Zustand:** tiny, minimal boilerplate, no provider needed, components subscribe to slices of state so they re-render only when that slice changes. Great for small-to-medium apps.
+**Zustand:** tiny, minimal boilerplate, no provider needed, components subscribe to slices of state so they re-render only when that slice changes. Great for small-to-medium apps. **Next.js App Router caveat:** a module-level store is shared across all server requests (one user's data can leak into another's render), so create the store per request inside a context provider, as the Zustand Next.js guide shows. In Zustand v5, wrap selectors that return a new object/array in `useShallow`, or you get an infinite re-render loop.
 
 ```typescript
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 
 type CartState = {
   items: CartItem[];
@@ -533,6 +555,8 @@ export const useCart = create<CartState>()((set) => ({
 
 // Select only what you need to avoid extra re-renders
 const count = useCart((s) => s.items.length);
+// Returning an object? Use useShallow so v5 doesn't loop
+const { add, remove } = useCart(useShallow((s) => ({ add: s.add, remove: s.remove })));
 ```
 
 ### Q10. Explain Redux data flow.
@@ -541,7 +565,7 @@ UI dispatches an **action** → a **reducer** (pure function) computes new state
 
 ### Q11. How would you implement search with an API?
 
-Debounce the input (300ms), put the term in the query key, keep previous results visible while loading (`placeholderData: keepPreviousData`), cancel outdated requests (TanStack passes an `AbortSignal`), and sync the term to the URL (`?q=`) so results are shareable and survive refresh. This combines several JD skills in one answer.
+Debounce the input (300ms), put the term in the query key, keep previous results visible while loading (`placeholderData: keepPreviousData`), cancel outdated requests (TanStack passes an `AbortSignal`, but it only cancels if you forward it: `queryFn: ({ signal }) => getUsers(page, { signal })`), and sync the term to the URL (`?q=`) so results are shareable and survive refresh. This combines several JD skills in one answer.
 
 ### Q12. Pagination vs infinite scroll?
 
@@ -555,15 +579,15 @@ Pagination: better for SEO, jumping to a page, and data tables. Infinite scroll:
 
 | Metric | Measures | Good target | Common fixes |
 | --- | --- | --- | --- |
-| LCP (Largest Contentful Paint) | Loading — when the main content appears | ≤ 2.5 s | Optimize hero image (`next/image` + `priority`), SSR/SSG, CDN, preload fonts |
+| LCP (Largest Contentful Paint) | Loading — when the main content appears | ≤ 2.5 s | Optimize hero image (`next/image` + `preload`), SSR/SSG, CDN, preload fonts |
 | INP (Interaction to Next Paint) | Responsiveness — delay after clicks/typing | ≤ 200 ms | Less JS, split long tasks, `useTransition`, move work off the main thread |
 | CLS (Cumulative Layout Shift) | Visual stability — content jumping | ≤ 0.1 | Set image width/height, reserve space for ads/embeds, `next/font`, skeletons |
 
-INP replaced FID (First Input Delay) as a Core Web Vital in March 2024 — mentioning this shows you're current.
+INP replaced FID (First Input Delay) as a Core Web Vital in March 2024 — mentioning this shows you're current. INP = input delay + processing time + presentation delay. Google judges CWV on **field data** (real Chrome users, CrUX) at the 75th percentile; Lighthouse is lab-only, can't measure INP and shows TBT as a proxy. Collect your own field data with the `web-vitals` library.
 
 ### Q2. How would you approach a slow page?
 
-1. **Measure:** Lighthouse and PageSpeed Insights (lab + real-user field data), Chrome DevTools Performance tab, React DevTools Profiler, and `@next/bundle-analyzer` for bundle size.
+1. **Measure:** PageSpeed Insights / Search Console for real-user field data (CrUX, p75), `web-vitals` for your own RUM, Lighthouse for lab debugging (TBT, not INP), Chrome DevTools Performance tab, React DevTools Profiler, and `@next/bundle-analyzer` for bundle size.
 2. **Identify the bottleneck:** big JS bundle? slow API? huge images? too many re-renders? render-blocking resources?
 3. **Fix the biggest issue first**, then re-measure to prove the improvement with numbers.
 
@@ -575,13 +599,16 @@ Then list fixes by category:
 - **Network:** caching (ISR, TanStack Query `staleTime`, HTTP cache headers), CDN, prefetching (Next.js `Link` prefetches automatically), parallel requests instead of waterfalls.
 - **Third-party scripts:** load with `next/script` and `strategy="lazyOnload"` or `afterInteractive`.
 
-Have one real story ready: "Our product page LCP was 4.1s; the hero image was a 2MB PNG. Switching to `next/image` with `priority` and AVIF brought it to 1.9s."
+Have one real story ready: "Our product page LCP was 4.1s; the hero image was a 2MB PNG. Switching to `next/image` with `preload` and AVIF brought it to 1.9s."
 
 ### Q3. What is code splitting and lazy loading?
 
 Splitting the JS bundle into chunks so users download only what the current page needs. Next.js splits by route automatically; you add manual splits for heavy components:
 
 ```tsx
+'use client'; // ssr: false is only allowed in a Client Component in the App Router
+import dynamic from 'next/dynamic';
+
 const Chart = dynamic(() => import('@/components/Chart'), {
   ssr: false,
   loading: () => <Skeleton className="h-64" />,
@@ -590,7 +617,7 @@ const Chart = dynamic(() => import('@/components/Chart'), {
 
 ### Q4. What is hydration, and what causes hydration errors?
 
-Hydration is React attaching event handlers to server-rendered HTML so it becomes interactive. A **hydration mismatch** happens when server HTML differs from the first client render — common causes: `Date.now()`/`Math.random()` in render, reading `window`/`localStorage` during render, locale-specific date formatting, or invalid HTML nesting (a `div` inside a `p`). Fix by moving browser-only logic into `useEffect`, or using `dynamic(..., { ssr: false })`.
+Hydration is React attaching event handlers to server-rendered HTML so it becomes interactive. A **hydration mismatch** happens when server HTML differs from the first client render — common causes: `Date.now()`/`Math.random()` in render, reading `window`/`localStorage` during render, locale-specific date formatting, or invalid HTML nesting (a `div` inside a `p`). Fix by moving browser-only logic into `useEffect`, or using `dynamic(..., { ssr: false })` from `next/dynamic` (only inside a `'use client'` file in the App Router).
 
 ### Q5. What else improves SEO beyond metadata?
 
@@ -598,12 +625,12 @@ Fast Core Web Vitals (a ranking signal), mobile-friendliness, server-rendered co
 
 ### Q6. How do you ensure cross-browser compatibility?
 
-- Define target browsers with **Browserslist**; Next.js/SWC and Autoprefixer use it to transpile JS and prefix CSS.
+- Define target browsers with **Browserslist**; Next.js/SWC uses it to transpile JS. Tailwind v4 uses Lightning CSS for prefixing (no Autoprefixer needed) and targets Safari 16.4+, Chrome 111+, Firefox 128+ — if you must support older browsers, stay on Tailwind v3.4.
 - Check feature support on **caniuse.com** before using newer APIs (e.g. `:has()`, container queries, `structuredClone`).
 - Use **progressive enhancement** and feature detection (`@supports`, `'IntersectionObserver' in window`) with fallbacks.
 - Test on real Safari/iOS — it's the most common source of bugs (`100vh` with the mobile address bar → use `100dvh`; date input styling; flex `gap` in very old versions).
 - Use cross-browser testing tools like **BrowserStack** or **Playwright** (which runs Chromium, Firefox and WebKit).
-- CSS reset/normalize (Tailwind Preflight already does this).
+- CSS reset/normalize (Tailwind Preflight already does this; v4 builds on modern CSS like `@layer` and `color-mix()`, which is why it needs those newer browsers).
 
 ### Q7. What are web performance quick wins you always apply?
 
@@ -616,7 +643,7 @@ Image optimization, font optimization, lazy-loading heavy components, avoiding l
 ### B1. What happens when you type a URL and press Enter?
 
 1. **URL parsing** — the browser checks whether it's a URL or a search term.
-2. **Cache check** — browser cache, then service worker; if a fresh copy exists, no network is needed.
+2. **Service worker, then cache** — if the site registered a service worker, it intercepts the request first and may answer from its own cache; otherwise the browser checks its HTTP cache. If a fresh copy exists, no network is needed.
 3. **DNS lookup** — the domain is resolved to an IP address (browser cache → OS → router → ISP/DNS resolver).
 4. **TCP connection** — a three-way handshake (SYN, SYN-ACK, ACK) with the server. HTTP/3 uses QUIC over UDP instead.
 5. **TLS handshake** — for HTTPS, the browser verifies the certificate and agrees on encryption keys.
@@ -773,7 +800,7 @@ Name tools and match each to a task — concrete beats generic:
 
 **Strong prompt:**
 
-> "Create a `LoginForm` component in Next.js 15 App Router with TypeScript and Tailwind. Use React Hook Form with a Zod schema: email (valid email) and password (min 8 chars). Reuse our `Button` and `Input` from `@/components/ui`. On submit call the existing `login()` server action from `@/app/actions/auth.ts`, show field errors under inputs, disable the button while submitting, and show a server error message at the top. It must be keyboard accessible with proper labels. Don't add new dependencies. Return only the component file."
+> "Create a `LoginForm` component in Next.js 16 App Router with TypeScript and Tailwind. Use React Hook Form with a Zod schema: email (valid email) and password (min 8 chars). Reuse our `Button` and `Input` from `@/components/ui`. On submit call the existing `login()` server action from `@/app/actions/auth.ts`, show field errors under inputs, disable the button while submitting, and show a server error message at the top. It must be keyboard accessible with proper labels. Don't add new dependencies. Return only the component file."
 
 Techniques worth naming: give a role and context, specify versions (models often default to outdated APIs like Pages Router), show an example of your existing code style, ask it to reason step by step or plan first, ask for edge cases and tests, and iterate with specific feedback ("the error state doesn't reset when the user types — fix only that").
 
@@ -984,28 +1011,31 @@ Docker packages an app with its runtime and dependencies into an **image** that 
 A **multi-stage build** keeps the final image small:
 
 ```dockerfile
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
+# some native packages need glibc compatibility on alpine (optional)
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+ENV NODE_ENV=production HOSTNAME=0.0.0.0 PORT=3000
+COPY --from=builder --chown=node:node /app/.next/standalone ./
+COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+COPY --from=builder --chown=node:node /app/public ./public
+USER node
 EXPOSE 3000
 CMD ["node", "server.js"]
 ```
 
-This requires `output: 'standalone'` in `next.config`. Also use a `.dockerignore` (exclude `node_modules`, `.next`, `.env`). Docker Compose runs multiple services together locally (frontend + API + database).
+This requires `output: 'standalone'` in `next.config`. `HOSTNAME=0.0.0.0` makes the server listen on all interfaces so it's reachable from outside the container, and `USER node` (a user the official Node images already include) avoids running as root. Use Node 24 — Node 20 reached end of life in April 2026. Also use a `.dockerignore` (exclude `node_modules`, `.next`, `.env`). Docker Compose runs multiple services together locally (frontend + API + database).
 
 ### Q3. What is CI/CD? Describe a pipeline you'd set up.
 
@@ -1019,9 +1049,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: npm }
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: npm run lint
       - run: npx tsc --noEmit
@@ -1053,7 +1083,7 @@ export async function GET() {
 
 ### Q6. What is the difference between edge and Node.js runtime in Next.js?
 
-The **Node.js runtime** supports all Node APIs and is the default. The **Edge runtime** runs on lightweight servers close to users with faster cold starts but a limited API (no file system, many Node packages unsupported) — used for middleware and simple, latency-sensitive responses.
+The **Node.js runtime** supports all Node APIs and is the default. The **Edge runtime** runs on lightweight servers close to users with faster cold starts but a limited API (no file system, many Node packages unsupported). It used to be the only option for middleware, but in Next.js 16 `middleware.ts` was renamed to **`proxy.ts`** and runs on the Node.js runtime, so Edge is now a niche choice for a few simple, latency-sensitive responses.
 
 ---
 
@@ -1141,7 +1171,7 @@ NaN === NaN;        // ?
 0.1 + 0.2 === 0.3;  // ?
 ```
 
-**Answer:** `"object"` (a famous historical bug in JavaScript), `"number"`, `false` (NaN is the only value not equal to itself — use `Number.isNaN()`), and `false` (floating-point rounding gives `0.30000000000000004`). For money, store integers like cents, or compare with `Math.abs(a - b) < Number.EPSILON`.
+**Answer:** `"object"` (a famous historical bug in JavaScript), `"number"`, `false` (NaN is the only value not equal to itself — use `Number.isNaN()`), and `false` (floating-point rounding gives `0.30000000000000004`). For money, store integers like cents. For other floats, compare with a tolerance — `Number.EPSILON` alone only works for values near 1, so use a relative one: `Math.abs(a - b) < Number.EPSILON * Math.max(Math.abs(a), Math.abs(b))`.
 
 ### T4. What are these results?
 
@@ -1169,7 +1199,12 @@ const fn = user.regular;
 console.log(fn());
 ```
 
-**Answer:** `'Asha'`, then `undefined`, then `undefined` (or a TypeError in strict mode, where `this` is `undefined`). A regular method gets `this` from the object it's called on. The arrow function takes `this` from the outer scope, not the object. Pulling the method out into `fn` loses the object, so `this` is lost — this is why you bind handlers or use arrow functions in callbacks.
+**Answer:** It depends on where the code runs:
+
+- **ES module** (all bundled React/Next code — strict mode, top-level `this` is `undefined`): `'Asha'`, then `undefined` (the `?.` stops it throwing), then a **TypeError** — `fn()` has no object, so `this` is `undefined` and `this.name` throws.
+- **Classic browser script** (sloppy mode, top-level `this` is `window`): `'Asha'`, then `''`, then `''` — both read `window.name`, which defaults to an empty string.
+
+A regular method gets `this` from the object it's called on. The arrow function takes `this` from the outer scope, not the object. Pulling the method out into `fn` loses the object, so `this` is lost — this is why you bind handlers or use arrow functions in callbacks.
 
 ### T6. What happens here?
 
@@ -1272,7 +1307,7 @@ function Parent() {
 }
 ```
 
-**Answer:** `parent render`, `child render`, `child effect`, `parent effect`. Rendering goes top-down, but effects run bottom-up — children's effects fire first because the parent isn't "mounted" until its children are. (In development Strict Mode, the effects then run a second time.)
+**Answer:** `parent render`, `child render`, `child effect`, `parent effect`. Rendering goes top-down, but effects run bottom-up — children's effects fire first because the parent isn't "mounted" until its children are. That is the production order. In development **Strict Mode**, React also calls each component twice (the second log is dimmed in the console), then simulates unmount + remount, so effects run again: `parent render`, `parent render`, `child render`, `child render`, `child effect`, `parent effect`, `child effect`, `parent effect`.
 
 ### T14. Why does the input lose focus after every keystroke?
 
@@ -1310,9 +1345,9 @@ const Row = React.memo(({ onSelect }) => <button onClick={onSelect}>Pick</button
 2. "A Server Component can render a Client Component."
 3. "A Client Component can import a Server Component."
 4. "Changing a `NEXT_PUBLIC_` env variable on the server takes effect without rebuilding."
-5. "Checking auth in middleware is enough to protect data."
+5. "Checking auth in middleware (`proxy.ts` since Next.js 16) is enough to protect data."
 
-**Answer:** (1) **False** — client components are still pre-rendered on the server for the first HTML, which is why `window is not defined` errors happen; use `useEffect` or `dynamic(..., { ssr: false })` for browser-only code. (2) **True.** (3) **False** — importing it turns it into client code; instead pass the Server Component in as `children` or a prop. (4) **False** — `NEXT_PUBLIC_` values are inlined into the JS bundle at build time, so a rebuild is required. (5) **False** — always re-check authorization where data is read or mutated (Server Components, Server Actions, route handlers).
+**Answer:** (1) **False** — client components are still pre-rendered on the server for the first HTML, which is why `window is not defined` errors happen; use `useEffect` or `dynamic(..., { ssr: false })` (only from a Client Component) for browser-only code. (2) **True.** (3) **False** — importing it turns it into client code; instead pass the Server Component in as `children` or a prop. (4) **False** — `NEXT_PUBLIC_` values are inlined into the JS bundle at build time, so a rebuild is required. (5) **False** — always re-check authorization where data is read or mutated (Server Components, Server Actions, route handlers). Proof: CVE-2025-29927 let attackers skip middleware entirely by sending an `x-middleware-subrequest` header. Proxy is for redirects and rewrites, not your only security layer.
 
 ### T19. CSS traps
 
@@ -1344,7 +1379,7 @@ const handleClick = useCallback(() => setOpen(true), []);
 
 **Progressive download** plays one MP4 file over HTTP: the browser downloads it from the start and plays while downloading. Simple, but there is one fixed quality — on a slow network it stalls, and on a fast one it can't improve. Seeking far ahead needs range requests.
 
-**Adaptive streaming (HLS/DASH)** encodes the video at several qualities (for example 240p, 480p, 720p, 1080p), cuts each into small segments of 2–6 seconds, and lists them in a manifest. The player downloads segment by segment and picks the quality of each next segment based on current network speed and buffer. That is how one stream can serve both a fast 4G user in Dhaka and a weak 3G user outside the city. Live TV is only possible this way.
+**Adaptive streaming (HLS/DASH)** encodes the video at several qualities (for example 240p, 480p, 720p, 1080p), cuts each into small segments of 2–6 seconds, and lists them in a manifest. The player downloads segment by segment and picks the quality of each next segment based on current network speed and buffer. That is how one stream can serve both a fast 4G user in Dhaka and a weak 3G user outside the city. At CDN scale, live TV is practically always delivered this way; WebRTC is used instead only for sub-second, interactive cases (video calls, auctions, watch parties) because it is much harder to scale to millions.
 
 ### Q3. HLS vs DASH? What are a manifest and segments?
 
@@ -1352,12 +1387,12 @@ const handleClick = useCallback(() => setOpen(true), []);
 |---|---|---|
 | Made by | Apple | MPEG standard |
 | Manifest | `.m3u8` text playlist | `.mpd` XML file |
-| Native browser support | Safari (macOS, iOS) | None — needs a JS player |
+| Native browser support | Safari (macOS, iOS), Chrome on Android; desktop Chrome is only recently adding it | Practically none — needs a JS player |
 | DRM usually paired | FairPlay (Apple), also Widevine | Widevine, PlayReady |
 
 The **manifest** is the table of contents. In HLS there is a **master playlist** listing each quality (bitrate, resolution, codecs) and a **media playlist** per quality listing its segments. For live streams the media playlist keeps changing — the player re-fetches it to discover new segments.
 
-**Segments** were traditionally `.ts` files; modern setups use **CMAF** (fragmented MP4), which lets one set of segment files serve both HLS and DASH, halving storage and CDN cache usage.
+**Segments** were traditionally `.ts` files; modern setups use **CMAF** (fragmented MP4), which lets one set of segment files serve both HLS and DASH, halving storage and CDN cache usage. With DRM, that only works if the segments are encrypted once with the **`cbcs`** scheme: FairPlay requires it, and modern Widevine and PlayReady support it. If you must support legacy devices that only understand `cenc`, you end up packaging twice.
 
 ### Q4. How does adaptive bitrate (ABR) decide which quality to play?
 
@@ -1373,49 +1408,75 @@ Frontend levers: the **start quality** (start low for a fast first frame, then c
 
 Through **Media Source Extensions (MSE)**. A JavaScript player such as hls.js, Shaka Player or dash.js downloads the manifest and segments itself, then feeds the bytes into a `MediaSource` attached to a normal `<video>` element. The browser just decodes what it's given; the JS library does all the streaming logic (ABR, retries, live playlist refresh).
 
-Safari on macOS and iOS can play an `.m3u8` URL directly with `video.src = url`. Historically iPhone Safari had no MSE at all, so native HLS was the only option; newer iOS versions add `ManagedMediaSource`. That's why streaming sites keep **two code paths** — an MSE player for most browsers and native HLS for Apple — and why some bugs appear "only on iPhone".
+Safari on macOS and iOS (and Chrome on Android) can play an `.m3u8` URL directly with `video.src = url`. Historically iPhone Safari had no MSE at all, so native HLS was the only option. Since iOS 17.1 Safari has **`ManagedMediaSource`** (MMS), and hls.js 1.5+ uses it, so `Hls.isSupported()` is true on modern iPhones too. MMS needs `video.disableRemotePlayback = true` (or an AirPlay alternative source), otherwise playback may not start.
+
+Many teams still keep **two code paths** — hls.js for most browsers and native HLS on Safari — mainly because FairPlay DRM, AirPlay and battery use are simplest with Apple's native player. That's why some bugs appear "only on iPhone".
 
 ### Q6. Build a simple HLS video player component for a Next.js app.
 
 ```tsx
 'use client';
-import { useEffect, useRef } from 'react';
-import Hls from 'hls.js';
+import { useEffect, useRef, useState } from 'react';
 
 export function VideoPlayer({ src }: { src: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+    let cancelled = false;
+    let destroy = () => {};
 
-    if (Hls.isSupported()) {
-      const hls = new Hls({ capLevelToPlayerSize: true });
-      hls.loadSource(src);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        if (!data.fatal) return; // hls.js retries non-fatal errors itself
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
-        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
-        else hls.destroy();
-      });
-      return () => hls.destroy(); // stop downloads when src changes or on unmount
-    }
+    (async () => {
+      const { default: Hls } = await import('hls.js'); // browser-only, own chunk
+      if (cancelled) return; // src changed or unmounted while loading
+      setError(null);
 
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = src; // Safari: native HLS
-      return () => {
-        video.removeAttribute('src');
-        video.load();
-      };
-    }
+      if (Hls.isSupported()) {
+        const hls = new Hls({ capLevelToPlayerSize: true });
+        let attempts = 0;
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          if (!data.fatal) return; // hls.js retries non-fatal errors itself
+          attempts += 1;
+          if (attempts <= 3 && data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            hls.startLoad();
+          } else if (attempts <= 3 && data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            if (attempts > 1) hls.swapAudioCodec(); // repeated media error
+            hls.recoverMediaError();
+          } else {
+            hls.destroy();
+            setError('Playback failed. Please try again.');
+          }
+        });
+        hls.loadSource(src);
+        hls.attachMedia(video);
+        destroy = () => hls.destroy();
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = src; // native HLS (older iOS Safari)
+        destroy = () => { video.removeAttribute('src'); video.load(); };
+      } else {
+        setError('Your browser cannot play this stream.');
+      }
+    })();
+
+    return () => { cancelled = true; destroy(); }; // stop old downloads
   }, [src]);
 
-  return <video ref={videoRef} controls playsInline muted autoPlay className="aspect-video w-full bg-black" />;
+  return (
+    <div className="relative aspect-video w-full bg-black">
+      <video ref={videoRef} controls playsInline muted autoPlay className="h-full w-full" />
+      {error && (
+        <p role="alert" className="absolute inset-0 grid place-items-center p-4 text-center text-white">
+          {error}
+        </p>
+      )}
+    </div>
+  );
 }
 ```
 
-**Points to say out loud:** it must be a Client Component (it touches the browser and the video element); the **cleanup** destroys the player so switching channels doesn't leave the old stream downloading in the background; `aspect-video` reserves space so there's no layout shift; `playsInline` stops iPhone from forcing fullscreen. Load the heavy player library lazily, e.g. `dynamic(() => import('./VideoPlayer'), { ssr: false })` from a Client Component, so it isn't in the home page bundle.
+**Points to say out loud:** it must be a Client Component (it touches the browser and the video element); hls.js is imported **inside the effect**, so it never runs during SSR and lives in its own chunk; check `Hls.isSupported()` first, because `canPlayType` also returns a value in browsers like Chrome on Android, and it is not a "Safari check"; fatal errors get a few recovery attempts (`swapAudioCodec()` then `recoverMediaError()` on a repeated media error), then the user sees a message instead of a dead black box; the **cleanup** sets `cancelled` and destroys the player so switching channels doesn't leave the old stream downloading in the background; `aspect-video` reserves space so there's no layout shift; `playsInline` stops iPhone from forcing fullscreen. To keep the whole component out of the home page bundle, load it from a Client Component with `dynamic(() => import('./VideoPlayer').then(m => m.VideoPlayer), { ssr: false })` — `.then` is needed because `VideoPlayer` is a named export.
 
 ### Q7. Why doesn't my video autoplay?
 
@@ -1423,6 +1484,7 @@ Browsers block **autoplay with sound** until the user has interacted with the si
 
 - Autoplay previews and hero banners **muted**, with a visible "tap to unmute" button.
 - `video.play()` returns a promise — always `.catch()` it. If it rejects with `NotAllowedError`, show a big play button instead of a frozen black box.
+- Even muted autoplay isn't guaranteed: iOS **Low Power Mode** can block it, a video inside a cross-origin iframe needs `allow="autoplay"`, and unmuting from code without a user gesture makes Chrome pause the video. That's why the `.catch()` is always needed.
 - On iOS also add `playsInline`, or the video jumps to fullscreen.
 - Chrome uses a Media Engagement score, so autoplay may work on your machine (you visit often) but fail for a new user. Test in a fresh profile.
 
@@ -1430,7 +1492,7 @@ Browsers block **autoplay with sound** until the user has interacted with the si
 
 DRM encrypts the video so only an authorized player can decrypt it — required by studios and sports rights holders.
 
-Flow: segments are encrypted (usually **CENC**, common encryption) → the player reads the manifest and sees the content is protected → the browser's **EME** (Encrypted Media Extensions) API creates a key request → the player sends it to the **license server** with the user's auth token → the server checks entitlement and returns a license → the browser's **CDM** (content decryption module) decrypts and plays. JavaScript never sees the actual key.
+Flow: segments are encrypted (usually **CENC**, common encryption) → the player reads the manifest and sees the content is protected → the browser's **EME** (Encrypted Media Extensions) API — available only on HTTPS (a secure context) — creates a key request (for FairPlay, key system `com.apple.fps`, the player must first fetch the provider's **server certificate**) → the player sends it to the **license server** with the user's auth token → the server checks entitlement and returns a license → the browser's **CDM** (content decryption module) decrypts and plays. JavaScript never sees the actual key.
 
 | DRM | Where |
 |---|---|
@@ -1438,7 +1500,7 @@ Flow: segments are encrypted (usually **CENC**, common encryption) → the playe
 | FairPlay (Apple) | Safari, iOS, Apple TV |
 | PlayReady (Microsoft) | Edge, Windows, many smart TVs |
 
-So a real OTT web app needs **multi-DRM**. Also know: Widevine has security levels — desktop browsers are usually **L3** (software only), so providers often cap browsers at a lower resolution and allow the highest quality only on hardware-secured devices.
+So a real OTT web app needs **multi-DRM**. Also know: Widevine has security levels — Chrome and Firefox on desktop are usually **L3** (software only), so providers often cap them around 720p. Edge with **PlayReady SL3000** and Safari with FairPlay are hardware-backed, so they can get higher resolutions, as can hardware-secured TVs and phones.
 
 ### Q9. Toffee's site registers your device before you can watch. Why, and how would you build that on the frontend?
 
@@ -1471,8 +1533,8 @@ Classic HLS uses ~6-second segments and the player wants about 3 segments buffer
 Ways to reduce it:
 
 - **Shorter segments** (2s) — lower latency, but more requests and less efficient encoding.
-- **Low-Latency HLS / LL-DASH** — segments are split into small "parts" delivered as they're produced; can reach a few seconds.
-- Player settings: target latency, catching up by playing slightly faster (e.g. 1.05×) when behind, and a "Go live" button when the user drifts.
+- **Low-Latency HLS / LL-DASH** — can reach a few seconds. LL-HLS splits segments into **partial segments** (~0.3–1s) published as they're produced; the player uses **blocking playlist reload** (the server holds the request until the next part exists, so no polling), **preload hints** (request the next part before it's ready) and **delta playlist updates** (fetch only the changed end of a long playlist).
+- Player settings: target latency, catching up by playing slightly faster (e.g. 1.05×) when behind, and a "Go live" button when the user drifts. In hls.js these are `lowLatencyMode`, `liveSyncDuration` (or `liveSyncDurationCount` in segments) and `maxLiveSyncPlaybackRate`. Native Safari HLS handles LL-HLS itself and doesn't expose these knobs.
 
 **Trade-off:** lower latency means a smaller buffer, so more rebuffering on bad networks. For a mass-market audience on mobile data, a slightly higher but stable latency is often the right choice.
 
@@ -1506,7 +1568,7 @@ For scores alone, **CDN-cached polling or SSE** is usually the best trade-off. R
 
 ### Q14. How would you split rendering in Next.js for a streaming site like Toffee?
 
-- **Home / category pages:** server-rendered and cached (ISR with a short `revalidate`) for shared rows — Trending, Live now, Bangla dramas. Personalized rows (Continue watching, Recommended for you) load on the client after the shell, so the main page stays cacheable.
+- **Home / category pages:** server-rendered and cached (ISR with a short `revalidate`) for shared rows — Trending, Live now, Bangla dramas. Personalized rows (Continue watching, Recommended for you) load after the shell, so the main page stays cacheable. With Next.js 16 **Cache Components** (Partial Prerendering), this fits in one page: a static shell plus shared rows marked `'use cache'`, and personalized rows streamed in inside `<Suspense>`. Fetching personalized rows on the client is the fallback.
 - **Movie / show / channel detail pages:** Server Components with static generation or ISR — great for SEO and a fast first paint.
 - **Player:** Client Component, loaded lazily; it needs the browser, DRM and user auth anyway.
 - **Search:** client-side with debounce, results from an API.
@@ -1524,7 +1586,7 @@ The principle: **cache everything that's the same for all users, personalize at 
 
 ### Q16. The home page has 15 horizontal rows of posters. How do you keep it fast?
 
-- **Images:** `next/image` with correct `sizes` so phones get small posters; modern formats (AVIF/WebP); `priority` only on the hero banner (usually the LCP element); everything else lazy.
+- **Images:** `next/image` with correct `sizes` so phones get small posters; modern formats (AVIF/WebP); `preload` (or `fetchPriority="high"`) only on the hero banner (usually the LCP element) — `priority` is deprecated in Next.js 16; everything else lazy.
 - **Load rows lazily:** render the first 2–3 rows on the server, load the rest as the user scrolls (IntersectionObserver).
 - **Inside a row:** native horizontal scroll with CSS `scroll-snap` is lighter than a heavy carousel library; render a limited number of cards and add more as the user scrolls sideways.
 - **Reserve space:** fixed aspect-ratio poster boxes and skeletons, so there's no layout shift (CLS).
@@ -1549,7 +1611,7 @@ Key metrics:
 - **Playback failures** — error rate by device, browser, network and DRM type.
 - **Average bitrate and number of quality switches.**
 
-Implementation: listen to `<video>` events (`playing`, `waiting`, `stalled`, `error`) and player-library events, batch them, and send with `navigator.sendBeacon` so data isn't lost when the tab closes. Page analytics can go through a tag manager, but player QoE usually needs its own pipeline because event volume is high. Then segment the data: "rebuffering is 3× higher on network X" is an actionable finding.
+Implementation: listen to `<video>` events (`playing`, `waiting`, `error`) and player-library events. Count rebuffering as the time from a `waiting` event after playback has started until the next `playing` — not `stalled`, which only means data stopped arriving for a moment. Batch the events, and send with `navigator.sendBeacon` so data isn't lost when the tab closes. Page analytics can go through a tag manager, but player QoE usually needs its own pipeline because event volume is high. Then segment the data: "rebuffering is 3× higher on network X" is an actionable finding. Also mention **CMCD** (Common Media Client Data): the player attaches buffer length, bitrate and a session ID to each segment request (hls.js `cmcd` config), so the CDN logs can be joined with player QoE.
 
 ### Q19. How do you handle player errors well?
 
@@ -1571,6 +1633,7 @@ Implementation: listen to `<video>` events (`playing`, `waiting`, `stalled`, `er
 - **VAST/VMAP** are standard XML formats describing an ad and when to play it (pre-roll, mid-roll, post-roll).
 - **Client-side ad insertion (CSAI):** the player pauses content and plays the ad through an SDK such as Google IMA. Easy and flexible targeting, but ad blockers can block it and switching streams can cause a black gap.
 - **Server-side ad insertion (SSAI):** ads are stitched into the stream itself. Smooth and hard to block — ideal for live sports breaks — but tracking and targeting are more complex.
+- **Server-guided ad insertion (SGAI) / HLS Interstitials:** a hybrid. The server marks ad breaks in the playlist with `EXT-X-DATERANGE` tags using `CLASS="com.apple.hls.interstitial"`, and the player fetches and plays the ads as separate streams at those points. You get SSAI-like timing with client-side flexibility. Safari supports it natively, and hls.js added support in 1.6.
 
 Frontend concerns: an ad failure must never break content playback, handle ad breaks during live streams, and report ad events accurately because they are revenue.
 
@@ -1583,7 +1646,7 @@ Frontend concerns: an ad failure must never break content playback, handle ad br
 
 ### Q23. Toffee uses `/en` routes. How do you handle Bangla and English?
 
-- Locale in the URL (`/en/...`, `/bn/...`) via a `[locale]` segment and a library like `next-intl`; middleware redirects based on a cookie or `Accept-Language`.
+- Locale in the URL (`/en/...`, `/bn/...`) via a `[locale]` segment and a library like `next-intl`; proxy (middleware before Next.js 16) redirects based on a cookie or `Accept-Language`.
 - All UI strings in translation files, never hard-coded.
 - Bangla font: load a proper Bengali font with `next/font`; conjunct letters need correct shaping, so test with real Bangla text, not lorem ipsum.
 - Use `Intl.NumberFormat('bn-BD')` and `Intl.DateTimeFormat` for numbers and dates (Bangla digits), and plural rules from the i18n library.
@@ -1593,7 +1656,7 @@ Frontend concerns: an ad failure must never break content playback, handle ad br
 ### Q24. How would you implement "Continue watching"?
 
 - Save the playback position periodically — e.g. every 10–15 seconds and on pause — not on every `timeupdate` event (it fires several times per second).
-- On `visibilitychange` to hidden (or `pagehide`), send the last position with `navigator.sendBeacon` so closing the tab doesn't lose it.
+- On `visibilitychange` to hidden (or `pagehide`), send the last position with `navigator.sendBeacon` so closing the tab doesn't lose it. `sendBeacon` is POST-only and can't set an `Authorization` header, so it works with cookie auth; with bearer tokens use `fetch(url, { method: 'POST', keepalive: true, headers })` instead.
 - The server stores it per user + content, so it syncs across phone, web and TV.
 - On open: "Resume from 23:14" or "Start over". Mark content finished at ~90–95% (credits) and drop it from the row.
 - Live streams don't resume to a position — they jump to the live edge.
