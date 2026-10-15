@@ -45,7 +45,8 @@
   color-scheme: dark;
 }
 *, *::before, *::after { box-sizing: inherit; }
-html { scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 130px); }
+/* --topbar-h is the sticky top bar's measured height (set from JS; it wraps differently per width) */
+html { scroll-padding-top: calc(env(safe-area-inset-top, 0px) + var(--topbar-h, 130px) + 12px); }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.55; }
 button, input, textarea, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -71,7 +72,7 @@ h1 { font-family: var(--serif); font-weight: 600; font-size: 1.45rem; margin: 0;
 
 /* Layout */
 .layout { max-width: 1240px; margin: 0 auto; padding: 20px; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 28px; align-items: start; }
-nav.sections { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 140px); max-height: calc(100vh - 160px); overflow-y: auto; }
+nav.sections { position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--topbar-h, 130px) + 12px); max-height: calc(100vh - env(safe-area-inset-top, 0px) - var(--topbar-h, 130px) - 32px); overflow-y: auto; }
 nav.sections ol { list-style: none; margin: 0; padding: 0; }
 nav.sections a { display: flex; justify-content: space-between; gap: 8px; padding: 7px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; font-size: .9rem; }
 nav.sections a:hover { background: var(--surface); }
@@ -170,7 +171,7 @@ html[data-lang="bn"] .md.lang-bn { border-top: none; margin-top: 0; padding-top:
         <h1>Frontend interview practice</h1>
         <p class="subtitle">Write or speak your answer, then reveal the model answer (or listen to it) and mark how you did. Your answers save in this browser.</p>
       </div>
-      <div class="progress" aria-live="polite">
+      <div class="progress">
         <span><strong id="p-att">0</strong> attempted</span>
         <span><strong id="p-got">0</strong> got it</span>
         <span><strong id="p-rev">0</strong> to review</span>
@@ -626,13 +627,13 @@ Server Components and Server Functions/Actions as stable features; **Actions** �
 
 ## 3. Next.js
 
-### Q1. Why use Next.js instead of plain React (Vite/CRA)?
+### Q1. Why use Next.js instead of plain React (e.g. Vite)?
 
-**Say this:** Next.js adds server-side rendering, static generation, file-based routing, image and font optimization, API routes, request interception (`proxy.ts`, called `middleware.ts` before Next 16) and built-in SEO metadata. Plain React renders in the browser, so the first HTML is empty — worse for SEO and first load on slow devices.
+**Say this:** Next.js adds server-side rendering, static generation, file-based routing, image and font optimization, API routes, request interception (`proxy.ts`, called `middleware.ts` before Next 16) and built-in SEO metadata. Plain React renders in the browser, so the first HTML is empty — worse for SEO and first load on slow devices. (Create React App has been deprecated since February 2025; Vite or a framework is the default now.)
 
 **বাংলায়:**
 
-Next.js হলো React-এর উপর একটা framework, যেটা server-side rendering, static generation, file-based routing, image/font optimization আর SEO metadata built-in দেয়। Plain React browser-এ render হয়, তাই প্রথম HTML খালি থাকে। এতে SEO খারাপ হয় আর slow device-এ first load দেরি হয়। Next.js-এ server থেকেই ready HTML আসে, তাই এই সমস্যা থাকে না।
+Next.js হলো React-এর উপর একটা framework, যেটা server-side rendering, static generation, file-based routing, image/font optimization আর SEO metadata built-in দেয়। Plain React browser-এ render হয়, তাই প্রথম HTML খালি থাকে। এতে SEO খারাপ হয় আর slow device-এ first load দেরি হয়। Next.js-এ server থেকেই ready HTML আসে, তাই এই সমস্যা থাকে না। (Create React App ২০২৫-এর ফেব্রুয়ারি থেকে deprecated, এখন Vite বা কোনো framework ব্যবহার হয়।)
 
 ### Q2. Explain SSR, SSG, ISR and CSR.
 
@@ -641,19 +642,19 @@ Next.js হলো React-এর উপর একটা framework, যেটা se
 | SSG (Static) | At build time | Marketing pages, blogs, docs | Default for routes with no dynamic data |
 | ISR (Incremental Static Regeneration) | At build; after N seconds the next request gets the stale page and triggers a background re-build | Product listings, CMS content | `export const revalidate = 60` or `fetch(url, { next: { revalidate: 60 } })` |
 | SSR (Dynamic) | On every request | Personalized pages, dashboards, auth data | Reading `searchParams`, `cookies()`, `headers()` or `connection()`, or `cache: 'no-store'` |
-| CSR (Client) | In the browser after JS loads | Highly interactive widgets behind login | `'use client'` + TanStack Query |
+| CSR (Client) | In the browser after JS loads | Highly interactive widgets behind login | `'use client'` + TanStack Query (the component is still pre-rendered on the server for the first HTML; only the fetched data renders client-side) |
 
-**Strong answer:** "I pick per page — static where possible for speed and cost, ISR for content that changes occasionally, dynamic only when the data is per-user." For instant updates after a mutation, use on-demand revalidation: `revalidatePath('/products')` or `revalidateTag('products', 'max')` from a Server Action or webhook (Next 16 needs a cache profile as the 2nd argument; inside a Server Action use `updateTag('products')` so the user sees their own write immediately).
+**Strong answer:** "I pick per page — static where possible for speed and cost, ISR for content that changes occasionally, dynamic only when the data is per-user." After a mutation, use on-demand revalidation: `revalidatePath('/products')` or `revalidateTag('products', 'max')` from a Server Action or webhook. Next 16 needs a cache profile as the 2nd argument, and `'max'` means stale-while-revalidate: the next visitor may still get the old page while it refreshes in the background. For immediate expiry from a webhook use `revalidateTag('products', { expire: 0 })`; inside a Server Action use `updateTag('products')` so the user sees their own write immediately.
 
-**Next 16 (current):** with `cacheComponents: true` in `next.config.ts`, caching is explicit — mark a component or function with `'use cache'` and control it with `cacheLife('hours')` and `cacheTag('products')`. This enables **Partial Prerendering**: a static shell is served instantly and dynamic parts stream in inside `<Suspense>`. Caching defaults changed a lot from 14 → 15 → 16 (fetch is no longer cached by default since 15), so always check the version the team uses.
+**Next 16 (current):** with `cacheComponents: true` in `next.config.ts`, caching is explicit — mark a component or function with `'use cache'` and control it with `cacheLife('hours')` and `cacheTag('products')`. This enables **Partial Prerendering**: a static shell is served instantly and dynamic parts stream in inside `<Suspense>`. With `cacheComponents` on, route segment config like `export const revalidate` or `export const dynamic` is no longer allowed (build error) — use `cacheLife(...)` inside `'use cache'` instead. Caching defaults changed a lot from 14 → 15 → 16 (fetch is no longer cached by default since 15), so always check the version the team uses.
 
 **বাংলায়:**
 
 - SSG: build time-এ HTML তৈরি হয়, blog বা docs-এর জন্য ভালো।
 - ISR: static, কিন্তু N সেকেন্ড পার হওয়ার পর প্রথম request-টা পুরনো page পায় আর background-এ নতুন build শুরু হয়, যেমন product listing।
 - SSR: প্রতি request-এ HTML তৈরি হয়, per-user dashboard-এর জন্য।
-- CSR: browser-এ JS load হওয়ার পর render হয়, login-এর পেছনের interactive widget-এর জন্য।
-- আমি page অনুযায়ী বেছে নিই। Mutation-এর পর সাথে সাথে update চাইলে `revalidatePath` বা `revalidateTag('products', 'max')` ব্যবহার করি, Next 16-এ দ্বিতীয় argument হিসেবে profile লাগে। Server Action-এর ভেতরে `updateTag` দিই, যাতে user নিজের change সাথে সাথে দেখে। Next 16-এ `'use cache'` দিয়ে caching explicit, আর version ভেদে default বদলায়, তাই team-এর version দেখে নিতে হয়।
+- CSR: data browser-এ JS load হওয়ার পর আসে ও render হয় (তবে `'use client'` component-এর প্রথম HTML server-এও pre-render হয়), login-এর পেছনের interactive widget-এর জন্য।
+- আমি page অনুযায়ী বেছে নিই। Mutation-এর পর `revalidatePath` বা `revalidateTag('products', 'max')` ব্যবহার করি। Next 16-এ দ্বিতীয় argument হিসেবে profile লাগে, আর `'max'` মানে stale-while-revalidate — পরের visitor হয়তো পুরনো page পাবে, background-এ refresh হবে। Webhook থেকে সাথে সাথে expire করতে `revalidateTag('products', { expire: 0 })`, আর Server Action-এর ভেতরে `updateTag` দিই, যাতে user নিজের change সাথে সাথে দেখে। Next 16-এ `'use cache'` দিয়ে caching explicit, আর version ভেদে default বদলায়, তাই team-এর version দেখে নিতে হয়। `cacheComponents` চালু থাকলে `export const revalidate` বা `dynamic` segment config দিলে build error হয়, তখন `'use cache'`-এর ভেতরে `cacheLife` ব্যবহার করতে হয়।
 
 ### Q3. App Router vs Pages Router?
 
@@ -790,7 +791,7 @@ Semantic elements, `alt` on images (empty `alt=""` for decorative), labels tied 
 **বাংলায়:**
 
 - Semantic element, image-এ `alt` (decorative হলে `alt=""`), input-এর সাথে label।
-- Visible focus state (`focus-visible:`), normal text-এ কমপক্ষে 4.5:1 আর বড় text ও icon-এ 3:1 contrast।
+- Visible focus state (`focus-visible:`), normal text-এ কমপক্ষে 4.5:1 আর বড় text, UI component (input border, button, focus ring) ও icon-এ 3:1 contrast।
 - লক্ষ্য WCAG 2.2 AA, এতে 24×24px minimum target size আর sticky header-এর নিচে focus ঢাকা না পড়ার নিয়মও আছে।
 - Keyboard navigation, modal-এ focus trap, আর native element না চললে তবেই ARIA।
 - Lighthouse, axe DevTools আর Tab চেপে page ঘুরে test করি।
@@ -852,11 +853,11 @@ Figma-র token, মানে color, font, spacing, radius, shadow, Tailwind the
 
 ### Q9. How do you implement dark mode?
 
-Tailwind's `dark:` variant. In v4 it follows `prefers-color-scheme` by default; for a user toggle (a `.dark` class on `html`, saved), override it in CSS with `@custom-variant dark (&:where(.dark, .dark *));` — v3's `darkMode: 'class'` config is gone. In Next.js, `next-themes` prevents the flash of wrong theme on load.
+Tailwind's `dark:` variant. In v4 it follows `prefers-color-scheme` by default; for a user toggle (a `.dark` class on `html`, saved), override it in CSS with `@custom-variant dark (&:where(.dark, .dark *));` — this CSS-first approach replaces v3's `darkMode: 'class'` (that option only still works through a legacy `@config` JS file). In Next.js, `next-themes` prevents the flash of wrong theme on load.
 
 **বাংলায়:**
 
-Tailwind-এর `dark:` variant দিয়ে dark mode করি। v4-এ default-ভাবে এটা `prefers-color-scheme` follow করে। User toggle চাইলে (`html`-এ `.dark` class) CSS-এ `@custom-variant dark` দিয়ে override করতে হয়, v3-এর `darkMode: 'class'` আর নেই। Next.js-এ load-এর সময় ভুল theme-এর flash ঠেকাতে `next-themes` ব্যবহার করি।
+Tailwind-এর `dark:` variant দিয়ে dark mode করি। v4-এ default-ভাবে এটা `prefers-color-scheme` follow করে। User toggle চাইলে (`html`-এ `.dark` class) CSS-এ `@custom-variant dark` দিয়ে override করতে হয় — v3-এর `darkMode: 'class'`-এর বদলে এখন এই CSS-first পদ্ধতি (পুরনো `@config` JS file দিয়েই শুধু ওটা এখনো চলে)। Next.js-এ load-এর সময় ভুল theme-এর flash ঠেকাতে `next-themes` ব্যবহার করি।
 
 ### Q10. Walk me through converting a Figma design into a pixel-perfect, responsive UI.
 
@@ -891,13 +892,13 @@ Design নিজে নিজে চুপচাপ বদলাই না। Sc
 
 ### Q1. What is REST? Explain HTTP methods and status codes.
 
-REST is an API style where URLs represent resources (`/users/42`) and HTTP methods represent actions: `GET` read, `POST` create, `PUT` replace, `PATCH` partial update, `DELETE` remove. `GET`, `PUT` and `DELETE` should be idempotent (same result if repeated).
+REST is an API style where URLs represent resources (`/users/42`) and HTTP methods represent actions: `GET` read, `POST` create, `PUT` replace, `PATCH` partial update, `DELETE` remove. `GET`, `PUT` and `DELETE` should be idempotent: repeating the request has the same effect on server state, though the response may differ (a second `DELETE` usually returns `404`). `GET` is also *safe* — it has no side effects.
 
 Status codes to know: `200` OK, `201` Created, `204` No Content, `400` Bad Request (validation), `401` Unauthorized (not logged in), `403` Forbidden (logged in, no permission), `404` Not Found, `409` Conflict, `422` Unprocessable, `429` Too Many Requests, `500` Server Error.
 
 **বাংলায়:**
 
-REST হলো এমন API style যেখানে URL হলো resource (`/users/42`) আর HTTP method হলো action: `GET` read, `POST` create, `PUT` replace, `PATCH` partial update, `DELETE` remove। `GET`, `PUT`, `DELETE` idempotent হওয়া উচিত, মানে বারবার করলেও result একই। Status code-এ `401` মানে login করা নেই, আর `403` মানে login আছে কিন্তু permission নেই। এই পার্থক্যটা interview-তে প্রায়ই জিজ্ঞেস করে।
+REST হলো এমন API style যেখানে URL হলো resource (`/users/42`) আর HTTP method হলো action: `GET` read, `POST` create, `PUT` replace, `PATCH` partial update, `DELETE` remove। `GET`, `PUT`, `DELETE` idempotent হওয়া উচিত, মানে বারবার করলেও server state-এ effect একই থাকে (response আলাদা হতে পারে, যেমন দ্বিতীয় `DELETE`-এ `404`)। `GET` আবার *safe* — এর কোনো side effect নেই। Status code-এ `401` মানে login করা নেই, আর `403` মানে login আছে কিন্তু permission নেই। এই পার্থক্যটা interview-তে প্রায়ই জিজ্ঞেস করে।
 
 ### Q2. How do you structure API calls in a frontend app?
 
@@ -945,11 +946,11 @@ Data-নির্ভর প্রতিটা component-এর চারটা s
 
 ### Q4. What is CORS?
 
-A browser security rule: a page on `app.com` can't read responses from `api.com` unless the server sends `Access-Control-Allow-Origin` headers allowing it. It's fixed on the **server**, not the frontend. For non-simple requests the browser sends an `OPTIONS` preflight first; simple requests still reach the server — the browser just blocks the page from reading the response, so CORS is not CSRF protection. With cookies (`credentials: 'include'`) the server must send `Access-Control-Allow-Credentials: true` and a specific origin, not `*`. In Next.js you can sidestep it by proxying through a route handler or `rewrites`.
+A browser security rule: a page on `app.com` can't read responses from `api.com` unless the server sends `Access-Control-Allow-Origin` headers allowing it. It's fixed on the **server**, not the frontend. For non-simple requests the browser sends an `OPTIONS` preflight first; simple requests still reach the server — the browser just blocks the page from reading the response, so CORS is not CSRF protection. With cookies (`credentials: 'include'`) the server must send `Access-Control-Allow-Credentials: true` and a specific origin, not `*`. CORS headers alone don't get cookies sent, though — `SameSite` works per *site*: `app.shop.com` → `api.shop.com` is same-site, so `Lax` cookies are sent, but a truly cross-site API (`app.com` → `api.com`) only receives `SameSite=None; Secure` cookies, and Safari and Firefox block those third-party cookies by default. So put the API on a subdomain of the same site, or proxy it: in Next.js, through a route handler or `rewrites`.
 
 **বাংলায়:**
 
-CORS হলো browser-এর security rule: `app.com`-এর page `api.com`-এর response পড়তে পারবে না, যদি server `Access-Control-Allow-Origin` header দিয়ে অনুমতি না দেয়। এটা server-এ fix করতে হয়, frontend-এ না। Non-simple request-এর আগে browser `OPTIONS` preflight পাঠায়। Simple request কিন্তু server-এ পৌঁছায়, browser শুধু response পড়তে দেয় না, তাই CORS কোনো CSRF protection না। Cookie পাঠালে `Access-Control-Allow-Credentials: true` আর `*`-এর বদলে নির্দিষ্ট origin লাগে। Next.js-এ route handler বা `rewrites` দিয়ে proxy করে এটা এড়ানো যায়।
+CORS হলো browser-এর security rule: `app.com`-এর page `api.com`-এর response পড়তে পারবে না, যদি server `Access-Control-Allow-Origin` header দিয়ে অনুমতি না দেয়। এটা server-এ fix করতে হয়, frontend-এ না। Non-simple request-এর আগে browser `OPTIONS` preflight পাঠায়। Simple request কিন্তু server-এ পৌঁছায়, browser শুধু response পড়তে দেয় না, তাই CORS কোনো CSRF protection না। Cookie পাঠালে `Access-Control-Allow-Credentials: true` আর `*`-এর বদলে নির্দিষ্ট origin লাগে। তবে শুধু CORS header দিলেই cookie যায় না — `SameSite` site ধরে কাজ করে: `app.shop.com` → `api.shop.com` same-site, তাই `Lax` cookie যায়; কিন্তু `app.com` → `api.com` cross-site, সেখানে শুধু `SameSite=None; Secure` cookie যায়, আর Safari/Firefox default-ভাবে এমন third-party cookie block করে। তাই API একই site-এর subdomain-এ রাখুন, অথবা proxy করুন — Next.js-এ route handler বা `rewrites` দিয়ে।
 
 ### Q5. Where do you store auth tokens?
 
@@ -1028,13 +1029,13 @@ export const useCart = create<CartState>()((set) => ({
   remove: (id) => set((s) => ({ items: s.items.filter((i) => i.id !== id) })),
 }));
 
-// Hooks must be called inside a component
-export function CartBadge() {
+// Hooks must be called inside a component or a custom hook
+export function useCartSummary() {
   // Select only what you need to avoid extra re-renders
   const count = useCart((s) => s.items.length);
   // Returning an object? Use useShallow so v5 doesn't loop
   const { add, remove } = useCart(useShallow((s) => ({ add: s.add, remove: s.remove })));
-  return { count, add, remove }; // render your UI here
+  return { count, add, remove };
 }
 ```
 
@@ -1093,7 +1094,7 @@ Core Web Vitals হলো Google-এর তিনটা metric: LCP (main conten
 
 Then list fixes by category:
 
-- **Less JavaScript:** Server Components, code splitting with `next/dynamic` / `React.lazy` for heavy components (charts, editors, modals), tree-shakable imports (`import debounce from 'lodash/debounce'`, not all of lodash), remove unused dependencies.
+- **Less JavaScript:** Server Components, code splitting with `next/dynamic` / `React.lazy` for heavy components (charts, editors, modals), per-method imports (`import debounce from 'lodash/debounce'`) or ESM packages like `lodash-es` that bundlers can tree-shake, not all of lodash, remove unused dependencies.
 - **Assets:** `next/image`, WebP/AVIF, SVG icons, `next/font`, lazy-load below-the-fold media.
 - **Rendering:** avoid unnecessary re-renders (memoization where profiled, state colocation, Zustand selectors), virtualize long lists (TanStack Virtual), debounce expensive handlers.
 - **Network:** caching (ISR, TanStack Query `staleTime`, HTTP cache headers), CDN, prefetching (Next.js `Link` prefetches automatically), parallel requests instead of waterfalls.
@@ -1234,7 +1235,7 @@ ES modules (`type="module"`) are deferred by default. In Next.js, `next/script` 
 Use a concrete example: `fetch('https://api.shop.com/products')` from a React component.
 
 1. **JS calls `fetch`** — it returns a Promise immediately; the request runs off the main thread, so the UI isn't blocked.
-2. **Same-origin check** — if the API is on a different origin (protocol, domain or port), CORS rules apply. For non-simple requests (custom headers like `Authorization`, JSON body, `PUT`/`DELETE`), the browser first sends an **`OPTIONS` preflight** asking permission.
+2. **Same-origin check** — if the API is on a different origin (protocol, domain or port), CORS rules apply. For non-simple requests (custom headers like `Authorization`, a `Content-Type: application/json` header, `PUT`/`DELETE`), the browser first sends an **`OPTIONS` preflight** asking permission.
 3. **Connection** — DNS lookup, TCP and TLS handshake, unless an existing connection is reused (keep-alive, HTTP/2).
 4. **Request sent** — method, URL, headers (`Content-Type`, `Authorization: Bearer …`), cookies (if `credentials: 'include'`), and a body for `POST`/`PUT`/`PATCH`.
 5. **Server side** — load balancer → API server → routing → auth middleware checks the token → controller runs business logic → database query → builds the response.
@@ -1248,7 +1249,7 @@ Use a concrete example: `fetch('https://api.shop.com/products')` from a React co
 **বাংলায়:**
 
 - `fetch` সাথে সাথে একটা Promise দেয়, request main thread-এর বাইরে চলে, তাই UI block হয় না।
-- অন্য origin হলে CORS apply হয়; `Authorization` header বা JSON body থাকলে browser আগে `OPTIONS` preflight পাঠায়।
+- অন্য origin হলে CORS apply হয়; `Authorization` header বা `Content-Type: application/json` header থাকলে browser আগে `OPTIONS` preflight পাঠায়।
 - DNS, TCP, TLS হয় (keep-alive/HTTP/2 থাকলে connection reuse হয়), তারপর request যায়; server-এ load balancer → auth middleware → business logic → database।
 - Response আসার পর browser CORS header check করে; allow না করলে server respond করলেও JS response পড়তে পারে না।
 - তারপর `await res.json()`, state update, re-render। Server Component বা route handler-এ fetch server-to-server হয়, তাই CORS নেই আর secret server-এই থাকে।
@@ -1323,13 +1324,13 @@ HTTP/1.1-এ একটা connection-এ একবারে একটা request
 
 ### B11. What are XSS and CSRF, and how do you prevent them?
 
-**XSS (Cross-Site Scripting):** an attacker injects script into your page (e.g. through a comment field). React escapes text by default; dangers are `dangerouslySetInnerHTML`, `href="javascript:…"`, and third-party scripts. Prevent with sanitizing (DOMPurify), a **Content Security Policy** header, and httpOnly cookies.
+**XSS (Cross-Site Scripting):** an attacker injects script into your page (e.g. through a comment field). React escapes text by default; dangers are `dangerouslySetInnerHTML`, `href="javascript:…"`, and third-party scripts. Prevent with sanitizing (DOMPurify) and a **Content Security Policy** header. httpOnly cookies don't prevent XSS, but they limit the damage — the injected script can't read and steal the token.
 
 **CSRF (Cross-Site Request Forgery):** another site makes the user's browser send an authenticated request to your API using their cookies. Prevent with `SameSite=Lax/Strict` cookies, CSRF tokens, and checking the `Origin` header. Next.js Server Actions include origin checks.
 
 **বাংলায়:**
 
-XSS মানে attacker আপনার page-এ script ঢুকিয়ে দেয়, যেমন comment field দিয়ে। React default-ভাবে text escape করে; ঝুঁকি হলো `dangerouslySetInnerHTML`, `javascript:` href আর third-party script — DOMPurify, Content Security Policy আর httpOnly cookie দিয়ে ঠেকান। CSRF মানে অন্য site user-এর cookie ব্যবহার করে আপনার API-তে authenticated request পাঠায়। এটা ঠেকাতে `SameSite=Lax/Strict` cookie, CSRF token আর `Origin` header check করুন; Next.js Server Actions-এ origin check built-in।
+XSS মানে attacker আপনার page-এ script ঢুকিয়ে দেয়, যেমন comment field দিয়ে। React default-ভাবে text escape করে; ঝুঁকি হলো `dangerouslySetInnerHTML`, `javascript:` href আর third-party script — DOMPurify আর Content Security Policy দিয়ে ঠেকান। httpOnly cookie XSS ঠেকায় না, তবে script token পড়ে চুরি করতে পারে না বলে ক্ষতি কমায়। CSRF মানে অন্য site user-এর cookie ব্যবহার করে আপনার API-তে authenticated request পাঠায়। এটা ঠেকাতে `SameSite=Lax/Strict` cookie, CSRF token আর `Origin` header check করুন; Next.js Server Actions-এ origin check built-in।
 
 ### B12. Explain event bubbling, capturing and delegation.
 
@@ -1377,7 +1378,7 @@ Tool-এর নাম বলুন আর প্রতিটা কোন কা
 ### Q2. Walk me through your AI-assisted workflow on a feature.
 
 1. **Understand the task myself first** — I can't evaluate output for a problem I haven't thought about.
-2. **Give context** — relevant files, types, the API contract, existing components to reuse, coding conventions (many tools support a project rules file like `CLAUDE.md`, `.cursorrules` or Copilot custom instructions).
+2. **Give context** — relevant files, types, the API contract, existing components to reuse, coding conventions (many tools support a project rules file like `CLAUDE.md`, `AGENTS.md`, Cursor's `.cursor/rules/` or Copilot's `.github/copilot-instructions.md`).
 3. **Ask for a plan before code** on anything non-trivial, and correct the plan.
 4. **Generate in small, reviewable chunks**, not a whole feature at once.
 5. **Review every line**, run the type checker, linter and tests.
@@ -1387,7 +1388,7 @@ Tool-এর নাম বলুন আর প্রতিটা কোন কা
 **বাংলায়:**
 
 - আগে নিজে task-টা বুঝি, নাহলে AI-এর output evaluate করতে পারব না।
-- Context দিই: relevant file, type, API contract, existing component, আর `CLAUDE.md` বা `.cursorrules`-এর মতো rules file।
+- Context দিই: relevant file, type, API contract, existing component, আর `CLAUDE.md`, `AGENTS.md` বা `.cursor/rules/`-এর মতো rules file।
 - বড় কাজে আগে plan চাই, plan ঠিক করি, তারপর ছোট ছোট reviewable chunk-এ code generate করাই।
 - প্রতিটা line review করি, type checker, linter, test চালাই; test আর docs লেখাতেও AI ব্যবহার করি, তারপর code ভাঙলে AI-লেখা test আসলেই fail করে কিনা দেখি।
 - পরিষ্কার commit message দিয়ে normal code review-তে পাঠাই — AI code-ও human code-এর মতোই scrutiny পায়।
@@ -1564,7 +1565,9 @@ Same API style (`describe`, `it`, `expect`, mocks). **Vitest** is built on Vite,
 ```tsx
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { test, expect } from 'vitest'; // or globals: true; toBeInTheDocument needs '@testing-library/jest-dom/vitest' in setupFiles
+import { test, expect } from 'vitest';
+// RTL auto-cleans the DOM only when afterEach is global: with globals: false, call afterEach(cleanup) in the setup file.
+// toBeInTheDocument needs '@testing-library/jest-dom/vitest' in setupFiles.
 import { Counter } from './Counter';
 
 test('increments the count when the button is clicked', async () => {
@@ -1768,12 +1771,15 @@ This requires `output: 'standalone'` in `next.config`. `HOSTNAME=0.0.0.0` makes 
 
 ### Q3. What is CI/CD? Describe a pipeline you'd set up.
 
-**CI (Continuous Integration):** every push/PR automatically installs, lints, type-checks, tests and builds. **CD (Continuous Delivery/Deployment):** passing code is automatically deployed to staging or production.
+**CI (Continuous Integration):** every PR and every push to `main` automatically installs, lints, type-checks, tests and builds. **CD (Continuous Delivery/Deployment):** passing code is automatically deployed to staging or production.
 
 ```yaml
 # .github/workflows/ci.yml
 name: CI
-on: [pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -1784,7 +1790,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npx tsc --noEmit
-      - run: npm test -- --run
+      - run: npm test # Vitest and Jest both run once (no watch) when CI=true
       - run: npm run build
 ```
 
@@ -1792,7 +1798,7 @@ Vercel or Netlify add automatic **preview deployments** per PR — great for des
 
 **বাংলায়:**
 
-**CI** মানে প্রতিটা push বা PR-এ automatically install, lint, type-check, test আর build চলে। **CD** মানে pass করা code automatically staging বা production-এ deploy হয়। উদাহরণের GitHub Actions workflow-এ `npm ci`, lint, `tsc --noEmit`, test আর build — এই step-গুলো আছে। Vercel বা Netlify প্রতিটা PR-এর জন্য **preview deployment** দেয়, যেটা designer আর QA review-এর জন্য খুব কাজের।
+**CI** মানে প্রতিটা PR আর `main`-এ প্রতিটা push-এ automatically install, lint, type-check, test আর build চলে। **CD** মানে pass করা code automatically staging বা production-এ deploy হয়। উদাহরণের GitHub Actions workflow-এ `npm ci`, lint, `tsc --noEmit`, test আর build — এই step-গুলো আছে। Vercel বা Netlify প্রতিটা PR-এর জন্য **preview deployment** দেয়, যেটা designer আর QA review-এর জন্য খুব কাজের।
 
 ### Q4. Which cloud platforms/hosting have you used?
 
@@ -1807,7 +1813,7 @@ Common উত্তর হলো Vercel (Next.js team-এর বানানো,
 - npm/pnpm/yarn, `package.json` scripts, semantic versioning (`^1.2.3` allows minor updates), lockfiles and why `npm ci` is used in CI.
 - Node is the runtime for Next.js server code, route handlers and build tools.
 - Building simple REST APIs with **Express** or Next.js route handlers: routes, middleware, JSON parsing, error handling.
-- Async I/O and the event loop (same model as the browser, plus `process.nextTick`).
+- Async I/O and the event loop. The core idea is like the browser (call stack, then microtasks, then macrotasks), but Node's loop runs in phases (timers → poll → check) and adds `setImmediate` and `process.nextTick`; the nextTick queue runs even before promise microtasks.
 - Environment variables via `process.env`.
 
 ```typescript
@@ -1823,7 +1829,7 @@ export async function GET() {
 - npm/pnpm/yarn, `package.json` script, semantic versioning (`^1.2.3` মানে minor update allow করে), lockfile আর CI-তে কেন `npm ci` ব্যবহার হয় — এগুলো জানা দরকার।
 - Next.js-এর server code, route handler আর build tool সব Node runtime-এ চলে।
 - Express বা Next.js route handler দিয়ে simple REST API বানাতে পারা উচিত: route, middleware, JSON parsing, error handling।
-- Async I/O আর event loop browser-এর মতোই, সাথে `process.nextTick` আছে। Environment variable পড়া হয় `process.env` দিয়ে।
+- Event loop-এর মূল idea browser-এর মতো (call stack, তারপর microtask, তারপর macrotask), কিন্তু Node-এর loop phase-এ চলে (timers → poll → check), আর এতে `setImmediate` ও `process.nextTick` আছে — nextTick queue promise microtask-এরও আগে চলে। Environment variable পড়া হয় `process.env` দিয়ে।
 
 ### Q6. What is the difference between edge and Node.js runtime in Next.js?
 
@@ -2050,11 +2056,11 @@ const sayBye = () => console.log('bye');
 ['1', '2', '3'].map(parseInt);
 ```
 
-**Answer:** `[1, 10, 2]` — the default sort compares values as **strings**. Use `.sort((a, b) => a - b)`. Note that `sort` also mutates the original array; use `toSorted()` or `[...arr].sort()` for React state. The second gives `[1, NaN, NaN]`, because `map` passes `(value, index)`, so it calls `parseInt('2', 1)` and `parseInt('3', 2)`, which are invalid radixes. Use `.map(Number)`.
+**Answer:** `[1, 10, 2]` — the default sort compares values as **strings**. Use `.sort((a, b) => a - b)`. Note that `sort` also mutates the original array; use `toSorted()` or `[...arr].sort()` for React state. The second gives `[1, NaN, NaN]`, because `map` passes `(value, index)`, so it calls `parseInt('1', 0)` (radix 0 is treated as 10, giving `1`), `parseInt('2', 1)` (radix 1 is invalid, so `NaN`) and `parseInt('3', 2)` (radix 2 is valid, but `3` is not a binary digit, so `NaN`). Use `.map(Number)`.
 
 **বাংলায়:**
 
-`[10, 1, 2].sort()` দেয় `[1, 10, 2]`, কারণ default sort value-গুলোকে **string** হিসেবে compare করে — `.sort((a, b) => a - b)` ব্যবহার করুন। `sort` original array-কেও mutate করে, তাই React state-এর জন্য `toSorted()` বা `[...arr].sort()` ব্যবহার করুন। `['1', '2', '3'].map(parseInt)` দেয় `[1, NaN, NaN]`, কারণ `map` `(value, index)` pass করে, ফলে `parseInt('2', 1)` আর `parseInt('3', 2)` call হয় — এগুলো invalid radix। এর বদলে `.map(Number)` ব্যবহার করুন।
+`[10, 1, 2].sort()` দেয় `[1, 10, 2]`, কারণ default sort value-গুলোকে **string** হিসেবে compare করে — `.sort((a, b) => a - b)` ব্যবহার করুন। `sort` original array-কেও mutate করে, তাই React state-এর জন্য `toSorted()` বা `[...arr].sort()` ব্যবহার করুন। `['1', '2', '3'].map(parseInt)` দেয় `[1, NaN, NaN]`, কারণ `map` `(value, index)` pass করে, ফলে `parseInt('1', 0)` (radix 0 মানে 10, তাই `1`), `parseInt('2', 1)` (radix 1 invalid, তাই `NaN`) আর `parseInt('3', 2)` call হয় — radix 2 valid, কিন্তু binary-তে `3` বলে কোনো digit নেই, তাই `NaN`। এর বদলে `.map(Number)` ব্যবহার করুন।
 
 ### T8. Is JavaScript pass-by-reference? What does this print?
 
@@ -2252,15 +2258,15 @@ const handleClick = useCallback(() => setOpen(true), []);
 
 ### Q1. What is Toffee, and why do you want to work on it?
 
-> "Toffee is Banglalink's streaming platform — when I used it I saw live TV channels, live sports, dramas and movies, on the web and in the mobile app. The web app is built with Next.js. What excites me is that streaming is one of the hardest frontend problems: video has to start fast and keep playing on cheap phones and slow mobile data, while a huge number of people open the same match at the same moment. I want to work on a product where frontend performance is directly visible to users — every second of buffering is someone closing the app."
+> "Toffee is Banglalink's streaming platform — when I used it I saw live TV channels, live sports, dramas and movies, on the web and in the mobile app. From the page source, the web app looks like it's built with Next.js. What excites me is that streaming is one of the hardest frontend problems: video has to start fast and keep playing on cheap phones and slow mobile data, while a huge number of people open the same match at the same moment. I want to work on a product where frontend performance is directly visible to users — every second of buffering is someone closing the app."
 
-**Why this works:** it shows you looked at the product (live sports, Next.js, multi-platform), names the real engineering challenge (scale + weak devices + weak networks), and connects it to user impact. Before the interview, actually use the site and app for a few minutes and mention one concrete thing you noticed.
+**Why this works:** it shows you looked at the product (live sports, Next.js, multi-platform), names the real engineering challenge (scale + weak devices + weak networks), and connects it to user impact. Before the interview, actually use the site and app for a few minutes and mention one concrete thing you noticed. Verify the Next.js claim yourself first (for example, `/_next/` asset paths in the page source) — only say what you have checked.
 
 **বাংলায়:**
 
-"Toffee হলো Banglalink-এর streaming platform — আমি ব্যবহার করে দেখেছি live TV channel, live sports, drama আর movie, web-এ আর mobile app-এ। Web app-টা Next.js দিয়ে বানানো। আমাকে যেটা সবচেয়ে বেশি excite করে, সেটা হলো streaming frontend-এর সবচেয়ে কঠিন problem-গুলোর একটা: সস্তা phone আর slow mobile data-তেও video দ্রুত start হতে হবে আর থেমে না গিয়ে চলতে হবে, অথচ একই মুহূর্তে বিপুল সংখ্যক মানুষ একই match খুলছে। আমি এমন একটা product-এ কাজ করতে চাই যেখানে frontend performance user সরাসরি দেখতে পায় — buffering-এর প্রতিটা সেকেন্ড মানে কেউ একজন app বন্ধ করে দিচ্ছে।"
+"Toffee হলো Banglalink-এর streaming platform — আমি ব্যবহার করে দেখেছি live TV channel, live sports, drama আর movie, web-এ আর mobile app-এ। Page source দেখে মনে হলো web app-টা Next.js দিয়ে বানানো। আমাকে যেটা সবচেয়ে বেশি excite করে, সেটা হলো streaming frontend-এর সবচেয়ে কঠিন problem-গুলোর একটা: সস্তা phone আর slow mobile data-তেও video দ্রুত start হতে হবে আর থেমে না গিয়ে চলতে হবে, অথচ একই মুহূর্তে বিপুল সংখ্যক মানুষ একই match খুলছে। আমি এমন একটা product-এ কাজ করতে চাই যেখানে frontend performance user সরাসরি দেখতে পায় — buffering-এর প্রতিটা সেকেন্ড মানে কেউ একজন app বন্ধ করে দিচ্ছে।"
 
-**কেন এটা কাজ করে:** এতে বোঝা যায় আপনি product-টা সত্যিই দেখেছেন (live sports, Next.js, multi-platform), আসল engineering challenge-টা ধরতে পেরেছেন (scale + দুর্বল device + দুর্বল network), আর সেটাকে user impact-এর সাথে connect করেছেন। Interview-এর আগে কয়েক মিনিট নিজে site আর app ব্যবহার করুন, আর নিজের চোখে খেয়াল করা একটা concrete জিনিস উল্লেখ করুন।
+**কেন এটা কাজ করে:** এতে বোঝা যায় আপনি product-টা সত্যিই দেখেছেন (live sports, Next.js, multi-platform), আসল engineering challenge-টা ধরতে পেরেছেন (scale + দুর্বল device + দুর্বল network), আর সেটাকে user impact-এর সাথে connect করেছেন। Interview-এর আগে কয়েক মিনিট নিজে site আর app ব্যবহার করুন, আর নিজের চোখে খেয়াল করা একটা concrete জিনিস উল্লেখ করুন। Next.js-এর কথাটা আগে নিজে যাচাই করুন (যেমন page source-এ `/_next/` asset path) — শুধু যা নিজে check করেছেন সেটাই বলুন।
 
 ### Q2. Progressive download vs adaptive streaming — what's the difference?
 
@@ -2340,24 +2346,39 @@ export function VideoPlayer({ src }: { src: string }) {
         const hls = new Hls({ capLevelToPlayerSize: true });
         let netRetries = 0;
         let mediaRetries = 0;
-        // playback is healthy again: give the next failure a fresh budget
-        hls.on(Hls.Events.FRAG_BUFFERED, () => { netRetries = 0; mediaRetries = 0; });
+        let lastRecovery = 0;
+        let retryTimer: number | undefined;
+        const fail = () => {
+          clearTimeout(retryTimer);
+          hls.destroy();
+          destroy = () => {}; // already torn down, make cleanup a no-op
+          setError('Playback failed. Please try again.');
+        };
+        // 30 s of healthy playback since the last recovery: give the next failure a fresh budget
+        hls.on(Hls.Events.FRAG_BUFFERED, () => {
+          if (Date.now() - lastRecovery > 30_000) { netRetries = 0; mediaRetries = 0; }
+        });
         hls.on(Hls.Events.ERROR, (_, data) => {
           if (!data.fatal) return; // hls.js retries non-fatal errors itself
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && ++netRetries <= 3) {
-            hls.startLoad();
+          const manifestFailed =
+            data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
+            data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT ||
+            data.details === Hls.ErrorDetails.MANIFEST_PARSING_ERROR;
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && !manifestFailed && ++netRetries <= 3) {
+            // hls.js has already retried internally, so wait before restarting (2 s, 4 s, 8 s)
+            lastRecovery = Date.now();
+            retryTimer = window.setTimeout(() => hls.startLoad(), 1000 * 2 ** netRetries);
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR && ++mediaRetries <= 3) {
+            lastRecovery = Date.now();
             if (mediaRetries > 1) hls.swapAudioCodec(); // repeated media error
             hls.recoverMediaError();
           } else {
-            hls.destroy();
-            destroy = () => {}; // already torn down, make cleanup a no-op
-            setError('Playback failed. Please try again.');
+            fail(); // includes manifest failures: startLoad() can't re-fetch the manifest
           }
         });
         hls.loadSource(src);
         hls.attachMedia(video);
-        destroy = () => hls.destroy();
+        destroy = () => { clearTimeout(retryTimer); hls.destroy(); };
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         const onErr = () => setError('Playback failed. Please try again.');
         video.addEventListener('error', onErr);
@@ -2388,11 +2409,11 @@ export function VideoPlayer({ src }: { src: string }) {
 }
 ```
 
-**Points to say out loud:** it must be a Client Component (it touches the browser and the video element); hls.js is imported **inside the effect**, so it never runs during SSR and lives in its own chunk; check `Hls.isSupported()` first, because `canPlayType` also returns a value in browsers like Chrome on Android, and it is not a "Safari check"; fatal errors get a few recovery attempts, counted separately for network and media errors and reset once a fragment buffers again, so a long live match doesn't run out of retries (`swapAudioCodec()` then `recoverMediaError()` on a repeated media error); after that the player is destroyed once (cleanup becomes a no-op, so no double destroy) and the user sees a message instead of a dead black box — the native-HLS path listens for the video `error` event for the same reason; the **cleanup** sets `cancelled`, removes listeners and destroys the player so switching channels doesn't leave the old stream downloading in the background; `aspect-video` reserves space so there's no layout shift; `playsInline` stops iPhone from forcing fullscreen. To keep the whole component out of the home page bundle, load it from a Client Component with `dynamic(() => import('./VideoPlayer').then(m => m.VideoPlayer), { ssr: false })` — `.then` is needed because `VideoPlayer` is a named export.
+**Points to say out loud:** it must be a Client Component (it touches the browser and the video element); hls.js is imported **inside the effect**, so it never runs during SSR and lives in its own chunk; check `Hls.isSupported()` first, because `canPlayType` also returns a value in browsers like Chrome on Android, and it is not a "Safari check"; fatal errors get a few recovery attempts, counted separately for network and media errors — network errors are retried with a growing delay (hls.js has already retried internally, so restarting instantly can loop), and a repeated media error gets `swapAudioCodec()` then `recoverMediaError()`; the counters reset only after 30 s of healthy playback, so a long live match doesn't run out of retries, but an error that comes back after every fragment can't loop forever; a manifest failure (wrong or expired URL, offline at start) can't be fixed by `startLoad()`, so it goes straight to the message; after that the player is destroyed once (cleanup clears the retry timer and becomes a no-op, so no double destroy) and the user sees a message instead of a dead black box — the native-HLS path listens for the video `error` event for the same reason; the **cleanup** sets `cancelled`, removes listeners and destroys the player so switching channels doesn't leave the old stream downloading in the background; `aspect-video` reserves space so there's no layout shift; `playsInline` stops iPhone from forcing fullscreen. To keep the whole component out of the home page bundle, load it from a Client Component (`ssr: false` is an error in a Server Component) with `dynamic(() => import('./VideoPlayer').then(m => m.VideoPlayer), { ssr: false, loading: () => <div className="aspect-video w-full bg-black" /> })` — `.then` is needed because `VideoPlayer` is a named export, and without the `loading` placeholder nothing renders until the chunk arrives, so the page shifts.
 
 **বাংলায়:**
 
-এটা একটা Client Component, কারণ browser আর video element লাগে; hls.js effect-এর ভেতরে dynamic import করা হয়, তাই SSR-এ চলে না আর আলাদা chunk-এ থাকে। আগে `Hls.isSupported()` check করা হয়, কারণ `canPlayType` Android Chrome-এও value দেয় — এটা "Safari check" না। Fatal error হলে কয়েকবার recovery চেষ্টা হয় — network আর media error আলাদা গোনা হয়, আর fragment আবার buffer হলে counter reset হয়, যাতে লম্বা live match-এ retry ফুরিয়ে না যায় (repeated media error-এ `swapAudioCodec()` তারপর `recoverMediaError()`); তারপর player একবারই destroy হয় (cleanup no-op হয়ে যায়, তাই double destroy হয় না) আর user একটা message দেখে, কালো box না — native HLS path-এও একই কারণে video-র `error` event শোনা হয়। Cleanup-এ `cancelled` set করে listener সরিয়ে player destroy করা হয়, যাতে channel বদলালে পুরনো stream background-এ download না হয়; `aspect-video` layout shift আটকায় আর `playsInline` iPhone-এ জোর করে fullscreen হওয়া থামায়। Home page bundle থেকে পুরো component বাইরে রাখতে `dynamic(..., { ssr: false })` দিয়ে load করুন — named export বলে `.then` লাগে।
+এটা একটা Client Component, কারণ browser আর video element লাগে; hls.js effect-এর ভেতরে dynamic import করা হয়, তাই SSR-এ চলে না আর আলাদা chunk-এ থাকে। আগে `Hls.isSupported()` check করা হয়, কারণ `canPlayType` Android Chrome-এও value দেয় — এটা "Safari check" না। Fatal error হলে কয়েকবার recovery চেষ্টা হয় — network আর media error আলাদা গোনা হয়। Network error-এ delay বাড়িয়ে retry হয় (hls.js নিজে আগেই retry করে ফেলেছে, তাই সাথে সাথে retry করলে loop হতে পারে), আর repeated media error-এ `swapAudioCodec()` তারপর `recoverMediaError()`। Counter শুধু 30 সেকেন্ড ঠিকঠাক playback-এর পর reset হয়, যাতে লম্বা live match-এ retry ফুরিয়ে না যায়, আবার প্রতি fragment-এর পর ফিরে আসা error অনন্ত loop-ও না করে। Manifest load fail হলে (ভুল বা expired URL, শুরুতেই offline) `startLoad()` কিছু করে না, তাই সরাসরি message দেখানো হয়। তারপর player একবারই destroy হয় (cleanup retry timer clear করে no-op হয়ে যায়, তাই double destroy হয় না) আর user একটা message দেখে, কালো box না — native HLS path-এও একই কারণে video-র `error` event শোনা হয়। Cleanup-এ `cancelled` set করে listener সরিয়ে player destroy করা হয়, যাতে channel বদলালে পুরনো stream background-এ download না হয়; `aspect-video` layout shift আটকায় আর `playsInline` iPhone-এ জোর করে fullscreen হওয়া থামায়। Home page bundle থেকে পুরো component বাইরে রাখতে একটা Client Component থেকে `dynamic(..., { ssr: false, loading: () => <div className="aspect-video w-full bg-black" /> })` দিয়ে load করুন (Server Component-এ `ssr: false` দিলে error হয়) — named export বলে `.then` লাগে, আর `loading` placeholder না দিলে chunk আসা পর্যন্ত জায়গা থাকে না, layout shift হয়।
 
 ### Q7. Why doesn't my video autoplay?
 
@@ -2441,13 +2462,13 @@ Frontend side:
 
 **বাংলায়:**
 
-এটা ভেতরের তথ্য হিসেবে না, নিজের observation হিসেবে বলুন: "Toffee-র site ব্যবহার করার সময় আমি একটা device-registration step দেখেছি — আমার ধারণা এটা..." সম্ভাব্য কারণ: device register করানো হয় account-প্রতি device limit, concurrent stream limit (login sharing আটকাতে), DRM license আর entitlement device-এর সাথে বাঁধতে, আর fraud ধরতে। Frontend-এ প্রথম visit-এ একটা stable device ID (random UUID, `localStorage` বা long-lived cookie-তে) বানাই — fingerprinting না, কারণ সেটা unreliable আর privacy-র জন্য খারাপ। Login আর license request-এ ID পাঠাই, server device token দেয়; playback-এর সময় প্রতি ~30–60 সেকেন্ডে heartbeat পাঠাই, limit পার হলে player থামিয়ে পরিষ্কার message দেখাই। Failure page-এ কারণ আর retry থাকা উচিত; আর মনে রাখবেন frontend শুধু *অনুরোধ* করতে পারে, আসল enforcement API আর license server-এ।
+এটা ভেতরের তথ্য হিসেবে না, নিজের observation হিসেবে বলুন: "Toffee-র site ব্যবহার করার সময় আমি একটা device-registration step দেখেছি — আমার ধারণা এটা..." সম্ভাব্য কারণ: account-প্রতি device সংখ্যা সীমিত রাখা, concurrent stream limit করা (login sharing আটকাতে), DRM license আর entitlement device-এর সাথে বাঁধা, আর fraud ধরা। Frontend-এ প্রথম visit-এ একটা stable device ID (random UUID, `localStorage` বা long-lived cookie-তে) বানাই — fingerprinting না, কারণ সেটা unreliable আর privacy-র জন্য খারাপ। Login আর license request-এ ID পাঠাই, server device token দেয়; playback-এর সময় প্রতি ~30–60 সেকেন্ডে heartbeat পাঠাই, limit পার হলে player থামিয়ে পরিষ্কার message দেখাই। Failure page-এ কারণ আর retry থাকা উচিত; আর মনে রাখবেন frontend শুধু *অনুরোধ* করতে পারে, আসল enforcement API আর license server-এ।
 
 ### Q10. How do you stop people from copying the stream URL and sharing it?
 
 The frontend alone can't — anything in the browser is visible in DevTools. The protection is server-side, and the frontend cooperates:
 
-- **Signed URLs or signed cookies** from the CDN with a short expiry (minutes), sometimes bound to the user. The player gets a fresh signed manifest URL from the API right before playback.
+- **Signed URLs or signed cookies** from the CDN with a short expiry (minutes), sometimes bound to the user. The player gets a fresh signed manifest URL from the API right before playback — and the token must also cover segment requests (signed cookies, or a CDN/packager that carries the token into every segment URL); signing only the manifest isn't enough, because segment URLs can still be shared.
 - **DRM** for premium content, so even a downloaded segment is useless without a license.
 - **Token in the license request**, checked against the user's subscription.
 - Concurrency heartbeats (previous question).
@@ -2456,7 +2477,7 @@ Frontend responsibilities: never hard-code stream URLs in the bundle, refresh to
 
 **বাংলায়:**
 
-শুধু frontend দিয়ে এটা আটকানো যায় না, কারণ browser-এ যা থাকে DevTools-এ দেখা যায়; protection server-side, frontend শুধু সহযোগিতা করে। CDN-এর short expiry-র signed URL বা signed cookie, premium content-এ DRM, license request-এ token check, আর concurrency heartbeat — এগুলোই আসল ব্যবস্থা। Frontend-এর কাজ হলো bundle-এ stream URL hard-code না করা, match-এর মাঝে token expire হওয়ার আগেই refresh করা, আর CDN থেকে 403 এলে error না দেখিয়ে নতুন signed URL আনা।
+শুধু frontend দিয়ে এটা আটকানো যায় না, কারণ browser-এ যা থাকে DevTools-এ দেখা যায়; protection server-side, frontend শুধু সহযোগিতা করে। CDN-এর short expiry-র signed URL বা signed cookie (শুধু manifest sign করলে হবে না — segment request-এও token লাগবে, signed cookie বা এমন CDN/packager দিয়ে যে প্রতিটা segment URL-এ token বসায়), premium content-এ DRM, license request-এ token check, আর concurrency heartbeat — এগুলোই আসল ব্যবস্থা। Frontend-এর কাজ হলো bundle-এ stream URL hard-code না করা, match-এর মাঝে token expire হওয়ার আগেই refresh করা, আর CDN থেকে 403 এলে error না দেখিয়ে নতুন signed URL আনা।
 
 ### Q11. Why is a live stream 20–30 seconds behind TV, and how can it be reduced?
 
@@ -2528,13 +2549,13 @@ Home আর category page server-rendered আর cached (short `revalidate`-স�
 
 - `generateMetadata()` per page: title, description, canonical URL.
 - Open Graph and Twitter images (the poster), so shared links look good on Facebook and messaging apps.
-- **JSON-LD structured data:** `Movie`, `TVSeries`/`TVEpisode`, and `VideoObject` (name, thumbnail, upload date, duration). For live matches, `BroadcastEvent` with `isLiveBroadcast`.
+- **JSON-LD structured data:** `Movie`, `TVSeries`/`TVEpisode`, and `VideoObject` (name, thumbnail, upload date, duration). For live matches, a `VideoObject` whose `publication` is a `BroadcastEvent` with `isLiveBroadcast: true`, `startDate` and `endDate`.
 - `hreflang` alternates between the English and Bangla versions.
 - Sitemaps that include every title and episode, and real HTML content (synopsis, cast) rendered on the server — not an empty page that only fills in with JS.
 
 **বাংলায়:**
 
-প্রতিটা page-এ `generateMetadata()` দিয়ে title, description, canonical URL দিন, আর poster দিয়ে Open Graph/Twitter image, যাতে Facebook বা messaging app-এ share করা link সুন্দর দেখায়। JSON-LD structured data দিন: `Movie`, `TVSeries`/`TVEpisode`, `VideoObject`, আর live match-এর জন্য `isLiveBroadcast`-সহ `BroadcastEvent`। English আর Bangla version-এর মধ্যে `hreflang`, সব title আর episode-সহ sitemap, আর synopsis ও cast-এর মতো আসল HTML content server-এ render করুন — JS দিয়ে পরে ভরা খালি page না।
+প্রতিটা page-এ `generateMetadata()` দিয়ে title, description, canonical URL দিন, আর poster দিয়ে Open Graph/Twitter image, যাতে Facebook বা messaging app-এ share করা link সুন্দর দেখায়। JSON-LD structured data দিন: `Movie`, `TVSeries`/`TVEpisode`, `VideoObject`, আর live match-এ `VideoObject`-এর `publication`-এ `isLiveBroadcast: true`, `startDate`, `endDate`-সহ `BroadcastEvent`। English আর Bangla version-এর মধ্যে `hreflang`, সব title আর episode-সহ sitemap, আর synopsis ও cast-এর মতো আসল HTML content server-এ render করুন — JS দিয়ে পরে ভরা খালি page না।
 
 ### Q16. The home page has 15 horizontal rows of posters. How do you keep it fast?
 
@@ -2667,11 +2688,11 @@ Structure হলো requirements → components → data → performance → edg
 
 ### Q26. Trap: "The stream plays in Chrome but shows a black screen on iPhone." Where do you look?
 
-**Answer:** Likely causes, in order: (1) the code only uses hls.js/MSE with no **native HLS fallback** — this only breaks iOS below 17.1, since newer iPhones use ManagedMediaSource; (2) DRM is Widevine-only but Apple devices need **FairPlay**; (3) `playsInline` is missing or autoplay with sound is blocked, so `play()` rejected silently; (4) the stream uses a codec or container Safari doesn't support. Debug with Safari Web Inspector on a real device — not Chrome's device emulation, which still uses Chrome's media stack.
+**Answer:** Likely causes, in order: (1) the code only uses hls.js/MSE with no **native HLS fallback** — with hls.js 1.5+ this only breaks iOS below 17.1 (newer iPhones get ManagedMediaSource), but an older hls.js, or code that checks `window.MediaSource` directly, fails on every iPhone; (2) DRM is Widevine-only but Apple devices need **FairPlay**; (3) `playsInline` is missing or autoplay with sound is blocked, so `play()` rejected silently; (4) the stream uses a codec or container Safari doesn't support. Debug with Safari Web Inspector on a real device — not Chrome's device emulation, which still uses Chrome's media stack.
 
 **বাংলায়:**
 
-সম্ভাব্য কারণ ক্রমানুসারে: (1) code শুধু hls.js/MSE ব্যবহার করে, native HLS fallback নেই — এটা শুধু iOS 17.1-এর নিচে ভাঙে, কারণ নতুন iPhone ManagedMediaSource ব্যবহার করে; (2) DRM শুধু Widevine, কিন্তু Apple device-এ FairPlay লাগে; (3) `playsInline` নেই বা sound-সহ autoplay block হয়েছে, তাই `play()` চুপচাপ reject করেছে; (4) stream-এর codec বা container Safari support করে না। Debug করুন আসল device-এ Safari Web Inspector দিয়ে — Chrome-এর device emulation দিয়ে না, কারণ সেটা এখনো Chrome-এর media stack ব্যবহার করে।
+সম্ভাব্য কারণ ক্রমানুসারে: (1) code শুধু hls.js/MSE ব্যবহার করে, native HLS fallback নেই — hls.js 1.5+ হলে এটা শুধু iOS 17.1-এর নিচে ভাঙে (নতুন iPhone ManagedMediaSource পায়), কিন্তু পুরনো hls.js বা সরাসরি `window.MediaSource` check করা code সব iPhone-এ ভাঙে; (2) DRM শুধু Widevine, কিন্তু Apple device-এ FairPlay লাগে; (3) `playsInline` নেই বা sound-সহ autoplay block হয়েছে, তাই `play()` চুপচাপ reject করেছে; (4) stream-এর codec বা container Safari support করে না। Debug করুন আসল device-এ Safari Web Inspector দিয়ে — Chrome-এর device emulation দিয়ে না, কারণ সেটা এখনো Chrome-এর media stack ব্যবহার করে।
 
 ### Q27. Trap: users say data usage keeps growing after they switch channels. What's the bug?
 
@@ -2792,15 +2813,19 @@ Bug হলো আগের player instance কখনো destroy হয়নি 
       });
     };
 
-    var rec = null, recBtn = null, recStatus = null;
-    function setRecUi(on) {
-      if (!recBtn) return;
-      recBtn.classList.toggle("listening", on);
-      recBtn.setAttribute("aria-pressed", String(on));
-      recBtn.textContent = on ? "⏹ Stop listening" : "🎤 Answer by voice";
+    var rec = null, recBtn = null;
+    function setRecUi(btn, on) {
+      btn.classList.toggle("listening", on);
+      btn.setAttribute("aria-pressed", String(on));
+      btn.textContent = on ? "⏹ Stop listening" : "🎤 Answer by voice";
     }
-    v.stopListening = function () { if (rec) rec.stop(); };
+    // discard: abort and drop any pending speech instead of writing it (used by Reset).
+    v.stopListening = function (discard) {
+      if (!rec) return;
+      if (discard) { rec.discard = true; rec.abort(); } else rec.stop();
+    };
     // Appends what you say to the textarea; onChange runs the normal autosave.
+    // Each session keeps its own btn/ta/statusEl, so switching cards cleans up the old one.
     v.toggleListen = function (btn, ta, statusEl, onChange) {
       if (rec) { var same = recBtn === btn; rec.stop(); if (same) return; }
       v.stopSpeaking();
@@ -2808,9 +2833,10 @@ Bug হলো আগের player instance কখনো destroy হয়নি 
       r.lang = v.recLang || "en-US"; r.continuous = true; r.interimResults = true;
       var base = ta.value && !/\s$/.test(ta.value) ? ta.value + " " : ta.value;
       var finalText = "";
-      rec = r; recBtn = btn; recStatus = statusEl;
-      r.onstart = function () { setRecUi(true); statusEl.textContent = "Listening…"; };
+      rec = r; recBtn = btn;
+      r.onstart = function () { setRecUi(btn, true); statusEl.textContent = "Listening…"; };
       r.onresult = function (e) {
+        if (r.discard) return;
         var interim = "";
         for (var i = e.resultIndex; i < e.results.length; i++) {
           if (e.results[i].isFinal) finalText += e.results[i][0].transcript.trim() + " ";
@@ -2820,21 +2846,21 @@ Bug হলো আগের player instance কখনো destroy হয়নি 
         onChange();
       };
       r.onerror = function (e) {
-        recStatus.textContent =
+        statusEl.textContent =
           e.error === "not-allowed" || e.error === "service-not-allowed" ? "Microphone blocked — allow it in the browser, and open this page over http://localhost rather than as a file." :
           e.error === "no-speech" ? "Didn't hear anything — try again." :
           e.error === "network" ? "Speech service unreachable — check your connection." :
           e.error === "aborted" ? "" : "Voice input error: " + e.error;
       };
       r.onend = function () {
-        if (rec !== r) return;
+        if (rec === r) { rec = null; recBtn = null; }
+        else if (recBtn === btn) return; // a newer session on this same card owns its UI now
         var done = (base + finalText).replace(/\s+$/, "");
-        if (ta.value !== done) { ta.value = done; onChange(); }
-        setRecUi(false);
-        if (recStatus.textContent === "Listening…") recStatus.textContent = "";
-        rec = null; recBtn = null; recStatus = null;
+        if (!r.discard && ta.value !== done) { ta.value = done; onChange(); } // drop leftover interim text
+        setRecUi(btn, false);
+        if (statusEl.textContent === "Listening…") statusEl.textContent = "";
       };
-      try { r.start(); } catch (err) { rec = null; statusEl.textContent = "Couldn't start voice input."; }
+      try { r.start(); } catch (err) { rec = null; recBtn = null; statusEl.textContent = "Couldn't start voice input."; }
     };
     return v;
   })();
@@ -2947,7 +2973,7 @@ Bug হলো আগের player instance কখনো destroy হয়নি 
           '<div class="actions"><button class="btn reveal" aria-expanded="false" aria-controls="' + aid + '">Show answer</button>' +
             (voice.canListen ? '<button class="btn voice mic" aria-pressed="false" title="Speak your answer; press again to stop">🎤 Answer by voice</button>' : "") +
             '<span class="saved" aria-live="polite"></span></div>' +
-          '<div class="answer" id="' + aid + '"><div><div class="answer-inner"><div class="ans-head"><p class="ans-label">Model answer</p>' +
+          '<div class="answer" id="' + aid + '" inert><div><div class="answer-inner"><div class="ans-head"><p class="ans-label">Model answer</p>' +
             (voice.canSpeak ? '<button class="btn voice speak" aria-pressed="false">🔊 Hear answer</button>' : "") +
           '</div><div class="md lang-en">' + md(qq.answer) + "</div>" +
           (qq.bn ? '<div class="md lang-bn" lang="bn"><p class="bn-label">বাংলায়</p>' + md(qq.bn) + "</div>" : "") +
@@ -2988,6 +3014,7 @@ Bug হলো আগের player instance কখনো destroy হয়নি 
   function setOpen(qq, open) {
     var ans = qq.el.querySelector(".answer"), b = qq.el.querySelector(".reveal");
     ans.classList.toggle("open", open);
+    ans.toggleAttribute("inert", !open); // collapsed answer: no Tab stops, not read by screen readers
     b.setAttribute("aria-expanded", String(open));
     b.textContent = open ? "Hide answer" : "Show answer";
     b.classList.toggle("secondary", open);
@@ -3059,6 +3086,7 @@ Bug হলো আগের player instance কখনো destroy হয়নি 
   });
   document.getElementById("reset").addEventListener("click", function () {
     if (!confirm("Clear all your typed answers and marks? This can't be undone.")) return;
+    voice.stopListening(true); voice.stopSpeaking(); // otherwise a live mic writes the old text back
     state = { answers: {}, status: {} }; save();
     all.forEach(function (qq) { qq.el.querySelector("textarea").value = ""; qq.el.querySelector(".saved").textContent = ""; paintStatus(qq); setOpen(qq, false); });
     updateCounts(); applyFilter();
@@ -3070,6 +3098,8 @@ Bug হলো আগের player instance কখনো destroy হয়নি 
   function labelTheme() { themeBtn.textContent = isDark() ? "Light mode" : "Dark mode"; }
   try { var saved = localStorage.getItem(STORE_KEY + "-theme"); if (saved) root.setAttribute("data-theme", saved); } catch (e) {}
   labelTheme();
+  var darkMq = matchMedia("(prefers-color-scheme: dark)");
+  if (darkMq.addEventListener) darkMq.addEventListener("change", labelTheme); // OS theme changed
   themeBtn.addEventListener("click", function () {
     var next = isDark() ? "light" : "dark";
     root.setAttribute("data-theme", next);
@@ -3115,19 +3145,33 @@ Bug হলো আগের player instance কখনো destroy হয়নি 
     window.addEventListener("pagehide", function () { voice.stopSpeaking(); voice.stopListening(); });
   }
 
-  /* ---------- Active section in nav ---------- */
-  if ("IntersectionObserver" in window) {
-    var links = {};
-    nav.querySelectorAll("a").forEach(function (a) { links[a.getAttribute("href").slice(1)] = a; });
-    var io = new IntersectionObserver(function (entries) {
+  // Typing saves after a 400 ms pause; flush when the tab is hidden or closed so nothing is lost.
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") save(); });
+  window.addEventListener("pagehide", save);
+
+  /* ---------- Top bar height and active section in nav ---------- */
+  // The sticky top bar wraps to a different height per width; offsets follow its measured height.
+  var topbar = document.querySelector(".topbar"), io = null, topbarH = -1, links = {};
+  nav.querySelectorAll("a").forEach(function (a) { links[a.getAttribute("href").slice(1)] = a; });
+  function fitTopbar() {
+    var h = Math.round(topbar.getBoundingClientRect().height);
+    if (h === topbarH) return;
+    topbarH = h;
+    root.style.setProperty("--topbar-h", h + "px");
+    if (!("IntersectionObserver" in window)) return;
+    if (io) io.disconnect();
+    io = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) {
         if (en.isIntersecting) {
           Object.keys(links).forEach(function (k) { links[k].classList.toggle("active", k === en.target.id); });
         }
       });
-    }, { rootMargin: "-140px 0px -65% 0px" });
+    }, { rootMargin: "-" + (h + 10) + "px 0px -65% 0px" });
     sections.forEach(function (s) { io.observe(document.getElementById(s.id)); });
   }
+  fitTopbar();
+  if ("ResizeObserver" in window) new ResizeObserver(fitTopbar).observe(topbar);
+  else window.addEventListener("resize", fitTopbar);
 
   updateCounts();
 })();
