@@ -20,6 +20,9 @@
 # production
 /build
 
+# local backups (npm run backup) can hold user data
+/backups
+
 # misc
 .DS_Store
 *.pem

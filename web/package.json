@@ -13,7 +13,10 @@
     "lint": "eslint",
     "test": "vitest run",
     "import:legacy": "tsx scripts/import-legacy.ts",
-    "seed:dev": "tsx scripts/seed-dev.ts"
+    "seed:dev": "tsx scripts/seed-dev.ts",
+    "content": "tsx scripts/content.ts",
+    "backup": "tsx scripts/backup.ts",
+    "restore": "tsx scripts/restore.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
