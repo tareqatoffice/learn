@@ -12,5 +12,6 @@ const revisionSchema = new Schema(
 );
 
 revisionSchema.index({ entityType: 1, entityId: 1, editedAt: -1 });
+revisionSchema.index({ editedAt: -1 }); // admin "recent edits" list
 
 export const Revision = mongoose.models.Revision || model("Revision", revisionSchema);

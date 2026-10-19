@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { commitImportAction, previewImportAction, type ImportInput } from "@/app/(app)/admin/import/actions";
 import { inputClass } from "@/components/admin/SaveBar";
+import { SubjectPicker } from "@/components/SubjectPicker";
 import { Button } from "@/components/ui/button";
 import type { ImportReport } from "@/content/types";
 
@@ -10,21 +11,32 @@ type Kind = "book" | "series" | "graph";
 type Files = { name: string; content: string }[];
 
 /** Paste or upload content, preview the import, then commit exactly what was previewed. */
-export function ImportForm() {
+export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string; name: string }[] }) {
   const [kind, setKind] = useState<Kind>("book");
   const [slug, setSlug] = useState("");
   const [title, setTitle] = useState("");
+  const [subjects, setSubjects] = useState<string[]>([]);
   const [publish, setPublish] = useState(false);
   const [text, setText] = useState("");
   const [files, setFiles] = useState<Files>([]);
   const [report, setReport] = useState<ImportReport | null>(null);
-  const [previewed, setPreviewed] = useState<string | null>(null);
+  // True only while the inputs are exactly what the last clean preview saw; any edit clears it.
+  const [previewClean, setPreviewClean] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  /** Wraps a setter so every input change invalidates the last preview. */
+  const edit =
+    <T,>(setter: (value: T) => void) =>
+    (value: T) => {
+      setPreviewClean(false);
+      setter(value);
+    };
+
+  // Built only when Preview or Commit is pressed, never per keystroke.
   function build(): ImportInput | string {
     const target = { kind, slug: slug.trim() };
-    const base = { target, title: title.trim() || undefined, publish };
+    const base = { target, title: title.trim() || undefined, subjects, publish };
     if (kind === "series") {
       const list = files.length ? files : text.trim() ? [{ name: "pasted.md", content: text }] : [];
       return list.length ? { ...base, source: { kind, files: list } } : "Add chapter files or paste one chapter";
@@ -41,18 +53,15 @@ export function ImportForm() {
     return { ...base, source: { kind, markdown: body } };
   }
 
-  const current = build();
-  const key = typeof current === "string" ? null : JSON.stringify(current);
-  const canCommit = !!report && !report.errors.length && previewed !== null && previewed === key;
-
   const go = (commit: boolean) =>
     startTransition(async () => {
       setError(null);
-      if (typeof current === "string") return setError(current);
-      const r = await (commit ? commitImportAction(current) : previewImportAction(current));
+      const input = build();
+      if (typeof input === "string") return setError(input);
+      const r = await (commit ? commitImportAction(input) : previewImportAction(input));
       if ("error" in r) return setError(r.error);
       setReport(r);
-      setPreviewed(commit ? null : key);
+      setPreviewClean(!commit && !r.errors.length);
     });
 
   return (
@@ -60,7 +69,7 @@ export function ImportForm() {
       <div className="grid gap-4 md:grid-cols-3">
         <label className="grid gap-1 text-sm">
           <span className="font-medium">Target kind</span>
-          <select className={inputClass} value={kind} onChange={(e) => setKind(e.target.value as Kind)}>
+          <select className={inputClass} value={kind} onChange={(e) => edit(setKind)(e.target.value as Kind)}>
             <option value="book">Question book (markdown)</option>
             <option value="series">Note series (one .md per chapter)</option>
             <option value="graph">Graph (JSON)</option>
@@ -68,12 +77,17 @@ export function ImportForm() {
         </label>
         <label className="grid gap-1 text-sm">
           <span className="font-medium">Target slug</span>
-          <input className={inputClass} value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="existing or new slug" />
+          <input className={inputClass} value={slug} onChange={(e) => edit(setSlug)(e.target.value)} placeholder="existing or new slug" />
         </label>
         <label className="grid gap-1 text-sm">
           <span className="font-medium">Title (only to create a new target)</span>
-          <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input className={inputClass} value={title} onChange={(e) => edit(setTitle)(e.target.value)} />
         </label>
+      </div>
+
+      <div className="grid gap-1 text-sm">
+        <span className="font-medium">Subjects (only to create a new target; its new items inherit them)</span>
+        <SubjectPicker options={subjectOptions} value={subjects} onChange={edit(setSubjects)} />
       </div>
 
       <label className="grid gap-1 text-sm">
@@ -82,16 +96,18 @@ export function ImportForm() {
           type="file"
           multiple={kind === "series"}
           accept={kind === "graph" ? ".json,application/json" : ".md,text/markdown"}
-          onChange={async (e) => setFiles(await Promise.all([...(e.target.files ?? [])].map(async (f) => ({ name: f.name, content: await f.text() }))))}
+          onChange={async (e) =>
+            edit(setFiles)(await Promise.all([...(e.target.files ?? [])].map(async (f) => ({ name: f.name, content: await f.text() }))))
+          }
         />
         {files.length > 0 && <span className="text-muted-foreground">{files.map((f) => f.name).join(", ")}</span>}
       </label>
       <label className="grid gap-1 text-sm">
         <span className="font-medium">…or paste</span>
-        <textarea className={`${inputClass} font-mono`} rows={12} value={text} onChange={(e) => setText(e.target.value)} />
+        <textarea className={`${inputClass} font-mono`} rows={12} value={text} onChange={(e) => edit(setText)(e.target.value)} />
       </label>
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={publish} onChange={(e) => setPublish(e.target.checked)} />
+        <input type="checkbox" checked={publish} onChange={(e) => edit(setPublish)(e.target.checked)} />
         Publish new items (otherwise they start as drafts)
       </label>
 
@@ -99,10 +115,10 @@ export function ImportForm() {
         <Button variant="outline" disabled={pending} onClick={() => go(false)}>
           Preview
         </Button>
-        <Button disabled={pending || !canCommit} onClick={() => go(true)}>
+        <Button disabled={pending || !previewClean} onClick={() => go(true)}>
           Commit
         </Button>
-        {!canCommit && report && !report.dryRun && <span className="text-sm text-muted-foreground">Committed. Preview again to make more changes.</span>}
+        {report && !report.dryRun && <span className="text-sm text-muted-foreground">Committed. Preview again to make more changes.</span>}
         {error && (
           <span role="alert" className="text-sm text-destructive">
             {error}

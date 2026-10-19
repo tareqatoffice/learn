@@ -1,8 +1,12 @@
+import { listSubjects } from "@/admin/queries";
 import { ImportForm } from "@/components/admin/ImportForm";
+import { connectDb } from "@/lib/db";
 
 export const metadata = { title: "Import markdown · Admin" };
 
-export default function ImportPage() {
+export default async function ImportPage() {
+  await connectDb();
+  const subjects = await listSubjects();
   return (
     <section className="grid gap-4">
       <h1 className="text-2xl font-semibold">Import markdown</h1>
@@ -11,7 +15,7 @@ export default function ImportPage() {
         import never deletes or archives anything. Files pulled with <code>npm run content -- pull</code> carry ids, so edits update the
         same items.
       </p>
-      <ImportForm />
+      <ImportForm subjectOptions={subjects} />
     </section>
   );
 }

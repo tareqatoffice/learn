@@ -62,6 +62,7 @@ export function parseCliArgs(argv: string[]): CliCommand {
     }
     if (!target) throw usage("push needs --book, --series or --graph <slug>");
     if (!files.length) throw usage("push needs at least one file");
+    if (target.kind === "graph" && files.length > 1) throw usage("push --graph takes exactly one file (one JSON graph)");
     return { cmd: "push", files, target, dryRun, publish, ...(title ? { title } : {}) };
   }
 

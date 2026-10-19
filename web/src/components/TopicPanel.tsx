@@ -43,6 +43,13 @@ const STATUSES: { value: NodeStatus; label: string }[] = [
 
 const STATUS_LABEL: Record<NodeStatus, string> = { none: "not started", learning: "learning", done: "done" };
 
+/** A js code block whose fence is longer than any backtick run inside the code, so the code can never close it. */
+function fencedCode(code: string): string {
+  const longest = Math.max(0, ...(code.match(/`+/g) ?? []).map((run) => run.length));
+  const fence = "`".repeat(Math.max(3, longest + 1));
+  return `${fence}js\n${code}\n${fence}`;
+}
+
 const linkClass = "hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 export function TopicPanel({ node, status, onStatus, related, pending, topicHref = (s) => `?topic=${s}` }: TopicPanelProps) {
@@ -96,7 +103,7 @@ export function TopicPanel({ node, status, onStatus, related, pending, topicHref
         </ul>
       )}
 
-      {node.code && <Markdown source={`\`\`\`js\n${node.code}\n\`\`\``} />}
+      {node.code && <Markdown source={fencedCode(node.code)} />}
 
       {node.pitfall && (
         <div className="rounded-lg border border-border bg-muted/50 p-3 text-sm">

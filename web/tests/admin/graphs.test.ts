@@ -49,6 +49,22 @@ describe("saveGraph", () => {
     expect(r).toMatchObject({ ok: false, errors: { tracks: expect.any(String) } });
   });
 
+  it("refuses to remove a track that still has topics", async () => {
+    const id = await graph();
+    await saved(node(id, "a", { trackKey: "async" }));
+    const r = await saveGraph(
+      { id, slug: "js", title: "JS", subtitle: "", footer: "", subjects: [], tracks: [TRACKS[0], { key: "extra", name: "Extra" }], status: "published" },
+      ADMIN,
+    );
+    expect(r).toMatchObject({ ok: false, errors: { tracks: expect.stringContaining("Async") } });
+  });
+
+  it("ignores blank key-point lines", async () => {
+    const g = await graph();
+    const id = await saved(node(g, "a", { points: ["One", "", "  ", "Two", ""] }));
+    expect((await GraphNode.findById(id).lean<{ points: string[] }>())?.points).toEqual(["One", "Two"]);
+  });
+
   it("updates with a revision", async () => {
     const id = await graph();
     const r = await saveGraph({ id, slug: "js", title: "JS!", subtitle: "", footer: "", subjects: [], tracks: TRACKS, status: "published" }, ADMIN);

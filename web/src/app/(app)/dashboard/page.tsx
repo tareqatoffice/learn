@@ -45,7 +45,8 @@ export default async function DashboardPage() {
   const user = await requireUser();
   await connectDb();
   const dash = await getDashboard(user.userId);
-  const firstName = user.name?.split(" ")[0];
+  // requireUser falls back to the email when the Google profile has no name; never greet with an address.
+  const firstName = user.name && user.name !== user.email ? user.name.split(" ")[0] : undefined;
 
   return (
     <div className="grid gap-6">

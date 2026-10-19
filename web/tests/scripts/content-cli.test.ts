@@ -29,6 +29,10 @@ describe("parseCliArgs", () => {
     expect(parseCliArgs(["pull", "book", "react"])).toEqual({ cmd: "pull", kind: "book", slug: "react", out: "." });
   });
 
+  it("rejects more than one file for a graph push", () => {
+    expect(() => parseCliArgs(["push", "a.json", "b.json", "--graph", "go"])).toThrow(/one file/i);
+  });
+
   it("throws a usage error for a push without a target", () => {
     expect(() => parseCliArgs(["push", "a.md"])).toThrow(/usage/i);
   });

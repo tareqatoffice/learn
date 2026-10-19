@@ -49,6 +49,16 @@ describe("TopicPanel", () => {
     expect(screen.getByRole("link", { name: /docs/i }).getAttribute("href")).toBe(node.docsUrl);
   });
 
+  it("keeps code that itself contains a ``` fence inside one code block", () => {
+    const code = "const md = `\n```js\nx()\n```\n`;\nafter()";
+    const { container } = render(
+      <TopicPanel node={{ ...node, code }} status="none" onStatus={vi.fn()} related={{ questions: [], notes: [], prereqs: [] }} />,
+    );
+    const blocks = container.querySelectorAll("pre code");
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].textContent).toContain("after()");
+  });
+
   it("marks the current status chip as pressed", () => {
     setup();
     expect(screen.getByRole("button", { name: "Learning" }).getAttribute("aria-pressed")).toBe("true");

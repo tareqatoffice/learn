@@ -33,6 +33,11 @@ describe("model indexes and validation", () => {
     await resetDb();
   });
 
+  it("indexes revisions by editedAt for the recent-edits list", async () => {
+    const indexes = await mongoose.models.Revision.collection.indexes();
+    expect(indexes.map((i) => i.key)).toContainEqual({ editedAt: -1 });
+  });
+
   afterAll(async () => {
     await mongoose.disconnect();
   });

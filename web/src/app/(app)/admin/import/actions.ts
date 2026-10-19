@@ -15,6 +15,8 @@ const input = z.object({
     z.object({ kind: z.literal("graph"), json: z.unknown() }),
   ]),
   title: z.string().max(200).optional(),
+  /** Applied when the import creates the target; its new items inherit them. */
+  subjects: z.array(slug).max(50).optional(),
   publish: z.boolean(),
 });
 export type ImportInput = z.input<typeof input>;

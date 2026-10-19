@@ -41,6 +41,31 @@ async function slugTaken(model: Model<unknown>, value: string, id?: string, scop
   return !!(await model.exists({ ...scope, slug: value, ...(id ? { _id: { $ne: id } } : {}) }));
 }
 
+/**
+ * Labels of the parent's current parts/tracks that the edit drops while children (any status)
+ * still point at them, e.g. "Part Two (2)"; empty when nothing would be orphaned.
+ */
+async function removedKeysInUse(
+  parentModel: Model<unknown>,
+  parentId: string,
+  listField: "parts" | "tracks",
+  labelField: "title" | "name",
+  next: { key: string }[],
+  childModel: Model<unknown>,
+  childScope: Record<string, unknown>,
+  childKeyField: string,
+): Promise<string> {
+  const parent = await parentModel.findById(parentId, { [listField]: 1 }).lean<Record<string, { key: string; title?: string; name?: string }[]>>();
+  const keep = new Set(next.map((x) => x.key));
+  const dropped = (parent?.[listField] ?? []).filter((x) => !keep.has(x.key));
+  const used: string[] = [];
+  for (const item of dropped) {
+    const n = await childModel.countDocuments({ ...childScope, [childKeyField]: item.key });
+    if (n) used.push(`${item[labelField] ?? item.key} (${n})`);
+  }
+  return used.join(", ");
+}
+
 // ---------- books ----------
 
 const bookSchema = z.object({
@@ -62,6 +87,10 @@ export async function saveBook(input: BookInput, editedBy: string): Promise<Resu
   if (new Set(parts.map((p) => p.key)).size !== parts.length) return fail({ parts: "Part keys must be unique" });
   if (new Set(extras.map((e) => e.key)).size !== extras.length) return fail({ extras: "Extra keys must be unique" });
   if (await slugTaken(QuestionBook, rest.slug, id)) return fail({ slug: "Another book already uses this slug" });
+  if (id) {
+    const stillUsed = await removedKeysInUse(QuestionBook, id, "parts", "title", parts, Question, { bookId: id }, "partKey");
+    if (stillUsed) return fail({ parts: `Move its questions out first: ${stillUsed}` });
+  }
 
   const data = {
     ...rest,
@@ -229,6 +258,10 @@ export async function saveGraph(input: GraphInput, editedBy: string): Promise<Re
   const { id, tracks, ...rest } = parsed.data;
   if (new Set(tracks.map((t) => t.key)).size !== tracks.length) return fail({ tracks: "Track keys must be unique" });
   if (await slugTaken(Graph, rest.slug, id)) return fail({ slug: "Another graph already uses this slug" });
+  if (id) {
+    const stillUsed = await removedKeysInUse(Graph, id, "tracks", "name", tracks, GraphNode, { graphId: id }, "trackKey");
+    if (stillUsed) return fail({ tracks: `Move its topics to another track first: ${stillUsed}` });
+  }
   const data = { ...rest, tracks: tracks.map((t, order) => ({ ...t, order })) };
   if (id) {
     if (!(await Graph.exists({ _id: id }))) return fail({ id: "Graph not found" });
@@ -245,7 +278,11 @@ const nodeSchema = z.object({
   title: z.string().trim(),
   prereqIds: z.array(objectId).max(50),
   summary: z.string(),
-  points: z.array(z.string().trim().min(1)).max(30),
+  // One point per line in the editor; blank lines carry no meaning.
+  points: z
+    .array(z.string())
+    .transform((ps) => ps.map((p) => p.trim()).filter(Boolean))
+    .pipe(z.array(z.string()).max(30)),
   code: z.string(),
   pitfall: z.string(),
   docsUrl: z.string().trim(),

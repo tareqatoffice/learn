@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  experimental: {
+    // Admin "Import markdown" posts whole books and note series through Server Actions (default limit 1 MB).
+    serverActions: { bodySizeLimit: "10mb" },
+  },
   turbopack: {
     rules: {
       "*.css": {

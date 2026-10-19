@@ -52,6 +52,17 @@ describe("saveBook", () => {
     expect(await Revision.countDocuments({ entityId: created.id })).toBe(1);
   });
 
+  it("refuses to remove a part that still has questions", async () => {
+    const book = await seedBook("js");
+    await seedQuestions(book, 2, "p2", "archived");
+    const r = await saveBook(
+      { id: book, slug: "js", title: "JS", intro: "", subjects: [], parts: [{ key: "p1", title: "Part One" }], extras: [], status: "published" },
+      ADMIN,
+    );
+    expect(r).toMatchObject({ ok: false, errors: { parts: expect.stringContaining("Part Two") } });
+    expect((await QuestionBook.findById(book).lean<{ parts: unknown[] }>())?.parts).toHaveLength(2);
+  });
+
   it("rejects a slug that is taken or not kebab-case", async () => {
     await seedBook("react");
     const taken = await saveBook({ slug: "react", title: "x", intro: "", subjects: [], parts: [], extras: [], status: "draft" }, ADMIN);
