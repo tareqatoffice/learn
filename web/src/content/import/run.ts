@@ -119,7 +119,7 @@ async function planBook(ctx: Ctx, markdown: string): Promise<void> {
     // A matched question keeps its part unless the source names one.
     const partKey = q.part ? partKeyByTitle.get(q.part) : m.doc ? undefined : GENERAL_PART.key;
     if (partKey) next.partKey = partKey;
-    planItem(ctx, Question, "question", m, next, { bookId: target.id, importKey: q.key }, container.subjects, nextOrder);
+    await planItem(ctx, Question, "question", m, next, { bookId: target.id, importKey: q.key }, container.subjects, nextOrder);
   }
 }
 
@@ -135,11 +135,11 @@ async function planSeries(ctx: Ctx, files: { name: string; content: string }[]):
   const container = await planContainer(ctx, NoteSeries, target, { title: opts.title, description: opts.description }, []);
 
   const nextOrder = orderAfter(docs);
-  matches.forEach((m, i) => {
+  for (const [i, m] of matches.entries()) {
     const { title, body, slug } = chapters[i]; // `title` unlabelled: a chapter without an H1 fails validation
     const next: Data = { title, body, toc: extractToc(body), readMinutes: readMinutes(body) };
-    planItem(ctx, Note, "note", m, next, { seriesId: target.id, slug }, container.subjects, nextOrder);
-  });
+    await planItem(ctx, Note, "note", m, next, { seriesId: target.id, slug }, container.subjects, nextOrder);
+  }
 }
 
 async function planGraph(ctx: Ctx, json: unknown): Promise<void> {
@@ -184,7 +184,7 @@ async function planGraph(ctx: Ctx, json: unknown): Promise<void> {
   if (cycle) report.errors.push(`cycle: ${cycle.map((id) => slugById.get(id)).join(" -> ")}`);
 
   const nextOrder = orderAfter(docs);
-  matches.forEach((m, i) => {
+  for (const [i, m] of matches.entries()) {
     const n = m.item;
     const next: Data = {
       trackKey: n.trackKey,
@@ -196,8 +196,8 @@ async function planGraph(ctx: Ctx, json: unknown): Promise<void> {
       docsUrl: n.docsUrl,
       prereqIds: prereqs[i],
     };
-    planItem(ctx, GraphNode, "node", m, next, { graphId: target.id, slug: n.slug }, container.subjects, nextOrder);
-  });
+    await planItem(ctx, GraphNode, "node", m, next, { graphId: target.id, slug: n.slug }, container.subjects, nextOrder);
+  }
 }
 
 /** The target container, or null (with an error) when it is missing and no title allows creating it. */
@@ -248,7 +248,7 @@ async function planContainer(
       status: newStatus(opts),
     };
     report.createdTarget = true;
-    queue(ctx, model, null, stamped(opts, data), { action: "create", type: "container", key, title, id: String(target.id) });
+    await queue(ctx, model, null, stamped(opts, data), { action: "create", type: "container", key, title, id: String(target.id) });
     report.items.push(...listItems);
     return { subjects, lists: merged };
   }
@@ -257,7 +257,7 @@ async function planContainer(
   const change: ItemChange = { action: "unchanged", type: "container", key, title, id: String(target.id) };
   if (fields.length) {
     const data = stamped(opts, { ...pick(given, fields), ...changedLists });
-    queue(ctx, model, target.doc, data, { ...change, action: "update", fields });
+    await queue(ctx, model, target.doc, data, { ...change, action: "update", fields });
   } else {
     report.items.push(change);
   }
@@ -316,7 +316,7 @@ function matchItems<T extends Incoming>(
 }
 
 /** Plans one child: an update of the fields that differ, nothing when unchanged, or a create. */
-function planItem(
+async function planItem(
   ctx: Ctx,
   model: AnyModel,
   type: ItemChange["type"],
@@ -325,13 +325,13 @@ function planItem(
   createData: Data,
   subjects: string[],
   nextOrder: () => number,
-): void {
+): Promise<void> {
   const { opts, report } = ctx;
   const base = { type, key: m.item.key, title: m.item.title, id: String(m.id) };
   if (!m.doc) {
     report.creates++;
     const data = { _id: m.id, ...createData, ...next, order: nextOrder(), subjects, status: newStatus(opts) };
-    queue(ctx, model, null, stamped(opts, data), { ...base, action: "create" });
+    await queue(ctx, model, null, stamped(opts, data), { ...base, action: "create" });
     return;
   }
   const fields = diff(m.doc, next);
@@ -341,15 +341,19 @@ function planItem(
     return;
   }
   report.updates++;
-  queue(ctx, model, m.doc, stamped(opts, pick(next, fields)), { ...base, action: "update", fields });
+  await queue(ctx, model, m.doc, stamped(opts, pick(next, fields)), { ...base, action: "update", fields });
 }
 
 /** Records a write and its report line; schema validation runs now so a bad item blocks the whole import. */
-function queue(ctx: Ctx, model: AnyModel, doc: Row | null, data: Data, change: ItemChange): void {
+async function queue(ctx: Ctx, model: AnyModel, doc: Row | null, data: Data, change: ItemChange): Promise<void> {
   const probe = doc ? model.hydrate(doc) : new model(data);
   if (doc) probe.set(data);
-  const invalid = probe.validateSync();
-  if (invalid) ctx.report.errors.push(`${change.type} "${change.title}": ${invalid.message}`);
+  try {
+    await probe.validate();
+  } catch (error) {
+    if (!(error instanceof mongoose.Error.ValidationError)) throw error;
+    ctx.report.errors.push(`${change.type} "${change.title}": ${error.message}`);
+  }
   ctx.writes.push({ model, id: doc?._id ?? null, data });
   ctx.report.items.push(change);
 }
