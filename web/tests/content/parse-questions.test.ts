@@ -301,7 +301,7 @@ describe("parseBook — title, intro, parts, extras", () => {
     const got = parseBook(book, "css");
     expect(got.title).toBe("The CSS Question Book");
     expect(got.intro).toBe("**A guide.**\n\n---\n\n## How to use this book\n\nRead it.");
-    expect(got.parts).toEqual([{ key: "part-1-fundamentals", title: "Part 1 — Fundamentals" }]);
+    expect(got.parts).toEqual([{ key: "part-1-fundamentals", title: "Part 1 — Fundamentals", intro: "" }]);
   });
 
   it("an Appendix section becomes an extra with its body, including its sub-headings", () => {
@@ -330,7 +330,9 @@ describe("parseBook — title, intro, parts, extras", () => {
       ["a-7-day-prep-plan", "**1. Day one.**\nRead."],
       ["final-advice", "Be calm."],
     ]);
-    expect(got.parts).toEqual([{ key: "part-5-rapid-fire-and-a-prep-plan", title: "Part 5 — Rapid-fire and a prep plan" }]);
+    expect(got.parts).toEqual([
+      { key: "part-5-rapid-fire-and-a-prep-plan", title: "Part 5 — Rapid-fire and a prep plan", intro: "## Rapid-fire" },
+    ]);
     expect(got.unaccounted).toEqual([]);
   });
 
@@ -343,7 +345,7 @@ describe("parseBook — title, intro, parts, extras", () => {
     );
     const got = parseBook(src, "fi");
     expect(got.intro).toBe("Intro.");
-    expect(got.parts).toEqual([{ key: "0-warm-up", title: "0. Warm-up" }]);
+    expect(got.parts).toEqual([{ key: "0-warm-up", title: "0. Warm-up", intro: "" }]);
     expect(got.unaccounted).toEqual([]);
   });
 
@@ -352,18 +354,49 @@ describe("parseBook — title, intro, parts, extras", () => {
       "# Frontend System Design", "### A Complete Question Bank", "",
       "## Table of Contents", "", "- stuff", "",
       "# PART IV — RAPID-FIRE BANK & PREP PLAN", "",
-      "## 41. Rapid-fire questions", "", "1. **CSR vs SSR?** SSR for SEO.", "",
+      "Part lead-in.", "",
+      "## 40. Design a Ticker", "", "Ticker answer.", "",
+      "## 41. Rapid-fire questions", "", "Rapid-fire lead-in.", "", "1. **CSR vs SSR?** SSR for SEO.", "",
       "## 42. Cheat sheets", "", "### Numbers", "", "table",
     );
     const got = parseBook(src, "fsd");
     expect(got.title).toBe("Frontend System Design");
     expect(got.intro).toBe("### A Complete Question Bank");
-    expect(got.parts.map((p) => p.title)).toEqual(["PART IV — RAPID-FIRE BANK & PREP PLAN"]);
+    expect(got.questions.map((q) => q.question)).toEqual(["Design a Ticker", "CSR vs SSR?"]);
+    expect(got.parts).toEqual([
+      {
+        key: "part-iv-rapid-fire-bank-prep-plan",
+        title: "PART IV — RAPID-FIRE BANK & PREP PLAN",
+        intro: "Part lead-in.\n\n## 41. Rapid-fire questions\n\nRapid-fire lead-in.",
+      },
+    ]);
     expect(got.extras).toEqual([{ key: "42-cheat-sheets", title: "42. Cheat sheets", body: "### Numbers\n\ntable" }]);
     expect(got.unaccounted).toEqual([]);
   });
 
-  it("a heading no rule covers is reported as unaccounted with its 1-based line", () => {
+  it("a part keeps its lead-in and source-section prose (headings included) as its intro", () => {
+    const src = md(
+      "# Part 4 — Design", "", "*Italic part intro.*", "",
+      "## Design prompts", "", "For each, structure your answer.", "",
+      "**1. Design a URL shortener.**", "Key generation.", "",
+      "## Behavioural", "", '- **"Tell me about an incident."** What broke.', "", "---", "",
+      "# Part 5 — Rapid-fire", "",
+      "## Q1. Default status?", "", "201",
+    );
+    const got = parseBook(src, "nest");
+    expect(got.questions.map((q) => [q.part, q.question])).toEqual([
+      ["Part 4 — Design", "Design a URL shortener"],
+      ["Part 4 — Design", "Tell me about an incident."],
+      ["Part 5 — Rapid-fire", "Default status?"],
+    ]);
+    expect(got.parts.map((p) => p.intro)).toEqual([
+      "*Italic part intro.*\n\n## Design prompts\n\nFor each, structure your answer.\n\n## Behavioural",
+      "",
+    ]);
+    expect(got.unaccounted).toEqual([]);
+  });
+
+  it("every line outside a kept range is reported as unaccounted with its 1-based line", () => {
     const src = md(
       "# Book", "",
       "# Part 1 — Basics", "",
@@ -373,7 +406,24 @@ describe("parseBook — title, intro, parts, extras", () => {
     );
     expect(parseBook(src, "bk").unaccounted).toEqual([
       { line: 9, heading: "# Glossary" },
+      { line: 11, heading: "Words." },
       { line: 13, heading: "### Stray notes" },
+      { line: 15, heading: "Text." },
+    ]);
+  });
+
+  it("a stray section inside a part is unaccounted, not folded into the part intro", () => {
+    const src = md(
+      "# Part 1 — Basics", "", "Lead.", "",
+      "## Q1. A?", "", "One.", "",
+      "## Notes", "", "Stray paragraph.", "", "---", "",
+      "## Q2. B?", "", "Two.",
+    );
+    const got = parseBook(src, "bk");
+    expect(got.parts[0].intro).toBe("Lead.");
+    expect(got.unaccounted).toEqual([
+      { line: 9, heading: "## Notes" },
+      { line: 11, heading: "Stray paragraph." },
     ]);
   });
 
@@ -391,6 +441,12 @@ describe("parseBook — canonical (pulled) format", () => {
     "",
     "<!-- learn:part key=part-1-fundamentals -->",
     "# Part 1 — Fundamentals",
+    "",
+    "*Part lead-in.*",
+    "",
+    "## Design prompts",
+    "",
+    "**1. Not a question here.**",
     "",
     "<!-- learn:question id=6710a1b2c3d4e5f6a7b8c9d1 -->",
     "## Q1. What is React?",
@@ -438,8 +494,12 @@ describe("parseBook — canonical (pulled) format", () => {
     expect(got.title).toBe("The React Question Book");
     expect(got.intro).toBe("How to read this.");
     expect(got.parts).toEqual([
-      { key: "part-1-fundamentals", title: "Part 1 — Fundamentals" },
-      { key: "part-2-hooks", title: "Part 2 — Hooks" },
+      {
+        key: "part-1-fundamentals",
+        title: "Part 1 — Fundamentals",
+        intro: "*Part lead-in.*\n\n## Design prompts\n\n**1. Not a question here.**",
+      },
+      { key: "part-2-hooks", title: "Part 2 — Hooks", intro: "" },
     ]);
     expect(got.questions).toEqual([
       {
@@ -476,15 +536,35 @@ describe("parseBook — canonical (pulled) format", () => {
     expect(got.unaccounted).toEqual([]);
   });
 
-  it("skips the legacy heuristics: a stray heading after a part title is unaccounted", () => {
+  it("an empty Q title becomes the puzzle question, as in legacy books", () => {
     const src = md(
-      "<!-- learn:book id=6710a1b2c3d4e5f6a7b8c9d0 -->", "# Book", "",
-      "<!-- learn:part key=p1 -->", "# Part 1", "", "## Cheat sheets", "", "**1. Not a question.**", "x",
+      "<!-- learn:book -->", "# Book", "", "<!-- learn:question -->", "### Q61.", "",
+      "```js", "a()", "```", "", "<!-- learn:answer -->", "1",
+    );
+    expect(records(src)).toEqual([
+      { question: "What does this code output?", part: "", prompt: "```js\na()\n```", answer: "1" },
+    ]);
+  });
+
+  it("content and headings before the book marker are unaccounted", () => {
+    const src = md("# Stray title", "", "Stray text.", "", "<!-- learn:book -->", "# Book", "", "Intro.");
+    const got = parseBook(src, "bk");
+    expect(got.title).toBe("Book");
+    expect(got.intro).toBe("Intro.");
+    expect(got.unaccounted).toEqual([
+      { line: 1, heading: "# Stray title" },
+      { line: 3, heading: "Stray text." },
+    ]);
+  });
+
+  it("a second answer marker in one question is unaccounted, not answer text", () => {
+    const src = md(
+      "<!-- learn:book -->", "# Book", "", "<!-- learn:question -->", "## Q1. A?", "",
+      "<!-- learn:answer -->", "One.", "", "<!-- learn:answer -->", "Two.",
     );
     const got = parseBook(src, "bk");
-    expect(got.questions).toEqual([]);
-    expect(got.extras).toEqual([]);
-    expect(got.unaccounted).toEqual([{ line: 7, heading: "## Cheat sheets" }]);
+    expect(got.questions[0].answer).toBe("One.\n\nTwo.");
+    expect(got.unaccounted).toEqual([{ line: 10, heading: "<!-- learn:answer -->" }]);
   });
 
   it("CRLF input gives the same result as LF", () => {

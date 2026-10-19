@@ -5,6 +5,7 @@ const partSchema = new Schema(
   {
     key: { type: String, required: true },
     title: { type: String, required: true },
+    intro: { type: String, default: "" },
     order: { type: Number, default: 0 },
   },
   { _id: false },

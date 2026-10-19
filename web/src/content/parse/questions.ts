@@ -3,9 +3,9 @@
 // from the app carry `<!-- learn:… -->` markers, and then the markers alone decide the structure.
 import type { ParsedBook, ParsedQuestion } from "@/content/types";
 import { importKey, slugify } from "@/lib/ids";
+import { isCanonical, parseCanonical } from "./canonical";
+import { fenceMask, HEADING, PUZZLE_QUESTION, unaccountedLine, type Item, type Structure } from "./shared";
 
-const FENCE = /^\s*(`{3,}|~{3,})(.*)$/;
-const HEADING = /^(#{1,6})\s+(.+?)\s*$/;
 const PART = /^(part|section)\b/i;
 const Q_HEAD = /^([QBT])\d+[.:]\s*(.*)$/;
 const SKIP_SECTION = /table of contents|cheat sheets?|preparation plan|prep plan|self-scoring|final advice/i;
@@ -13,32 +13,11 @@ const EXTRA_SECTION = /cheat sheets?|preparation plan|prep plan|self-scoring|fin
 const CONTENTS = /^(table of )?contents$/i;
 const RAPID_FIRE = /rapid-fire/i;
 const ANSWER_LABEL = /^\*\*Answer:\*\*\s*/;
-const MARKER = /^<!--\s*learn:(book|part|question|answer|extra)\b(.*?)-->\s*$/;
-const PUZZLE_QUESTION = "What does this code output?";
+const RAPID_ITEM = /^\d+\.\s+\*\*(.+?)\*\*\s*(.*)$/;
+const RULE = /^\s*(-{3,}|\*{3,}|_{3,})\s*$/;
 
 type Heading = { line: number; level: number; text: string };
-type Item = { id?: string; question: string; part: string; prompt: string; answer: string };
 type Range = [start: number, end: number];
-type Structure = Omit<ParsedBook, "questions"> & { items: Item[] };
-
-// outside[i] is true when line i is plain markdown (not a fence marker, not inside a fence).
-function fenceMask(lines: string[]): boolean[] {
-  const outside: boolean[] = [];
-  let fence: string | null = null;
-  for (const line of lines) {
-    const f = line.match(FENCE);
-    if (f && !fence) {
-      fence = f[1];
-      outside.push(false);
-    } else if (f && fence && f[1][0] === fence[0] && f[1].length >= fence.length && f[2].trim() === "") {
-      fence = null;
-      outside.push(false);
-    } else {
-      outside.push(!fence);
-    }
-  }
-  return outside;
-}
 
 function scanHeadings(lines: string[], outside: boolean[]): Heading[] {
   const headings: Heading[] = [];
@@ -146,10 +125,12 @@ function questionRecord(kind: string, title: string, part: string, body: string)
 // Question-like items in sections that are not Q headings: bold numbered prompts
 // ("**1. Design a URL shortener.**" + answer lines), quoted bold bullets
 // ("- **"Tell me about…"** answer"), and "| Question | Answer |" tables.
-function sectionExtras(text: string, part: string): Item[] {
+// `used` lists the (0-based) lines the items were built from; the rest is lead-in prose.
+function sectionExtras(text: string, part: string): { items: Item[]; used: number[] } {
   const lines = text.split("\n");
   const outside = fenceMask(lines);
   const out: Item[] = [];
+  const used: number[] = [];
   let open: { question: string; lines: string[] } | null = null;
   const flush = () => {
     if (open) out.push({ question: open.question, part, prompt: "", answer: cleanAnswer(open.lines.join("\n")) });
@@ -162,12 +143,14 @@ function sectionExtras(text: string, part: string): Item[] {
       if (m) {
         flush();
         open = { question: m[1].trim(), lines: [] };
+        used.push(i);
         continue;
       }
       m = line.match(/^[-*]\s+\*\*"(.+?)"\*\*\s*(.*)$/);
       if (m) {
         flush();
         out.push({ question: m[1].trim(), part, prompt: "", answer: m[2].trim() });
+        used.push(i);
         continue;
       }
     }
@@ -177,18 +160,23 @@ function sectionExtras(text: string, part: string): Item[] {
       /^\|[\s:|-]+\|\s*$/.test(lines[i + 1] || "")
     ) {
       flush();
+      used.push(i, i + 1);
       let j = i + 2;
       for (; j < lines.length && outside[j] && /^\|.*\|\s*$/.test(lines[j]); j++) {
         const cells = lines[j].trim().slice(1, -1).split("|").map((c) => c.trim());
         out.push({ question: cells[0], part, prompt: "", answer: cells.slice(1).join(" | ") });
+        used.push(j);
       }
       i = j - 1;
       continue;
     }
-    if (open) open.lines.push(line);
+    if (open) {
+      open.lines.push(line);
+      used.push(i);
+    }
   }
   flush();
-  return out;
+  return { items: out, used };
 }
 
 function splitRapidFire(text: string): { question: string; answer: string }[] {
@@ -196,14 +184,17 @@ function splitRapidFire(text: string): { question: string; answer: string }[] {
   const outside = fenceMask(lines);
   const items: { question: string; answer: string }[] = [];
   lines.forEach((line, i) => {
-    const m = outside[i] && line.match(/^\d+\.\s+\*\*(.+?)\*\*\s*(.*)$/);
+    const m = outside[i] && line.match(RAPID_ITEM);
     if (m) items.push({ question: m[1].trim(), answer: m[2].trim() });
     else if (items.length) items[items.length - 1].answer += "\n" + line;
   });
   return items.map((it) => ({ question: it.question, answer: cleanAnswer(it.answer) }));
 }
 
-/** What a legacy mode found: the questions plus which headings/lines they account for. */
+/**
+ * What a legacy mode found: the questions, the line ranges they were built from, the part headings,
+ * and the "source" headings whose sections hold question items but are not questions themselves.
+ */
 type ModeResult = { items: Item[]; questionRanges: Range[]; partHeads: Set<number>; sources: Set<number> };
 
 // Q mode: Q/B/T headings, plus question-like items in the direct content of other sections.
@@ -239,10 +230,11 @@ function parseQuestionHeadings(lines: string[], headings: Heading[], excluded: R
     if (h.level >= 2 && h.line >= insideQ && !SKIP_SECTION.test(h.text) && !inRanges(h.line, excluded)) {
       const next = i + 1 < headings.length ? headings[i + 1].line : lines.length;
       const found = sectionExtras(lines.slice(h.line + 1, next).join("\n"), "");
-      if (found.length) {
+      if (found.items.length) {
         const p = partOf();
-        items.push(...found.map((it) => ({ ...it, part: p })));
+        items.push(...found.items.map((it) => ({ ...it, part: p })));
         sources.add(i);
+        found.used.forEach((k) => questionRanges.push([h.line + 1 + k, h.line + 2 + k]));
       }
     }
   });
@@ -250,10 +242,11 @@ function parseQuestionHeadings(lines: string[], headings: Heading[], excluded: R
 }
 
 // Fallback for books without Q headings: each "## N. Topic" is a question.
-function parseNumberedSections(lines: string[], headings: Heading[]): ModeResult {
+function parseNumberedSections(lines: string[], outside: boolean[], headings: Heading[]): ModeResult {
   const items: Item[] = [];
   const questionRanges: Range[] = [];
   const partHeads = new Set<number>();
+  const sources = new Set<number>();
   let part = "";
   headings.forEach((h, i) => {
     if (h.level === 1 && PART.test(h.text)) {
@@ -264,16 +257,22 @@ function parseNumberedSections(lines: string[], headings: Heading[]): ModeResult
     if (h.level !== 2) return;
     const m = h.text.match(/^(\d+)\.\s+(.+)$/);
     if (!m || SKIP_SECTION.test(m[2])) return;
-    questionRanges.push([h.line, bodyEnd(lines, headings, i)]);
+    const end = bodyEnd(lines, headings, i);
     const title = m[2].trim();
     const answer = sliceAnswer(lines, headings, i);
     if (RAPID_FIRE.test(title)) {
+      // The heading and any lead-in before the first item are prose, not a question.
+      let first = h.line + 1;
+      while (first < end && !(outside[first] && RAPID_ITEM.test(lines[first]))) first++;
+      sources.add(i);
+      questionRanges.push([first, end]);
       splitRapidFire(answer).forEach((r) => items.push({ question: r.question, part, prompt: "", answer: r.answer }));
       return;
     }
+    questionRanges.push([h.line, end]);
     items.push({ question: /^Design\b/i.test(title) ? title : `Explain: ${title}`, part, prompt: "", answer });
   });
-  return { items, questionRanges, partHeads, sources: new Set() };
+  return { items, questionRanges, partHeads, sources };
 }
 
 const sectionTitle = (text: string) => text.replace(/^\d+\.\s+/, "");
@@ -306,6 +305,26 @@ function findSections(lines: string[], headings: Heading[], questionRanges: Rang
   return { contents, extras };
 }
 
+/** Joins runs of consecutive lines into markdown, dropping rules and blanks at each run's edges. */
+function joinRuns(lines: string[], picked: number[]): string {
+  const runs: string[][] = [];
+  picked.forEach((i, k) => {
+    if (k === 0 || picked[k - 1] !== i - 1) runs.push([]);
+    runs[runs.length - 1].push(lines[i]);
+  });
+  const edge = (l: string) => !l.trim() || RULE.test(l);
+  return runs
+    .map((run) => {
+      let s = 0;
+      let e = run.length;
+      while (s < e && edge(run[s])) s++;
+      while (e > s && edge(run[e - 1])) e--;
+      return run.slice(s, e).join("\n");
+    })
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 function parseLegacy(lines: string[], outside: boolean[], bookSlug: string): Structure {
   const headings = scanHeadings(lines, outside);
   // Q/B/T heading ranges never depend on extras, so extras can be found first and kept out of Q mode.
@@ -313,28 +332,55 @@ function parseLegacy(lines: string[], outside: boolean[], bookSlug: string): Str
   let { contents, extras } = findSections(lines, headings, qRanges);
   let mode = parseQuestionHeadings(lines, headings, [...contents, ...extras.map((e) => e.range)]);
   if (mode.items.length === 0) {
-    mode = parseNumberedSections(lines, headings);
+    mode = parseNumberedSections(lines, outside, headings);
     ({ contents, extras } = findSections(lines, headings, mode.questionRanges));
   }
   if (mode.items.length === 0) throw new Error(`No questions found in ${bookSlug}`);
 
+  // Every line gets exactly one owner; whatever is left over is reported as unaccounted.
+  const owner: string[] = new Array(lines.length).fill("");
+  const claim = ([s, e]: Range, who: string) => {
+    for (let i = s; i < e; i++) if (!owner[i]) owner[i] = who;
+  };
+  contents.forEach((r) => claim(r, "drop"));
+  extras.forEach((x) => claim(x.range, "extra"));
+  mode.questionRanges.forEach((r) => claim(r, "question"));
+
   const first = headings[0];
   const titled = !!first && first.level === 1 && !PART.test(first.text) && !EXTRA_SECTION.test(first.text);
-  const extraRanges = extras.map((e) => e.range);
   const introEnd = Math.min(
     lines.length,
     ...[...mode.partHeads, ...mode.sources].map((i) => headings[i].line),
     ...mode.questionRanges.map(([s]) => s),
-    ...extraRanges.map(([s]) => s),
+    ...extras.map((x) => x.range[0]),
   );
-  const introStart = titled ? first.line + 1 : 0;
-  const intro = cleanAnswer(
-    lines.slice(introStart, introEnd).filter((_, k) => !inRanges(introStart + k, contents)).join("\n"),
-  );
+  if (titled) owner[first.line] = "title";
+  claim([0, introEnd], "intro");
+  const pick = (who: string) => owner.flatMap((o, i) => (o === who ? [i] : []));
+  const intro = joinRuns(lines, pick("intro"));
 
+  // A part owns the prose in its range that no question or extra took: lead-ins and source sections.
+  // A heading that is neither (and the prose directly under it) stays unowned.
+  const headingAt = new Map(headings.map((h, i) => [h.line, i]));
   const partKey = uniqueKeys();
-  const partTitles = new Set([...mode.partHeads].sort((a, b) => a - b).map((i) => headings[i].text));
-  const parts = [...partTitles].map((title) => ({ key: partKey(slugify(title)), title }));
+  const parts: Structure["parts"] = [];
+  [...mode.partHeads]
+    .sort((a, b) => a - b)
+    .forEach((idx) => {
+      const head = headings[idx];
+      const who = `part:${idx}`;
+      owner[head.line] = "part";
+      let stray = false;
+      for (let i = head.line + 1; i < bodyEnd(lines, headings, idx); i++) {
+        const h = headingAt.get(i);
+        if (h !== undefined) stray = !owner[i] && !mode.sources.has(h);
+        if (!owner[i] && !stray) owner[i] = who;
+      }
+      const intro = joinRuns(lines, pick(who));
+      const same = parts.find((p) => p.title === head.text);
+      if (same) same.intro = [same.intro, intro].filter(Boolean).join("\n\n");
+      else parts.push({ key: partKey(slugify(head.text)), title: head.text, intro });
+    });
 
   const extraKey = uniqueKeys();
   const extraList = extras.map(({ idx, range: [start, end] }) => ({
@@ -343,10 +389,9 @@ function parseLegacy(lines: string[], outside: boolean[], bookSlug: string): Str
     body: cleanAnswer(lines.slice(start + 1, end).join("\n")),
   }));
 
-  const covered = [...mode.questionRanges, ...extraRanges, ...contents, [0, introEnd] as Range];
-  const unaccounted = headings
-    .filter((h, i) => !(titled && i === 0) && !mode.partHeads.has(i) && !mode.sources.has(i) && !inRanges(h.line, covered))
-    .map((h) => ({ line: h.line + 1, heading: lines[h.line].trim() }));
+  const unaccounted = owner.flatMap((o, i) =>
+    !o && lines[i].trim() && !RULE.test(lines[i]) ? [unaccountedLine(lines, i)] : [],
+  );
 
   return {
     ...(titled ? { title: first.text } : {}),
@@ -358,81 +403,13 @@ function parseLegacy(lines: string[], outside: boolean[], bookSlug: string): Str
   };
 }
 
-function markerAttrs(raw: string): Record<string, string> {
-  return Object.fromEntries([...raw.matchAll(/(\w+)=(\S+)/g)].map((m) => [m[1], m[2]]));
-}
-
-// Canonical (pulled) format: `<!-- learn:book|part|question|answer|extra … -->` markers, each
-// followed by its heading; the markers alone decide what every line belongs to.
-function parseCanonical(lines: string[], outside: boolean[]): Structure {
-  const marks = lines.flatMap((line, i) => {
-    const m = outside[i] && line.match(MARKER);
-    return m ? [{ line: i, kind: m[1], attrs: markerAttrs(m[2]) }] : [];
-  });
-  const unaccounted: ParsedBook["unaccounted"] = [];
-  const text = (from: number, to: number) => lines.slice(from, to).join("\n").trim();
-  // The heading right after a marker (blank lines allowed in between), if there is one.
-  const takeHeading = (from: number, to: number) => {
-    let i = from;
-    while (i < to && !lines[i].trim()) i++;
-    const m = i < to && outside[i] ? lines[i].match(HEADING) : null;
-    return m ? { title: m[2].trim(), level: m[1].length, next: i + 1 } : { title: "", level: 0, next: from };
-  };
-  const strayHeadings = (from: number, to: number) => {
-    for (let i = from; i < to; i++) {
-      if (outside[i] && HEADING.test(lines[i])) unaccounted.push({ line: i + 1, heading: lines[i].trim() });
-    }
-  };
-
-  const bookMark = marks.find((m) => m.kind === "book");
-  const structural = marks.filter((m) => m.kind !== "book" && m.kind !== "answer");
-  const bookEnd = structural.length ? structural[0].line : lines.length;
-  const bookStart = bookMark && bookMark.line < bookEnd ? bookMark.line + 1 : 0;
-  const head = takeHeading(bookStart, bookEnd);
-  const titled = head.level === 1;
-
-  const parts: ParsedBook["parts"] = [];
-  const extras: ParsedBook["extras"] = [];
-  const items: Item[] = [];
-  let part = "";
-  structural.forEach((mark, k) => {
-    const end = k + 1 < structural.length ? structural[k + 1].line : lines.length;
-    const h = takeHeading(mark.line + 1, end);
-    if (mark.kind === "part") {
-      part = h.title;
-      parts.push({ key: mark.attrs.key ?? slugify(h.title), title: h.title });
-      strayHeadings(h.next, end);
-    } else if (mark.kind === "extra") {
-      extras.push({ key: mark.attrs.key ?? slugify(h.title), title: h.title, body: text(h.next, end) });
-    } else {
-      const answerMark = marks.find((m) => m.kind === "answer" && m.line > mark.line && m.line < end);
-      const item: Item = {
-        question: h.title.replace(/^[QBT]\d+[.:]\s*/, ""),
-        part,
-        prompt: answerMark ? text(h.next, answerMark.line) : "",
-        answer: answerMark ? text(answerMark.line + 1, end) : text(h.next, end),
-      };
-      items.push(mark.attrs.id ? { id: mark.attrs.id, ...item } : item);
-    }
-  });
-
-  return {
-    ...(bookMark?.attrs.id ? { id: bookMark.attrs.id } : {}),
-    ...(titled ? { title: head.title } : {}),
-    intro: text(titled ? head.next : bookStart, bookEnd),
-    parts,
-    extras,
-    items,
-    unaccounted,
-  };
-}
-
 /** Parses one question book. `bookSlug` prefixes every importKey (repeats get `-2`, `-3`… per book). */
 export function parseBook(md: string, bookSlug: string): ParsedBook {
   const lines = md.split(/\r?\n/);
   const outside = fenceMask(lines);
-  const canonical = lines.some((line, i) => outside[i] && MARKER.test(line));
-  const { items, ...book } = canonical ? parseCanonical(lines, outside) : parseLegacy(lines, outside, bookSlug);
+  const { items, ...book } = isCanonical(lines, outside)
+    ? parseCanonical(lines, outside)
+    : parseLegacy(lines, outside, bookSlug);
   const key = uniqueKeys();
   const questions: ParsedQuestion[] = items.map((it) => ({
     ...it,

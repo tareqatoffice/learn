@@ -9,14 +9,15 @@ export type ParsedQuestion = {
 };
 
 /**
- * A parsed question book. `extras` are non-question sections (appendix, prep plan, …) kept as raw
- * markdown; `unaccounted` lists heading lines (1-based) that no parsing rule placed anywhere.
+ * A parsed question book. A part's `intro` is the prose inside the part that is not a question or
+ * extra. `extras` are non-question sections (appendix, prep plan, …) kept as raw markdown.
+ * `unaccounted` lists non-blank lines (1-based, with their text) that no parsing rule placed anywhere.
  */
 export type ParsedBook = {
   id?: string;
   title?: string;
   intro: string;
-  parts: { key: string; title: string }[];
+  parts: { key: string; title: string; intro: string }[];
   extras: { key: string; title: string; body: string }[];
   questions: ParsedQuestion[];
   unaccounted: { line: number; heading: string }[];

@@ -103,4 +103,14 @@ describe("model indexes and validation", () => {
       });
     }
   });
+
+  it("stores a part intro and defaults it to ''", async () => {
+    const book = await QuestionBook.create({
+      slug: "b",
+      title: "B",
+      parts: [{ key: "p1", title: "Part 1", intro: "Lead-in." }, { key: "p2", title: "Part 2" }],
+    });
+    const saved = await QuestionBook.findById(book._id).lean<{ parts: { intro: string }[] }>();
+    expect(saved?.parts.map((p) => p.intro)).toEqual(["Lead-in.", ""]);
+  });
 });
