@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { startQuizAction } from "@/app/(app)/interview/actions";
+import { Chip } from "@/components/Chip";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import type { QuizMode } from "@/progress/quiz";
 
 export type SetupBook = { id: string; title: string; parts: { key: string; title: string }[] };
@@ -19,22 +19,6 @@ const SIZES: { value: 10 | 20 | 50 | null; label: string }[] = [
   { value: 50, label: "50" },
   { value: null, label: "All" },
 ];
-
-function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onClick}
-      className={cn(
-        "rounded-full border px-3 py-1 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-        on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground hover:bg-muted",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
 
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
   return (
