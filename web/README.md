@@ -22,6 +22,25 @@ npx vitest run
 Tests start their own in-memory MongoDB replica set (`mongodb-memory-server`),
 so Docker is not needed. The first run downloads a `mongod` binary.
 
+## Deploy (Vercel + MongoDB Atlas)
+
+1. **Database.** Create a MongoDB Atlas cluster (the free tier works), a database
+   user, and allow Vercel's egress (or `0.0.0.0/0`) in Network Access. Copy the
+   `mongodb+srv://…/learn` connection string.
+2. **Google sign-in.** In Google Cloud Console create an OAuth client (Web
+   application) with these authorized redirect URIs:
+   - `http://localhost:3000/api/auth/callback/google`
+   - `https://<your-vercel-domain>/api/auth/callback/google`
+3. **Vercel.** Import the repo with **Root Directory** `web`, and set these
+   environment variables: `MONGODB_URI`, `AUTH_SECRET` (`npx auth secret`),
+   `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `ADMIN_EMAILS` (your Google email).
+   Leave `AUTH_DEV_LOGIN` unset. Outside Vercel, also set `AUTH_TRUST_HOST=true`
+   or `AUTH_URL`.
+4. **Content.** Point `MONGODB_URI` in `web/.env.local` at Atlas, then run
+   `npm run import:legacy -- --dry-run` and `npm run import:legacy` (only while the
+   legacy source folders still exist), and take a backup (`npm run backup -- backups/after-import.json`).
+5. `vercel deploy` (or push to the connected branch).
+
 ## Adding content with Claude Code
 
 Content lives in MongoDB and is edited in the app (Admin). For bulk work, the

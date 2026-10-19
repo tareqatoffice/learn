@@ -106,6 +106,21 @@ async function seedSubjects(importedAt: Date): Promise<void> {
  * then compares the number of items in the DB (or, on a dry run, in the plan) with `expected`.
  * `ok` is false on any import error, count mismatch, or if the DB holds content this import did not create.
  */
+/** Book and graph source files on disk that the pinned map does not cover. */
+async function unmappedFiles(repoRoot: string): Promise<string[]> {
+  const books = new Set(BOOKS.map((b) => `${b.slug}.md`));
+  const graphs = new Set(GRAPHS.map((g) => `${g.slug}.mjs`));
+  const list = async (rel: string, ext: RegExp, known: Set<string>) => {
+    const dir = path.join(repoRoot, rel);
+    if (!existsSync(dir)) return [];
+    return (await readdir(dir)).filter((name) => ext.test(name) && !known.has(name)).map((name) => `${rel}/${name}`);
+  };
+  return [
+    ...(await list("interview-topics", /\.md$/i, books)),
+    ...(await list("learning-graph/_src/data", /\.mjs$/i, graphs)),
+  ];
+}
+
 export async function importLegacy(opts: { repoRoot: string; dryRun: boolean; expected?: ExpectedCounts }): Promise<LegacyResult> {
   const expected = opts.expected ?? EXPECTED_COUNTS;
   const all = jobs();
@@ -116,7 +131,17 @@ export async function importLegacy(opts: { repoRoot: string; dryRun: boolean; ex
   );
   if (unknown.length) return { ok: false, message: `no legacy mapping for: ${unknown.join(", ")}`, rows: [] };
 
+  // The sources are deleted after the import, so a file the map does not know about must stop it.
+  const unmapped = await unmappedFiles(opts.repoRoot);
+  if (unmapped.length) return { ok: false, message: `legacy files not in the pinned map: ${unmapped.join(", ")}`, rows: [] };
+
   if (await hasForeignContent()) return { ok: false, message: REFUSAL, rows: [] };
+
+  // A commit only runs when a full dry run of the same sources is clean, so a problem never leaves a partial import.
+  if (!opts.dryRun) {
+    const plan = await importLegacy({ ...opts, dryRun: true });
+    if (!plan.ok) return plan;
+  }
 
   const importedAt = new Date();
   if (!opts.dryRun) await seedSubjects(importedAt);
@@ -156,6 +181,7 @@ export async function importLegacy(opts: { repoRoot: string; dryRun: boolean; ex
     }
     if (row.actual !== row.expected) problems.push(`${label}: expected ${row.expected}, got ${row.actual}`);
   }
+  if (warnings.length) problems.push(`${warnings.length} source line(s) would not be imported:\n${warnings.join("\n")}`);
 
   return { ok: problems.length === 0, ...(problems.length ? { message: problems.join("\n") } : {}), rows, warnings };
 }

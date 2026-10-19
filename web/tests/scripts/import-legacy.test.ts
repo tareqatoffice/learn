@@ -195,6 +195,23 @@ describe("importLegacy", () => {
     expect(result.message).toContain("css-questions-ebook");
   });
 
+  it("fails when a legacy book or graph file is not in the pinned map", async () => {
+    write("interview-topics/brand-new-book.md", BOOK);
+    write("learning-graph/_src/data/rust.mjs", `export default ${JSON.stringify(GRAPH)};\n`);
+    const result = await importLegacy({ repoRoot: repo, dryRun: true, expected: EXPECTED });
+    expect(result.ok).toBe(false);
+    expect(result.message).toMatch(/brand-new-book\.md/);
+    expect(result.message).toMatch(/rust\.mjs/);
+  });
+
+  it("fails, even on a dry run, when a source line would not be imported", async () => {
+    write("interview-topics/css-questions-ebook.md", `${BOOK}\n\n# Stray section\n\nThis text belongs nowhere.\n`);
+    const result = await importLegacy({ repoRoot: repo, dryRun: true, expected: EXPECTED });
+    expect(result.ok).toBe(false);
+    expect(result.message).toMatch(/would not be imported/);
+    expect(await Question.countDocuments()).toBe(0);
+  });
+
   it("fails when expected names a slug that is not in the legacy map", async () => {
     const result = await importLegacy({ repoRoot: repo, dryRun: true, expected: { ...EXPECTED, books: { nope: 1 } } });
 
