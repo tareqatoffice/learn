@@ -1,4 +1,4 @@
-import { Schema, model, models } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 import { STATUSES } from "./status";
 
 const questionSchema = new Schema(
@@ -21,4 +21,4 @@ questionSchema.index({ bookId: 1, partKey: 1, order: 1 });
 questionSchema.index({ importKey: 1 }, { unique: true, sparse: true });
 questionSchema.index({ subjects: 1 });
 
-export const Question = models.Question || model("Question", questionSchema);
+export const Question = mongoose.models.Question || model("Question", questionSchema);

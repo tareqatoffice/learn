@@ -1,4 +1,4 @@
-import { Schema, model, models } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 
 const questionProgressSchema = new Schema(
   {
@@ -16,4 +16,4 @@ questionProgressSchema.index({ userId: 1, questionId: 1 }, { unique: true });
 questionProgressSchema.index({ userId: 1, bookId: 1, status: 1 });
 
 export const QuestionProgress =
-  models.QuestionProgress || model("QuestionProgress", questionProgressSchema);
+  mongoose.models.QuestionProgress || model("QuestionProgress", questionProgressSchema);

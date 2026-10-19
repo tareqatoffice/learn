@@ -1,4 +1,4 @@
-import { Schema, model, models } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 import { STATUSES } from "./status";
 
 const tocEntrySchema = new Schema(
@@ -29,4 +29,4 @@ const noteSchema = new Schema(
 noteSchema.index({ seriesId: 1, slug: 1 }, { unique: true });
 noteSchema.index({ seriesId: 1, order: 1 });
 
-export const Note = models.Note || model("Note", noteSchema);
+export const Note = mongoose.models.Note || model("Note", noteSchema);

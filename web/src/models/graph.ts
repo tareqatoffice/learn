@@ -1,4 +1,4 @@
-import { Schema, model, models } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 import { STATUSES } from "./status";
 
 const trackSchema = new Schema(
@@ -25,4 +25,4 @@ const graphSchema = new Schema(
   { timestamps: true },
 );
 
-export const Graph = models.Graph || model("Graph", graphSchema);
+export const Graph = mongoose.models.Graph || model("Graph", graphSchema);

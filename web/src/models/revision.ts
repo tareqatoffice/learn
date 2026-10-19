@@ -1,4 +1,4 @@
-import { Schema, model, models } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 
 const revisionSchema = new Schema(
   {
@@ -13,4 +13,4 @@ const revisionSchema = new Schema(
 
 revisionSchema.index({ entityType: 1, entityId: 1, editedAt: -1 });
 
-export const Revision = models.Revision || model("Revision", revisionSchema);
+export const Revision = mongoose.models.Revision || model("Revision", revisionSchema);

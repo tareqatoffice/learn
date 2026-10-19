@@ -1,4 +1,4 @@
-import { Schema, model, models } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 
 const noteProgressSchema = new Schema(
   {
@@ -15,4 +15,4 @@ const noteProgressSchema = new Schema(
 noteProgressSchema.index({ userId: 1, noteId: 1 }, { unique: true });
 noteProgressSchema.index({ userId: 1, lastOpenedAt: -1 });
 
-export const NoteProgress = models.NoteProgress || model("NoteProgress", noteProgressSchema);
+export const NoteProgress = mongoose.models.NoteProgress || model("NoteProgress", noteProgressSchema);

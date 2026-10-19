@@ -1,4 +1,4 @@
-import { Schema, model, models } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 
 const nodeProgressSchema = new Schema(
   {
@@ -16,4 +16,4 @@ nodeProgressSchema.index({ userId: 1, nodeId: 1 }, { unique: true });
 nodeProgressSchema.index({ userId: 1, graphId: 1 });
 nodeProgressSchema.index({ userId: 1, status: 1 });
 
-export const NodeProgress = models.NodeProgress || model("NodeProgress", nodeProgressSchema);
+export const NodeProgress = mongoose.models.NodeProgress || model("NodeProgress", nodeProgressSchema);

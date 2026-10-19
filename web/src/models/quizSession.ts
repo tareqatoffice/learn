@@ -1,4 +1,4 @@
-import { Schema, model, models } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 
 const filterSchema = new Schema(
   {
@@ -34,4 +34,4 @@ const quizSessionSchema = new Schema(
 
 quizSessionSchema.index({ userId: 1, startedAt: -1 });
 
-export const QuizSession = models.QuizSession || model("QuizSession", quizSessionSchema);
+export const QuizSession = mongoose.models.QuizSession || model("QuizSession", quizSessionSchema);

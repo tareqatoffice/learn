@@ -1,4 +1,4 @@
-import { Schema, model, models } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 import { STATUSES } from "./status";
 
 const relatedNoteSchema = new Schema(
@@ -43,4 +43,4 @@ graphNodeSchema.index({ graphId: 1, order: 1 });
 graphNodeSchema.index({ "related.questionIds": 1 });
 graphNodeSchema.index({ "related.notes.noteId": 1 });
 
-export const GraphNode = models.GraphNode || model("GraphNode", graphNodeSchema);
+export const GraphNode = mongoose.models.GraphNode || model("GraphNode", graphNodeSchema);

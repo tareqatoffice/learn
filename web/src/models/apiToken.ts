@@ -1,4 +1,4 @@
-import { Schema, model, models } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 
 const apiTokenSchema = new Schema(
   {
@@ -11,4 +11,4 @@ const apiTokenSchema = new Schema(
   { timestamps: true },
 );
 
-export const ApiToken = models.ApiToken || model("ApiToken", apiTokenSchema);
+export const ApiToken = mongoose.models.ApiToken || model("ApiToken", apiTokenSchema);

@@ -1,4 +1,4 @@
-import { Schema, model, models } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 import { STATUSES } from "./status";
 
 const noteSeriesSchema = new Schema(
@@ -14,4 +14,4 @@ const noteSeriesSchema = new Schema(
   { timestamps: true },
 );
 
-export const NoteSeries = models.NoteSeries || model("NoteSeries", noteSeriesSchema);
+export const NoteSeries = mongoose.models.NoteSeries || model("NoteSeries", noteSeriesSchema);
