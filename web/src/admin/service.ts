@@ -1,7 +1,10 @@
-import mongoose, { isValidObjectId, type Model, type Types } from "mongoose";
+import mongoose, { isValidObjectId, Types, type Model } from "mongoose";
 import { z } from "zod";
+import { findCycle } from "@/content/cycles";
+import { validateNode } from "@/content/parse/graph";
 import { saveWithRevision } from "@/content/revisions";
 import { importKey } from "@/lib/ids";
+import { extractToc, readMinutes } from "@/lib/markdown/toc";
 import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook, STATUSES, Subject, type Status } from "@/models";
 
 // Admin write operations. Every function validates its input, writes through
@@ -185,6 +188,174 @@ export async function setQuestionTopicLink(questionId: string, nodeId: string, l
   if (current.includes(questionId) === linked) return done(nodeId);
   const next = linked ? [...current, questionId] : current.filter((q) => q !== questionId);
   return done((await saveWithRevision(GraphNode, nodeId, { "related.questionIds": next } as never, editedBy))._id);
+}
+
+/** Adds or removes a link from the topic to a note (whole chapter when anchor is '', else one of its headings). */
+export async function setNodeNoteLink(nodeId: string, noteId: string, anchor: string, linked: boolean, editedBy: string): Promise<Result> {
+  if (!isValidObjectId(nodeId) || !isValidObjectId(noteId) || typeof anchor !== "string") return fail({ _: "Invalid link" });
+  const note = await Note.findById(noteId, { toc: 1 }).lean<{ toc?: { anchor: string }[] }>();
+  if (!note) return fail({ noteId: "Chapter not found" });
+  if (anchor && !(note.toc ?? []).some((t) => t.anchor === anchor)) return fail({ anchor: "That heading is not in the chapter" });
+  const node = await GraphNode.findById(nodeId, { related: 1 }).lean<{ related?: { notes?: { noteId: Id; anchor?: string }[] } }>();
+  if (!node) return fail({ nodeId: "Topic not found" });
+
+  const current = (node.related?.notes ?? []).map((n) => ({ noteId: n.noteId, anchor: n.anchor ?? "" }));
+  const same = (n: { noteId: Id; anchor: string }) => String(n.noteId) === noteId && n.anchor === anchor;
+  if (current.some(same) === linked) return done(nodeId);
+  const next = linked ? [...current, { noteId: new Types.ObjectId(noteId), anchor }] : current.filter((n) => !same(n));
+  return done((await saveWithRevision(GraphNode, nodeId, { "related.notes": next } as never, editedBy))._id);
+}
+
+// ---------- graphs and topics ----------
+
+const graphSchema = z.object({
+  id: objectId.optional(),
+  slug,
+  title: text("Title"),
+  subtitle: z.string(),
+  footer: z.string(),
+  subjects,
+  tracks: z
+    .array(z.object({ key: slug, name: text("Track name") }))
+    .min(2, "A graph needs 2 to 6 tracks")
+    .max(6, "A graph needs 2 to 6 tracks"),
+  status,
+});
+export type GraphInput = z.input<typeof graphSchema>;
+
+export async function saveGraph(input: GraphInput, editedBy: string): Promise<Result> {
+  const parsed = graphSchema.safeParse(input);
+  if (!parsed.success) return fail(fieldErrors(parsed.error));
+  const { id, tracks, ...rest } = parsed.data;
+  if (new Set(tracks.map((t) => t.key)).size !== tracks.length) return fail({ tracks: "Track keys must be unique" });
+  if (await slugTaken(Graph, rest.slug, id)) return fail({ slug: "Another graph already uses this slug" });
+  const data = { ...rest, tracks: tracks.map((t, order) => ({ ...t, order })) };
+  if (id) {
+    if (!(await Graph.exists({ _id: id }))) return fail({ id: "Graph not found" });
+    return done((await saveWithRevision(Graph, id, data, editedBy))._id);
+  }
+  return done((await saveWithRevision(Graph, null, { ...data, order: await nextOrder(Graph) }, editedBy))._id);
+}
+
+const nodeSchema = z.object({
+  id: objectId.optional(),
+  graphId: objectId,
+  slug,
+  trackKey: z.string(),
+  title: z.string().trim(),
+  prereqIds: z.array(objectId).max(50),
+  summary: z.string(),
+  points: z.array(z.string().trim().min(1)).max(30),
+  code: z.string(),
+  pitfall: z.string(),
+  docsUrl: z.string().trim(),
+  subjects,
+  status,
+});
+export type NodeInput = z.input<typeof nodeSchema>;
+
+// validateNode messages → form fields.
+const NODE_RULE_FIELDS: [RegExp, string][] = [
+  [/id must/, "slug"],
+  [/unknown track/, "trackKey"],
+  [/title/, "title"],
+  [/: s missing/, "summary"],
+  [/: c missing/, "code"],
+  [/: pit missing/, "pitfall"],
+  [/p needs/, "points"],
+  [/u must/, "docsUrl"],
+];
+
+export async function saveNode(input: NodeInput, editedBy: string): Promise<Result> {
+  const parsed = nodeSchema.safeParse(input);
+  if (!parsed.success) return fail(fieldErrors(parsed.error));
+  const { id, ...data } = parsed.data;
+  const graph = await Graph.findById(data.graphId, { tracks: 1 }).lean<{ tracks?: { key: string }[] }>();
+  if (!graph) return fail({ graphId: "Graph not found" });
+
+  const errors: Record<string, string> = {};
+  for (const message of validateNode({ ...data, prereqSlugs: [] }, (graph.tracks ?? []).map((t) => t.key))) {
+    const field = NODE_RULE_FIELDS.find(([pattern]) => pattern.test(message))?.[1] ?? "_";
+    errors[field] ??= message.replace(/^node [^:]*: /, "");
+  }
+  if (await slugTaken(GraphNode, data.slug, id, { graphId: data.graphId })) errors.slug ??= "Another topic in this graph uses this slug";
+  if (Object.keys(errors).length) return fail(errors);
+
+  const siblings = await GraphNode.find({ graphId: data.graphId }, { title: 1, prereqIds: 1 }).lean<{ _id: Id; title: string; prereqIds?: Id[] }[]>();
+  const selfId = id ?? "new";
+  if (data.prereqIds.includes(selfId)) return fail({ prereqIds: "A topic cannot require itself" });
+  const inGraph = new Set(siblings.map((s) => String(s._id)));
+  if (data.prereqIds.some((p) => !inGraph.has(p))) return fail({ prereqIds: "Prerequisites must be topics in the same graph" });
+
+  const edges = Object.fromEntries(siblings.map((s) => [String(s._id), (s.prereqIds ?? []).map(String)]));
+  edges[selfId] = data.prereqIds;
+  const cycle = findCycle(edges);
+  if (cycle) {
+    const titleOf = new Map(siblings.map((s) => [String(s._id), s.title]));
+    titleOf.set(selfId, data.title);
+    // Start the loop at the topic being saved so the message reads from the user's point of view.
+    const loop = cycle.slice(0, -1);
+    const start = Math.max(0, loop.indexOf(selfId));
+    const rotated = [...loop.slice(start), ...loop.slice(0, start)];
+    return fail({ prereqIds: `Creates a cycle: ${[...rotated, rotated[0]].map((n) => titleOf.get(n) ?? n).join(" → ")}` });
+  }
+
+  if (id) {
+    if (!(await GraphNode.exists({ _id: id, graphId: data.graphId }))) return fail({ id: "Topic not found" });
+    return done((await saveWithRevision(GraphNode, id, data, editedBy))._id);
+  }
+  return done((await saveWithRevision(GraphNode, null, { ...data, order: await nextOrder(GraphNode, { graphId: data.graphId }) }, editedBy))._id);
+}
+
+// ---------- notes ----------
+
+const seriesSchema = z.object({ id: objectId.optional(), slug, title: text("Title"), description: z.string(), subjects, status });
+export type SeriesInput = z.input<typeof seriesSchema>;
+
+export async function saveSeries(input: SeriesInput, editedBy: string): Promise<Result> {
+  const parsed = seriesSchema.safeParse(input);
+  if (!parsed.success) return fail(fieldErrors(parsed.error));
+  const { id, ...data } = parsed.data;
+  if (await slugTaken(NoteSeries, data.slug, id)) return fail({ slug: "Another series already uses this slug" });
+  if (id) {
+    if (!(await NoteSeries.exists({ _id: id }))) return fail({ id: "Series not found" });
+    return done((await saveWithRevision(NoteSeries, id, data, editedBy))._id);
+  }
+  return done((await saveWithRevision(NoteSeries, null, { ...data, order: await nextOrder(NoteSeries) }, editedBy))._id);
+}
+
+const noteSchema = z.object({ id: objectId.optional(), seriesId: objectId, slug, title: text("Title"), body: z.string(), subjects, status });
+export type NoteInput = z.input<typeof noteSchema>;
+
+export async function saveNote(input: NoteInput, editedBy: string): Promise<Result> {
+  const parsed = noteSchema.safeParse(input);
+  if (!parsed.success) return fail(fieldErrors(parsed.error));
+  const { id, ...rest } = parsed.data;
+  if (!(await NoteSeries.exists({ _id: rest.seriesId }))) return fail({ seriesId: "Series not found" });
+  if (await slugTaken(Note, rest.slug, id, { seriesId: rest.seriesId })) return fail({ slug: "Another chapter in this series uses this slug" });
+  const data = { ...rest, toc: extractToc(rest.body), readMinutes: readMinutes(rest.body) };
+  if (id) {
+    if (!(await Note.exists({ _id: id, seriesId: rest.seriesId }))) return fail({ id: "Chapter not found" });
+    return done((await saveWithRevision(Note, id, data, editedBy))._id);
+  }
+  return done((await saveWithRevision(Note, null, { ...data, order: await nextOrder(Note, { seriesId: rest.seriesId }) }, editedBy))._id);
+}
+
+// ---------- subjects ----------
+
+const subjectSchema = z.object({ id: objectId.optional(), slug, name: text("Name") });
+export type SubjectInput = z.input<typeof subjectSchema>;
+
+export async function saveSubject(input: SubjectInput, editedBy: string): Promise<Result> {
+  const parsed = subjectSchema.safeParse(input);
+  if (!parsed.success) return fail(fieldErrors(parsed.error));
+  const { id, ...data } = parsed.data;
+  if (await slugTaken(Subject, data.slug, id)) return fail({ slug: "That subject already exists" });
+  if (id) {
+    if (!(await Subject.exists({ _id: id }))) return fail({ id: "Subject not found" });
+    return done((await saveWithRevision(Subject, id, data, editedBy))._id);
+  }
+  return done((await saveWithRevision(Subject, null, { ...data, order: await nextOrder(Subject) }, editedBy))._id);
 }
 
 /** Topics whose title matches, limited to the given subjects when any; for the "link topic" picker. */

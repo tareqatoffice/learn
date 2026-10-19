@@ -1,5 +1,5 @@
 import { isValidObjectId, type Types } from "mongoose";
-import { Graph, GraphNode, Question, QuestionBook, Subject, type Status } from "@/models";
+import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook, Subject, type Status } from "@/models";
 
 // Admin reads: every status, unlike the user-facing queries.
 
@@ -109,4 +109,207 @@ export async function getQuestionAdmin(id: string): Promise<{
     },
     topics: nodes.map((n) => ({ id: String(n._id), title: n.title, graphTitle: titleOf.get(String(n.graphId)) ?? "" })),
   };
+}
+
+// ---------- graphs ----------
+
+export type AdminGraph = {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string;
+  footer: string;
+  subjects: string[];
+  status: Status;
+  tracks: { key: string; name: string }[];
+};
+
+export async function listGraphsAdmin(): Promise<{ id: string; slug: string; title: string; status: Status; topics: number }[]> {
+  const graphs = await Graph.find({}, { slug: 1, title: 1, status: 1 })
+    .sort({ order: 1, _id: 1 })
+    .lean<{ _id: Id; slug: string; title: string; status: Status }[]>();
+  const counts = await GraphNode.aggregate<{ _id: Id; n: number }>([{ $group: { _id: "$graphId", n: { $sum: 1 } } }]);
+  const countOf = new Map(counts.map((c) => [String(c._id), c.n]));
+  return graphs.map((g) => ({ id: String(g._id), slug: g.slug, title: g.title, status: g.status, topics: countOf.get(String(g._id)) ?? 0 }));
+}
+
+export async function getGraphAdmin(id: string): Promise<{
+  graph: AdminGraph;
+  nodes: { id: string; slug: string; title: string; trackKey: string; status: Status }[];
+} | null> {
+  if (!isValidObjectId(id)) return null;
+  const g = await Graph.findById(id).lean<{
+    _id: Id;
+    slug: string;
+    title: string;
+    subtitle?: string;
+    footer?: string;
+    subjects?: string[];
+    status: Status;
+    tracks?: { key: string; name: string; order?: number }[];
+  }>();
+  if (!g) return null;
+  const nodes = await GraphNode.find({ graphId: g._id }, { slug: 1, title: 1, trackKey: 1, status: 1 })
+    .sort({ order: 1, _id: 1 })
+    .lean<{ _id: Id; slug: string; title: string; trackKey: string; status: Status }[]>();
+  return {
+    graph: {
+      id: String(g._id),
+      slug: g.slug,
+      title: g.title,
+      subtitle: g.subtitle ?? "",
+      footer: g.footer ?? "",
+      subjects: g.subjects ?? [],
+      status: g.status,
+      tracks: (g.tracks ?? []).toSorted((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(({ key, name }) => ({ key, name })),
+    },
+    nodes: nodes.map((n) => ({ id: String(n._id), slug: n.slug, title: n.title, trackKey: n.trackKey, status: n.status })),
+  };
+}
+
+export type AdminNode = {
+  id: string;
+  graphId: string;
+  slug: string;
+  trackKey: string;
+  title: string;
+  prereqIds: string[];
+  summary: string;
+  points: string[];
+  code: string;
+  pitfall: string;
+  docsUrl: string;
+  subjects: string[];
+  status: Status;
+};
+
+export type AdminRelated = {
+  questions: { id: string; title: string }[];
+  notes: { noteId: string; anchor: string; title: string }[];
+};
+
+export async function getNodeAdmin(id: string): Promise<{ node: AdminNode; related: AdminRelated } | null> {
+  if (!isValidObjectId(id)) return null;
+  const n = await GraphNode.findById(id).lean<{
+    _id: Id;
+    graphId: Id;
+    slug: string;
+    trackKey: string;
+    title: string;
+    prereqIds?: Id[];
+    summary?: string;
+    points?: string[];
+    code?: string;
+    pitfall?: string;
+    docsUrl?: string;
+    subjects?: string[];
+    status: Status;
+    related?: { questionIds?: Id[]; notes?: { noteId: Id; anchor?: string }[] };
+  }>();
+  if (!n) return null;
+  const questionIds = n.related?.questionIds ?? [];
+  const noteLinks = n.related?.notes ?? [];
+  const [questions, notes] = await Promise.all([
+    Question.find({ _id: { $in: questionIds } }, { question: 1 }).lean<{ _id: Id; question: string }[]>(),
+    Note.find({ _id: { $in: noteLinks.map((l) => l.noteId) } }, { title: 1, toc: 1 }).lean<
+      { _id: Id; title: string; toc?: { anchor: string; text: string }[] }[]
+    >(),
+  ]);
+  const qTitle = new Map(questions.map((q) => [String(q._id), q.question]));
+  const noteById = new Map(notes.map((x) => [String(x._id), x]));
+  return {
+    node: {
+      id: String(n._id),
+      graphId: String(n.graphId),
+      slug: n.slug,
+      trackKey: n.trackKey,
+      title: n.title,
+      prereqIds: (n.prereqIds ?? []).map(String),
+      summary: n.summary ?? "",
+      points: n.points ?? [],
+      code: n.code ?? "",
+      pitfall: n.pitfall ?? "",
+      docsUrl: n.docsUrl ?? "",
+      subjects: n.subjects ?? [],
+      status: n.status,
+    },
+    related: {
+      questions: questionIds.map((q) => ({ id: String(q), title: qTitle.get(String(q)) ?? "(missing question)" })),
+      notes: noteLinks.map((l) => {
+        const note = noteById.get(String(l.noteId));
+        const heading = l.anchor ? note?.toc?.find((t) => t.anchor === l.anchor)?.text : undefined;
+        return {
+          noteId: String(l.noteId),
+          anchor: l.anchor ?? "",
+          title: `${note?.title ?? "(missing chapter)"}${heading ? ` § ${heading}` : ""}`,
+        };
+      }),
+    },
+  };
+}
+
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Questions whose text matches, limited to the given subjects when any; for the related picker. */
+export async function searchQuestions(query: string, subjectSlugs: string[]): Promise<{ id: string; title: string }[]> {
+  const term = query.trim();
+  const rows = await Question.find(
+    { ...(term ? { question: new RegExp(escapeRegex(term), "i") } : {}), ...(subjectSlugs.length ? { subjects: { $in: subjectSlugs } } : {}) },
+    { question: 1 },
+  )
+    .limit(20)
+    .lean<{ _id: Id; question: string }[]>();
+  return rows.map((q) => ({ id: String(q._id), title: q.question }));
+}
+
+/** Chapters whose title matches, with their headings; for the related picker. */
+export async function searchNotes(query: string): Promise<{ id: string; title: string; toc: { anchor: string; text: string }[] }[]> {
+  const term = query.trim();
+  const rows = await Note.find(term ? { title: new RegExp(escapeRegex(term), "i") } : {}, { title: 1, toc: 1 })
+    .limit(20)
+    .lean<{ _id: Id; title: string; toc?: { anchor: string; text: string }[] }[]>();
+  return rows.map((n) => ({ id: String(n._id), title: n.title, toc: (n.toc ?? []).map(({ anchor, text }) => ({ anchor, text })) }));
+}
+
+// ---------- notes ----------
+
+export type AdminSeries = { id: string; slug: string; title: string; description: string; subjects: string[]; status: Status };
+export type AdminNote = { id: string; seriesId: string; slug: string; title: string; body: string; subjects: string[]; status: Status };
+
+export async function listSeriesAdmin(): Promise<{ id: string; slug: string; title: string; status: Status; chapters: number }[]> {
+  const series = await NoteSeries.find({}, { slug: 1, title: 1, status: 1 })
+    .sort({ order: 1, _id: 1 })
+    .lean<{ _id: Id; slug: string; title: string; status: Status }[]>();
+  const counts = await Note.aggregate<{ _id: Id; n: number }>([{ $group: { _id: "$seriesId", n: { $sum: 1 } } }]);
+  const countOf = new Map(counts.map((c) => [String(c._id), c.n]));
+  return series.map((s) => ({ id: String(s._id), slug: s.slug, title: s.title, status: s.status, chapters: countOf.get(String(s._id)) ?? 0 }));
+}
+
+export async function getSeriesAdmin(id: string): Promise<{
+  series: AdminSeries;
+  notes: { id: string; slug: string; title: string; status: Status }[];
+} | null> {
+  if (!isValidObjectId(id)) return null;
+  const s = await NoteSeries.findById(id).lean<{ _id: Id; slug: string; title: string; description?: string; subjects?: string[]; status: Status }>();
+  if (!s) return null;
+  const notes = await Note.find({ seriesId: s._id }, { slug: 1, title: 1, status: 1 })
+    .sort({ order: 1, _id: 1 })
+    .lean<{ _id: Id; slug: string; title: string; status: Status }[]>();
+  return {
+    series: { id: String(s._id), slug: s.slug, title: s.title, description: s.description ?? "", subjects: s.subjects ?? [], status: s.status },
+    notes: notes.map((n) => ({ id: String(n._id), slug: n.slug, title: n.title, status: n.status })),
+  };
+}
+
+export async function getNoteAdmin(id: string): Promise<AdminNote | null> {
+  if (!isValidObjectId(id)) return null;
+  const n = await Note.findById(id).lean<{ _id: Id; seriesId: Id; slug: string; title: string; body?: string; subjects?: string[]; status: Status }>();
+  return n
+    ? { id: String(n._id), seriesId: String(n.seriesId), slug: n.slug, title: n.title, body: n.body ?? "", subjects: n.subjects ?? [], status: n.status }
+    : null;
+}
+
+export async function listSubjectsAdmin(): Promise<{ id: string; slug: string; name: string }[]> {
+  const rows = await Subject.find({}, { slug: 1, name: 1 }).sort({ order: 1, name: 1 }).lean<{ _id: Id; slug: string; name: string }[]>();
+  return rows.map((s) => ({ id: String(s._id), slug: s.slug, name: s.name }));
 }
