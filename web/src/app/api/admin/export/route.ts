@@ -1,15 +1,12 @@
+import { auth } from "@/auth";
 import { exportContent } from "@/content/backup";
-import { ForbiddenError, requireAdmin } from "@/lib/authz";
+import { isAdminEmail } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 
-/** Streams every content collection as one canonical-EJSON download (admins only). */
+/** Streams every content collection as one canonical-EJSON download (signed-in admins only; API tokens never apply). */
 export async function GET(): Promise<Response> {
-  try {
-    await requireAdmin();
-  } catch (error) {
-    if (error instanceof ForbiddenError) return new Response("Forbidden", { status: 403 });
-    throw error;
-  }
+  const session = await auth();
+  if (!isAdminEmail(session?.user?.email)) return new Response("Forbidden", { status: 403 });
   await connectDb();
 
   const encoder = new TextEncoder();
