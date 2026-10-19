@@ -8,7 +8,7 @@ type RevisionRow = {
   entityType: string;
   entityId: Types.ObjectId;
   snapshot: Record<string, unknown>;
-  editedBy?: Types.ObjectId;
+  editedBy?: string;
   editedAt: Date;
 };
 
@@ -35,20 +35,23 @@ export async function saveWithRevision<T>(
 
   const doc = await model.findById(id, null, { session });
   if (!doc) throw new Error(`${model.modelName} ${id} not found`);
+  const snapshot = doc.toObject({ versionKey: true });
+  doc.set(data);
+  // Validate before storing the snapshot, so a rejected update leaves no revision behind.
+  await doc.validate();
 
   await Revision.create(
     [
       {
         entityType: model.modelName,
         entityId: doc._id,
-        snapshot: doc.toObject({ versionKey: true }),
+        snapshot,
         editedBy,
         editedAt: new Date(),
       },
     ],
     { session },
   );
-  doc.set(data);
   return (await doc.save({ session })) as HydratedDocument<T>;
 }
 

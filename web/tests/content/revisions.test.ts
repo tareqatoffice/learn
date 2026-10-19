@@ -81,6 +81,19 @@ describe("revisions", () => {
     );
   });
 
+  it("rejects an invalid update and writes no revision", async () => {
+    const id = await seedQuestion("first");
+    await expect(saveWithRevision(Question, id, { status: "bogus" }, editor)).rejects.toThrow(/status/);
+    expect(await Revision.countDocuments()).toBe(0);
+    expect((await Question.findById(id).lean())!.status).toBe("published");
+  });
+
+  it("stores editedBy as given, such as an email or token name", async () => {
+    const id = await seedQuestion("first");
+    await saveWithRevision(Question, id, { question: "second" }, "token:cli");
+    expect((await listRevisions("Question", id))[0].editedBy).toBe("token:cli");
+  });
+
   it("works inside a transaction session, and rolls back with it", async () => {
     const id = await seedQuestion("first");
     const session = await mongoose.startSession();

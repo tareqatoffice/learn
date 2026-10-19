@@ -48,3 +48,38 @@ export type ParsedGraph = {
   tracks: { key: string; name: string }[];
   nodes: ParsedNode[];
 };
+
+/** The container an import writes into, addressed by slug. */
+export type ImportTarget = { kind: "book" | "series" | "graph"; slug: string };
+
+/** Raw import input: one book markdown, note chapter files, or legacy-shaped graph JSON. */
+export type ImportSource =
+  | { kind: "book"; markdown: string }
+  | { kind: "series"; files: { name: string; content: string }[] }
+  | { kind: "graph"; json: unknown };
+
+/** One planned change. `fields` lists the changed field names of an update. */
+export type ItemChange = {
+  action: "create" | "update" | "unchanged";
+  type: "container" | "question" | "part" | "extra" | "note" | "node" | "track";
+  key: string;
+  title: string;
+  id?: string;
+  fields?: string[];
+};
+
+/**
+ * Result of `runImport`. `creates`/`updates`/`unchanged` count content items (questions, notes,
+ * nodes); `items` also lists the container and its parts, extras and tracks.
+ */
+export type ImportReport = {
+  target: ImportTarget;
+  dryRun: boolean;
+  createdTarget: boolean;
+  creates: number;
+  updates: number;
+  unchanged: number;
+  items: ItemChange[];
+  warnings: string[];
+  errors: string[];
+};

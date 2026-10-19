@@ -5,7 +5,7 @@ const revisionSchema = new Schema(
     entityType: { type: String, required: true },
     entityId: { type: Schema.Types.ObjectId, required: true },
     snapshot: { type: Schema.Types.Mixed, required: true },
-    editedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    editedBy: { type: String }, // user email or "token:<name>"
     editedAt: { type: Date, default: Date.now },
   },
   { timestamps: true },
