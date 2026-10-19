@@ -6,6 +6,7 @@ let replSet: MongoMemoryReplSet | undefined;
 /** Vitest global setup: one in-memory replica set (transactions need one) per run. */
 export async function setup(): Promise<void> {
   replSet = await MongoMemoryReplSet.create({
+    binary: { version: "7.0.14" }, // match docker mongo:7
     replSet: { count: 1, storageEngine: "wiredTiger" },
   });
   process.env.MONGODB_URI = replSet.getUri("learn_test");
