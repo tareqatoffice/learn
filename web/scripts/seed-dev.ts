@@ -12,6 +12,7 @@ import mongoose from "mongoose";
 import { runImport } from "@/content/import/run";
 import type { ImportReport, ImportSource, ImportTarget } from "@/content/types";
 import { connectDb } from "@/lib/db";
+import { getEnv } from "@/lib/env";
 import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook } from "@/models";
 
 const EDITED_BY = "seed-dev";
@@ -173,9 +174,24 @@ const JOBS: Job[] = [
   },
 ];
 
+/** True when every host of a MongoDB connection string is on this machine. `mongodb+srv` always names a remote cluster. */
+export function isLocalMongoUri(uri: string): boolean {
+  const match = uri.trim().match(/^mongodb:\/\/([^/?#]+)/i);
+  if (!match) return false;
+  const hosts = match[1].slice(match[1].lastIndexOf("@") + 1).split(",");
+  return hosts.every((entry) => {
+    const host = entry.replace(/:\d*$/, "").toLowerCase();
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host.endsWith(".localhost");
+  });
+}
+
 /** Imports every job; stops at the first one with errors. The reports say what happened. */
 export async function seedDev(): Promise<ImportReport[]> {
+  // tsx leaves NODE_ENV unset, so the database address is the check that actually protects a real DB.
   if (process.env.NODE_ENV === "production") throw new Error("seed-dev refuses to run when NODE_ENV=production");
+  if (!isLocalMongoUri(getEnv().MONGODB_URI)) {
+    throw new Error("seed-dev refuses to run: MONGODB_URI does not point at a local database (localhost, 127.0.0.1, [::1] or *.localhost)");
+  }
   await connectDb();
 
   const importedAt = new Date();

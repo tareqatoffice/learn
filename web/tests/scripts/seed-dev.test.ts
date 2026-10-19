@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectDb } from "@/lib/db";
+import { resetEnvCache } from "@/lib/env";
 import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook } from "@/models";
-import { seedDev } from "../../scripts/seed-dev";
+import { isLocalMongoUri, seedDev } from "../../scripts/seed-dev";
 import { resetDb } from "../setup/mongo";
 
 beforeEach(async () => {
   await connectDb();
   await resetDb();
 });
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  resetEnvCache();
+});
 
 const published = { status: "published", importedAt: { $ne: null } };
 
@@ -47,4 +51,30 @@ describe("seedDev", () => {
     await expect(seedDev()).rejects.toThrow(/production/);
     expect(await QuestionBook.countDocuments()).toBe(0);
   });
+
+  it("refuses a database that is not local and writes nothing", async () => {
+    vi.stubEnv("MONGODB_URI", "mongodb+srv://x.mongodb.net/learn");
+    resetEnvCache();
+    await expect(seedDev()).rejects.toThrow(/local database/);
+    expect(await QuestionBook.countDocuments()).toBe(0);
+  });
+});
+
+describe("isLocalMongoUri", () => {
+  it.each([
+    "mongodb://localhost:27017/learn?replicaSet=rs0",
+    "mongodb://127.0.0.1:50000/learn_test",
+    "mongodb://[::1]:27017/learn",
+    "mongodb://user:p%40ss@db.localhost/learn",
+    "mongodb://localhost:27017,127.0.0.1:27018/learn",
+  ])("accepts %s", (uri) => expect(isLocalMongoUri(uri)).toBe(true));
+
+  it.each([
+    "mongodb+srv://x.mongodb.net/learn",
+    "mongodb://db.example.com:27017/learn",
+    "mongodb://localhost:27017,db.example.com:27017/learn",
+    "mongodb://localhost@evil.com/learn",
+    "mongodb://notlocalhost/learn",
+    "",
+  ])("rejects %s", (uri) => expect(isLocalMongoUri(uri)).toBe(false));
 });
