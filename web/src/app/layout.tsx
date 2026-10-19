@@ -23,12 +23,18 @@ export const metadata: Metadata = {
   description: "A personal learning platform",
 };
 
+// Runs before first paint so a saved choice never flashes the wrong theme. Reads the key ThemeToggle writes.
+const themeScript = `try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
       className={`${plexSans.variable} ${notoBengali.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
