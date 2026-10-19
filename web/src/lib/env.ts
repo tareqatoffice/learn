@@ -33,6 +33,14 @@ export function getEnv(): Env {
     ].join(", ");
     throw new Error(`Invalid environment variables: ${fields}`);
   }
+  if (process.env.NODE_ENV === "production") {
+    const missing = (["AUTH_SECRET", "AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET"] as const).filter(
+      (key) => !result.data[key].trim(),
+    );
+    if (missing.length > 0) {
+      throw new Error(`Missing required environment variables in production: ${missing.join(", ")}`);
+    }
+  }
   cached = result.data;
   return cached;
 }

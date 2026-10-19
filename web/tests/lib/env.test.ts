@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getEnv, resetEnvCache } from "@/lib/env";
 
 const KEYS = [
@@ -21,6 +21,7 @@ describe("getEnv", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     for (const k of KEYS) {
       if (saved[k] === undefined) delete process.env[k];
       else process.env[k] = saved[k];
@@ -52,6 +53,36 @@ describe("getEnv", () => {
   it("parses AUTH_DEV_LOGIN=true as true", () => {
     process.env.AUTH_DEV_LOGIN = "true";
     expect(getEnv().AUTH_DEV_LOGIN).toBe(true);
+  });
+
+  describe("in production", () => {
+    it("names every missing auth variable without echoing values", () => {
+      vi.stubEnv("NODE_ENV", "production");
+      process.env.AUTH_GOOGLE_ID = "super-secret-id";
+      let message = "";
+      try {
+        getEnv();
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).toMatch(/AUTH_SECRET/);
+      expect(message).toMatch(/AUTH_GOOGLE_SECRET/);
+      expect(message).not.toContain("AUTH_GOOGLE_ID");
+      expect(message).not.toContain("super-secret-id");
+    });
+
+    it("accepts a fully configured environment", () => {
+      vi.stubEnv("NODE_ENV", "production");
+      process.env.AUTH_SECRET = "s";
+      process.env.AUTH_GOOGLE_ID = "id";
+      process.env.AUTH_GOOGLE_SECRET = "secret";
+      expect(() => getEnv()).not.toThrow();
+    });
+
+    it("does not require auth variables outside production", () => {
+      vi.stubEnv("NODE_ENV", "development");
+      expect(() => getEnv()).not.toThrow();
+    });
   });
 
   it("caches the parsed result until resetEnvCache is called", () => {

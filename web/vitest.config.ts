@@ -11,5 +11,7 @@ export default defineConfig({
     environment: "node",
     globalSetup: ["./tests/setup/mongo.ts"],
     include: ["tests/**/*.test.{ts,tsx}"],
+    // next-auth imports "next/server" without an extension, which Node's ESM resolver rejects.
+    server: { deps: { inline: ["next-auth"] } },
   },
 });
