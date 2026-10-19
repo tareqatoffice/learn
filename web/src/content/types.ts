@@ -22,3 +22,29 @@ export type ParsedBook = {
   questions: ParsedQuestion[];
   unaccounted: { line: number; heading: string }[];
 };
+
+/** One note chapter. `id` is present only when the markdown carries a learn:note marker. */
+export type ParsedChapter = { id?: string; slug: string; title: string; body: string };
+
+/** One learning-graph node (legacy fields: id=slug, tr=trackKey, t=title, pre=prereqSlugs, s, p, c, pit, u). */
+export type ParsedNode = {
+  id?: string;
+  slug: string;
+  trackKey: string;
+  title: string;
+  prereqSlugs: string[];
+  summary: string;
+  points: string[];
+  code: string;
+  pitfall: string;
+  docsUrl: string;
+};
+
+export type ParsedGraph = {
+  id?: string;
+  title?: string;
+  subtitle?: string;
+  footer?: string;
+  tracks: { key: string; name: string }[];
+  nodes: ParsedNode[];
+};

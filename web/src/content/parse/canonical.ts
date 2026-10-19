@@ -10,7 +10,7 @@ export function isCanonical(lines: string[], outside: boolean[]): boolean {
   return lines.some((line, i) => outside[i] && MARKER.test(line));
 }
 
-function markerAttrs(raw: string): Record<string, string> {
+export function markerAttrs(raw: string): Record<string, string> {
   return Object.fromEntries([...raw.matchAll(/(\w+)=(\S+)/g)].map((m) => [m[1], m[2]]));
 }
 
