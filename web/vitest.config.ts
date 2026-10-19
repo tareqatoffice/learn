@@ -10,6 +10,8 @@ export default defineConfig({
   test: {
     environment: "node",
     globalSetup: ["./tests/setup/mongo.ts"],
+    // Test files share one database and resetDb() empties it, so files must not run concurrently.
+    fileParallelism: false,
     include: ["tests/**/*.test.{ts,tsx}"],
     // next-auth imports "next/server" without an extension, which Node's ESM resolver rejects.
     server: { deps: { inline: ["next-auth"] } },

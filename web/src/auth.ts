@@ -38,6 +38,17 @@ export async function upsertUserOnSignIn(
   return { userId: String(doc._id), role };
 }
 
+/** Email drives admin rights and account linking, so Google must vouch for it. */
+export function isSignInAllowed({
+  account,
+  profile,
+}: {
+  account?: { provider?: string } | null;
+  profile?: { email_verified?: unknown } | null;
+}): boolean {
+  return account?.provider !== "google" || profile?.email_verified === true;
+}
+
 const devLoginSchema = z.object({ email: z.email() });
 
 export function getProviders(): Provider[] {
@@ -69,6 +80,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
   providers: getProviders(),
   session: { strategy: "jwt" as const },
   callbacks: {
+    signIn: ({ account, profile }) => isSignInAllowed({ account, profile }),
     async jwt({ token, account, profile, user }) {
       if (account) {
         const email = (profile?.email ?? user?.email ?? token.email) as string | undefined;

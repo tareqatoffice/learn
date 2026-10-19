@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetDb } from "../setup/mongo";
 import { resetEnvCache } from "@/lib/env";
-import { getProviders, upsertUserOnSignIn } from "@/auth";
+import { getProviders, isSignInAllowed, upsertUserOnSignIn } from "@/auth";
 import { User } from "@/models";
 
 const KEYS = [
@@ -86,6 +86,27 @@ describe("sign-in", () => {
       process.env.AUTH_DEV_LOGIN = "false";
       resetEnvCache();
       expect(ids()).toEqual(["google"]);
+    });
+  });
+
+  describe("isSignInAllowed", () => {
+    it("rejects Google accounts whose email is not verified", () => {
+      expect(
+        isSignInAllowed({ account: { provider: "google" }, profile: { email_verified: false } }),
+      ).toBe(false);
+      expect(isSignInAllowed({ account: { provider: "google" }, profile: {} })).toBe(false);
+    });
+
+    it("allows verified Google accounts", () => {
+      expect(
+        isSignInAllowed({ account: { provider: "google" }, profile: { email_verified: true } }),
+      ).toBe(true);
+    });
+
+    it("does not affect the dev credentials provider", () => {
+      expect(isSignInAllowed({ account: { provider: "credentials" }, profile: undefined })).toBe(
+        true,
+      );
     });
   });
 });
