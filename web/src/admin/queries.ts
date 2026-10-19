@@ -1,5 +1,19 @@
 import { isValidObjectId, type Types } from "mongoose";
-import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook, Subject, type Status } from "@/models";
+import {
+  Graph,
+  GraphNode,
+  NodeProgress,
+  Note,
+  NoteProgress,
+  NoteSeries,
+  Question,
+  QuestionBook,
+  QuestionProgress,
+  Revision,
+  Subject,
+  User,
+  type Status,
+} from "@/models";
 
 // Admin reads: every status, unlike the user-facing queries.
 
@@ -307,6 +321,53 @@ export async function getNoteAdmin(id: string): Promise<AdminNote | null> {
   return n
     ? { id: String(n._id), seriesId: String(n.seriesId), slug: n.slug, title: n.title, body: n.body ?? "", subjects: n.subjects ?? [], status: n.status }
     : null;
+}
+
+// ---------- system ----------
+
+export type RevisionRow = { id: string; entityType: string; entityId: string; editedBy: string; editedAt: Date; snapshot: Record<string, unknown> };
+
+/** Newest revisions across all content, or of one entity when given. */
+export async function listRevisionsAdmin(filter: { entityType?: string; entityId?: string } = {}, limit = 100): Promise<RevisionRow[]> {
+  const query: Record<string, unknown> = {};
+  if (filter.entityType) query.entityType = filter.entityType;
+  if (filter.entityId) {
+    if (!isValidObjectId(filter.entityId)) return [];
+    query.entityId = filter.entityId;
+  }
+  const rows = await Revision.find(query)
+    .sort({ editedAt: -1, _id: -1 })
+    .limit(limit)
+    .lean<{ _id: Id; entityType: string; entityId: Id; editedBy?: string; editedAt: Date; snapshot: Record<string, unknown> }[]>();
+  return rows.map((r) => ({
+    id: String(r._id),
+    entityType: r.entityType,
+    entityId: String(r.entityId),
+    editedBy: r.editedBy ?? "",
+    editedAt: r.editedAt,
+    snapshot: r.snapshot,
+  }));
+}
+
+export async function listUsersAdmin(): Promise<
+  { id: string; email: string; name: string; role: string; lastLoginAt?: Date; questions: number; topics: number; notes: number }[]
+> {
+  const users = await User.find({}, { email: 1, name: 1, role: 1, lastLoginAt: 1 })
+    .sort({ lastLoginAt: -1, _id: -1 })
+    .lean<{ _id: Id; email: string; name?: string; role?: string; lastLoginAt?: Date }[]>();
+  const count = async (model: typeof QuestionProgress) =>
+    new Map((await model.aggregate<{ _id: Id; n: number }>([{ $group: { _id: "$userId", n: { $sum: 1 } } }])).map((r) => [String(r._id), r.n]));
+  const [questions, topics, notes] = await Promise.all([count(QuestionProgress), count(NodeProgress), count(NoteProgress)]);
+  return users.map((u) => ({
+    id: String(u._id),
+    email: u.email,
+    name: u.name ?? "",
+    role: u.role ?? "user",
+    lastLoginAt: u.lastLoginAt,
+    questions: questions.get(String(u._id)) ?? 0,
+    topics: topics.get(String(u._id)) ?? 0,
+    notes: notes.get(String(u._id)) ?? 0,
+  }));
 }
 
 export async function listSubjectsAdmin(): Promise<{ id: string; slug: string; name: string }[]> {

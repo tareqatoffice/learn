@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { moveItemAction, setStatusAction } from "@/app/(app)/admin/actions";
@@ -44,6 +45,9 @@ export function RowActions({ kind, id, status, label }: { kind: OrderedKind; id:
           <option value="archived">Archived</option>
         </select>
       )}
+      <Link href={`/admin/revisions/${MODEL_OF[kind]}/${id}`} className="px-1 text-xs underline-offset-2 hover:underline">
+        History
+      </Link>
       {error && (
         <span role="alert" className="text-xs text-destructive">
           {error}
@@ -52,3 +56,14 @@ export function RowActions({ kind, id, status, label }: { kind: OrderedKind; id:
     </span>
   );
 }
+
+/** Revision.entityType is the Mongoose model name. */
+const MODEL_OF: Record<OrderedKind, string> = {
+  book: "QuestionBook",
+  question: "Question",
+  graph: "Graph",
+  node: "GraphNode",
+  series: "NoteSeries",
+  note: "Note",
+  subject: "Subject",
+};
