@@ -256,6 +256,21 @@ export async function listUnfinished(
   const sessions = await QuizSession.find({ userId, finishedAt: null })
     .sort({ startedAt: -1, _id: -1 })
     .lean<SessionRow[]>();
+  const labels = await labelSessions(sessions);
+  return sessions.map((s, i) => ({
+    id: String(s._id),
+    label: labels[i],
+    position: Math.min(s.cursor, s.questionIds.length),
+    total: s.questionIds.length,
+    startedAt: s.startedAt,
+  }));
+}
+
+/** The last result per unique question of a session. */
+export const sessionCounts = (session: Pick<SessionRow, "results">) => countResults(session.results);
+
+/** A display label per session ("JavaScript · Hooks", "Mixed", ...), in the same order. */
+export async function labelSessions(sessions: Pick<SessionRow, "filter" | "questionIds">[]): Promise<string[]> {
   if (!sessions.length) return [];
 
   // "All books" and topic decks have no books in the filter; label them by the books in the deck.
@@ -282,15 +297,9 @@ export async function listUnfinished(
       sessionBooks.length === 1 && s.filter.partKeys.length === 1
         ? sessionBooks[0].parts.find((p) => p.key === s.filter.partKeys[0])?.title
         : undefined;
-    return {
-      id: String(s._id),
-      label: sessionLabel(
-        sessionBooks.map((b) => b.title),
-        partTitle,
-      ),
-      position: Math.min(s.cursor, s.questionIds.length),
-      total: s.questionIds.length,
-      startedAt: s.startedAt,
-    };
+    return sessionLabel(
+      sessionBooks.map((b) => b.title),
+      partTitle,
+    );
   });
 }
