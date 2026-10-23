@@ -1,6 +1,3 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { computeTiers, layoutGraph, readyNext } from "@/graph/layout";
 
@@ -56,20 +53,5 @@ describe("layoutGraph", () => {
       expect.objectContaining({ tier: 0, first: true }),
       expect.objectContaining({ tier: 0, first: false }),
     ]);
-  });
-
-  const realGraph = resolve(__dirname, "../../../learning-graph/_src/data/javascript.mjs");
-  it.skipIf(!existsSync(realGraph))("gives every topic of the real JavaScript graph its own position", async () => {
-    const data = (await import(pathToFileURL(realGraph).href)).default as {
-      tracks: { k: string }[];
-      nodes: { id: string; tr: string; pre: string[] }[];
-    };
-    const out = layoutGraph(
-      data.nodes.map((n) => ({ id: n.id, trackKey: n.tr, prereqIds: n.pre })),
-      data.tracks.map((t) => ({ key: t.k })),
-    );
-    const spots = Object.values(out.positions).map((p) => `${p.x},${p.y}`);
-    expect(spots).toHaveLength(37);
-    expect(new Set(spots).size).toBe(37);
   });
 });

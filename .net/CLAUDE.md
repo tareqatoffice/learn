@@ -15,65 +15,40 @@ To learn ASP.NET Core (Web API), Clean Architecture, and Microservices with Post
 - **Deep focus:** Clean Architecture, Authentication & JWT, Testing (xUnit + integration), Docker & deployment
 - **Pace:** Intensive (10+ hrs/week)
 
----
-
-## Progress Tracker
-
-| Phase | Topic | Status | Notes File |
-|-------|-------|--------|------------|
-| 1 | C# Fundamentals | **In Progress** | `notes/01-csharp-fundamentals.md` |
-| 2 | ASP.NET Core Basics | Not started | `notes/02-aspnet-basics.md` |
-| 3 | EF Core + PostgreSQL | Not started | `notes/03-efcore-postgres.md` |
-| 4 | Clean Architecture | Not started | `notes/04-clean-architecture.md` |
-| 5 | Authentication & JWT | Not started | `notes/05-auth-jwt.md` |
-| 6 | Testing (xUnit + Integration) | Not started | `notes/06-testing.md` |
-| 7 | Advanced ASP.NET Core | Not started | `notes/07-advanced-aspnet.md` |
-| 8 | Microservices | Not started | `notes/08-microservices.md` |
-| 9 | Docker & Deployment | Not started | `notes/09-docker-deployment.md` |
 
 ---
 
-## Currently Learning
+## Where the notes live
 
-**Phase 1 — C# Fundamentals**
+This track's notes are the chapters of the **C# / .NET** series (slug `dotnet`) in the
+Learn app (`../web/`). The old `notes/*.md` and `LEARNING_PLAN.md` files were imported
+into the app and removed. Read progress is tracked per user in the app, not here.
 
-Working through: mental model shift, types, control flow, OOP, LINQ, async/await.  
-Notes: `notes/01-csharp-fundamentals.md`
+Runnable code still lives in `examples/` (real files, not snippets).
 
-## Completed Topics
+### Phases
 
-_Nothing completed yet — just starting._
+| Phase | Topic |
+|-------|-------|
+| 1 | C# Fundamentals |
+| 2 | ASP.NET Core Basics |
+| 3 | EF Core + PostgreSQL |
+| 4 | Clean Architecture |
+| 5 | Authentication & JWT |
+| 6 | Testing (xUnit + Integration) |
+| 7 | Advanced ASP.NET Core |
+| 8 | Microservices |
+| 9 | Docker & Deployment |
 
-## Next Steps
+### Adding or editing chapters
 
-1. Start Phase 1: C# Fundamentals (`LEARNING_PLAN.md` → Phase 1)
-2. Work through syntax, types, OOP, LINQ, and async/await with practical examples
-3. Create `notes/01-csharp-fundamentals.md` as you progress
+Do not create `notes/*.md` or `LEARNING_PLAN.md` files. Instead:
 
----
+1. Write each chapter as its own markdown file whose first line is the H1 title.
+2. Preview, from `web/` with paths relative to it: `cd ../web && npm run content -- push ../.net/<file>.md --series dotnet`
+3. Apply: run the same command with `--commit` (add `--publish` to publish new chapters).
+4. To edit existing chapters: `npm run content -- pull series dotnet --out tmp`, edit the
+   files (keep the `<!-- learn:… -->` markers), then push them as above.
 
-## Project Structure (will grow over time)
-
-```
-.net/
-├── CLAUDE.md               ← this file (always-on context)
-├── LEARNING_PLAN.md        ← full roadmap with all topics
-├── notes/                  ← per-phase notes, examples, exercises
-│   ├── 01-csharp-fundamentals.md
-│   ├── 02-aspnet-basics.md
-│   └── ...
-└── examples/               ← all apps and projects built during learning
-    ├── TodoApp/            ← Phase 1 mini-project (console, C# fundamentals)
-    ├── phase2-products-api/
-    ├── phase4-clean-arch/
-    └── ...
-```
-
----
-
-## Key Conventions for This Learning Journey
-
-- Every phase has a notes file tracking what was learned, with code examples
-- Practical projects are built alongside theory — not after
-- Node.js/Express analogies are used to bridge concepts faster
-- Each notes file has a "Gotchas" section for C#/.NET surprises
+The CLI needs `LEARN_API_URL` and `LEARN_API_TOKEN` in `web/.env.local` (create the token in
+Admin → API tokens). See `web/README.md` → "Adding content with Claude Code".

@@ -36,9 +36,13 @@ so Docker is not needed. The first run downloads a `mongod` binary.
    `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `ADMIN_EMAILS` (your Google email).
    Leave `AUTH_DEV_LOGIN` unset. Outside Vercel, also set `AUTH_TRUST_HOST=true`
    or `AUTH_URL`.
-4. **Content.** Point `MONGODB_URI` in `web/.env.local` at Atlas, then run
-   `npm run import:legacy -- --dry-run` and `npm run import:legacy` (only while the
-   legacy source folders still exist), and take a backup (`npm run backup -- backups/after-import.json`).
+4. **Content.** The legacy files were imported into the local database and removed.
+   With the local app running, download **Admin → Export** (content only: no users,
+   progress or history), point `MONGODB_URI` in `web/.env.local` at the empty Atlas
+   database and run `npm run restore -- <export-file>.json`. Don't restore a full
+   backup such as `backups/after-import.json` here: it also carries local dev-login
+   users and test progress. If the local database is gone, rebuild it from the commit
+   before `chore: remove legacy content files` (`npm run import:legacy`).
 5. `vercel deploy` (or push to the connected branch).
 
 ## Adding content with Claude Code

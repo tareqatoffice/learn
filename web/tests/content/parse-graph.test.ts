@@ -1,6 +1,3 @@
-import { existsSync } from "node:fs";
-import { pathToFileURL } from "node:url";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseGraph, validateNode } from "@/content/parse/graph";
 
@@ -10,20 +7,6 @@ const node = (over: Record<string, unknown> = {}) => ({
 });
 const graph = (nodes: unknown[], tracks: unknown[] = [{ k: "t1", n: "One" }, { k: "t2", n: "Two" }]) => ({
   title: "G", sub: "S", foot: "F", tracks, nodes,
-});
-
-const path = resolve(process.cwd(), "../learning-graph/_src/data/javascript.mjs");
-describe.skipIf(!existsSync(path))("parseGraph on the real javascript graph", () => {
-  it("parses 37 nodes with no errors", async () => {
-    const cfg = (await import(pathToFileURL(path).href)).default;
-    const { graph: g, errors } = parseGraph(cfg);
-    expect(g.nodes).toHaveLength(37);
-    expect(errors).toEqual([]);
-    expect(g.title).toBe(cfg.title);
-    expect(g.subtitle).toBe(cfg.sub);
-    expect(g.footer).toBe(cfg.foot);
-    expect(g.nodes[0]).toMatchObject({ slug: "values-types", trackKey: "basics", title: "Values & types" });
-  });
 });
 
 describe("parseGraph", () => {

@@ -12,7 +12,6 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "import:legacy": "tsx scripts/import-legacy.ts",
     "seed:dev": "tsx scripts/seed-dev.ts",
     "content": "tsx scripts/content.ts",
     "backup": "tsx scripts/backup.ts",
