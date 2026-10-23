@@ -1,6 +1,7 @@
 import { isValidObjectId, type Types } from "mongoose";
 import { visibleNodeFilter } from "@/content/visibility";
 import { ForbiddenError } from "@/lib/authz";
+import { retryOnDuplicateKey } from "@/lib/db";
 import { GraphNode, NodeProgress } from "@/models";
 
 export type NodeStatus = "none" | "learning" | "done";
@@ -24,10 +25,8 @@ export async function setNodeStatus(userId: string, nodeId: string, status: Node
     status === "learning"
       ? { $set: { status }, $unset: { doneAt: 1 } }
       : { $set: { status, doneAt: now } };
-  await NodeProgress.updateOne(
-    key,
-    { ...update, $setOnInsert: { graphId: node.graphId, startedAt: now } },
-    { upsert: true },
+  await retryOnDuplicateKey(() =>
+    NodeProgress.updateOne(key, { ...update, $setOnInsert: { graphId: node.graphId, startedAt: now } }, { upsert: true }),
   );
 }
 

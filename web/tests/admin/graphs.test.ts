@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { saveGraph, saveNode } from "@/admin/service";
+import { restoreRevisionChecked, saveGraph, saveNode } from "@/admin/service";
 import { connectDb } from "@/lib/db";
 import { Graph, GraphNode, Revision } from "@/models";
 import { resetDb } from "../setup/mongo";
@@ -121,5 +121,46 @@ describe("saveNode", () => {
     const g = await graph();
     await saved(node(g, "a"));
     expect(await saveNode(node(g, "a"), ADMIN)).toMatchObject({ ok: false, errors: { slug: expect.any(String) } });
+  });
+});
+
+describe("restoreRevisionChecked", () => {
+  const revisionWith = async (entityId: string, match: (snap: Record<string, unknown>) => boolean) => {
+    const rows = await Revision.find({ entityId }).lean<{ _id: unknown; snapshot: Record<string, unknown> }[]>();
+    const row = rows.find((r) => match(r.snapshot));
+    if (!row) throw new Error("revision not found");
+    return String(row._id);
+  };
+
+  it("refuses a topic version whose prerequisites would now form a cycle", async () => {
+    const g = await graph();
+    const a = await saved(node(g, "a"));
+    const b = await saved(node(g, "b"));
+    await saved(node(g, "a", { id: a, prereqIds: [b] }));
+    await saved(node(g, "a", { id: a, prereqIds: [] })); // stores the a -> b version
+    await saved(node(g, "b", { id: b, prereqIds: [a] }));
+
+    const aNeedsB = await revisionWith(a, (s) => (s.prereqIds as unknown[]).length === 1);
+    expect(await restoreRevisionChecked(aNeedsB, ADMIN)).toMatchObject({ ok: false, errors: { prereqIds: expect.stringContaining("cycle") } });
+    expect((await GraphNode.findById(a).lean<{ prereqIds: unknown[] }>())?.prereqIds).toEqual([]);
+  });
+
+  it("refuses a graph version that drops a track still holding topics", async () => {
+    const g = await graph();
+    const three = [...TRACKS, { key: "extra", name: "Extra" }];
+    expect(await saveGraph({ id: g, slug: "js", title: "js graph", subtitle: "", footer: "", subjects: [], tracks: three, status: "published" }, ADMIN)).toMatchObject({ ok: true });
+    await saved(node(g, "x", { trackKey: "extra" }));
+
+    const twoTracks = await revisionWith(g, (s) => (s.tracks as unknown[]).length === 2);
+    expect(await restoreRevisionChecked(twoTracks, ADMIN)).toMatchObject({ ok: false, errors: { tracks: expect.stringContaining("Extra") } });
+  });
+
+  it("restores a version that still fits", async () => {
+    const g = await graph();
+    const a = await saved(node(g, "a"));
+    await saved(node(g, "a", { id: a, title: "renamed" }));
+    const original = await revisionWith(a, (s) => s.title === "a topic");
+    expect(await restoreRevisionChecked(original, ADMIN)).toEqual({ ok: true, id: a });
+    expect((await GraphNode.findById(a).lean<{ title: string }>())?.title).toBe("a topic");
   });
 });

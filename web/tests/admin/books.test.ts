@@ -115,6 +115,17 @@ describe("moveItem", () => {
     expect([await order(q1), await order(q2), await order(q3)]).toEqual([1, 0, 2]);
     expect(await moveItem("question", q2, "up", ADMIN)).toMatchObject({ ok: false });
   });
+
+  it("swaps only the two items when orders are distinct but not 0-based (as imported)", async () => {
+    const book = await seedBook("js");
+    const ids = await seedQuestions(book, 5);
+    await Promise.all(ids.map((id, i) => Question.updateOne({ _id: id }, { $set: { order: i + 1 } })));
+
+    expect(await moveItem("question", ids[3], "up", ADMIN)).toEqual({ ok: true, id: ids[3] });
+    const orders = await Promise.all(ids.map(async (id) => (await Question.findById(id).lean<{ order: number }>())?.order));
+    expect(orders).toEqual([1, 2, 4, 3, 5]);
+    expect(await Revision.countDocuments({ entityType: "Question" })).toBe(2);
+  });
 });
 
 describe("setStatus", () => {

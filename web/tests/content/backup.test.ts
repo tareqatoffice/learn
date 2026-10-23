@@ -1,11 +1,11 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import mongoose from "mongoose";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { backupAll, restoreAll } from "@/content/backup";
 import { connectDb } from "@/lib/db";
-import { Question, QuestionProgress, Revision, User } from "@/models";
+import { Question, QuestionBook, QuestionProgress, Revision, Subject, User } from "@/models";
 import { markQuestion } from "@/progress/questions";
 import { resetDb } from "../setup/mongo";
 import { seedBook, seedQuestions } from "../progress/seed";
@@ -47,5 +47,32 @@ describe("backupAll / restoreAll", () => {
     const file = path.join(dir, "backup.json");
     await backupAll(file);
     await expect(restoreAll(file)).rejects.toThrow("target database is not empty");
+  });
+
+  it("refuses when only non-content collections have documents", async () => {
+    const file = path.join(dir, "backup.json");
+    await backupAll(file);
+    await Revision.create({ entityType: "Question", entityId: new mongoose.Types.ObjectId(), snapshot: {}, editedAt: new Date() });
+    await expect(restoreAll(file)).rejects.toThrow("revisions has documents");
+  });
+
+  it("rolls back a restore that fails part way, so it can be rerun", async () => {
+    const { EJSON } = mongoose.mongo.BSON;
+    const dup = new mongoose.Types.ObjectId();
+    const book = { _id: dup, slug: "a", title: "A", status: "published" };
+    const file = path.join(dir, "broken.json");
+    writeFileSync(
+      file,
+      EJSON.stringify({
+        version: 1,
+        collections: {
+          subjects: [{ _id: new mongoose.Types.ObjectId(), slug: "js", name: "JS" }],
+          questionbooks: [book, { ...book, slug: "b" }],
+        },
+      }),
+    );
+    await expect(restoreAll(file)).rejects.toThrow("rolled back");
+    expect(await Subject.countDocuments()).toBe(0);
+    expect(await QuestionBook.countDocuments()).toBe(0);
   });
 });

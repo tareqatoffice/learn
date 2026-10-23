@@ -1,6 +1,7 @@
 import { isValidObjectId, type Types } from "mongoose";
 import { visibleNoteFilter } from "@/content/visibility";
 import { ForbiddenError } from "@/lib/authz";
+import { retryOnDuplicateKey } from "@/lib/db";
 import { Note, NoteProgress } from "@/models";
 
 async function visibleNote(noteId: string): Promise<{ seriesId: Types.ObjectId }> {
@@ -15,7 +16,9 @@ async function visibleNote(noteId: string): Promise<{ seriesId: Types.ObjectId }
 
 async function upsertNoteProgress(userId: string, noteId: string, update: Record<string, unknown>): Promise<void> {
   const { seriesId } = await visibleNote(noteId);
-  await NoteProgress.updateOne({ userId, noteId }, { ...update, $setOnInsert: { seriesId } }, { upsert: true });
+  await retryOnDuplicateKey(() =>
+    NoteProgress.updateOne({ userId, noteId }, { ...update, $setOnInsert: { seriesId } }, { upsert: true }),
+  );
 }
 
 /** Records that the user opened a chapter (drives "continue reading"). */

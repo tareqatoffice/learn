@@ -18,3 +18,18 @@ export async function connectDb(): Promise<typeof mongoose> {
   }
   return cache.conn;
 }
+
+const isDuplicateKey = (error: unknown) => error instanceof mongoose.mongo.MongoServerError && error.code === 11000;
+
+/**
+ * Runs an upsert keyed on a unique index, once more if it loses a race: two first writes can
+ * both miss and both insert, and the loser's E11000 retry then matches the winner's doc.
+ */
+export async function retryOnDuplicateKey<T>(write: () => Promise<T>): Promise<T> {
+  try {
+    return await write();
+  } catch (error) {
+    if (!isDuplicateKey(error)) throw error;
+    return write();
+  }
+}

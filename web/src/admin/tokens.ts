@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { isValidObjectId, type Types } from "mongoose";
-import { ApiToken } from "@/models";
+import { isAdminEmail } from "@/lib/authz";
+import { ApiToken, User } from "@/models";
 
 /** Only this hash is stored; the token itself is shown once at creation. */
 export const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -32,12 +33,20 @@ export async function listTokens(): Promise<{ id: string; name: string; createdB
   }));
 }
 
-/** The live (not revoked) token behind a bearer value, recording its use; null when there is none. */
+/**
+ * The live token behind a bearer value, recording its use; null when there is none. A token is
+ * live while it is not revoked and its creator is still in ADMIN_EMAILS, so removing an admin
+ * also cuts off the tokens they made.
+ */
 export async function findLiveToken(token: string): Promise<{ tokenId: string; name: string } | null> {
-  const doc = await ApiToken.findOneAndUpdate(
-    { tokenHash: hashToken(token), revokedAt: null },
-    { $set: { lastUsedAt: new Date() } },
-    { projection: { name: 1 } },
-  ).lean<{ _id: Types.ObjectId; name: string }>();
-  return doc ? { tokenId: String(doc._id), name: doc.name } : null;
+  const doc = await ApiToken.findOne({ tokenHash: hashToken(token), revokedAt: null }, { name: 1, createdBy: 1 }).lean<{
+    _id: Types.ObjectId;
+    name: string;
+    createdBy: Types.ObjectId;
+  }>();
+  if (!doc) return null;
+  const owner = await User.findById(doc.createdBy, { email: 1 }).lean<{ email: string }>();
+  if (!isAdminEmail(owner?.email)) return null;
+  await ApiToken.updateOne({ _id: doc._id }, { $set: { lastUsedAt: new Date() } });
+  return { tokenId: String(doc._id), name: doc.name };
 }

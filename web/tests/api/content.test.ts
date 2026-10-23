@@ -1,11 +1,12 @@
 import mongoose from "mongoose";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createToken, revokeToken } from "@/admin/tokens";
 import { GET as listContent } from "@/app/api/content/route";
 import { POST as importContent } from "@/app/api/content/import/route";
 import { GET as pullContent } from "@/app/api/content/pull/route";
 import { GET as exportContent } from "@/app/api/admin/export/route";
 import { connectDb } from "@/lib/db";
+import { resetEnvCache } from "@/lib/env";
 import { Question, Revision, User } from "@/models";
 import { resetDb } from "../setup/mongo";
 import { seedBook, seedQuestions } from "../progress/seed";
@@ -14,7 +15,15 @@ import { seedBook, seedQuestions } from "../progress/seed";
 vi.mock("@/auth", () => ({ auth: () => Promise.resolve(null) }));
 
 beforeAll(connectDb);
-beforeEach(resetDb);
+beforeEach(async () => {
+  await resetDb();
+  vi.stubEnv("ADMIN_EMAILS", "owner@example.test");
+  resetEnvCache();
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  resetEnvCache();
+});
 afterAll(() => mongoose.disconnect());
 
 const URL_BASE = "http://localhost:3000";
@@ -39,6 +48,14 @@ describe("content API tokens", () => {
     const { id, token: t } = await token();
     expect((await listContent(new Request(`${URL_BASE}/api/content`, { headers: auth("learn_nope") }))).status).toBe(401);
     await revokeToken(id);
+    expect((await listContent(new Request(`${URL_BASE}/api/content`, { headers: auth(t) }))).status).toBe(401);
+  });
+
+  it("rejects a token once its creator is no longer an admin", async () => {
+    const { token: t } = await token();
+    expect((await listContent(new Request(`${URL_BASE}/api/content`, { headers: auth(t) }))).status).toBe(200);
+    vi.stubEnv("ADMIN_EMAILS", "someone-else@example.test");
+    resetEnvCache();
     expect((await listContent(new Request(`${URL_BASE}/api/content`, { headers: auth(t) }))).status).toBe(401);
   });
 

@@ -17,6 +17,14 @@ describe("graph progress", () => {
   afterEach(() => vi.useRealTimers());
   afterAll(() => mongoose.disconnect());
 
+  it("survives two racing first status changes (duplicate key retried)", async () => {
+    const user = newUserId();
+    const node = await seedNode(await seedGraph("g"), "n");
+    await NodeProgress.init();
+    await Promise.all(Array.from({ length: 8 }, () => setNodeStatus(user, node, "learning")));
+    expect(await NodeProgress.countDocuments({ userId: user })).toBe(1);
+  });
+
   it("none -> learning -> done -> none leaves no doc and keeps startedAt", async () => {
     const user = newUserId();
     const graphId = await seedGraph("g");

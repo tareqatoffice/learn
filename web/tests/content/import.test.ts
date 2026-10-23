@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectDb } from "@/lib/db";
 import { importKey } from "@/lib/ids";
 import { runImport } from "@/content/import/run";
@@ -368,5 +368,21 @@ describe("runImport", () => {
       expect(report).toMatchObject({ updates: 1, unchanged: 1 });
       expect(report.items.find((i) => i.action === "update")).toMatchObject({ key: "b", fields: ["summary", "prereqIds"] });
     });
+  });
+
+  it("refuses to commit over an item edited after the plan was made", async () => {
+    await commitBook();
+    const changed = BOOK.replace("X is a thing.", "X is a changed thing.");
+    // The edit lands between planning (reads) and the commit transaction.
+    const startSession = mongoose.startSession.bind(mongoose);
+    const spy = vi.spyOn(mongoose, "startSession").mockImplementationOnce(async (...args) => {
+      await Question.updateOne({ question: "What is X?" }, { $set: { answer: "Edited by an admin." } });
+      return startSession(...args);
+    });
+
+    const report = await commitBook(changed);
+    spy.mockRestore();
+    expect(report.errors).toEqual([expect.stringContaining("edited since this import was planned")]);
+    expect((await Question.findOne({ question: "What is X?" }).lean<{ answer: string }>())?.answer).toBe("Edited by an admin.");
   });
 });

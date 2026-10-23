@@ -2,7 +2,7 @@ import NextAuth, { type NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { z } from "zod";
-import { connectDb } from "@/lib/db";
+import { connectDb, retryOnDuplicateKey } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { isAdminEmail } from "@/lib/authz";
 import { User } from "@/models";
@@ -32,9 +32,12 @@ export async function upsertUserOnSignIn(
     lastLoginAt: new Date(),
   };
   // Match the Google subject first, then fall back to the email (first login after a dev login).
+  // Two first sign-ins racing on the unique email: the loser's retry updates the winner's doc.
   const doc =
     (await User.findOneAndUpdate({ googleId: profile.sub }, { $set: fields }, { returnDocument: "after" })) ??
-    (await User.findOneAndUpdate({ email }, { $set: fields }, { returnDocument: "after", upsert: true }));
+    (await retryOnDuplicateKey(() =>
+      User.findOneAndUpdate({ email }, { $set: fields }, { returnDocument: "after", upsert: true }),
+    ));
   return { userId: String(doc._id), role };
 }
 

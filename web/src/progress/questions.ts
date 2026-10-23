@@ -1,9 +1,8 @@
-import { isValidObjectId, mongo, type Types } from "mongoose";
+import { isValidObjectId, type Types } from "mongoose";
+import { retryOnDuplicateKey } from "@/lib/db";
 import { Question, QuestionProgress } from "@/models";
 
 export type MarkResult = "got" | "review" | "skip";
-
-const isDuplicateKey = (error: unknown) => error instanceof mongo.MongoServerError && error.code === 11000;
 
 /**
  * Records one mark in a single upsert: every mark counts as seen; got/review set the
@@ -22,11 +21,5 @@ export async function markQuestion(userId: string, questionId: string, result: M
     $set: { lastSeenAt: new Date(), ...(skip ? {} : { status: result }) },
     $setOnInsert: { bookId: question.bookId, ...(skip ? { status: null } : {}) },
   };
-  const upsert = () => QuestionProgress.updateOne({ userId, questionId }, update, { upsert: true });
-  try {
-    await upsert();
-  } catch (error) {
-    if (!isDuplicateKey(error)) throw error;
-    await upsert();
-  }
+  await retryOnDuplicateKey(() => QuestionProgress.updateOne({ userId, questionId }, update, { upsert: true }));
 }

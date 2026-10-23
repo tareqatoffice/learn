@@ -26,7 +26,8 @@ type Data = Record<string, unknown>;
 type Row = Data & { _id: Types.ObjectId };
 /** A part, extra or track: container subdocs merged by `key`. */
 type Entry = Data & { key: string };
-type Write = { model: AnyModel; id: Types.ObjectId | null; data: Data };
+/** `seen` is the doc's `updatedAt` when planned; the commit refuses to overwrite a doc edited since. */
+type Write = { model: AnyModel; id: Types.ObjectId | null; data: Data; seen?: unknown; label: string };
 type Ctx = { opts: ImportOptions; report: ImportReport; writes: Write[] };
 type Target = { doc: Row | null; id: Types.ObjectId };
 type Incoming = { id?: string; key: string; title: string };
@@ -73,6 +74,10 @@ export async function runImport(opts: ImportOptions): Promise<ImportReport> {
   try {
     await session.withTransaction(async () => {
       for (const w of ctx.writes) {
+        // The plan was read outside the transaction; an edit made since would be silently overwritten.
+        if (w.id && !(await w.model.exists({ _id: w.id, updatedAt: w.seen ?? null }).session(session))) {
+          throw new Error(`${w.label} was edited since this import was planned; preview again`);
+        }
         await saveWithRevision(w.model, w.id && String(w.id), w.data, opts.editedBy, { session });
       }
     });
@@ -354,7 +359,7 @@ async function queue(ctx: Ctx, model: AnyModel, doc: Row | null, data: Data, cha
     if (!(error instanceof mongoose.Error.ValidationError)) throw error;
     ctx.report.errors.push(`${change.type} "${change.title}": ${error.message}`);
   }
-  ctx.writes.push({ model, id: doc?._id ?? null, data });
+  ctx.writes.push({ model, id: doc?._id ?? null, data, seen: doc?.updatedAt, label: `${change.type} "${change.title}"` });
   ctx.report.items.push(change);
 }
 

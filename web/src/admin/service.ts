@@ -2,10 +2,10 @@ import mongoose, { isValidObjectId, Types, type Model } from "mongoose";
 import { z } from "zod";
 import { findCycle } from "@/content/cycles";
 import { validateNode } from "@/content/parse/graph";
-import { saveWithRevision } from "@/content/revisions";
+import { restoreRevision, saveWithRevision } from "@/content/revisions";
 import { importKey } from "@/lib/ids";
 import { extractToc, readMinutes } from "@/lib/markdown/toc";
-import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook, STATUSES, Subject, type Status } from "@/models";
+import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook, Revision, STATUSES, Subject, type Status } from "@/models";
 
 // Admin write operations. Every function validates its input, writes through
 // saveWithRevision (so edits keep history) and never deletes content.
@@ -166,7 +166,10 @@ const KINDS: Record<OrderedKind, { model: Model<unknown>; parent: string | null 
   subject: { model: Subject, parent: null },
 };
 
-/** Swaps the item with its neighbour among siblings (same parent), renumbering siblings 0..n-1. */
+/**
+ * Swaps the item with its neighbour among siblings (same parent). When sibling orders are already
+ * distinct only the two `order` values swap; ties or missing orders renumber siblings 0..n-1.
+ */
 export async function moveItem(kind: OrderedKind, id: string, dir: "up" | "down", editedBy: string): Promise<Result> {
   const spec = Object.hasOwn(KINDS, kind) ? KINDS[kind] : undefined;
   if (!spec || !isValidObjectId(id) || (dir !== "up" && dir !== "down")) return fail({ _: "Invalid move" });
@@ -181,14 +184,18 @@ export async function moveItem(kind: OrderedKind, id: string, dir: "up" | "down"
   const to = dir === "up" ? at - 1 : at + 1;
   if (to < 0 || to >= siblings.length) return fail({ _: dir === "up" ? "Already first" : "Already last" });
 
+  const orders = siblings.map((s) => s.order);
+  const distinct = orders.every((o, i) => typeof o === "number" && (i === 0 || o > orders[i - 1]!));
   const next = siblings.slice();
   [next[at], next[to]] = [next[to], next[at]];
+  // Positions keep their order values; only the items in them move.
+  const writes = next
+    .map((s, i) => ({ id: String(s._id), order: distinct ? orders[i]! : i, current: s.order }))
+    .filter((w) => w.order !== w.current);
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
-      for (const [order, s] of next.entries()) {
-        if (s.order !== order) await saveWithRevision(spec.model, String(s._id), { order }, editedBy, { session });
-      }
+      for (const w of writes) await saveWithRevision(spec.model, w.id, { order: w.order }, editedBy, { session });
     });
   } finally {
     await session.endSession();
@@ -393,6 +400,74 @@ export async function saveSubject(input: SubjectInput, editedBy: string): Promis
     return done((await saveWithRevision(Subject, id, data, editedBy))._id);
   }
   return done((await saveWithRevision(Subject, null, { ...data, order: await nextOrder(Subject) }, editedBy))._id);
+}
+
+// ---------- revisions ----------
+
+type Snapshot = Record<string, unknown>;
+const idsOf = (value: unknown) => (Array.isArray(value) ? value.map(String) : []);
+
+/**
+ * The rules the editors enforce, applied to a snapshot about to be restored: slugs stay unique,
+ * parts/tracks still in use are not dropped, children point at an existing part/track, and
+ * topic prerequisites stay in the graph without forming a cycle. Returns field errors or null.
+ */
+async function restoreErrors(entityType: string, id: string, snap: Snapshot): Promise<Record<string, string> | null> {
+  const slugScope: Record<string, [Model<unknown>, string | null]> = {
+    QuestionBook: [QuestionBook, null],
+    Graph: [Graph, null],
+    NoteSeries: [NoteSeries, null],
+    Subject: [Subject, null],
+    GraphNode: [GraphNode, "graphId"],
+    Note: [Note, "seriesId"],
+  };
+  const scoped = slugScope[entityType];
+  if (scoped && typeof snap.slug === "string") {
+    const [model, parent] = scoped;
+    if (await slugTaken(model, snap.slug, id, parent ? { [parent]: snap[parent] } : {})) {
+      return { slug: `Another item now uses the slug "${snap.slug}"` };
+    }
+  }
+
+  if (entityType === "QuestionBook") {
+    const used = await removedKeysInUse(QuestionBook, id, "parts", "title", (snap.parts as { key: string }[]) ?? [], Question, { bookId: id }, "partKey");
+    if (used) return { parts: `This version drops parts that still have questions: ${used}` };
+  }
+  if (entityType === "Graph") {
+    const used = await removedKeysInUse(Graph, id, "tracks", "name", (snap.tracks as { key: string }[]) ?? [], GraphNode, { graphId: id }, "trackKey");
+    if (used) return { tracks: `This version drops tracks that still have topics: ${used}` };
+  }
+  if (entityType === "Question") {
+    const book = await QuestionBook.findById(snap.bookId, { parts: 1 }).lean<{ parts: { key: string }[] }>();
+    if (!book?.parts.some((p) => p.key === snap.partKey)) return { partKey: "This version's part is no longer in the book" };
+  }
+  if (entityType === "GraphNode") {
+    const graph = await Graph.findById(snap.graphId, { tracks: 1 }).lean<{ tracks?: { key: string }[] }>();
+    if (!graph?.tracks?.some((t) => t.key === snap.trackKey)) return { trackKey: "This version's track is no longer in the graph" };
+    const siblings = await GraphNode.find({ graphId: snap.graphId }, { prereqIds: 1 }).lean<{ _id: Id; prereqIds?: Id[] }[]>();
+    const prereqs = idsOf(snap.prereqIds);
+    const inGraph = new Set(siblings.map((s) => String(s._id)));
+    if (prereqs.some((p) => p === id || !inGraph.has(p))) return { prereqIds: "This version's prerequisites are no longer in the graph" };
+    const edges = Object.fromEntries(siblings.map((s) => [String(s._id), (s.prereqIds ?? []).map(String)]));
+    edges[id] = prereqs;
+    if (findCycle(edges)) return { prereqIds: "Restoring this version would create a prerequisite cycle" };
+  }
+  return null;
+}
+
+/** Restores a revision after checking it against the editors' rules; the restore is itself revisioned. */
+export async function restoreRevisionChecked(revisionId: string, editedBy: string): Promise<Result> {
+  if (!isValidObjectId(revisionId)) return fail({ _: "Invalid revision" });
+  const revision = await Revision.findById(revisionId).lean<{ entityType: string; entityId: Id; snapshot: Snapshot }>();
+  if (!revision) return fail({ _: "Revision not found" });
+  const errors = await restoreErrors(revision.entityType, String(revision.entityId), revision.snapshot);
+  if (errors) return fail(errors);
+  try {
+    await restoreRevision(revisionId, editedBy);
+  } catch (error) {
+    return fail({ _: error instanceof Error ? error.message : "Restore failed" });
+  }
+  return done(revision.entityId);
 }
 
 /** Topics whose title matches, limited to the given subjects when any; for the "link topic" picker. */

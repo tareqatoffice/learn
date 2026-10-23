@@ -81,12 +81,12 @@ export async function backupAll(filePath: string): Promise<{ counts: Record<stri
 
 /**
  * Loads a backup or a content export into an empty database, keeping every original
- * `_id` so progress still points at its content. Refuses when content or users exist.
+ * `_id` so progress still points at its content. Refuses unless every Learn collection is
+ * empty; if an insert fails, empties them again so the restore can simply be rerun.
  */
 export async function restoreAll(filePath: string): Promise<{ counts: Record<string, number> }> {
-  const guarded = [...CONTENT_COLLECTIONS.map(([, model]) => model), User];
-  for (const model of guarded) {
-    if (await model.exists({})) throw new Error("target database is not empty");
+  for (const [name, model] of ALL_COLLECTIONS) {
+    if (await model.exists({})) throw new Error(`target database is not empty (${name} has documents)`);
   }
 
   const doc = EJSON.parse(await readFile(filePath, "utf8")) as { version?: number; collections?: Record<string, Record<string, unknown>[]> };
@@ -96,11 +96,18 @@ export async function restoreAll(filePath: string): Promise<{ counts: Record<str
   if (unknown.length) throw new Error(`unknown collections in backup: ${unknown.join(", ")}`);
 
   const counts: Record<string, number> = {};
-  for (const [name, docs] of Object.entries(doc.collections)) {
-    const model = byName.get(name)!;
-    await model.init();
-    if (docs.length) await model.collection.insertMany(docs, { ordered: true });
-    counts[name] = docs.length;
+  try {
+    for (const [name, docs] of Object.entries(doc.collections)) {
+      const model = byName.get(name)!;
+      await model.init();
+      if (docs.length) await model.collection.insertMany(docs, { ordered: true });
+      counts[name] = docs.length;
+    }
+  } catch (error) {
+    // Every collection was empty before the restore, so emptying them undoes it.
+    await Promise.all(ALL_COLLECTIONS.map(([, model]) => model.collection.deleteMany({})));
+    const why = error instanceof Error ? error.message : String(error);
+    throw new Error(`restore failed and was rolled back, the database is empty again: ${why}`);
   }
   return { counts };
 }
