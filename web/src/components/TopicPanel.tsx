@@ -94,7 +94,7 @@ export function TopicPanel({ node, status, onStatus, related, pending, topicHref
       {node.summary && <Markdown source={node.summary} />}
 
       {node.points.length > 0 && (
-        <ul className="grid list-disc gap-1 pl-5 text-sm">
+        <ul className="grid list-disc gap-1.5 pl-5 leading-relaxed marker:text-muted-foreground">
           {node.points.map((point, i) => (
             <li key={i}>
               <Markdown source={point} inline />
@@ -106,7 +106,7 @@ export function TopicPanel({ node, status, onStatus, related, pending, topicHref
       {node.code && <Markdown source={fencedCode(node.code)} />}
 
       {node.pitfall && (
-        <div className="rounded-lg border border-border bg-muted/50 p-3 text-sm">
+        <div className="rounded-lg border border-border bg-muted/50 p-3 leading-relaxed">
           <p className="font-medium">Common mistake</p>
           <p className="mt-1">{node.pitfall}</p>
         </div>

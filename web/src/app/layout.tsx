@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist_Mono, IBM_Plex_Sans, Noto_Sans_Bengali } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans, Noto_Sans_Bengali } from "next/font/google";
 import "./globals.css";
 
 const plexSans = IBM_Plex_Sans({
@@ -13,8 +13,9 @@ const notoBengali = Noto_Sans_Bengali({
   subsets: ["bengali"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-plex-mono",
+  weight: ["400", "500"],
   subsets: ["latin"],
 });
 
@@ -31,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${plexSans.variable} ${notoBengali.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${plexSans.variable} ${notoBengali.variable} ${plexMono.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />

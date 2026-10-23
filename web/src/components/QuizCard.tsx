@@ -111,7 +111,7 @@ function Live({ view, card, onResult, onFinish }: QuizCardProps & { card: Card }
         ) : (
           <Button type="button" variant="outline" onClick={() => setRevealed(true)}>
             Show answer
-            <kbd className="ml-1 rounded border border-border px-1 text-[0.7rem] text-muted-foreground">Space</kbd>
+            <kbd className="ml-1 rounded border border-border px-1 text-xs text-muted-foreground">Space</kbd>
           </Button>
         )}
       </div>
