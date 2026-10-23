@@ -127,7 +127,7 @@ export async function getQuestionView(
 ): Promise<{
   question: { id: string; question: string; prompt: string; answer: string };
   book: { slug: string; title: string };
-  topic?: { graphSlug: string; nodeSlug: string; title: string };
+  topic?: QuestionTopic;
 } | null> {
   if (!isValidObjectId(questionId)) return null;
   const book = await QuestionBook.findOne({ slug: bookSlug, status: "published" }, { slug: 1, title: 1 }).lean<BookRow>();
@@ -140,18 +140,25 @@ export async function getQuestionView(
     answer: string;
   }>();
   if (!q) return null;
+  const topic = await topicForQuestion(q._id);
 
+  return {
+    question: { id: String(q._id), question: q.question, prompt: q.prompt ?? "", answer: q.answer },
+    book: { slug: book.slug, title: book.title },
+    ...(topic ? { topic } : {}),
+  };
+}
+
+export type QuestionTopic = { graphSlug: string; nodeSlug: string; title: string };
+
+/** The first visible graph topic (by order) that lists the question; undefined when none does. */
+export async function topicForQuestion(questionId: Id): Promise<QuestionTopic | undefined> {
   const node = await GraphNode.findOne(
-    { ...(await visibleNodeFilter()), "related.questionIds": q._id },
+    { ...(await visibleNodeFilter()), "related.questionIds": questionId },
     { graphId: 1, slug: 1, title: 1 },
   )
     .sort({ order: 1, _id: 1 })
     .lean<{ graphId: Id; slug: string; title: string }>();
   const graph = node ? await Graph.findById(node.graphId, { slug: 1 }).lean<{ slug: string }>() : null;
-
-  return {
-    question: { id: String(q._id), question: q.question, prompt: q.prompt ?? "", answer: q.answer },
-    book: { slug: book.slug, title: book.title },
-    ...(node && graph ? { topic: { graphSlug: graph.slug, nodeSlug: node.slug, title: node.title } } : {}),
-  };
+  return node && graph ? { graphSlug: graph.slug, nodeSlug: node.slug, title: node.title } : undefined;
 }

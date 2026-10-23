@@ -1,8 +1,8 @@
 import { listUsersAdmin } from "@/admin/queries";
 import { connectDb } from "@/lib/db";
+import { formatDateTime } from "@/lib/format";
 
 export const metadata = { title: "Users · Admin" };
-const when = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" });
 
 export default async function UsersPage() {
   await connectDb();
@@ -30,7 +30,7 @@ export default async function UsersPage() {
                   {u.role === "admin" && <span className="ml-2 text-xs text-muted-foreground">admin</span>}
                 </td>
                 <td className="px-4 py-2">{u.name}</td>
-                <td className="px-4 py-2">{u.lastLoginAt ? when.format(u.lastLoginAt) : "—"}</td>
+                <td className="px-4 py-2">{u.lastLoginAt ? formatDateTime(u.lastLoginAt) : "—"}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{u.questions}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{u.topics}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{u.notes}</td>

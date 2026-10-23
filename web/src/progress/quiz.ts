@@ -1,7 +1,8 @@
 import { isValidObjectId, type Types } from "mongoose";
-import { visibleNodeFilter, visibleQuestionFilter } from "@/content/visibility";
+import { type QuestionTopic, topicForQuestion } from "@/content/queries/books";
+import { visibleQuestionFilter } from "@/content/visibility";
 import { ForbiddenError } from "@/lib/authz";
-import { Graph, GraphNode, Question, QuestionBook, QuestionProgress, QuizSession } from "@/models";
+import { Question, QuestionBook, QuestionProgress, QuizSession } from "@/models";
 import { markQuestion, type MarkResult } from "./questions";
 
 export type QuizMode = "unseen" | "review" | "all";
@@ -30,7 +31,7 @@ export type SessionView = {
     bookSlug: string;
     bookTitle: string;
     partTitle: string;
-    topic?: { graphSlug: string; nodeSlug: string; title: string };
+    topic?: QuestionTopic;
   };
 };
 
@@ -166,13 +167,7 @@ async function cardView(questionId: Id): Promise<SessionView["current"]> {
   }>();
   if (!q) return null;
   const book = await QuestionBook.findById(q.bookId, { slug: 1, title: 1, parts: 1 }).lean<BookRow>();
-  const node = await GraphNode.findOne(
-    { ...(await visibleNodeFilter()), "related.questionIds": q._id },
-    { graphId: 1, slug: 1, title: 1 },
-  )
-    .sort({ order: 1, _id: 1 })
-    .lean<{ graphId: Id; slug: string; title: string }>();
-  const graph = node ? await Graph.findById(node.graphId, { slug: 1 }).lean<{ slug: string }>() : null;
+  const topic = await topicForQuestion(q._id);
 
   return {
     id: String(q._id),
@@ -182,7 +177,7 @@ async function cardView(questionId: Id): Promise<SessionView["current"]> {
     bookSlug: book?.slug ?? "",
     bookTitle: book?.title ?? "",
     partTitle: book?.parts.find((p) => p.key === q.partKey)?.title ?? "",
-    ...(node && graph ? { topic: { graphSlug: graph.slug, nodeSlug: node.slug, title: node.title } } : {}),
+    ...(topic ? { topic } : {}),
   };
 }
 

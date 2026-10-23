@@ -29,7 +29,7 @@ export function useSaveForm<T extends { id: string }>(initial: T, save: (draft: 
     });
   };
 
-  return { draft, setDraft, set, errors, saved, pending, submit };
+  return { draft, setDraft, set, errors, setErrors, saved, pending, submit };
 }
 
 /** Drops the empty id of a not-yet-created item so the service treats it as new. */

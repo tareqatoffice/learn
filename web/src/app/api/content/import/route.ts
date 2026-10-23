@@ -1,23 +1,10 @@
 import { z } from "zod";
 import { runImport } from "@/content/import/run";
+import { importFields } from "@/content/import/schema";
 import { withToken } from "@/lib/tokenAuth";
+import { issuesMessage } from "@/lib/zod";
 
-const slug = z.string().regex(/^[a-z0-9-]+$/);
-const MAX_TEXT = 3_000_000;
-
-const body = z.object({
-  target: z.object({ kind: z.enum(["book", "series", "graph"]), slug }),
-  source: z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("book"), markdown: z.string().max(MAX_TEXT) }),
-    z.object({ kind: z.literal("series"), files: z.array(z.object({ name: z.string().max(200), content: z.string().max(MAX_TEXT) })).max(500) }),
-    z.object({ kind: z.literal("graph"), json: z.unknown() }),
-  ]),
-  dryRun: z.boolean().optional(),
-  publish: z.boolean().optional(),
-  title: z.string().max(200).optional(),
-  subjects: z.array(slug).max(50).optional(),
-  description: z.string().max(MAX_TEXT).optional(),
-});
+const body = z.object({ ...importFields, dryRun: z.boolean().optional(), publish: z.boolean().optional() });
 
 /** POST an import; a dry run (the default) only reports. 400 when the report has errors. */
 export function POST(req: Request): Promise<Response> {
@@ -26,7 +13,7 @@ export function POST(req: Request): Promise<Response> {
     try {
       parsed = body.parse(await req.json());
     } catch (error) {
-      const message = error instanceof z.ZodError ? error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") : "Body must be JSON";
+      const message = error instanceof z.ZodError ? issuesMessage(error) : "Body must be JSON";
       return Response.json({ error: message }, { status: 400 });
     }
     if (parsed.source.kind !== parsed.target.kind) {

@@ -1,9 +1,9 @@
 import { listTokens } from "@/admin/tokens";
 import { TokensEditor } from "@/components/admin/TokensEditor";
 import { connectDb } from "@/lib/db";
+import { formatDateTime } from "@/lib/format";
 
 export const metadata = { title: "API tokens · Admin" };
-const when = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" });
 
 export default async function TokensPage() {
   await connectDb();
@@ -18,9 +18,9 @@ export default async function TokensPage() {
         tokens={tokens.map((t) => ({
           id: t.id,
           name: t.name,
-          createdAt: when.format(t.createdAt),
-          lastUsedAt: t.lastUsedAt ? when.format(t.lastUsedAt) : undefined,
-          revokedAt: t.revokedAt ? when.format(t.revokedAt) : undefined,
+          createdAt: formatDateTime(t.createdAt),
+          lastUsedAt: t.lastUsedAt ? formatDateTime(t.lastUsedAt) : undefined,
+          revokedAt: t.revokedAt ? formatDateTime(t.revokedAt) : undefined,
         }))}
       />
     </section>

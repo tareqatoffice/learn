@@ -1,5 +1,6 @@
 import { findCycle } from "@/content/cycles";
 import type { ParsedGraph, ParsedNode } from "@/content/types";
+import { SLUG_PATTERN } from "@/lib/ids";
 
 const MAX_TRACKS = 6;
 const MAX_TITLE = 22;
@@ -12,7 +13,7 @@ const strings = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)) : []
 export function validateNode(node: ParsedNode, trackKeys: string[]): string[] {
   const errs: string[] = [];
   const at = `node ${node.slug || "?"}`;
-  if (!/^[a-z0-9-]+$/.test(node.slug || "")) errs.push(`${at}: id must be lowercase kebab`);
+  if (!SLUG_PATTERN.test(node.slug || "")) errs.push(`${at}: id must be lowercase kebab`);
   if (!trackKeys.includes(node.trackKey)) errs.push(`${at}: unknown track ${node.trackKey}`);
   if (!node.title || node.title.length > MAX_TITLE) {
     errs.push(`${at}: title missing or over ${MAX_TITLE} chars ("${node.title}")`);

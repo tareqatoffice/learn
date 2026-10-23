@@ -2,8 +2,8 @@ import Link from "next/link";
 import { listRevisionsAdmin } from "@/admin/queries";
 import { RestoreButton } from "@/components/admin/RestoreButton";
 import { connectDb } from "@/lib/db";
+import { formatDateTime } from "@/lib/format";
 
-const when = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" });
 
 export default async function EntityHistoryPage({ params }: { params: Promise<{ entityType: string; entityId: string }> }) {
   const { entityType, entityId } = await params;
@@ -26,7 +26,7 @@ export default async function EntityHistoryPage({ params }: { params: Promise<{ 
             <li key={r.id} className="rounded-xl border border-border bg-card p-4">
               <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
                 <span>
-                  Version before the edit by <strong>{r.editedBy || "unknown"}</strong> on {when.format(r.editedAt)}
+                  Version before the edit by <strong>{r.editedBy || "unknown"}</strong> on {formatDateTime(r.editedAt)}
                 </span>
                 <RestoreButton revisionId={r.id} />
               </div>

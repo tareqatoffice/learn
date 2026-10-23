@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { listRevisionsAdmin } from "@/admin/queries";
 import { connectDb } from "@/lib/db";
+import { formatDateTime } from "@/lib/format";
 
 export const metadata = { title: "Revisions · Admin" };
-const when = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" });
 
 export default async function RevisionsPage() {
   await connectDb();
@@ -20,7 +20,7 @@ export default async function RevisionsPage() {
               {r.entityType} · {String(r.snapshot.title ?? r.snapshot.question ?? r.snapshot.name ?? r.entityId).slice(0, 80)}
             </Link>
             <span className="text-xs text-muted-foreground">
-              {r.editedBy} · {when.format(r.editedAt)}
+              {r.editedBy} · {formatDateTime(r.editedAt)}
             </span>
           </li>
         ))}

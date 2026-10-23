@@ -2,11 +2,10 @@
 
 import { saveNoteAction } from "@/app/(app)/admin/notes/actions";
 import type { AdminNote } from "@/admin/queries";
-import { inputClass, SaveBar } from "@/components/admin/SaveBar";
+import { StatusField, SubjectsField, TextField } from "@/components/admin/fields";
+import { SaveBar } from "@/components/admin/SaveBar";
 import { useSaveForm, withoutEmptyId } from "@/components/admin/useSaveForm";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
-import { StatusChips } from "@/components/StatusChips";
-import { SubjectPicker } from "@/components/SubjectPicker";
 
 export function NoteForm({ note, subjects }: { note: AdminNote; subjects: { slug: string; name: string }[] }) {
   const { draft, set, errors, saved, pending, submit } = useSaveForm(
@@ -17,23 +16,11 @@ export function NoteForm({ note, subjects }: { note: AdminNote; subjects: { slug
   return (
     <form className="grid gap-5" onSubmit={submit}>
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="grid gap-1 text-sm">
-          <span className="font-medium">Title</span>
-          <input className={inputClass} value={draft.title} onChange={(e) => set("title", e.target.value)} />
-        </label>
-        <label className="grid gap-1 text-sm">
-          <span className="font-medium">Slug (URL)</span>
-          <input className={inputClass} value={draft.slug} onChange={(e) => set("slug", e.target.value)} />
-        </label>
+        <TextField label="Title" value={draft.title} onChange={(v) => set("title", v)} />
+        <TextField label="Slug (URL)" value={draft.slug} onChange={(v) => set("slug", v)} />
       </div>
-      <div className="grid gap-1">
-        <span className="text-sm font-medium">Status</span>
-        <StatusChips value={draft.status} onChange={(s) => set("status", s)} />
-      </div>
-      <div className="grid gap-1">
-        <span className="text-sm font-medium">Subjects</span>
-        <SubjectPicker options={subjects} value={draft.subjects} onChange={(v) => set("subjects", v)} />
-      </div>
+      <StatusField value={draft.status} onChange={(s) => set("status", s)} />
+      <SubjectsField options={subjects} value={draft.subjects} onChange={(v) => set("subjects", v)} />
       <MarkdownEditor label="Body" value={draft.body} onChange={(v) => set("body", v)} rows={24} />
       <SaveBar label="Save chapter" pending={pending} saved={saved} errors={errors} />
     </form>

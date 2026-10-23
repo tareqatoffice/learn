@@ -2,11 +2,10 @@
 
 import { saveGraphAction } from "@/app/(app)/admin/graphs/actions";
 import type { AdminGraph } from "@/admin/queries";
+import { StatusField, SubjectsField, TextField } from "@/components/admin/fields";
 import { inputClass, SaveBar } from "@/components/admin/SaveBar";
 import { useSaveForm, withoutEmptyId } from "@/components/admin/useSaveForm";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
-import { StatusChips } from "@/components/StatusChips";
-import { SubjectPicker } from "@/components/SubjectPicker";
 import { Button } from "@/components/ui/button";
 
 const EMPTY: AdminGraph = {
@@ -31,27 +30,12 @@ export function GraphForm({ graph = EMPTY, subjects }: { graph?: AdminGraph; sub
   return (
     <form className="grid gap-5" onSubmit={submit}>
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="grid gap-1 text-sm">
-          <span className="font-medium">Title</span>
-          <input className={inputClass} value={draft.title} onChange={(e) => set("title", e.target.value)} />
-        </label>
-        <label className="grid gap-1 text-sm">
-          <span className="font-medium">Slug (URL)</span>
-          <input className={inputClass} value={draft.slug} onChange={(e) => set("slug", e.target.value)} />
-        </label>
+        <TextField label="Title" value={draft.title} onChange={(v) => set("title", v)} />
+        <TextField label="Slug (URL)" value={draft.slug} onChange={(v) => set("slug", v)} />
       </div>
-      <label className="grid gap-1 text-sm">
-        <span className="font-medium">Subtitle</span>
-        <input className={inputClass} value={draft.subtitle} onChange={(e) => set("subtitle", e.target.value)} />
-      </label>
-      <div className="grid gap-1">
-        <span className="text-sm font-medium">Status</span>
-        <StatusChips value={draft.status} onChange={(s) => set("status", s)} />
-      </div>
-      <div className="grid gap-1">
-        <span className="text-sm font-medium">Subjects</span>
-        <SubjectPicker options={subjects} value={draft.subjects} onChange={(v) => set("subjects", v)} />
-      </div>
+      <TextField label="Subtitle" value={draft.subtitle} onChange={(v) => set("subtitle", v)} />
+      <StatusField value={draft.status} onChange={(s) => set("status", s)} />
+      <SubjectsField options={subjects} value={draft.subjects} onChange={(v) => set("subjects", v)} />
       <fieldset className="grid gap-2 rounded-lg border border-border p-3">
         <legend className="px-1 text-sm font-medium">Tracks (2 to 6)</legend>
         {draft.tracks.map((t, i) => (

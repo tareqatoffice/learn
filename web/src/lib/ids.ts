@@ -20,3 +20,6 @@ export function fnv1a(s: string): string {
 export function importKey(bookSlug: string, question: string, prompt: string): string {
   return `${bookSlug}-${fnv1a(question + "\n" + prompt)}`;
 }
+
+/** What a stored slug may contain: lowercase letters, digits and dashes. */
+export const SLUG_PATTERN = /^[a-z0-9-]+$/;
