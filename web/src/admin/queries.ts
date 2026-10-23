@@ -1,4 +1,5 @@
 import { isValidObjectId, type Types } from "mongoose";
+import { byOrder, escapeRegex } from "@/lib/utils";
 import {
   Graph,
   GraphNode,
@@ -61,7 +62,6 @@ export async function getBookAdmin(id: string): Promise<{
     extras?: { key: string; title: string; body?: string; order?: number }[];
   }>();
   if (!book) return null;
-  const byOrder = <T extends { order?: number }>(xs: T[] = []) => xs.toSorted((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const questions = await Question.find({ bookId: book._id }, { question: 1, partKey: 1, status: 1 })
     .sort({ order: 1, _id: 1 })
     .lean<{ _id: Id; question: string; partKey: string; status: Status }[]>();
@@ -175,7 +175,7 @@ export async function getGraphAdmin(id: string): Promise<{
       footer: g.footer ?? "",
       subjects: g.subjects ?? [],
       status: g.status,
-      tracks: (g.tracks ?? []).toSorted((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(({ key, name }) => ({ key, name })),
+      tracks: byOrder(g.tracks).map(({ key, name }) => ({ key, name })),
     },
     nodes: nodes.map((n) => ({ id: String(n._id), slug: n.slug, title: n.title, trackKey: n.trackKey, status: n.status })),
   };
@@ -261,8 +261,6 @@ export async function getNodeAdmin(id: string): Promise<{ node: AdminNode; relat
     },
   };
 }
-
-const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Questions whose text matches, limited to the given subjects when any; for the related picker. */
 export async function searchQuestions(query: string, subjectSlugs: string[]): Promise<{ id: string; title: string }[]> {

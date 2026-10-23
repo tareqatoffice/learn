@@ -506,6 +506,7 @@ describe("parseBook — canonical (pulled) format", () => {
         id: "6710a1b2c3d4e5f6a7b8c9d1",
         question: "What is React?",
         part: "Part 1 — Fundamentals",
+        partKey: "part-1-fundamentals",
         prompt: "",
         answer: "A UI library.\n\n#### Detail\n\nMore.",
         importKey: importKey("react-questions-ebook", "What is React?", ""),
@@ -514,6 +515,7 @@ describe("parseBook — canonical (pulled) format", () => {
         id: "6710a1b2c3d4e5f6a7b8c9d2",
         question: "What does this print?",
         part: "Part 1 — Fundamentals",
+        partKey: "part-1-fundamentals",
         prompt: "```js\n<!-- learn:answer -->\nconsole.log(1);\n```",
         answer: "`1`.",
         importKey: importKey("react-questions-ebook", "What does this print?", "```js\n<!-- learn:answer -->\nconsole.log(1);\n```"),
@@ -521,6 +523,7 @@ describe("parseBook — canonical (pulled) format", () => {
       {
         question: "What is a hook?",
         part: "Part 2 — Hooks",
+        partKey: "part-2-hooks",
         prompt: "",
         answer: "A function.",
         importKey: importKey("react-questions-ebook", "What is a hook?", ""),
@@ -569,5 +572,21 @@ describe("parseBook — canonical (pulled) format", () => {
 
   it("CRLF input gives the same result as LF", () => {
     expect(parseBook(canonical.replace(/\n/g, "\r\n"), "bk")).toEqual(parseBook(canonical, "bk"));
+  });
+
+  it("a leading byte-order mark is ignored", () => {
+    expect(parseBook(`﻿${canonical}`, "bk")).toEqual(parseBook(canonical, "bk"));
+  });
+
+  it("questions keep the key of their own part when two parts share a title", () => {
+    const src = md(
+      "<!-- learn:book -->", "# Book", "",
+      "<!-- learn:part key=misc-a -->", "# Misc", "", "<!-- learn:question -->", "## Q1. A?", "", "<!-- learn:answer -->", "a",
+      "<!-- learn:part key=misc-b -->", "# Misc", "", "<!-- learn:question -->", "## Q2. B?", "", "<!-- learn:answer -->", "b",
+    );
+    expect(parseBook(src, "bk").questions.map((q) => [q.question, q.partKey])).toEqual([
+      ["A?", "misc-a"],
+      ["B?", "misc-b"],
+    ]);
   });
 });

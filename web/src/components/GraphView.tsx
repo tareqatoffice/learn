@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { setNodeStatusAction } from "@/app/(app)/graphs/actions";
 import { Chip } from "@/components/Chip";
@@ -12,12 +12,13 @@ import { cn } from "@/lib/utils";
 
 const statusOf = (progress: GraphData["progress"], id: string): NodeStatus => progress[id] ?? "none";
 
-export function GraphView({ data, initialTopic }: { data: GraphData; initialTopic?: string }) {
-  const router = useRouter();
+export function GraphView({ data }: { data: GraphData }) {
   const pathname = usePathname();
+  // The URL's ?topic= is the selection, so any link to another topic of this graph (the panel's
+  // prerequisites, links from elsewhere) selects it without a remount.
+  const selected = useSearchParams().get("topic");
   const { graph, nodes } = data;
   const [progress, setProgress] = useState(data.progress);
-  const [selected, setSelected] = useState(() => nodes.find((n) => n.slug === initialTopic)?.slug ?? null);
   const [focus, setFocus] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,9 +34,9 @@ export function GraphView({ data, initialTopic }: { data: GraphData; initialTopi
   const current = nodes.find((n) => n.slug === selected) ?? null;
 
   function select(slug: string) {
-    setSelected(slug);
     setError(null);
-    router.replace(`${pathname}?topic=${encodeURIComponent(slug)}`, { scroll: false });
+    // The native history API updates useSearchParams without refetching the page from the server.
+    window.history.replaceState(null, "", `${pathname}?topic=${encodeURIComponent(slug)}`);
     panelRef.current?.focus({ preventScroll: window.matchMedia("(min-width: 1024px)").matches });
   }
 

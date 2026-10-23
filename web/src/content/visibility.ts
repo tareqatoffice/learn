@@ -1,4 +1,5 @@
 import type { Model, QueryFilter, Types } from "mongoose";
+import { cache } from "react";
 import { Graph, NoteSeries, QuestionBook } from "@/models";
 
 type Filter = QueryFilter<Record<string, unknown>>;
@@ -23,9 +24,16 @@ async function visibleChildFilter(
   return { status: "published", [parentField]: { $in: parents } };
 }
 
-export const visibleBookIds = () => publishedIds(QuestionBook);
-export const visibleGraphIds = () => publishedIds(Graph);
-export const visibleSeriesIds = () => publishedIds(NoteSeries);
+// Read once per server render (a page asks several helpers for the same parents); outside a render,
+// e.g. in tests and scripts, React's `cache` calls straight through.
+export const visibleBookIds = cache(() => publishedIds(QuestionBook));
+export const visibleGraphIds = cache(() => publishedIds(Graph));
+export const visibleSeriesIds = cache(() => publishedIds(NoteSeries));
+
+/** `filter` applied to the sub-document at `path`, e.g. after a `$lookup` into `path`. */
+export function filterUnder(path: string, filter: Filter): Filter {
+  return Object.fromEntries(Object.entries(filter).map(([key, value]) => [`${path}.${key}`, value]));
+}
 
 export async function visibleQuestionFilter(bookIds?: string[]): Promise<Filter> {
   return visibleChildFilter("bookId", await visibleBookIds(), bookIds);

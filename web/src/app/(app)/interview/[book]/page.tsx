@@ -76,7 +76,7 @@ export default async function BookPage({ params }: PageProps<"/interview/[book]"
                     className="flex items-baseline justify-between gap-3 px-4 py-2.5 hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                   >
                     <span className="min-w-0">
-                      <Markdown source={q.question} inline />
+                      <Markdown source={q.question} inline insideLink />
                     </span>
                     {q.status && (
                       <span className={q.status === "got" ? "shrink-0 text-xs text-ok" : "shrink-0 text-xs text-track-1"}>

@@ -1,6 +1,7 @@
 import { createWriteStream } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { finished } from "node:stream/promises";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import mongoose, { type Model } from "mongoose";
 import {
   ApiToken,
@@ -70,12 +71,8 @@ const countsOf = async (collections: typeof ALL_COLLECTIONS) =>
 /** Full backup of every collection to `filePath`, in the same format as the content export. */
 export async function backupAll(filePath: string): Promise<{ counts: Record<string, number> }> {
   const counts = await countsOf(ALL_COLLECTIONS);
-  const out = createWriteStream(filePath, { encoding: "utf8" });
-  for await (const chunk of exportContent(ALL_COLLECTIONS)) {
-    if (!out.write(chunk)) await new Promise<void>((resolve) => out.once("drain", () => resolve()));
-  }
-  out.end();
-  await finished(out);
+  // pipeline handles backpressure and rejects (closing both ends) on a read or write error.
+  await pipeline(Readable.from(exportContent(ALL_COLLECTIONS)), createWriteStream(filePath, { encoding: "utf8" }));
   return { counts };
 }
 

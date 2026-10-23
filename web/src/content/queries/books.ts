@@ -1,5 +1,6 @@
 import { isValidObjectId, type Types } from "mongoose";
 import { visibleNodeFilter, visibleQuestionFilter } from "@/content/visibility";
+import { byOrder } from "@/lib/utils";
 import { Graph, GraphNode, Question, QuestionBook, QuestionProgress } from "@/models";
 
 type Id = Types.ObjectId;
@@ -15,9 +16,6 @@ type BookRow = {
   extras: Extra[];
 };
 type Status = "got" | "review" | null;
-
-const byOrder = <T extends Ordered>(items: T[] | undefined): T[] =>
-  (items ?? []).toSorted((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
 /** Visible books, in display order. */
 async function visibleBooks(): Promise<BookRow[]> {

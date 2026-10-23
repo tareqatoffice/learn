@@ -30,12 +30,21 @@ export async function setNodeStatus(userId: string, nodeId: string, status: Node
   );
 }
 
-/** Status per visible node of the graph that the user has started (nodeId -> status). */
-export async function getGraphProgress(userId: string, graphId: string): Promise<Record<string, "learning" | "done">> {
+/**
+ * Status per visible node of the graph that the user has started (nodeId -> status). A caller that
+ * already holds the graph's visible node ids passes them as `visibleIds` to skip reading them again.
+ */
+export async function getGraphProgress(
+  userId: string,
+  graphId: string,
+  visibleIds?: Types.ObjectId[],
+): Promise<Record<string, "learning" | "done">> {
   if (!isValidObjectId(graphId)) return {};
-  const visible = await GraphNode.find(await visibleNodeFilter(graphId), { _id: 1 }).lean<{ _id: Types.ObjectId }[]>();
+  const ids =
+    visibleIds ??
+    (await GraphNode.find(await visibleNodeFilter(graphId), { _id: 1 }).lean<{ _id: Types.ObjectId }[]>()).map((n) => n._id);
   const rows = await NodeProgress.find(
-    { userId, nodeId: { $in: visible.map((n) => n._id) } },
+    { userId, nodeId: { $in: ids } },
     { nodeId: 1, status: 1 },
   ).lean<{ nodeId: Types.ObjectId; status: "learning" | "done" }[]>();
   return Object.fromEntries(rows.map((row) => [String(row.nodeId), row.status]));

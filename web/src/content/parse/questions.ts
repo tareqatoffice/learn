@@ -4,7 +4,7 @@
 import type { ParsedBook, ParsedQuestion } from "@/content/types";
 import { importKey, slugify } from "@/lib/ids";
 import { isCanonical, parseCanonical } from "./canonical";
-import { fenceMask, HEADING, PUZZLE_QUESTION, unaccountedLine, type Item, type Structure } from "./shared";
+import { fenceMask, HEADING, PUZZLE_QUESTION, splitLines, unaccountedLine, type Item, type Structure } from "./shared";
 
 const PART = /^(part|section)\b/i;
 const Q_HEAD = /^([QBT])\d+[.:]\s*(.*)$/;
@@ -405,7 +405,7 @@ function parseLegacy(lines: string[], outside: boolean[], bookSlug: string): Str
 
 /** Parses one question book. `bookSlug` prefixes every importKey (repeats get `-2`, `-3`… per book). */
 export function parseBook(md: string, bookSlug: string): ParsedBook {
-  const lines = md.split(/\r?\n/);
+  const lines = splitLines(md);
   const outside = fenceMask(lines);
   const { items, ...book } = isCanonical(lines, outside)
     ? parseCanonical(lines, outside)

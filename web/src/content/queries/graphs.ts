@@ -1,5 +1,6 @@
 import { isValidObjectId, type Types } from "mongoose";
 import { visibleNodeFilter, visibleNoteFilter, visibleQuestionFilter } from "@/content/visibility";
+import { byOrder } from "@/lib/utils";
 import { Graph, GraphNode, Note, NoteSeries, NodeProgress, Question, QuestionBook } from "@/models";
 import { getGraphProgress } from "@/progress/graph";
 
@@ -124,7 +125,7 @@ export async function getGraphView(userId: string, slug: string): Promise<GraphV
   const [questions, notes, progress] = await Promise.all([
     questionLinks(rows.flatMap((r) => r.related?.questionIds ?? [])),
     noteRows(rows.flatMap((r) => (r.related?.notes ?? []).map((n) => n.noteId))),
-    getGraphProgress(userId, String(graph._id)),
+    getGraphProgress(userId, String(graph._id), rows.map((r) => r._id)),
   ]);
 
   const nodes = rows.map((r) => ({
@@ -154,7 +155,7 @@ export async function getGraphView(userId: string, slug: string): Promise<GraphV
       title: graph.title,
       subtitle: graph.subtitle ?? "",
       footer: graph.footer ?? "",
-      tracks: (graph.tracks ?? []).toSorted((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(({ key, name }) => ({ key, name })),
+      tracks: byOrder(graph.tracks).map(({ key, name }) => ({ key, name })),
     },
     nodes,
     progress,

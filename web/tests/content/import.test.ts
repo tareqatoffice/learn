@@ -240,6 +240,27 @@ describe("runImport", () => {
       expect((await Question.findOne({ question: "Loose?" }).lean<{ partKey: string }>())!.partKey).toBe("general");
     });
 
+    it("keeps each question in its own part when two parts share a title", async () => {
+      const src = md(
+        "<!-- learn:book -->", "# Test Book", "",
+        "<!-- learn:part key=misc-a -->", "# Misc", "", "<!-- learn:question -->", "## Q1. A?", "", "<!-- learn:answer -->", "a",
+        "<!-- learn:part key=misc-b -->", "# Misc", "", "<!-- learn:question -->", "## Q2. B?", "", "<!-- learn:answer -->", "b",
+      );
+      expect(await commitBook(src)).toMatchObject({ creates: 2, errors: [] });
+      const rows = await Question.find().sort({ order: 1 }).lean<{ question: string; partKey: string }[]>();
+      expect(rows.map((q) => [q.question, q.partKey])).toEqual([
+        ["A?", "misc-a"],
+        ["B?", "misc-b"],
+      ]);
+    });
+
+    it("rejects part keys the admin editor could not save", async () => {
+      const src = md("<!-- learn:book -->", "# Test Book", "", "<!-- learn:part key=Part_One -->", "# One", "", "<!-- learn:question -->", "## Q1. A?", "", "<!-- learn:answer -->", "a");
+      const report = await commitBook(src);
+      expect(report.errors.join("\n")).toMatch(/part "One": key "Part_One"/);
+      expect(await counts()).toMatchObject({ books: 0, questions: 0 });
+    });
+
     it("rejects a source whose kind differs from the target", async () => {
       const report = await runImport({ target: bookTarget, source: { kind: "graph", json: {} }, dryRun: false, editedBy, title: "T" });
       expect(report.errors).toEqual(["source kind graph does not match target kind book"]);
@@ -307,6 +328,18 @@ describe("runImport", () => {
         title: "Series",
       });
       expect(report.errors.join("\n")).toMatch(/title/);
+      expect(await counts()).toMatchObject({ series: 0, notes: 0 });
+    });
+
+    it("a file name that is not a valid slug is an error and nothing is written", async () => {
+      const report = await runImport({
+        target: { kind: "series", slug: "s" },
+        source: { kind: "series", files: [{ name: "Intro to X.md", content: "# Intro" }] },
+        dryRun: false,
+        editedBy,
+        title: "Series",
+      });
+      expect(report.errors.join("\n")).toMatch(/slug "Intro to X"/);
       expect(await counts()).toMatchObject({ series: 0, notes: 0 });
     });
   });

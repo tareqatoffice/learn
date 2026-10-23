@@ -145,7 +145,8 @@ async function run(command: CliCommand): Promise<number> {
   }
 
   const { kind, slug } = command.target;
-  const texts = await Promise.all(command.files.map((f) => readFile(f, "utf8")));
+  // Node keeps a UTF-8 byte-order mark, which JSON.parse rejects; drop it from every file.
+  const texts = await Promise.all(command.files.map(async (f) => (await readFile(f, "utf8")).replace(/^﻿/, "")));
   const source =
     kind === "series"
       ? { kind, files: command.files.map((f, i) => ({ name: path.basename(f), content: texts[i] })) }

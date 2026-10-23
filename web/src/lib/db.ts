@@ -1,22 +1,46 @@
-import mongoose from "mongoose";
+import mongoose, { type ClientSession } from "mongoose";
 import { getEnv } from "@/lib/env";
 
-type Cache = { conn?: typeof mongoose; promise?: Promise<typeof mongoose> };
+type Cache = { promise?: Promise<typeof mongoose> };
 
 const globalForMongoose = globalThis as typeof globalThis & { _mongooseCache?: Cache };
 const cache: Cache = (globalForMongoose._mongooseCache ??= {});
 
-/** Connects once per process; cached on `globalThis` so hot reload reuses the connection. */
-export async function connectDb(): Promise<typeof mongoose> {
-  if (cache.conn && mongoose.connection.readyState === 1) return cache.conn;
-  cache.promise = mongoose.connect(getEnv().MONGODB_URI);
+/**
+ * Connects once per process; cached on `globalThis` so hot reload reuses the connection. After a
+ * dropped connection the driver reconnects on its own, and calling `mongoose.connect()` again would
+ * open a second client and leak the first, so only a failed connect or an explicit close (scripts,
+ * tests) clears the cache.
+ */
+export function connectDb(): Promise<typeof mongoose> {
+  cache.promise ??= mongoose.connect(getEnv().MONGODB_URI).then(
+    (connected) => {
+      connected.connection.once("close", () => {
+        cache.promise = undefined;
+      });
+      return connected;
+    },
+    (error: unknown) => {
+      cache.promise = undefined;
+      throw error;
+    },
+  );
+  return cache.promise;
+}
+
+/** Runs `work` in one transaction (the database is a replica set) and returns its result. */
+export async function inTransaction<T>(work: (session: ClientSession) => Promise<T>): Promise<T> {
+  const session = await mongoose.startSession();
   try {
-    cache.conn = await cache.promise;
-  } catch (error) {
-    cache.promise = undefined;
-    throw error;
+    let result!: T;
+    // The driver may retry the callback on a transient error; the last run's result wins.
+    await session.withTransaction(async () => {
+      result = await work(session);
+    });
+    return result;
+  } finally {
+    await session.endSession();
   }
-  return cache.conn;
 }
 
 const isDuplicateKey = (error: unknown) => error instanceof mongoose.mongo.MongoServerError && error.code === 11000;

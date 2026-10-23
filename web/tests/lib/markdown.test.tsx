@@ -57,4 +57,11 @@ describe("Markdown", () => {
     expect(c.querySelector("p")).toBeNull();
     expect(c.querySelector("strong")?.textContent).toBe("hi");
   });
+
+  it("insideLink keeps link text but never renders a nested <a>", () => {
+    const { container } = render(<Markdown source="Type www.example.com or [docs](https://example.com) **now**" inline insideLink />);
+    expect(container.querySelector("a")).toBeNull();
+    expect(container.textContent).toBe("Type www.example.com or docs now");
+    expect(container.querySelector("strong")?.textContent).toBe("now");
+  });
 });

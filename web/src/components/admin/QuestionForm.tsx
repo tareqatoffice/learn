@@ -32,6 +32,8 @@ export function QuestionForm({
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Topic[] | null>(null);
 
+  const searchTopics = () => startTransition(async () => setResults(await searchTopicsAction(search, draft.subjects)));
+
   function link(topic: Topic, linked: boolean) {
     startTransition(async () => {
       const result = await setQuestionTopicLinkAction(draft.id, topic.id, linked);
@@ -88,13 +90,14 @@ export function QuestionForm({
               className={inputClass}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter would submit (save) the question form; here it runs the search instead.
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                searchTopics();
+              }}
             />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => startTransition(async () => setResults(await searchTopicsAction(search, draft.subjects)))}
-            >
+            <Button type="button" variant="outline" size="sm" onClick={searchTopics}>
               Search
             </Button>
           </div>

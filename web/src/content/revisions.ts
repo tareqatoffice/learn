@@ -56,8 +56,8 @@ export async function saveWithRevision<T>(
 }
 
 /** Re-applies a stored snapshot through `saveWithRevision`, so the restore is itself revisioned. */
-export async function restoreRevision(revisionId: string, editedBy: string): Promise<void> {
-  const revision = await Revision.findById(revisionId).lean<RevisionRow | null>();
+export async function restoreRevision(revisionId: string, editedBy: string, opts?: SaveOptions): Promise<void> {
+  const revision = await Revision.findById(revisionId, null, { session: opts?.session }).lean<RevisionRow | null>();
   if (!revision) throw new Error(`Revision ${revisionId} not found`);
 
   const model = mongoose.models[revision.entityType];
@@ -65,7 +65,7 @@ export async function restoreRevision(revisionId: string, editedBy: string): Pro
 
   const data = { ...revision.snapshot };
   for (const key of SNAPSHOT_META) delete data[key];
-  await saveWithRevision(model, String(revision.entityId), data, editedBy);
+  await saveWithRevision(model, String(revision.entityId), data, editedBy, opts);
 }
 
 /** Revisions of one entity, newest first. */

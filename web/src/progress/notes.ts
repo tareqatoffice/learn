@@ -31,12 +31,21 @@ export async function setNoteRead(userId: string, noteId: string, read: boolean)
   await upsertNoteProgress(userId, noteId, update);
 }
 
-/** Read state per visible chapter of the series that the user has touched (noteId -> { read }). */
-export async function getSeriesProgress(userId: string, seriesId: string): Promise<Record<string, { read: boolean }>> {
+/**
+ * Read state per visible chapter of the series that the user has touched (noteId -> { read }). A caller
+ * that already holds the series' visible chapter ids passes them as `visibleIds` to skip reading them again.
+ */
+export async function getSeriesProgress(
+  userId: string,
+  seriesId: string,
+  visibleIds?: Types.ObjectId[],
+): Promise<Record<string, { read: boolean }>> {
   if (!isValidObjectId(seriesId)) return {};
-  const visible = await Note.find(await visibleNoteFilter(seriesId), { _id: 1 }).lean<{ _id: Types.ObjectId }[]>();
+  const ids =
+    visibleIds ??
+    (await Note.find(await visibleNoteFilter(seriesId), { _id: 1 }).lean<{ _id: Types.ObjectId }[]>()).map((n) => n._id);
   const rows = await NoteProgress.find(
-    { userId, noteId: { $in: visible.map((n) => n._id) } },
+    { userId, noteId: { $in: ids } },
     { noteId: 1, read: 1 },
   ).lean<{ noteId: Types.ObjectId; read: boolean }[]>();
   return Object.fromEntries(rows.map((row) => [String(row.noteId), { read: row.read }]));

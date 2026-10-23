@@ -137,7 +137,7 @@ export function TopicPanel({ node, status, onStatus, related, pending, topicHref
                 {related.questions.map((q) => (
                   <li key={q.id}>
                     <Link href={q.href} className={linkClass}>
-                      <Markdown source={q.title} inline />
+                      <Markdown source={q.title} inline insideLink />
                     </Link>
                   </li>
                 ))}

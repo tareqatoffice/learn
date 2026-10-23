@@ -1,10 +1,12 @@
-import mongoose, { isValidObjectId, Types, type Model } from "mongoose";
+import mongoose, { isValidObjectId, Types, type ClientSession, type Model } from "mongoose";
 import { z } from "zod";
 import { findCycle } from "@/content/cycles";
 import { validateNode } from "@/content/parse/graph";
 import { restoreRevision, saveWithRevision } from "@/content/revisions";
-import { importKey } from "@/lib/ids";
+import { inTransaction } from "@/lib/db";
+import { importKey, SLUG_PATTERN } from "@/lib/ids";
 import { extractToc, readMinutes } from "@/lib/markdown/toc";
+import { escapeRegex } from "@/lib/utils";
 import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook, Revision, STATUSES, Subject, type Status } from "@/models";
 
 // Admin write operations. Every function validates its input, writes through
@@ -16,7 +18,7 @@ type Id = Types.ObjectId;
 const fail = (errors: Record<string, string>): Result => ({ ok: false, errors });
 const done = (id: unknown): Result => ({ ok: true, id: String(id) });
 
-const slug = z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, digits and dashes");
+const slug = z.string().trim().regex(SLUG_PATTERN, "Use lowercase letters, digits and dashes");
 const text = (label: string) => z.string().trim().min(1, `${label} is required`);
 const objectId = z.string().refine((v) => isValidObjectId(v), "Invalid id");
 const status = z.enum(STATUSES);
@@ -66,6 +68,45 @@ async function removedKeysInUse(
   return used.join(", ");
 }
 
+/** Content that lists subjects by slug. */
+const SUBJECT_HOLDERS: Model<unknown>[] = [QuestionBook, Question, Graph, GraphNode, NoteSeries, Note];
+
+/**
+ * Keeps slug-keyed references in step with a subject or book whose slug changed: content lists its
+ * subjects by slug, and question importKeys (what a legacy re-import matches on) start with the book slug.
+ */
+async function followSlugChange(entityType: string, id: string, from: string, to: string, session: ClientSession): Promise<void> {
+  if (from === to) return;
+  if (entityType === "Subject") {
+    for (const model of SUBJECT_HOLDERS) {
+      await model.updateMany({ subjects: from }, { $addToSet: { subjects: to } }, { session });
+      await model.updateMany({ subjects: from }, { $pull: { subjects: from } }, { session });
+    }
+  } else if (entityType === "QuestionBook") {
+    const prefix = `${from}-`;
+    const rows = await Question.find({ bookId: id, importKey: new RegExp(`^${escapeRegex(prefix)}`) }, { importKey: 1 })
+      .session(session)
+      .lean<{ _id: Id; importKey: string }[]>();
+    if (!rows.length) return;
+    await Question.bulkWrite(
+      rows.map((r) => ({
+        updateOne: { filter: { _id: r._id }, update: { $set: { importKey: `${to}-${r.importKey.slice(prefix.length)}` } } },
+      })),
+      { session },
+    );
+  }
+}
+
+/** Updates an existing subject or book and, in the same transaction, follows its slug change. */
+async function updateFollowingSlug(model: Model<unknown>, id: string, data: { slug: string }, editedBy: string): Promise<unknown> {
+  return inTransaction(async (session) => {
+    const before = await model.findById(id, { slug: 1 }, { session }).lean<{ slug: string }>();
+    const saved = await saveWithRevision(model, id, data, editedBy, { session });
+    if (before) await followSlugChange(model.modelName, id, before.slug, data.slug, session);
+    return saved._id;
+  });
+}
+
 // ---------- books ----------
 
 const bookSchema = z.object({
@@ -99,7 +140,7 @@ export async function saveBook(input: BookInput, editedBy: string): Promise<Resu
   };
   if (id) {
     if (!(await QuestionBook.exists({ _id: id }))) return fail({ id: "Book not found" });
-    return done((await saveWithRevision(QuestionBook, id, data, editedBy))._id);
+    return done(await updateFollowingSlug(QuestionBook, id, data, editedBy));
   }
   return done((await saveWithRevision(QuestionBook, null, { ...data, order: await nextOrder(QuestionBook) }, editedBy))._id);
 }
@@ -192,14 +233,9 @@ export async function moveItem(kind: OrderedKind, id: string, dir: "up" | "down"
   const writes = next
     .map((s, i) => ({ id: String(s._id), order: distinct ? orders[i]! : i, current: s.order }))
     .filter((w) => w.order !== w.current);
-  const session = await mongoose.startSession();
-  try {
-    await session.withTransaction(async () => {
-      for (const w of writes) await saveWithRevision(spec.model, w.id, { order: w.order }, editedBy, { session });
-    });
-  } finally {
-    await session.endSession();
-  }
+  await inTransaction(async (session) => {
+    for (const w of writes) await saveWithRevision(spec.model, w.id, { order: w.order }, editedBy, { session });
+  });
   return done(id);
 }
 
@@ -397,7 +433,7 @@ export async function saveSubject(input: SubjectInput, editedBy: string): Promis
   if (await slugTaken(Subject, data.slug, id)) return fail({ slug: "That subject already exists" });
   if (id) {
     if (!(await Subject.exists({ _id: id }))) return fail({ id: "Subject not found" });
-    return done((await saveWithRevision(Subject, id, data, editedBy))._id);
+    return done(await updateFollowingSlug(Subject, id, data, editedBy));
   }
   return done((await saveWithRevision(Subject, null, { ...data, order: await nextOrder(Subject) }, editedBy))._id);
 }
@@ -463,7 +499,16 @@ export async function restoreRevisionChecked(revisionId: string, editedBy: strin
   const errors = await restoreErrors(revision.entityType, String(revision.entityId), revision.snapshot);
   if (errors) return fail(errors);
   try {
-    await restoreRevision(revisionId, editedBy);
+    await inTransaction(async (session) => {
+      const before = await mongoose.models[revision.entityType]
+        ?.findById(revision.entityId, { slug: 1 }, { session })
+        .lean<{ slug?: string }>();
+      await restoreRevision(revisionId, editedBy, { session });
+      const [from, to] = [before?.slug, revision.snapshot.slug];
+      if (typeof from === "string" && typeof to === "string") {
+        await followSlugChange(revision.entityType, String(revision.entityId), from, to, session);
+      }
+    });
   } catch (error) {
     return fail({ _: error instanceof Error ? error.message : "Restore failed" });
   }
@@ -476,7 +521,7 @@ export async function searchTopics(
   subjectSlugs: string[],
 ): Promise<{ id: string; title: string; graphTitle: string }[]> {
   const term = query.trim();
-  const pattern = term ? new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") : null;
+  const pattern = term ? new RegExp(escapeRegex(term), "i") : null;
   const nodes = await GraphNode.find(
     { ...(pattern ? { title: pattern } : {}), ...(subjectSlugs.length ? { subjects: { $in: subjectSlugs } } : {}) },
     { title: 1, graphId: 1 },

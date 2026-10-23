@@ -1,8 +1,12 @@
-/** One question parsed from a question book. `part` is the part's title ('' when there is none). */
+/**
+ * One question parsed from a question book. `part` is the part's title ('' when there is none);
+ * canonical books also give the part's `partKey`, since two parts may share a title.
+ */
 export type ParsedQuestion = {
   id?: string;
   question: string;
   part: string;
+  partKey?: string;
   prompt: string;
   answer: string;
   importKey: string;

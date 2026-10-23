@@ -1,11 +1,11 @@
 import type { Types } from "mongoose";
+import { byOrder } from "@/lib/utils";
 import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook } from "@/models";
 
 // Lossless exports in the canonical formats the parsers read back: every item
 // carries its id, so editing a pulled file and importing it updates in place.
 
 type Id = Types.ObjectId;
-const byOrder = <T extends { order?: number }>(xs: T[] = []) => xs.toSorted((a, b) => (a.order ?? 0) - (b.order ?? 0));
 const block = (text?: string) => (text?.trim() ? [text.trim(), ""] : []);
 
 export class NotFoundError extends Error {}

@@ -53,6 +53,9 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
     return { ...base, source: { kind, markdown: body } };
   }
 
+  // A commit that reports errors wrote nothing (the plan stopped it, or the transaction rolled back).
+  const committed = report !== null && !report.dryRun && report.errors.length === 0;
+
   const go = (commit: boolean) =>
     startTransition(async () => {
       setError(null);
@@ -118,7 +121,7 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
         <Button disabled={pending || !previewClean} onClick={() => go(true)}>
           Commit
         </Button>
-        {report && !report.dryRun && <span className="text-sm text-muted-foreground">Committed. Preview again to make more changes.</span>}
+        {committed && <span className="text-sm text-muted-foreground">Committed. Preview again to make more changes.</span>}
         {error && (
           <span role="alert" className="text-sm text-destructive">
             {error}
@@ -129,7 +132,7 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
       {report && (
         <section aria-label="Import report" className="grid gap-2 rounded-xl border border-border bg-card p-4 text-sm">
           <p className="font-medium">
-            {report.dryRun ? "Preview — nothing written yet" : "Committed"}
+            {report.dryRun ? "Preview — nothing written yet" : committed ? "Committed" : "Not committed — nothing was written"}
             {report.createdTarget ? " · creates the target" : ""}
           </p>
           <p>

@@ -21,5 +21,9 @@ export function importKey(bookSlug: string, question: string, prompt: string): s
   return `${bookSlug}-${fnv1a(question + "\n" + prompt)}`;
 }
 
-/** What a stored slug may contain: lowercase letters, digits and dashes. */
-export const SLUG_PATTERN = /^[a-z0-9-]+$/;
+/**
+ * The one slug rule for every stored slug and key (admin editors, imports, the API): lowercase
+ * letters and digits in dash-separated groups, so "a-b2" but not "-a", "a-" or "a--b". `slugify`
+ * output always matches it (or is empty).
+ */
+export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

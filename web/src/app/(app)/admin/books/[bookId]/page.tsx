@@ -40,7 +40,7 @@ export default async function AdminBookPage({ params }: { params: Promise<{ book
             <li key={q.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2">
               <span className="min-w-0 text-sm">
                 <Link href={`/admin/books/${bookId}/questions/${q.id}`} className="hover:underline">
-                  <Markdown source={q.question} inline />
+                  <Markdown source={q.question} inline insideLink />
                 </Link>
                 <span className="ml-2 text-xs text-muted-foreground">{partTitle.get(q.partKey) ?? q.partKey}</span>
               </span>

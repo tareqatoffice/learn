@@ -80,7 +80,7 @@ export function RelatedPicker({ nodeId, subjects, initial }: { nodeId: string; s
               .map((h) => (
                 <li key={h.id}>
                   <button type="button" className="text-left hover:underline" disabled={pending} onClick={() => linkQuestion(h, true)}>
-                    + <Markdown source={h.title} inline />
+                    + <Markdown source={h.title} inline insideLink />
                   </button>
                 </li>
               ))}

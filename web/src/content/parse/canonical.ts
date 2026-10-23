@@ -47,13 +47,15 @@ export function parseCanonical(lines: string[], outside: boolean[]): Structure {
   const extras: Structure["extras"] = [];
   const items: Item[] = [];
   let part = "";
+  let partKey: string | undefined;
   structural.forEach((mark, k) => {
     used.add(mark.line);
     const end = k + 1 < structural.length ? structural[k + 1].line : lines.length;
     const h = takeHeading(mark.line + 1, end);
     if (mark.kind === "part") {
       part = h.title;
-      parts.push({ key: mark.attrs.key ?? slugify(h.title), title: h.title, intro: text(h.next, end) });
+      partKey = mark.attrs.key ?? slugify(h.title);
+      parts.push({ key: partKey, title: h.title, intro: text(h.next, end) });
     } else if (mark.kind === "extra") {
       extras.push({ key: mark.attrs.key ?? slugify(h.title), title: h.title, body: text(h.next, end) });
     } else {
@@ -62,6 +64,7 @@ export function parseCanonical(lines: string[], outside: boolean[]): Structure {
       const item: Item = {
         question: h.title.replace(/^[QBT]\d+[.:]\s*/, "") || PUZZLE_QUESTION,
         part,
+        ...(partKey ? { partKey } : {}),
         prompt: answerMark ? text(h.next, answerMark.line) : "",
         answer: answerMark ? text(answerMark.line + 1, end) : text(h.next, end),
       };

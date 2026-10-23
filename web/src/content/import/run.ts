@@ -5,6 +5,8 @@ import { parseChapter } from "@/content/parse/notes";
 import { parseBook } from "@/content/parse/questions";
 import { saveWithRevision } from "@/content/revisions";
 import type { ImportReport, ImportSource, ImportTarget, ItemChange } from "@/content/types";
+import { inTransaction } from "@/lib/db";
+import { SLUG_PATTERN } from "@/lib/ids";
 import { extractToc, readMinutes } from "@/lib/markdown/toc";
 import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook } from "@/models";
 
@@ -39,6 +41,8 @@ const GENERAL_PART: Entry = { key: "general", title: "General", intro: "" };
 /** parseGraph checks these against the incoming JSON alone; the import re-checks them against existing + incoming. */
 const GRAPH_CONTEXT_ERRORS = [/^tracks: need /, /: unknown track /, /: unknown prerequisite /, /^cycle: /];
 const MAX_TRACKS = 6;
+/** Same rule the admin editors apply, so imported slugs and keys stay editable there. */
+const SLUG_RULE = "must be lowercase letters and digits joined by single dashes";
 
 /**
  * Imports a book, note series or graph. Plans a diff against the DB first (reads only); when not a
@@ -70,9 +74,8 @@ export async function runImport(opts: ImportOptions): Promise<ImportReport> {
   }
   if (report.dryRun || report.errors.length || !ctx.writes.length) return report;
 
-  const session = await mongoose.startSession();
   try {
-    await session.withTransaction(async () => {
+    await inTransaction(async (session) => {
       for (const w of ctx.writes) {
         // The plan was read outside the transaction; an edit made since would be silently overwritten.
         if (w.id && !(await w.model.exists({ _id: w.id, updatedAt: w.seen ?? null }).session(session))) {
@@ -83,8 +86,6 @@ export async function runImport(opts: ImportOptions): Promise<ImportReport> {
     });
   } catch (error) {
     report.errors.push(`import failed, nothing was written: ${message(error)}`);
-  } finally {
-    await session.endSession();
   }
   return report;
 }
@@ -107,7 +108,7 @@ async function planBook(ctx: Ctx, markdown: string): Promise<void> {
 
   const parts: Entry[] = [...parsed.parts];
   const knownParts = [...parts, ...((target.doc?.parts as Entry[] | undefined) ?? [])];
-  if (matches.some((m) => !m.doc && !m.item.part) && !knownParts.some((p) => p.key === GENERAL_PART.key)) {
+  if (matches.some((m) => !m.doc && !m.item.part && !m.item.partKey) && !knownParts.some((p) => p.key === GENERAL_PART.key)) {
     parts.push(GENERAL_PART);
   }
   const container = await planContainer(ctx, QuestionBook, target, { title: opts.title || parsed.title, intro: parsed.intro }, [
@@ -115,6 +116,8 @@ async function planBook(ctx: Ctx, markdown: string): Promise<void> {
     { name: "extras", type: "extra", fields: ["title", "body"], incoming: parsed.extras },
   ]);
 
+  // Legacy books name a question's part by title (parts with the same title were merged by the parser);
+  // canonical books give its key, since two parts may share a title.
   const partKeyByTitle = new Map<string, string>();
   for (const p of parsed.parts) if (!partKeyByTitle.has(p.title)) partKeyByTitle.set(p.title, p.key);
   const nextOrder = orderAfter(docs);
@@ -122,15 +125,20 @@ async function planBook(ctx: Ctx, markdown: string): Promise<void> {
     const q = m.item;
     const next: Data = { question: q.question, prompt: q.prompt, answer: q.answer };
     // A matched question keeps its part unless the source names one.
-    const partKey = q.part ? partKeyByTitle.get(q.part) : m.doc ? undefined : GENERAL_PART.key;
+    const partKey = q.partKey ?? (q.part ? partKeyByTitle.get(q.part) : m.doc ? undefined : GENERAL_PART.key);
     if (partKey) next.partKey = partKey;
     await planItem(ctx, Question, "question", m, next, { bookId: target.id, importKey: q.key }, container.subjects, nextOrder);
   }
 }
 
 async function planSeries(ctx: Ctx, files: { name: string; content: string }[]): Promise<void> {
-  const { opts } = ctx;
+  const { opts, report } = ctx;
   const chapters = files.map((f) => parseChapter(f.content, f.name));
+  for (const c of chapters) {
+    if (!SLUG_PATTERN.test(c.slug)) {
+      report.errors.push(`note "${c.title || c.slug}": slug "${c.slug}" ${SLUG_RULE} (rename the file or set slug= in its learn:note marker)`);
+    }
+  }
   const target = await loadContainer(ctx, NoteSeries);
   if (!target) return;
 
@@ -233,6 +241,9 @@ async function planContainer(
   const merged: Record<string, Entry[]> = {};
   const changedLists: Data = {};
   for (const spec of lists) {
+    for (const inc of spec.incoming) {
+      if (!SLUG_PATTERN.test(inc.key)) report.errors.push(`${spec.type} "${String(inc.title ?? inc.name ?? "")}": key "${inc.key}" ${SLUG_RULE}`);
+    }
     const result = mergeByKey((target.doc?.[spec.name] as Entry[] | undefined) ?? [], spec, listItems);
     merged[spec.name] = result.list;
     if (result.changed) changedLists[spec.name] = result.list;

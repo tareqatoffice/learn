@@ -5,7 +5,7 @@ export const HEADING = /^(#{1,6})\s+(.+?)\s*$/;
 export const PUZZLE_QUESTION = "What does this code output?";
 
 /** A question before its importKey is assigned. */
-export type Item = { id?: string; question: string; part: string; prompt: string; answer: string };
+export type Item = { id?: string; question: string; part: string; partKey?: string; prompt: string; answer: string };
 /** A parsed book whose questions still need importKeys. */
 export type Structure = Omit<ParsedBook, "questions"> & { items: Item[] };
 
@@ -29,6 +29,9 @@ export function fenceMask(lines: string[]): boolean[] {
   }
   return outside;
 }
+
+/** Markdown split into lines, without the byte-order mark some Windows editors put first. */
+export const splitLines = (md: string): string[] => md.replace(/^﻿/, "").split(/\r?\n/);
 
 /** An `unaccounted` entry for 0-based line `i`. */
 export const unaccountedLine = (lines: string[], i: number) => ({ line: i + 1, heading: lines[i].trim() });

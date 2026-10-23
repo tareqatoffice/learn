@@ -49,7 +49,8 @@ export async function getSeriesView(
 } | null> {
   const [series] = await visibleSeries(slug);
   if (!series) return null;
-  const [chapters, progress] = await Promise.all([chaptersOf(series._id), getSeriesProgress(userId, String(series._id))]);
+  const chapters = await chaptersOf(series._id);
+  const progress = await getSeriesProgress(userId, String(series._id), chapters.map((c) => c._id));
   return {
     series: { slug: series.slug, title: series.title, description: series.description ?? "" },
     chapters: chapters.map((c) => ({
@@ -97,11 +98,8 @@ export async function getChapterView(
   }>();
   if (!note) return null;
 
-  const [chapters, progress, relatedTopics] = await Promise.all([
-    chaptersOf(series._id),
-    getSeriesProgress(userId, String(series._id)),
-    topicsLinking(note._id),
-  ]);
+  const [chapters, relatedTopics] = await Promise.all([chaptersOf(series._id), topicsLinking(note._id)]);
+  const progress = await getSeriesProgress(userId, String(series._id), chapters.map((c) => c._id));
   const at = chapters.findIndex((c) => String(c._id) === String(note._id));
   const prev = chapters[at - 1];
   const next = chapters[at + 1];

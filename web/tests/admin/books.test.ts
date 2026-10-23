@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { moveItem, saveBook, saveQuestion, setQuestionTopicLink, setStatus } from "@/admin/service";
 import { connectDb } from "@/lib/db";
+import { importKey } from "@/lib/ids";
 import { GraphNode, Question, QuestionBook, Revision } from "@/models";
 import { resetDb } from "../setup/mongo";
 import { seedBook, seedGraph, seedNode, seedQuestions } from "../progress/seed";
@@ -50,6 +51,20 @@ describe("saveBook", () => {
     );
     expect(updated).toEqual({ ok: true, id: created.id });
     expect(await Revision.countDocuments({ entityId: created.id })).toBe(1);
+  });
+
+  it("a slug change keeps question importKeys in step, so a legacy re-import still matches", async () => {
+    const book = await seedBook("js");
+    const q = await saveQuestion(questionInput(book), ADMIN);
+    if (!q.ok) throw new Error(JSON.stringify(q.errors));
+    const parts = [
+      { key: "p1", title: "Part One" },
+      { key: "p2", title: "Part Two" },
+    ];
+    const r = await saveBook({ id: book, slug: "javascript", title: "JS", intro: "", subjects: [], parts, extras: [], status: "published" }, ADMIN);
+    expect(r).toEqual({ ok: true, id: book });
+    const saved = await Question.findById(q.id).lean<{ importKey: string }>();
+    expect(saved!.importKey).toBe(importKey("javascript", "What is a closure?", ""));
   });
 
   it("refuses to remove a part that still has questions", async () => {

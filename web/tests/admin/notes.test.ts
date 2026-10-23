@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { saveNote, saveSeries, saveSubject, setNodeNoteLink } from "@/admin/service";
+import { restoreRevisionChecked, saveNote, saveSeries, saveSubject, setNodeNoteLink } from "@/admin/service";
 import { connectDb } from "@/lib/db";
-import { GraphNode, Note, Subject } from "@/models";
+import { GraphNode, Note, NoteSeries, Revision, Subject } from "@/models";
 import { resetDb } from "../setup/mongo";
 import { seedGraph, seedNode } from "../progress/seed";
 
@@ -69,5 +69,23 @@ describe("saveSubject", () => {
     expect(await saveSubject({ id: r.id, slug: "react", name: "React.js" }, ADMIN)).toEqual({ ok: true, id: r.id });
     expect((await Subject.findById(r.id).lean<{ name: string }>())?.name).toBe("React.js");
     expect(await saveSubject({ slug: "react", name: "Dupe" }, ADMIN)).toMatchObject({ ok: false, errors: { slug: expect.any(String) } });
+  });
+
+  it("a slug change re-tags content, and restoring the old version tags it back", async () => {
+    const subject = await saveSubject({ slug: "react", name: "React" }, ADMIN);
+    if (!subject.ok) throw new Error(JSON.stringify(subject.errors));
+    const tagged = await saveSeries({ slug: "a", title: "A", description: "", subjects: ["react", "web"], status: "draft" }, ADMIN);
+    const both = await saveSeries({ slug: "b", title: "B", description: "", subjects: ["reactjs", "react"], status: "draft" }, ADMIN);
+    if (!tagged.ok || !both.ok) throw new Error("seed failed");
+    const subjectsOf = async (id: string) => (await NoteSeries.findById(id).lean<{ subjects: string[] }>())!.subjects;
+
+    expect(await saveSubject({ id: subject.id, slug: "reactjs", name: "React" }, ADMIN)).toEqual({ ok: true, id: subject.id });
+    expect(await subjectsOf(tagged.id)).toEqual(["web", "reactjs"]);
+    expect(await subjectsOf(both.id)).toEqual(["reactjs"]);
+
+    const [before] = await Revision.find({ entityType: "Subject", entityId: subject.id }).sort({ editedAt: -1 }).lean<{ _id: unknown }[]>();
+    expect(await restoreRevisionChecked(String(before._id), ADMIN)).toEqual({ ok: true, id: subject.id });
+    expect((await Subject.findById(subject.id).lean<{ slug: string }>())!.slug).toBe("react");
+    expect(await subjectsOf(tagged.id)).toEqual(["web", "react"]);
   });
 });

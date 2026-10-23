@@ -1,6 +1,6 @@
 import type { ParsedChapter } from "@/content/types";
 import { markerAttrs } from "./canonical";
-import { fenceMask } from "./shared";
+import { fenceMask, splitLines } from "./shared";
 
 const NOTE_MARKER = /^<!--\s*learn:note\b(.*?)-->\s*$/;
 const H1 = /^#\s+(.+?)\s*$/;
@@ -13,7 +13,7 @@ function slugFromFileName(fileName: string): string {
 
 /** Parses one note file: title is the first H1 outside code fences, body is everything after it. */
 export function parseChapter(md: string, fileName: string): ParsedChapter {
-  const lines = md.replace(/^﻿/, "").split(/\r?\n/);
+  const lines = splitLines(md);
   let slug = slugFromFileName(fileName);
   let id: string | undefined;
 
