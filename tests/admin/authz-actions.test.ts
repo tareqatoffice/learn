@@ -7,7 +7,7 @@ vi.mock("@/auth", () => ({
 
 // Every admin Server Action file; the sweep grows as later tasks add actions.
 // "(app)" is a glob group, so match the route-group folder with a wildcard.
-const modules = import.meta.glob("../../src/app/*/admin/**/actions.ts", { eager: true }) as Record<string, Record<string, unknown>>;
+const modules = import.meta.glob("../../app/*/admin/**/actions.ts", { eager: true }) as Record<string, Record<string, unknown>>;
 const actions = Object.entries(modules).flatMap(([file, mod]) =>
   Object.entries(mod)
     .filter(([, value]) => typeof value === "function")
