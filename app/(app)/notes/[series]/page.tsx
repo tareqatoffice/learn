@@ -34,13 +34,17 @@ export default async function SeriesPage({ params }: { params: Promise<{ series:
             <li key={c.slug} className="flex items-center justify-between gap-3 py-2">
               <Link
                 href={`/notes/${view.series.slug}/${c.slug}`}
-                className="min-w-0 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                className="relative flex min-w-0 items-baseline gap-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
-                <span aria-hidden className="mr-2 inline-block w-4 text-ok">
-                  {c.read ? "✓" : ""}
-                </span>
-                {c.title}
-                {c.read && <span className="sr-only"> (read)</span>}
+                <span className="min-w-0">{c.title}</span>
+                {c.read && (
+                  <>
+                    <span aria-hidden className="shrink-0 text-ok">
+                      ✓
+                    </span>
+                    <span className="sr-only"> (read)</span>
+                  </>
+                )}
               </Link>
               <span className="shrink-0 text-xs text-muted-foreground">{c.readMinutes} min</span>
             </li>

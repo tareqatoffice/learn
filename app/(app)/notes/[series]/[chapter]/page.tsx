@@ -30,13 +30,21 @@ export default async function ChapterPage({ params }: { params: Promise<{ series
               <Link
                 href={`/notes/${view.series.slug}/${c.slug}`}
                 aria-current={c.slug === view.chapter.slug ? "page" : undefined}
-                className={cn("block rounded px-2 py-1", c.slug === view.chapter.slug ? "bg-muted font-medium" : "", linkClass)}
+                className={cn(
+                  "relative flex items-start gap-1.5 rounded px-2 py-1",
+                  c.slug === view.chapter.slug ? "bg-muted font-medium" : "",
+                  linkClass,
+                )}
               >
-                <span aria-hidden className="mr-1 inline-block w-4 text-ok">
-                  {c.read ? "✓" : ""}
-                </span>
-                {c.title}
-                {c.read && <span className="sr-only"> (read)</span>}
+                <span className="min-w-0">{c.title}</span>
+                {c.read && (
+                  <>
+                    <span aria-hidden className="shrink-0 text-ok">
+                      ✓
+                    </span>
+                    <span className="sr-only"> (read)</span>
+                  </>
+                )}
               </Link>
             </li>
           ))}
