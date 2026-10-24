@@ -1,0 +1,366 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@import "./hljs.css";
+
+/* `dark:` follows the same rules as the variables below: data-theme wins, else the OS preference. */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+}
+
+@theme inline {
+  --color-ok: var(--ok);
+  --color-track-0: var(--t-0);
+  --color-track-1: var(--t-1);
+  --color-track-2: var(--t-2);
+  --color-track-3: var(--t-3);
+  --color-track-4: var(--t-4);
+  --color-track-5: var(--t-5);
+  --color-code: var(--code-bg);
+  --color-code-foreground: var(--code-fg);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-plex), var(--font-bengali), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/*
+ * Palette from learning-graph/_src/template.html, mapped onto the shadcn tokens. Dark applies when the
+ * OS prefers it, unless <html data-theme="light"> says otherwise, or when <html data-theme="dark"> is
+ * set (ThemeToggle). The two dark blocks must stay identical.
+ */
+:root {
+  --radius: 0.625rem;
+  --background: #f2f4f7;
+  --foreground: #131a25;
+  --card: #ffffff;
+  --card-foreground: #131a25;
+  --popover: #ffffff;
+  --popover-foreground: #131a25;
+  --primary: #131a25;
+  --primary-foreground: #f2f4f7;
+  --secondary: #e7ebf1;
+  --secondary-foreground: #131a25;
+  --muted: #e7ebf1;
+  --muted-foreground: #566175;
+  --accent: #e7ebf1;
+  --accent-foreground: #131a25;
+  --destructive: #b42318;
+  --border: #c9d1dc;
+  --input: #c9d1dc;
+  --ring: #2563c9;
+  --chart-1: var(--t-0);
+  --chart-2: var(--t-1);
+  --chart-3: var(--t-2);
+  --chart-4: var(--t-3);
+  --chart-5: var(--t-4);
+  --sidebar: #ffffff;
+  --sidebar-foreground: #131a25;
+  --sidebar-primary: #131a25;
+  --sidebar-primary-foreground: #f2f4f7;
+  --sidebar-accent: #e7ebf1;
+  --sidebar-accent-foreground: #131a25;
+  --sidebar-border: #c9d1dc;
+  --sidebar-ring: #2563c9;
+  --ok: #1b7f4b;
+  --t-0: #2563c9; --t-1: #b45309; --t-2: #0f7b6c; --t-3: #6b57c2; --t-4: #c2255c; --t-5: #4d7c0f;
+  --code-bg: #f6f8fa;
+  --code-fg: #24292f;
+  --hl-comment: #6e7781; --hl-keyword: #cf222e; --hl-string: #0a3069; --hl-number: #0550ae;
+  --hl-title: #8250df; --hl-type: #953800; --hl-meta: #116329;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #0e131b;
+    --foreground: #e8eef7;
+    --card: #161d28;
+    --card-foreground: #e8eef7;
+    --popover: #161d28;
+    --popover-foreground: #e8eef7;
+    --primary: #e8eef7;
+    --primary-foreground: #0e131b;
+    --secondary: #202a39;
+    --secondary-foreground: #e8eef7;
+    --muted: #202a39;
+    --muted-foreground: #9aa8bd;
+    --accent: #202a39;
+    --accent-foreground: #e8eef7;
+    --destructive: #f97066;
+    --border: #33405a;
+    --input: #33405a;
+    --ring: #6ea8ff;
+    --sidebar: #161d28;
+    --sidebar-foreground: #e8eef7;
+    --sidebar-primary: #e8eef7;
+    --sidebar-primary-foreground: #0e131b;
+    --sidebar-accent: #202a39;
+    --sidebar-accent-foreground: #e8eef7;
+    --sidebar-border: #33405a;
+    --sidebar-ring: #6ea8ff;
+    --ok: #4cc58a;
+    --t-0: #6ea8ff; --t-1: #f0a14a; --t-2: #4fd1b8; --t-3: #a99cf0; --t-4: #ff7aa5; --t-5: #a3d65c;
+    --code-bg: #0a0f16;
+    --code-fg: #dbe5f3;
+    --hl-comment: #8b949e; --hl-keyword: #ff7b72; --hl-string: #a5d6ff; --hl-number: #79c0ff;
+    --hl-title: #d2a8ff; --hl-type: #ffa657; --hl-meta: #7ee787;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --background: #0e131b;
+  --foreground: #e8eef7;
+  --card: #161d28;
+  --card-foreground: #e8eef7;
+  --popover: #161d28;
+  --popover-foreground: #e8eef7;
+  --primary: #e8eef7;
+  --primary-foreground: #0e131b;
+  --secondary: #202a39;
+  --secondary-foreground: #e8eef7;
+  --muted: #202a39;
+  --muted-foreground: #9aa8bd;
+  --accent: #202a39;
+  --accent-foreground: #e8eef7;
+  --destructive: #f97066;
+  --border: #33405a;
+  --input: #33405a;
+  --ring: #6ea8ff;
+  --sidebar: #161d28;
+  --sidebar-foreground: #e8eef7;
+  --sidebar-primary: #e8eef7;
+  --sidebar-primary-foreground: #0e131b;
+  --sidebar-accent: #202a39;
+  --sidebar-accent-foreground: #e8eef7;
+  --sidebar-border: #33405a;
+  --sidebar-ring: #6ea8ff;
+  --ok: #4cc58a;
+  --t-0: #6ea8ff; --t-1: #f0a14a; --t-2: #4fd1b8; --t-3: #a99cf0; --t-4: #ff7aa5; --t-5: #a3d65c;
+  --code-bg: #0a0f16;
+  --code-fg: #dbe5f3;
+  --hl-comment: #8b949e; --hl-keyword: #ff7b72; --hl-string: #a5d6ff; --hl-number: #79c0ff;
+  --hl-title: #d2a8ff; --hl-type: #ffa657; --hl-meta: #7ee787;
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/*
+ * Reading typography for rendered markdown (chapters, answers, topic summaries). Preflight strips
+ * every browser default, so the whole prose rhythm lives here. Flow spacing (`> * + *`) keeps the
+ * first and last blocks flush with their container; headings take more space above than below so
+ * each one binds to the text it introduces. 1.7 leading suits the ~65ch column and gives
+ * Bengali conjuncts and vowel signs room.
+ */
+@layer components {
+  .md {
+    line-height: 1.7;
+    overflow-wrap: break-word;
+  }
+  .md > * + * {
+    margin-top: 1rem;
+  }
+
+  .md :is(h1, h2, h3, h4) {
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    scroll-margin-top: 1.5rem;
+  }
+  .md h1 {
+    font-size: 1.5rem;
+  }
+  .md h2 {
+    font-size: 1.375rem;
+  }
+  .md h3 {
+    font-size: 1.125rem;
+  }
+  .md h4 {
+    font-size: 1rem;
+  }
+  .md > :is(h1, h2) {
+    margin-top: 2.5rem;
+  }
+  .md > :is(h3, h4) {
+    margin-top: 1.75rem;
+  }
+  .md > :is(h1, h2, h3, h4) + * {
+    margin-top: 0.625rem;
+  }
+  .md > :first-child {
+    margin-top: 0;
+  }
+
+  .md :is(ul, ol) {
+    padding-left: 1.5rem;
+  }
+  .md ul {
+    list-style: disc;
+  }
+  .md ol {
+    list-style: decimal;
+  }
+  .md ul ul {
+    list-style: circle;
+  }
+  .md li + li,
+  .md li > :is(ul, ol) {
+    margin-top: 0.375rem;
+  }
+  .md li::marker {
+    color: var(--muted-foreground);
+  }
+  /* Loose lists wrap items in <p>; keep their rhythm close to a tight list's. */
+  .md li > p + p {
+    margin-top: 0.5rem;
+  }
+
+  .md :is(strong, b) {
+    font-weight: 600;
+  }
+
+  .md a,
+  .md-inline a {
+    text-decoration: underline;
+    text-decoration-color: var(--muted-foreground);
+    text-underline-offset: 0.2em;
+  }
+  .md a:hover,
+  .md-inline a:hover {
+    text-decoration-color: currentColor;
+  }
+
+  /* --font-mono is an inline theme token (no runtime variable), so name the face directly. */
+  .md :is(pre, code, kbd),
+  .md-inline code {
+    font-family: var(--font-plex-mono), ui-monospace, monospace;
+  }
+  .md :not(pre) > code,
+  .md-inline code {
+    font-size: 0.875em;
+    background: var(--muted);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+  }
+
+  .md blockquote {
+    background: var(--muted);
+    color: var(--muted-foreground);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+  }
+  .md blockquote > * + * {
+    margin-top: 0.5rem;
+  }
+
+  .md hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin-block: 2rem;
+  }
+
+  /* A wide table scrolls inside the column instead of widening the page. */
+  .md table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+  .md :is(th, td) {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  .md th {
+    background: var(--muted);
+    font-weight: 600;
+  }
+
+  .md img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+  }
+
+  .md kbd {
+    font-size: 0.8125em;
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 0.05em 0.35em;
+  }
+
+  .md details {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+  }
+  .md summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .md details[open] > summary {
+    margin-bottom: 0.5rem;
+  }
+}

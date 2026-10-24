@@ -16,63 +16,38 @@ OOP is the conceptual backbone under both the C#/.NET track and a lot of TypeScr
 - **Practical:** Know when OOP helps and when it hurts; blend it with functional style
 - **Pace:** Intensive, alongside the .net/ and javascript/ tracks
 
----
-
-## Progress Tracker
-
-| Phase | Topic | Status | Notes File |
-|-------|-------|--------|------------|
-| 1 | OOP Foundations & Mental Model | Not started | `notes/01-foundations.md` |
-| 2 | Classes, Objects & Members | Not started | `notes/02-classes-objects.md` |
-| 3 | Encapsulation | Not started | `notes/03-encapsulation.md` |
-| 4 | Inheritance | Not started | `notes/04-inheritance.md` |
-| 5 | Polymorphism | Not started | `notes/05-polymorphism.md` |
-| 6 | Abstraction (Interfaces & Abstract Classes) | Not started | `notes/06-abstraction.md` |
-| 7 | SOLID Principles | Not started | `notes/07-solid.md` |
-| 8 | Design Patterns | Not started | `notes/08-design-patterns.md` |
-| 9 | Composition, Anti-Patterns & Real-World OOP | Not started | `notes/09-composition-realworld.md` |
 
 ---
 
-## Currently Learning
+## Where the notes live
 
-_Nothing started yet._
+This track's notes are the chapters of the **OOP** series (slug `oop`) in the
+Learn app (`../web/`). The old `notes/*.md` and `LEARNING_PLAN.md` files were imported
+into the app and removed. Read progress is tracked per user in the app, not here.
 
-## Completed Topics
+### Phases
 
-_Nothing completed yet._
+| Phase | Topic |
+|-------|-------|
+| 1 | OOP Foundations & Mental Model |
+| 2 | Classes, Objects & Members |
+| 3 | Encapsulation |
+| 4 | Inheritance |
+| 5 | Polymorphism |
+| 6 | Abstraction (Interfaces & Abstract Classes) |
+| 7 | SOLID Principles |
+| 8 | Design Patterns |
+| 9 | Composition, Anti-Patterns & Real-World OOP |
 
-## Next Steps
+### Adding or editing chapters
 
-1. Start Phase 1: OOP Foundations (`LEARNING_PLAN.md` → Phase 1)
-2. Internalise the mental model and the four pillars at a high level
-3. Create `notes/01-foundations.md` as you progress
+Do not create `notes/*.md` or `LEARNING_PLAN.md` files. Instead:
 
----
+1. Write each chapter as its own markdown file whose first line is the H1 title.
+2. Preview, from `web/` with paths relative to it: `cd ../web && npm run content -- push ../oop/<file>.md --series oop`
+3. Apply: run the same command with `--commit` (add `--publish` to publish new chapters).
+4. To edit existing chapters: `npm run content -- pull series oop --out tmp`, edit the
+   files (keep the `<!-- learn:… -->` markers), then push them as above.
 
-## Project Structure (will grow over time)
-
-```
-oop/
-├── CLAUDE.md               ← this file (always-on context)
-├── LEARNING_PLAN.md        ← full roadmap with all topics
-├── notes/                  ← per-phase notes with TS + C# examples
-│   ├── 01-foundations.md
-│   ├── 02-classes-objects.md
-│   └── ...
-└── examples/               ← runnable example code per phase
-    ├── phase2-classes/
-    ├── phase7-solid/
-    ├── phase8-patterns/
-    └── ...
-```
-
----
-
-## Key Conventions for This Learning Journey
-
-- Concept-first: explain the *idea*, then show it in **TypeScript and C#** side by side
-- Call out where the two languages diverge (structural vs nominal typing, `#private` vs `private`, default interface methods, etc.)
-- Every notes file has a "Gotchas" section and a hands-on exercise
-- Cross-reference the `.net/` and `javascript/` tracks where OOP shows up in real frameworks (NestJS DI, EF Core entities, Clean Architecture domain models)
-- Be honest about OOP's limits — composition, functional style, and "when not to use OOP" are first-class topics, not afterthoughts
+The CLI needs `LEARN_API_URL` and `LEARN_API_TOKEN` in `web/.env.local` (create the token in
+Admin → API tokens). See `web/README.md` → "Adding content with Claude Code".

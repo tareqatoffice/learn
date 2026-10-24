@@ -16,63 +16,39 @@ Docker is the common infrastructure layer under both the .NET and Node.js tracks
 - **Kubernetes:** Intro-level — understand why K8s exists and how Compose maps to it
 - **Pace:** Intensive alongside the other two tracks
 
----
-
-## Progress Tracker
-
-| Phase | Topic | Status | Notes File |
-|-------|-------|--------|------------|
-| 1 | Containers & Images — Core Concepts | Not started | `notes/01-containers-images.md` |
-| 2 | Writing Dockerfiles | Not started | `notes/02-dockerfiles.md` |
-| 3 | Networking | Not started | `notes/03-networking.md` |
-| 4 | Volumes & Storage | Not started | `notes/04-volumes-storage.md` |
-| 5 | Docker Compose | Not started | `notes/05-compose.md` |
-| 6 | Development Workflows | Not started | `notes/06-dev-workflows.md` |
-| 7 | Security | Not started | `notes/07-security.md` |
-| 8 | CI/CD Integration | Not started | `notes/08-cicd.md` |
-| 9 | Production Patterns | Not started | `notes/09-production.md` |
-| 10 | Kubernetes Intro | Not started | `notes/10-kubernetes-intro.md` |
 
 ---
 
-## Currently Learning
+## Where the notes live
 
-_Nothing started yet._
+This track's notes are the chapters of the **Docker** series (slug `docker`) in the
+Learn app (`../web/`). The old `notes/*.md` and `LEARNING_PLAN.md` files were imported
+into the app and removed. Read progress is tracked per user in the app, not here.
 
-## Completed Topics
+### Phases
 
-_Nothing completed yet._
+| Phase | Topic |
+|-------|-------|
+| 1 | Containers & Images — Core Concepts |
+| 2 | Writing Dockerfiles |
+| 3 | Networking |
+| 4 | Volumes & Storage |
+| 5 | Docker Compose |
+| 6 | Development Workflows |
+| 7 | Security |
+| 8 | CI/CD Integration |
+| 9 | Production Patterns |
+| 10 | Kubernetes Intro |
 
-## Next Steps
+### Adding or editing chapters
 
-1. Start Phase 1: Containers & Images (`LEARNING_PLAN.md` → Phase 1)
-2. Work through namespaces, cgroups, image layers, and the Docker CLI
-3. Create `notes/01-containers-images.md` as you progress
+Do not create `notes/*.md` or `LEARNING_PLAN.md` files. Instead:
 
----
+1. Write each chapter as its own markdown file whose first line is the H1 title.
+2. Preview, from `web/` with paths relative to it: `cd ../web && npm run content -- push ../docker/<file>.md --series docker`
+3. Apply: run the same command with `--commit` (add `--publish` to publish new chapters).
+4. To edit existing chapters: `npm run content -- pull series docker --out tmp`, edit the
+   files (keep the `<!-- learn:… -->` markers), then push them as above.
 
-## Project Structure (will grow over time)
-
-```
-docker/
-├── CLAUDE.md               ← this file (always-on context)
-├── LEARNING_PLAN.md        ← full roadmap with all topics
-├── notes/                  ← per-phase notes with examples and exercises
-│   ├── 01-containers-images.md
-│   ├── 02-dockerfiles.md
-│   └── ...
-└── examples/               ← Dockerfiles, Compose files, sample apps
-    ├── phase1-basics/
-    ├── phase2-multistage/
-    ├── phase5-compose-stack/
-    └── ...
-```
-
----
-
-## Key Conventions for This Learning Journey
-
-- Each phase has a notes file with concepts, CLI commands, annotated Dockerfiles/Compose files
-- Practical examples go in `examples/` — real files, not just snippets
-- Cross-references to .NET and Node.js tracks where Docker is the glue
-- Each notes file has a "Common Mistakes" section for things that bite everyone
+The CLI needs `LEARN_API_URL` and `LEARN_API_TOKEN` in `web/.env.local` (create the token in
+Admin → API tokens). See `web/README.md` → "Adding content with Claude Code".

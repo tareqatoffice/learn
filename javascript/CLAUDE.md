@@ -15,65 +15,38 @@ To go from "can build things" to "understands why things work", production-level
 - **Deep focus:** JS engine internals, Advanced TypeScript, Clean Architecture (NestJS), Testing (Jest + Testcontainers), Docker & deployment
 - **Pace:** Intensive (10+ hrs/week)
 
----
-
-## Progress Tracker
-
-| Phase | Topic | Status | Notes File |
-|-------|-------|--------|------------|
-| 1 | JavaScript Internals & Runtime | **In Progress** | `notes/01-js-internals.md` |
-| 2 | Advanced TypeScript | Not started | `notes/02-advanced-typescript.md` |
-| 3 | Node.js Production Patterns | Not started | `notes/03-nodejs-production.md` |
-| 4 | PostgreSQL with Prisma & DrizzleORM | Not started | `notes/04-postgres-orm.md` |
-| 5 | Clean Architecture with NestJS | Not started | `notes/05-clean-architecture-nest.md` |
-| 6 | Authentication & Security | Not started | `notes/06-auth-security.md` |
-| 7 | Testing (Jest + Integration + Testcontainers) | Not started | `notes/07-testing.md` |
-| 8 | Microservices | Not started | `notes/08-microservices.md` |
-| 9 | Docker & Deployment | Not started | `notes/09-docker-deployment.md` |
 
 ---
 
-## Currently Learning
+## Where the notes live
 
-**Phase 1 — JavaScript Internals & Runtime**
+This track's notes are the chapters of the **JavaScript & Node (backend)** series (slug `javascript`) in the
+Learn app (`../web/`). The old `notes/*.md` and `LEARNING_PLAN.md` files were imported
+into the app and removed. Read progress is tracked per user in the app, not here.
 
-Working through: V8 engine, event loop mechanics, closures, prototypes, GC, `this`, generators.  
-Notes: `notes/01-js-internals.md`
+### Phases
 
-## Completed Topics
+| Phase | Topic |
+|-------|-------|
+| 1 | JavaScript Internals & Runtime |
+| 2 | Advanced TypeScript |
+| 3 | Node.js Production Patterns |
+| 4 | PostgreSQL with Prisma & DrizzleORM |
+| 5 | Clean Architecture with NestJS |
+| 6 | Authentication & Security |
+| 7 | Testing (Jest + Integration + Testcontainers) |
+| 8 | Microservices |
+| 9 | Docker & Deployment |
 
-_Nothing completed yet._
+### Adding or editing chapters
 
-## Next Steps
+Do not create `notes/*.md` or `LEARNING_PLAN.md` files. Instead:
 
-1. Read `notes/01-js-internals.md` — all 7 sections
-2. Build the mini-project: `examples/phase1-scheduler/` — task scheduler with generators, no async/await
-3. Move to Phase 2: Advanced TypeScript
+1. Write each chapter as its own markdown file whose first line is the H1 title.
+2. Preview, from `web/` with paths relative to it: `cd ../web && npm run content -- push ../javascript/<file>.md --series javascript`
+3. Apply: run the same command with `--commit` (add `--publish` to publish new chapters).
+4. To edit existing chapters: `npm run content -- pull series javascript --out tmp`, edit the
+   files (keep the `<!-- learn:… -->` markers), then push them as above.
 
----
-
-## Project Structure (will grow over time)
-
-```
-javascript/
-├── CLAUDE.md               ← this file (always-on context)
-├── LEARNING_PLAN.md        ← full roadmap with all topics
-├── notes/                  ← per-phase notes, examples, exercises
-│   ├── 01-js-internals.md
-│   ├── 02-advanced-typescript.md
-│   └── ...
-└── examples/               ← all apps and projects built during learning
-    ├── phase1-internals/
-    ├── phase3-nodejs-server/
-    ├── phase5-clean-arch/
-    └── ...
-```
-
----
-
-## Key Conventions for This Learning Journey
-
-- Every phase has a notes file tracking what was learned, with code examples
-- Practical projects are built alongside theory — not after
-- .NET/.C# comparisons are included where they reinforce understanding across both tracks
-- Each notes file has a "Gotchas" section for JS surprises or things that differ from .NET
+The CLI needs `LEARN_API_URL` and `LEARN_API_TOKEN` in `web/.env.local` (create the token in
+Admin → API tokens). See `web/README.md` → "Adding content with Claude Code".

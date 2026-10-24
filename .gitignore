@@ -39,6 +39,7 @@ publish/
 # Secrets & environment
 *.env
 .env*
+!.env.example
 appsettings.*.json
 !appsettings.json
 !appsettings.Development.json
@@ -64,3 +65,6 @@ desktop.ini
 
 # Mini-project data files (runtime-generated)
 **/todos.json
+
+# Superpowers workflow artifacts
+.superpowers/
