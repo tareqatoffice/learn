@@ -95,7 +95,7 @@ function SectionsEditor<T extends Section, F extends Exclude<keyof T, keyof Sect
       <legend className="px-1 text-sm font-medium">{legend}</legend>
       {items.map((x, i) => (
         <div key={i} className="grid gap-2 border-b border-border pb-3 last:border-0">
-          <div className="grid gap-2 md:grid-cols-[1fr_200px_auto]">
+          <div className="grid gap-2 md:grid-cols-[1fr_12.5rem_auto]">
             <input
               aria-label={`${noun} ${i + 1} title`}
               className={inputClass}

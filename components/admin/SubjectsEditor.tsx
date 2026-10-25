@@ -15,7 +15,7 @@ function SubjectRow({ row, onSave }: { row: Row; onSave: (r: Row) => Promise<str
   const [pending, startTransition] = useTransition();
   const dirty = draft.slug !== row.slug || draft.name !== row.name;
   return (
-    <li className="grid items-center gap-2 px-4 py-2 md:grid-cols-[1fr_200px_auto_auto]">
+    <li className="grid items-center gap-2 px-4 py-2 md:grid-cols-[1fr_12.5rem_auto_auto]">
       <input aria-label="Subject name" className={inputClass} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
       <input aria-label="Subject slug" className={inputClass} value={draft.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value })} />
       <Button

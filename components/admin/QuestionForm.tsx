@@ -44,7 +44,7 @@ export function QuestionForm({
 
   return (
     <form className="grid gap-5" onSubmit={submit}>
-      <div className="grid gap-4 md:grid-cols-[1fr_260px]">
+      <div className="grid gap-4 md:grid-cols-[1fr_16.25rem]">
         <TextField label="Question (inline markdown)" value={draft.question} onChange={(v) => set("question", v)} error={errors.question} />
         <Field label="Part" error={errors.partKey}>
           <select className={inputClass} value={draft.partKey} onChange={(e) => set("partKey", e.target.value)}>

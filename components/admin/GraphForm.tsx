@@ -39,7 +39,7 @@ export function GraphForm({ graph = EMPTY, subjects }: { graph?: AdminGraph; sub
       <fieldset className="grid gap-2 rounded-lg border border-border p-3">
         <legend className="px-1 text-sm font-medium">Tracks (2 to 6)</legend>
         {draft.tracks.map((t, i) => (
-          <div key={i} className="grid gap-2 md:grid-cols-[1fr_200px_auto]">
+          <div key={i} className="grid gap-2 md:grid-cols-[1fr_12.5rem_auto]">
             <input aria-label={`Track ${i + 1} name`} className={inputClass} value={t.name} onChange={(e) => updateTrack(i, { name: e.target.value })} />
             <input aria-label={`Track ${i + 1} key`} className={inputClass} value={t.key} onChange={(e) => updateTrack(i, { key: e.target.value })} />
             <Button type="button" size="sm" variant="outline" onClick={() => set("tracks", draft.tracks.filter((_, j) => j !== i))}>

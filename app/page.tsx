@@ -29,7 +29,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
       <main className={cn(containerClass, "flex flex-1 items-center py-6")}>
         <div className="page-enter w-full">
-          <div className="grid items-center gap-8 py-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-16 lg:py-16">
+          <div className="grid items-center gap-8 py-6 lg:grid-cols-[minmax(0,1fr)_26.25rem] lg:gap-16 lg:py-16">
             <section aria-labelledby="welcome" className="grid gap-6">
               <div>
                 <h1 id="welcome" className="text-4xl font-bold tracking-tight sm:text-5xl">

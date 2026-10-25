@@ -160,7 +160,7 @@ export function GraphView({ data }: { data: GraphData }) {
   const ordered = [...edges.filter((e) => !lit(e)), ...edges.filter(lit)];
 
   const topicUrl = (slug: string, read: boolean) => `${pathname}?topic=${encodeURIComponent(slug)}${read ? "&read=1" : ""}`;
-  const wide = () => window.matchMedia("(min-width: 1024px)").matches;
+  const wide = () => window.matchMedia("(min-width: 64rem)").matches;
 
   // The native history API updates useSearchParams without refetching the page from the server.
   function select(slug: string) {
@@ -295,7 +295,7 @@ export function GraphView({ data }: { data: GraphData }) {
         )}
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_25rem]">
         <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-background">
           <div ref={canvasRef} className="overflow-auto">
             <svg

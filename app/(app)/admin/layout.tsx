@@ -34,7 +34,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-[200px_minmax(0,1fr)]">
+    <div className="grid gap-6 md:grid-cols-[12.5rem_minmax(0,1fr)]">
       <AdminNav groups={NAV} />
       <div className="min-w-0">{children}</div>
     </div>

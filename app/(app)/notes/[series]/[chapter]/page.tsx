@@ -66,7 +66,7 @@ export default async function ChapterPage({ params }: { params: Promise<{ series
   );
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_200px] lg:gap-6">
+    <div className="grid gap-4 lg:grid-cols-[13.75rem_minmax(0,1fr)_12.5rem] lg:gap-6">
       <details className={disclosureClass}>
         <summary className={summaryClass}>
           <span className="min-w-0 truncate">

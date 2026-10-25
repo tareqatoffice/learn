@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /** Page width and gutters shared by the header row and every page's <main>, so they line up. */
-export const containerClass = "mx-auto w-full max-w-[1400px] px-4 sm:px-6 lg:px-8";
+export const containerClass = "mx-auto w-full max-w-[87.5rem] px-4 sm:px-6 lg:px-8";
 
 /**
  * The sticky header shell: the "Learn" mark plus whatever controls the caller puts beside it.

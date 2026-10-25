@@ -312,14 +312,14 @@
   .md-inline code {
     font-size: 0.875em;
     background: var(--muted);
-    border-radius: 4px;
+    border-radius: 0.25rem;
     padding: 0.1em 0.35em;
   }
 
   .md blockquote {
     background: var(--muted);
     color: var(--muted-foreground);
-    border-radius: 8px;
+    border-radius: calc(var(--radius) * 0.8);
     padding: 0.75rem 1rem;
   }
   .md blockquote > * + * {
@@ -355,20 +355,20 @@
   .md img {
     max-width: 100%;
     height: auto;
-    border-radius: 8px;
+    border-radius: calc(var(--radius) * 0.8);
   }
 
   .md kbd {
     font-size: 0.8125em;
     border: 1px solid var(--border);
     border-bottom-width: 2px;
-    border-radius: 4px;
+    border-radius: 0.25rem;
     padding: 0.05em 0.35em;
   }
 
   .md details {
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: calc(var(--radius) * 0.8);
     padding: 0.5rem 1rem;
   }
   .md summary {
@@ -419,9 +419,9 @@ input:not([type="checkbox"], [type="radio"]):focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 22%, transparent);
+  box-shadow: 0 0 0 0.1875rem color-mix(in oklch, var(--ring) 22%, transparent);
   outline: 2px solid transparent;
-  outline-offset: 2px;
+  outline-offset: 0.125rem;
 }
 
 /*
@@ -450,7 +450,7 @@ main :is(li.rounded-xl.bg-card, .card-interactive) {
 }
 main :is(li.rounded-xl.bg-card, .card-interactive):hover {
   border-color: color-mix(in oklch, var(--border), var(--ring) 45%);
-  box-shadow: 0 6px 20px -8px color-mix(in oklch, var(--foreground) 25%, transparent);
+  box-shadow: 0 0.375rem 1.25rem -0.5rem color-mix(in oklch, var(--foreground) 25%, transparent);
 }
 main :is(.divide-y > li, .divide-y > div, tbody > tr) {
   transition: background-color 160ms ease;
@@ -469,13 +469,13 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
   transform-origin: center;
 }
 .graph-node .node-body {
-  filter: drop-shadow(0 1px 1.5px color-mix(in oklch, var(--foreground) 14%, transparent));
+  filter: drop-shadow(0 0.0625rem 0.09375rem color-mix(in oklch, var(--foreground) 14%, transparent));
   transition: fill 180ms ease, stroke 180ms ease, filter 220ms ease;
 }
 /* Touch screens keep :hover on the last tapped node, so only a real pointer gets the hover lift. */
 @media (hover: hover) {
   .graph-node:hover .node-body {
-    filter: drop-shadow(0 6px 10px color-mix(in oklch, var(--foreground) 22%, transparent));
+    filter: drop-shadow(0 0.375rem 0.625rem color-mix(in oklch, var(--foreground) 22%, transparent));
   }
 }
 .graph-node .node-ring {
@@ -522,7 +522,7 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
   }
 
   main :is(li.rounded-xl.bg-card, .card-interactive):hover {
-    translate: 0 -2px;
+    translate: 0 -0.125rem;
   }
   :where(button, [role="button"], a[class*="rounded"]):not(:disabled):active {
     scale: 0.97;
@@ -537,7 +537,7 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
   }
   @media (hover: hover) {
     .graph-node:hover .node-lift {
-      translate: 0 -2px;
+      translate: 0 -0.125rem;
     }
   }
   /* The full-screen topic reader (components/TopicReader.tsx) rises over a fading backdrop. */
@@ -562,7 +562,7 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
   from { opacity: 0; }
 }
 @keyframes rise-in {
-  from { opacity: 0; translate: 0 10px; }
+  from { opacity: 0; translate: 0 0.625rem; }
 }
 @keyframes grow-x {
   from { transform: scaleX(0); }
