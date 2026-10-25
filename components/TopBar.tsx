@@ -40,7 +40,8 @@ export function TopBar({ user }: { user: TopBarUser }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const links = user.isAdmin ? [...LINKS, ADMIN_LINK] : LINKS;
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`);
   const accountRef = useRef<HTMLDivElement>(null);
   const accountButtonRef = useRef<HTMLButtonElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -64,7 +65,8 @@ export function TopBar({ user }: { user: TopBarUser }) {
       setAccountOpen(false);
     };
     const onPointer = (e: PointerEvent) => {
-      if (accountRef.current && !accountRef.current.contains(e.target as Node)) setAccountOpen(false);
+      if (accountRef.current && !accountRef.current.contains(e.target as Node))
+        setAccountOpen(false);
     };
     document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onPointer);
@@ -78,30 +80,47 @@ export function TopBar({ user }: { user: TopBarUser }) {
     <AppHeader
       logoHref="/dashboard"
       below={
+        // Overlays the page instead of pushing it down: absolute under the sticky header, with a
+        // backdrop over the rest of the viewport that closes the menu on tap.
         menuOpen && (
-          <nav id="mobile-nav" aria-label="Mobile" className="border-t border-border px-4 py-2 sm:px-6 animate-in fade-in-0 slide-in-from-top-2 duration-200 md:hidden">
-            <ul className="grid gap-1">
-              {links.map(({ href, label }) => (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    aria-current={isActive(href) ? "page" : undefined}
-                    onClick={() => setMenuOpen(false)}
-                    className={cn(linkClass(isActive(href)), "block py-2.5")}
-                  >
-                    {label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          <>
+            <div
+              aria-hidden
+              onClick={() => setMenuOpen(false)}
+              className="fixed inset-x-0 bottom-0 top-14 bg-black/40 animate-in fade-in-0 duration-200 md:hidden"
+            />
+            <nav
+              id="mobile-nav"
+              aria-label="Mobile"
+              className="absolute inset-x-0 top-full border-y border-border bg-card px-4 py-2 shadow-lg sm:px-6 animate-in fade-in-0 slide-in-from-top-2 duration-200 md:hidden"
+            >
+              <ul className="grid gap-1">
+                {links.map(({ href, label }) => (
+                  <li key={href}>
+                    <Link
+                      href={href}
+                      aria-current={isActive(href) ? "page" : undefined}
+                      onClick={() => setMenuOpen(false)}
+                      className={cn(linkClass(isActive(href)), "block py-2.5")}
+                    >
+                      {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </>
         )
       }
     >
       <nav aria-label="Main" className="hidden gap-1 self-stretch md:flex">
         {links.map(({ href, label }) => (
           <div key={href} className="relative flex items-center">
-            <Link href={href} aria-current={isActive(href) ? "page" : undefined} className={cn(linkClass(isActive(href)), "peer")}>
+            <Link
+              href={href}
+              aria-current={isActive(href) ? "page" : undefined}
+              className={cn(linkClass(isActive(href)), "peer")}
+            >
               {label}
             </Link>
             <span aria-hidden className={barClass(isActive(href))} />
@@ -122,14 +141,23 @@ export function TopBar({ user }: { user: TopBarUser }) {
           >
             {user.image ? (
               // eslint-disable-next-line @next/next/no-img-element -- Google avatar host; next/image would need a remote pattern
-              <img src={user.image} alt="" referrerPolicy="no-referrer" className="size-full object-cover" />
+              <img
+                src={user.image}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="size-full object-cover"
+              />
             ) : (
-              <span aria-hidden>{(user.name.trim()[0] ?? "?").toUpperCase()}</span>
+              <span aria-hidden>
+                {(user.name.trim()[0] ?? "?").toUpperCase()}
+              </span>
             )}
           </button>
           {accountOpen && (
             <div className="absolute right-0 top-11 w-56 origin-top-right rounded-lg border border-border bg-popover p-2 shadow-md animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-150">
-              <p className="truncate px-2 py-1.5 text-sm font-medium">{user.name}</p>
+              <p className="truncate px-2 py-1.5 text-sm font-medium">
+                {user.name}
+              </p>
               <form action={signOutAction}>
                 <button
                   type="submit"
@@ -150,7 +178,11 @@ export function TopBar({ user }: { user: TopBarUser }) {
           onClick={() => setMenuOpen((open) => !open)}
           className="inline-flex size-9 pointer-coarse:size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:hidden"
         >
-          {menuOpen ? <X className="size-5" aria-hidden /> : <Menu className="size-5" aria-hidden />}
+          {menuOpen ? (
+            <X className="size-5" aria-hidden />
+          ) : (
+            <Menu className="size-5" aria-hidden />
+          )}
         </button>
       </div>
     </AppHeader>

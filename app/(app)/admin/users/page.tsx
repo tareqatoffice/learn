@@ -21,7 +21,7 @@ export default async function UsersPage() {
             <tr>
               <th className="px-4 py-2">Email</th>
               <th className="px-4 py-2">Name</th>
-              <th className="px-4 py-2">Last sign-in</th>
+              <th className="min-w-56 whitespace-nowrap px-4 py-2">Last sign-in</th>
               <th className="px-4 py-2 text-right">Questions</th>
               <th className="px-4 py-2 text-right">Topics</th>
               <th className="px-4 py-2 text-right">Chapters</th>
@@ -39,7 +39,7 @@ export default async function UsersPage() {
                   )}
                 </td>
                 <td className="px-4 py-2">{u.name}</td>
-                <td className="px-4 py-2">
+                <td className="whitespace-nowrap px-4 py-2">
                   {u.lastLoginAt ? formatDateTime(u.lastLoginAt) : "—"}
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums">

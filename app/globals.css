@@ -447,6 +447,22 @@ textarea:hover:not(:focus-visible, :disabled),
 select:hover:not(:focus-visible, :disabled) {
   border-color: color-mix(in oklch, var(--border), var(--foreground) 25%);
 }
+/*
+ * Single-line selects draw their own chevron, inset from the right edge with room reserved for it;
+ * the native arrow sits flush against the border. Gradients take currentColor, so it follows the theme.
+ */
+select:not([multiple], [size]) {
+  appearance: none;
+  padding-inline-end: 2rem;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 1.0625rem) 50%,
+    calc(100% - 0.75rem) 50%;
+  background-size: 0.3125rem 0.3125rem;
+  background-repeat: no-repeat;
+}
 /* The transparent outline is what forced-colors mode paints, since it drops box-shadow. */
 input:not([type="checkbox"], [type="radio"]):focus-visible,
 textarea:focus-visible,
