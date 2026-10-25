@@ -540,6 +540,14 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
       translate: 0 -2px;
     }
   }
+  /* The full-screen topic reader (components/TopicReader.tsx) rises over a fading backdrop. */
+  .topic-reader[open] {
+    animation: rise-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .topic-reader[open]::backdrop {
+    animation: page-fade 240ms ease-out both;
+  }
+
   /* A topic's prerequisite chain draws in, prerequisite to topic, each time a topic is highlighted. */
   .edge-draw {
     animation: edge-draw 520ms cubic-bezier(0.22, 1, 0.36, 1) both;

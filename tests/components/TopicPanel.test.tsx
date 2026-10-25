@@ -90,7 +90,7 @@ describe("TopicPanel", () => {
           { id: "q2", title: "Closures in loops", href: "/interview/js/q2" },
         ],
         notes: [{ title: "JS internals § Closures", href: "/notes/js/internals#closures" }],
-        prereqs: [{ slug: "functions", title: "Functions", status: "done" }],
+        prereqs: [{ slug: "functions", title: "Functions", state: "done" }],
       },
     });
     expect(screen.getByRole("link", { name: "JS internals § Closures" }).getAttribute("href")).toBe(

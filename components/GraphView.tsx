@@ -1,11 +1,14 @@
 "use client";
 
+import { Maximize2 } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { setNodeStatusAction } from "@/app/(app)/graphs/actions";
 import { Chip } from "@/components/Chip";
 import { ProgressBar } from "@/components/ProgressBar";
-import { TopicPanel } from "@/components/TopicPanel";
+import { type NodeState, STATE_LABEL, StatusGlyph, StatusIcon } from "@/components/StatusIcon";
+import { TopicPanel, type TopicPanelProps } from "@/components/TopicPanel";
+import { TopicReader } from "@/components/TopicReader";
 import { Button } from "@/components/ui/button";
 import type { GraphView as GraphData } from "@/content/queries";
 import { layoutGraph, LBL, NH, NW, readyNext } from "@/graph/layout";
@@ -13,16 +16,6 @@ import type { NodeStatus } from "@/progress/graph";
 import { cn } from "@/lib/utils";
 
 const statusOf = (progress: GraphData["progress"], id: string): NodeStatus => progress[id] ?? "none";
-
-/** What a node shows: its saved status, with "not started" split by whether its prerequisites are done. */
-type NodeState = "locked" | "ready" | "learning" | "done";
-
-const STATE_LABEL: Record<NodeState, string> = {
-  locked: "Needs prerequisites",
-  ready: "Ready to start",
-  learning: "Learning",
-  done: "Done",
-};
 
 const EDGE_COLOR = {
   chain: "var(--foreground)",
@@ -56,42 +49,14 @@ function wrapTitle(title: string): { lines: string[]; cut: boolean } {
   return { lines: shown, cut };
 }
 
-/** A 16px status glyph centred on the origin; `color` is the topic's track colour. */
-function StatusIcon({ state, color }: { state: NodeState; color: string }) {
-  if (state === "done")
-    return (
-      <g>
-        <circle r={8} fill="var(--ok)" />
-        <path d="M-3.6,0.2 L-1.1,2.7 L3.8,-2.6" fill="none" stroke="var(--card)" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-      </g>
-    );
-  if (state === "learning")
-    return (
-      <g>
-        <circle r={7} fill="none" stroke={color} strokeWidth={1.6} />
-        <path d="M0,-4.4 A4.4,4.4 0 0 1 0,4.4 Z" fill={color} />
-      </g>
-    );
-  if (state === "ready")
-    return (
-      <g>
-        <circle r={7} fill="none" stroke={color} strokeWidth={1.6} />
-        <path d="M-1.5,-3 L3,0 L-1.5,3 Z" fill={color} />
-      </g>
-    );
-  return (
-    <g fill="none" stroke="var(--muted-foreground)" strokeWidth={1.4} strokeLinecap="round">
-      <rect x={-4.5} y={-1} width={9} height={7} rx={1.6} />
-      <path d="M-2.6,-1 V-3 A2.6,2.6 0 0 1 2.6,-3 V-1" />
-    </g>
-  );
-}
-
 export function GraphView({ data }: { data: GraphData }) {
   const pathname = usePathname();
   // The URL's ?topic= is the selection, so any link to another topic of this graph (the panel's
   // prerequisites, links from elsewhere) selects it without a remount.
-  const selected = useSearchParams().get("topic");
+  const searchParams = useSearchParams();
+  const selected = searchParams.get("topic");
+  // ?read=1 opens the selected topic in the full-screen reader, so the back button closes it.
+  const readParam = searchParams.get("read") === "1";
   const { graph, nodes } = data;
   const [progress, setProgress] = useState(data.progress);
   const [focus, setFocus] = useState<string | null>(null);
@@ -101,16 +66,33 @@ export function GraphView({ data }: { data: GraphData }) {
   const [error, setError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  // Whether this page pushed the reader's history entry, so closing can step back over it.
+  const pushedReader = useRef(false);
 
   const layout = useMemo(() => layoutGraph(nodes, graph.tracks), [nodes, graph.tracks]);
   const trackIdx = useMemo(() => new Map(graph.tracks.map((t, i) => [t.key, i])), [graph.tracks]);
   const trackName = useMemo(() => new Map(graph.tracks.map((t) => [t.key, t.name])), [graph.tracks]);
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
+  // Each topic's dependents: the topics it unlocks.
+  const children = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const n of nodes) for (const p of n.prereqIds) m.set(p, [...(m.get(p) ?? []), n.id]);
+    return m;
+  }, [nodes]);
   const ready = useMemo(() => new Set(readyNext(nodes, progress)), [nodes, progress]);
   const done = nodes.filter((n) => progress[n.id] === "done").length;
   const learning = nodes.filter((n) => progress[n.id] === "learning").length;
   const current = nodes.find((n) => n.slug === selected) ?? null;
   const upNext = nodes.filter((n) => ready.has(n.id));
+  const reading = readParam && current !== null;
+  // Reading order for the reader's previous/next: step by step, left to right.
+  const order = useMemo(
+    () =>
+      nodes.toSorted(
+        (a, b) => (layout.positions[a.id]?.y ?? 0) - (layout.positions[b.id]?.y ?? 0) || (layout.positions[a.id]?.x ?? 0) - (layout.positions[b.id]?.x ?? 0),
+      ),
+    [nodes, layout],
+  );
 
   // On a canvas narrower than the graph (phones), bring the selected topic, else the first one ready, into view.
   const focusId = current?.id ?? upNext[0]?.id;
@@ -177,13 +159,44 @@ export function GraphView({ data }: { data: GraphData }) {
   const lit = (e: (typeof edges)[number]) => e.kind === "chain" || e.kind === "unlock";
   const ordered = [...edges.filter((e) => !lit(e)), ...edges.filter(lit)];
 
+  const topicUrl = (slug: string, read: boolean) => `${pathname}?topic=${encodeURIComponent(slug)}${read ? "&read=1" : ""}`;
+  const wide = () => window.matchMedia("(min-width: 1024px)").matches;
+
+  // The native history API updates useSearchParams without refetching the page from the server.
   function select(slug: string) {
     setError(null);
-    // The native history API updates useSearchParams without refetching the page from the server.
-    window.history.replaceState(null, "", `${pathname}?topic=${encodeURIComponent(slug)}`);
-    panelRef.current?.focus({
-      preventScroll: window.matchMedia("(min-width: 1024px)").matches,
-    });
+    window.history.replaceState(null, "", topicUrl(slug, reading));
+    if (!reading) panelRef.current?.focus({ preventScroll: wide() });
+  }
+
+  function openReader(slug: string) {
+    setError(null);
+    // Read the live URL, not `reading`: a fast double tap fires twice before the next render.
+    if (new URLSearchParams(window.location.search).get("read") === "1") {
+      window.history.replaceState(null, "", topicUrl(slug, true));
+      return;
+    }
+    window.history.pushState(null, "", topicUrl(slug, true));
+    pushedReader.current = true;
+  }
+
+  function closeReader() {
+    const slug = current?.slug;
+    if (!slug) return;
+    if (!pushedReader.current) {
+      window.history.replaceState(null, "", topicUrl(slug, false));
+      return;
+    }
+    pushedReader.current = false;
+    // Step back over the reader's entry, then keep the topic the reader ended on selected.
+    window.addEventListener("popstate", () => window.history.replaceState(null, "", topicUrl(slug, false)), { once: true });
+    window.history.back();
+  }
+
+  // The side panel sits beside the graph on wide screens; on narrow ones it is far below, so open the reader.
+  function pick(slug: string) {
+    if (wide()) select(slug);
+    else openReader(slug);
   }
 
   async function changeStatus(nodeId: string, status: NodeStatus) {
@@ -205,6 +218,29 @@ export function GraphView({ data }: { data: GraphData }) {
       setPending(false);
     }
   }
+
+  const relatedTopic = (n: (typeof nodes)[number]) => ({ slug: n.slug, title: n.title, state: stateOf(n.id), color: colorOf(n.trackKey) });
+  // Everything the side panel and the full-screen reader share.
+  const topicProps: Omit<TopicPanelProps, "topicHref" | "variant" | "action"> | null = current && {
+    node: { ...current, trackName: trackName.get(current.trackKey) ?? "", trackColor: colorOf(current.trackKey) },
+    status: statusOf(progress, current.id),
+    onStatus: (s) => changeStatus(current.id, s),
+    pending,
+    error,
+    related: {
+      questions: current.related.questions,
+      notes: current.related.notes,
+      prereqs: current.prereqIds.flatMap((id) => {
+        const p = byId.get(id);
+        return p ? [relatedTopic(p)] : [];
+      }),
+      unlocks: (children.get(current.id) ?? []).flatMap((id) => {
+        const n = byId.get(id);
+        return n ? [relatedTopic(n)] : [];
+      }),
+    },
+  };
+  const readIdx = current ? order.findIndex((n) => n.id === current.id) : -1;
 
   return (
     <div className="grid gap-5">
@@ -248,12 +284,10 @@ export function GraphView({ data }: { data: GraphData }) {
               <button
                 key={n.id}
                 type="button"
-                onClick={() => select(n.slug)}
+                onClick={() => pick(n.slug)}
                 className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:py-2"
               >
-                <svg width={14} height={14} viewBox="-8 -8 16 16" aria-hidden>
-                  <StatusIcon state="ready" color={colorOf(n.trackKey)} />
-                </svg>
+                <StatusGlyph state="ready" color={colorOf(n.trackKey)} />
                 {n.title}
               </button>
             ))}
@@ -339,11 +373,12 @@ export function GraphView({ data }: { data: GraphData }) {
                       tabIndex={0}
                       aria-label={label}
                       aria-pressed={isSel}
-                      onClick={() => select(n.slug)}
+                      onClick={() => pick(n.slug)}
+                      onDoubleClick={() => openReader(n.slug)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          select(n.slug);
+                          pick(n.slug);
                         }
                       }}
                       // A touch tap fires pointerenter too; only a real hover previews, or every tap would dim the graph.
@@ -351,7 +386,8 @@ export function GraphView({ data }: { data: GraphData }) {
                       onPointerLeave={() => setHovered(null)}
                       onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHovered(n.id)}
                       onBlur={() => setHovered(null)}
-                      className="graph-node cursor-pointer outline-none"
+                      // select-none: double-click opens the reader and must not also highlight a word of the title.
+                      className="graph-node cursor-pointer outline-none select-none"
                       style={{ opacity }}
                     >
                       {cut && <title>{n.title}</title>}
@@ -389,9 +425,7 @@ export function GraphView({ data }: { data: GraphData }) {
           <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-border bg-card px-4 py-3 text-xs text-muted-foreground">
             {(["locked", "ready", "learning", "done"] as const).map((s) => (
               <span key={s} className="inline-flex items-center gap-1.5">
-                <svg width={14} height={14} viewBox="-8 -8 16 16" aria-hidden>
-                  <StatusIcon state={s} color="var(--muted-foreground)" />
-                </svg>
+                <StatusGlyph state={s} />
                 {STATE_LABEL[s]}
               </span>
             ))}
@@ -411,46 +445,22 @@ export function GraphView({ data }: { data: GraphData }) {
           aria-label="Topic details"
           className="rounded-xl border border-border bg-card p-5 outline-none lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-auto"
         >
-          {current ? (
-            <>
-              <TopicPanel
-                node={{
-                  ...current,
-                  trackName: trackName.get(current.trackKey) ?? "",
-                }}
-                status={statusOf(progress, current.id)}
-                onStatus={(s) => changeStatus(current.id, s)}
-                pending={pending}
-                topicHref={(slug) => `${pathname}?topic=${encodeURIComponent(slug)}`}
-                related={{
-                  questions: current.related.questions,
-                  notes: current.related.notes,
-                  prereqs: current.prereqIds.flatMap((id) => {
-                    const p = byId.get(id);
-                    return p
-                      ? [
-                          {
-                            slug: p.slug,
-                            title: p.title,
-                            status: statusOf(progress, p.id),
-                          },
-                        ]
-                      : [];
-                  }),
-                }}
-              />
-              {error && (
-                <p role="alert" className="mt-3 text-sm text-destructive">
-                  {error}
-                </p>
-              )}
-            </>
+          {topicProps ? (
+            <TopicPanel
+              {...topicProps}
+              topicHref={(slug) => topicUrl(slug, false)}
+              action={
+                <Button variant="ghost" size="icon-sm" aria-label="Open full screen" title="Open full screen" onClick={() => openReader(topicProps.node.slug)}>
+                  <Maximize2 aria-hidden />
+                </Button>
+              }
+            />
           ) : (
             <div className="grid justify-items-start gap-2">
               <h2 className="font-semibold">No topic selected</h2>
               <p className="text-sm text-muted-foreground">Pick a topic in the graph to see its summary, an example, and the questions that test it.</p>
               {upNext[0] && (
-                <Button variant="outline" size="sm" className="mt-2" onClick={() => select(upNext[0].slug)}>
+                <Button variant="outline" size="sm" className="mt-2" onClick={() => pick(upNext[0].slug)}>
                   Start with {upNext[0].title}
                 </Button>
               )}
@@ -458,6 +468,21 @@ export function GraphView({ data }: { data: GraphData }) {
           )}
         </div>
       </div>
+
+      {topicProps && current && (
+        <TopicReader
+          open={reading}
+          onClose={closeReader}
+          onPrev={readIdx > 0 ? () => select(order[readIdx - 1].slug) : undefined}
+          onNext={readIdx < order.length - 1 ? () => select(order[readIdx + 1].slug) : undefined}
+          context={`${graph.title} · Step ${(layout.positions[current.id]?.tier ?? 0) + 1} · ${readIdx + 1} of ${order.length}`}
+          topicKey={current.slug}
+          labelledBy={`reader-topic-${current.slug}`}
+        >
+          {/* Mounted only while open: no hidden second copy of the topic for assistive tech to find. */}
+          {reading && <TopicPanel {...topicProps} variant="full" topicHref={(slug) => topicUrl(slug, true)} />}
+        </TopicReader>
+      )}
     </div>
   );
 }
