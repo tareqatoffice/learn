@@ -463,6 +463,28 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
   transform-origin: left;
 }
 
+/* Prerequisite-graph nodes (components/GraphView.tsx): press scales about the node, not the SVG origin. */
+.graph-node {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.graph-node .node-body {
+  filter: drop-shadow(0 1px 1.5px color-mix(in oklch, var(--foreground) 14%, transparent));
+  transition: fill 180ms ease, stroke 180ms ease, filter 220ms ease;
+}
+/* Touch screens keep :hover on the last tapped node, so only a real pointer gets the hover lift. */
+@media (hover: hover) {
+  .graph-node:hover .node-body {
+    filter: drop-shadow(0 6px 10px color-mix(in oklch, var(--foreground) 22%, transparent));
+  }
+}
+.graph-node .node-ring {
+  transition: opacity 180ms ease;
+}
+.graph-node:focus-visible .node-ring {
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   /* Stagger index: position among siblings, capped at 5. */
   :where(.page-enter *) { --i: 0; }
@@ -509,6 +531,23 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
   .progress-fill {
     animation: grow-x 700ms cubic-bezier(0.22, 1, 0.36, 1) 200ms both;
   }
+
+  .graph-node .node-lift {
+    transition: translate 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @media (hover: hover) {
+    .graph-node:hover .node-lift {
+      translate: 0 -2px;
+    }
+  }
+  /* A topic's prerequisite chain draws in, prerequisite to topic, each time a topic is highlighted. */
+  .edge-draw {
+    animation: edge-draw 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes edge-draw {
+  from { stroke-dashoffset: 1; }
 }
 
 @keyframes page-fade {

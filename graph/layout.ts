@@ -2,13 +2,14 @@
 // Topics sit in tiers (steps) by prerequisite depth; a tier with more than MAXC
 // topics wraps onto balanced visual rows; rows are centred against the widest one.
 
-export const NW = 176;
-export const NH = 44;
+export const NW = 184;
+export const NH = 48;
 const GX = 14;
 const GY = 52;
 const TG = 14;
-const PAD = 16;
-const LBL = 66;
+// Half the row gap, so each step's band reaches halfway to its neighbours and the bands tile the canvas.
+const PAD = GY / 2;
+export const LBL = 72;
 const MAXC = 4;
 
 type Prereqs = { id: string; prereqIds: string[] };
@@ -49,6 +50,8 @@ export function layoutGraph(
   height: number;
   positions: Record<string, { x: number; y: number; tier: number }>;
   rows: { tier: number; y: number; first: boolean }[];
+  /** One horizontal band per tier, covering all of its wrapped rows. */
+  bands: { tier: number; y: number; height: number }[];
 } {
   const tiers = computeTiers(nodes);
   const trackIdx = new Map(tracks.map((t, i) => [t.key, i]));
@@ -82,10 +85,18 @@ export function layoutGraph(
     return { tier: v.tier, y, first: v.first };
   });
 
+  const bands: { tier: number; y: number; height: number }[] = [];
+  for (const r of rows) {
+    const last = bands.at(-1);
+    if (last?.tier === r.tier) last.height = r.y + NH + GY / 2 - last.y;
+    else bands.push({ tier: r.tier, y: r.y - GY / 2, height: NH + GY });
+  }
+
   return {
     width: LBL + PAD * 2 + maxW,
     height: PAD * 2 + vrows.length * NH + Math.max(0, vrows.length - 1) * GY,
     positions,
     rows,
+    bands,
   };
 }
