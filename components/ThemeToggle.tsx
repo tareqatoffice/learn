@@ -20,7 +20,13 @@ function effectiveTheme(): "light" | "dark" {
 export function ThemeToggle({ className }: { className?: string }) {
   function toggle() {
     const next = effectiveTheme() === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
+    const root = document.documentElement;
+    // Suspend transitions for the swap (see .theme-switching in globals.css): flushing styles while the
+    // class is on commits the new colours untransitioned, so removing it right after starts nothing.
+    root.classList.add("theme-switching");
+    root.dataset.theme = next;
+    void document.body.offsetHeight;
+    root.classList.remove("theme-switching");
     try {
       localStorage.setItem(KEY, next);
     } catch {
@@ -34,7 +40,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       onClick={toggle}
       aria-label="Toggle theme"
       className={cn(
-        "inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        "inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:transition-transform [&_svg]:duration-500 [&_svg]:ease-out hover:[&_svg]:-rotate-[25deg] hover:[&_svg]:scale-110 motion-reduce:[&_svg]:transition-none",
         className,
       )}
     >

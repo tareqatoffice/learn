@@ -13,7 +13,7 @@ const dateFormat = new Intl.DateTimeFormat("en", { month: "short", day: "numeric
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   const id = `card-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
   return (
-    <section aria-labelledby={id} className="grid content-start gap-2 rounded-xl border border-border bg-card p-4">
+    <section aria-labelledby={id} className="card-interactive grid content-start gap-2 rounded-xl border border-border bg-card p-4">
       <h2 id={id} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
       </h2>

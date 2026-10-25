@@ -364,3 +364,143 @@
     margin-bottom: 0.5rem;
   }
 }
+/*
+ * Motion and interaction. Every control eases between states, presses in on click and shows a
+ * pointer; inline text links draw an underline in from the left; card tiles lift on hover. Pages fade
+ * up section by section on each navigation (app/(app)/template.tsx replays `.page-enter`, and the
+ * sign-in page uses it too), and list rows reveal as they scroll in. Everything that moves is gated on
+ * prefers-reduced-motion: no-preference, so reduced motion keeps the colour feedback and drops the
+ * movement.
+ */
+@layer base {
+  :where(a, button, summary, select, label, [role="button"], input, textarea) {
+    transition-property: color, background-color, border-color, text-decoration-color, box-shadow, opacity, scale,
+      translate, background-size;
+    transition-duration: 180ms;
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  :where(button, summary, select, [role="button"], label[for], input[type="checkbox"], input[type="radio"]):not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* ThemeToggle sets this for one frame so the whole page swaps colours at once instead of fading piecemeal. */
+.theme-switching,
+.theme-switching * {
+  transition: none !important;
+}
+
+/*
+ * Unlayered on purpose: these must beat the Tailwind utilities already on each element
+ * (border-border, text-muted-foreground, hover:underline) for the hover states to show.
+ */
+input:not([type="checkbox"], [type="radio"]):hover:not(:focus-visible, :disabled),
+textarea:hover:not(:focus-visible, :disabled),
+select:hover:not(:focus-visible, :disabled) {
+  border-color: color-mix(in oklch, var(--border), var(--foreground) 25%);
+}
+/* The transparent outline is what forced-colors mode paints, since it drops box-shadow. */
+input:not([type="checkbox"], [type="radio"]):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 22%, transparent);
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+/*
+ * Inline text links: an underline grows in from the left and the text picks up the accent. Anchors
+ * styled as controls (rounded, bordered, button slots) or laid out as boxes are left alone.
+ */
+main a:not([class*="rounded"], [class*="border"], [data-slot], .block, .flex, .inline-flex, .grid, .underline, .md a, svg a) {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 0% 1px;
+  text-decoration-line: none;
+}
+main a:not([class*="rounded"], [class*="border"], [data-slot], .block, .flex, .inline-flex, .grid, .underline, .md a, svg a):hover {
+  background-size: 100% 1px;
+  color: var(--ring);
+}
+main a.underline:hover,
+.md a:hover {
+  color: var(--ring);
+}
+
+/* Card tiles (list items and opted-in `.card-interactive` panels) answer the pointer; forms and panels don't. */
+main :is(li.rounded-xl.bg-card, .card-interactive) {
+  transition: border-color 220ms ease, box-shadow 220ms ease, translate 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+main :is(li.rounded-xl.bg-card, .card-interactive):hover {
+  border-color: color-mix(in oklch, var(--border), var(--ring) 45%);
+  box-shadow: 0 6px 20px -8px color-mix(in oklch, var(--foreground) 25%, transparent);
+}
+main :is(.divide-y > li, .divide-y > div, tbody > tr) {
+  transition: background-color 160ms ease;
+}
+main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
+  background-color: color-mix(in oklch, var(--muted) 55%, transparent);
+}
+
+.progress-fill {
+  transform-origin: left;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Stagger index: position among siblings, capped at 5. */
+  :where(.page-enter *) { --i: 0; }
+  :where(.page-enter *:nth-child(2)) { --i: 1; }
+  :where(.page-enter *:nth-child(3)) { --i: 2; }
+  :where(.page-enter *:nth-child(4)) { --i: 3; }
+  :where(.page-enter *:nth-child(5)) { --i: 4; }
+  :where(.page-enter *:nth-child(n + 6)) { --i: 5; }
+
+  /*
+   * The entry rules are wrapped in :where() so they carry no specificity: the scroll reveal below
+   * must win on list rows, and the grid-children rule wins over the section rule by source order.
+   */
+  .page-enter {
+    animation: page-fade 260ms ease-out both;
+  }
+  :where(.page-enter > * > *) {
+    animation: rise-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(var(--i) * 60ms);
+  }
+  /* Grid children of a section (dashboard cards, list tiles) cascade in after their section. */
+  :where(.page-enter :is(.grid, ul):not(.md *, .md-inline *) > :is(section, li)) {
+    animation: rise-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(120ms + var(--i) * 50ms);
+  }
+
+  /* Rows reveal as they scroll into view, where the browser supports scroll timelines. */
+  @supports (animation-timeline: view()) {
+    .page-enter :is(.divide-y > li, .divide-y > div, tbody > tr) {
+      animation: rise-in linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 80%;
+    }
+  }
+
+  main :is(li.rounded-xl.bg-card, .card-interactive):hover {
+    translate: 0 -2px;
+  }
+  :where(button, [role="button"], a[class*="rounded"]):not(:disabled):active {
+    scale: 0.97;
+  }
+
+  .progress-fill {
+    animation: grow-x 700ms cubic-bezier(0.22, 1, 0.36, 1) 200ms both;
+  }
+}
+
+@keyframes page-fade {
+  from { opacity: 0; }
+}
+@keyframes rise-in {
+  from { opacity: 0; translate: 0 10px; }
+}
+@keyframes grow-x {
+  from { transform: scaleX(0); }
+}
