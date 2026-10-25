@@ -1,13 +1,12 @@
 import { isValidObjectId } from "mongoose";
 import { z } from "zod";
 import type { Result } from "@/admin/service";
+import { BLOCK_REASON_MAX } from "@/lib/access-limits";
 import { isAdminEmail } from "@/lib/authz";
 import { User } from "@/models";
 
 // Admin review of sign-in requests: approve lets a user in, block keeps (or puts) them out.
 // Admins come from ADMIN_EMAILS and can be neither approved nor blocked here.
-
-export const BLOCK_REASON_MAX = 300;
 
 const input = z.object({
   id: z.string().refine((v) => isValidObjectId(v), "Invalid user id"),

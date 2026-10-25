@@ -4,10 +4,8 @@ import { useRouter } from "next/navigation";
 import { createContext, useContext, useId, useState, useTransition } from "react";
 import { setUserAccessAction } from "@/app/(app)/admin/users/actions";
 import { Button } from "@/components/ui/button";
+import { BLOCK_REASON_MAX as REASON_MAX } from "@/lib/access-limits";
 import { cn } from "@/lib/utils";
-
-// Keep in sync with BLOCK_REASON_MAX in admin/users.ts (the server re-checks it).
-const REASON_MAX = 300;
 
 type Flash = { tone: "ok" | "error"; text: string } | null;
 const FlashContext = createContext<(flash: Flash) => void>(() => {});

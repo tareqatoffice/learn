@@ -1,5 +1,4 @@
 import { Check, Clock, ShieldX } from "lucide-react";
-import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { checkAccessAction } from "@/app/access/actions";
 import { signOutAction } from "@/app/actions";
@@ -10,12 +9,15 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { accessRecordFor } from "@/lib/access";
 import { formatDateTime } from "@/lib/format";
+import { buildMetadata } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: "Account access",
-  robots: { index: false, follow: false },
-};
+  description: "The status of your request to use Learn.",
+  path: "/access",
+  noindex: true,
+});
 
 const STEPS = ["Signed in", "Admin review", "Access granted"];
 

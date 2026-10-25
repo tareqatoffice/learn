@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { connectDb } from "@/lib/db";
+import { getEnv } from "@/lib/env";
 import {
   Graph,
   GraphNode,
@@ -28,7 +29,8 @@ export default async function AdminHome() {
       NoteSeries.countDocuments(),
       Note.countDocuments(),
       User.countDocuments(),
-      User.countDocuments({ status: "pending" }),
+      // Admins are always approved whatever their stored status, as on the users page.
+      User.countDocuments({ status: "pending", email: { $nin: getEnv().ADMIN_EMAILS } }),
     ]);
   const rows = [
     {

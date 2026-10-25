@@ -11,6 +11,8 @@ export function AccessRequestForm({ savedNote }: { savedNote?: string }) {
   const [state, action, pending] = useActionState<NoteState, FormData>(sendRequestNoteAction, null);
   const [note, setNote] = useState(savedNote ?? "");
   const [touched, setTouched] = useState(false);
+  // The page does not re-render after a send, so a successful send also counts as having a note.
+  const hasNote = !!savedNote || !!state?.ok;
 
   const length = note.trim().length;
   const localError =
@@ -34,7 +36,7 @@ export function AccessRequestForm({ savedNote }: { savedNote?: string }) {
       className="grid gap-2"
     >
       <label htmlFor="access-note" className="text-sm font-medium">
-        {savedNote ? "Your note to the admin" : "Add a note for the admin (optional)"}
+        {hasNote ? "Your note to the admin" : "Add a note for the admin (optional)"}
       </label>
       <p id="access-note-hint" className="text-xs text-muted-foreground">
         Who are you, and why do you want access? It helps the admin recognise you.
@@ -71,7 +73,7 @@ export function AccessRequestForm({ savedNote }: { savedNote?: string }) {
         </span>
       </div>
       <Button type="submit" variant="outline" disabled={pending} className="justify-self-start">
-        {pending ? "Sending…" : savedNote ? "Update note" : "Send note"}
+        {pending ? "Sending…" : hasNote ? "Update note" : "Send note"}
       </Button>
     </form>
   );

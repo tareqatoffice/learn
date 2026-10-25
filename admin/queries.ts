@@ -1,4 +1,5 @@
 import { isValidObjectId, type Types } from "mongoose";
+import { effectiveStatus } from "@/lib/access";
 import { isAdminEmail } from "@/lib/authz";
 import { byOrder, escapeRegex } from "@/lib/utils";
 import {
@@ -398,8 +399,7 @@ export async function listUsersAdmin(): Promise<AdminUserRow[]> {
     name: u.name ?? "",
     image: u.image,
     isAdmin: isAdminEmail(u.email),
-    // Admins are always let in; accounts from before the review have no status and count as approved.
-    status: isAdminEmail(u.email) ? "approved" : (u.status ?? "approved"),
+    status: effectiveStatus(u.email, u.status),
     requestedAt: u.createdAt,
     requestNote: u.requestNote,
     blockReason: u.blockReason,

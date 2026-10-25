@@ -6,6 +6,14 @@ import { connectDb } from "@/lib/db";
 import { User, type AccessStatus } from "@/models";
 
 /**
+ * The status that applies to a user record: admins (ADMIN_EMAILS) are always approved, and users
+ * created before the field existed have none and count as approved. The one place for this rule.
+ */
+export function effectiveStatus(email: string, stored: AccessStatus | undefined): AccessStatus {
+  return isAdminEmail(email) ? "approved" : (stored ?? "approved");
+}
+
+/**
  * The signed-in user's access status, read from the database on every call so an approval or a
  * block takes effect on the next request rather than when the 30-day JWT expires. Admins are always
  * approved. Null when the user document is gone (stale session): callers treat that as signed out.
@@ -15,7 +23,7 @@ export async function accessStatusFor(user: { userId?: string; email: string }):
   await connectDb();
   const doc = await User.findOne(userFilter(user), { status: 1 }).lean<{ status?: AccessStatus }>();
   if (!doc) return null;
-  return doc.status ?? "approved";
+  return effectiveStatus(user.email, doc.status);
 }
 
 export interface AccessRecord {
@@ -36,7 +44,7 @@ export async function accessRecordFor(user: { userId?: string; email: string }):
   }>();
   if (!doc) return null;
   return {
-    status: isAdminEmail(user.email) ? "approved" : (doc.status ?? "approved"),
+    status: effectiveStatus(user.email, doc.status),
     requestedAt: doc.createdAt,
     requestNote: doc.requestNote,
     blockReason: doc.blockReason,
@@ -45,7 +53,6 @@ export async function accessRecordFor(user: { userId?: string; email: string }):
 
 const userFilter = (user: { userId?: string; email: string }) =>
   user.userId && isValidObjectId(user.userId) ? { _id: user.userId } : { email: user.email.trim().toLowerCase() };
-
 
 const requestNote = z
   .string({ error: "Write a short note for the admin" })
