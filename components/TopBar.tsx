@@ -26,11 +26,13 @@ const linkClass = (active: boolean) =>
   );
 
 // Desktop only: an accent bar on the header's bottom border, under the link, that grows on hover and
-// stays for the current page. It is positioned against the full-height wrapper around each link.
+// stays for the current page. It is a sibling of the link (positioned against the full-height wrapper),
+// not the link's ::after: the press scale on the link would make the link its containing block and
+// pull the bar up under the text for the length of the click.
 const barClass = (active: boolean) =>
   cn(
-    "after:pointer-events-none after:absolute after:inset-x-3 after:-bottom-px after:h-0.5 after:origin-left after:rounded-full after:bg-ring after:transition-transform after:duration-300 after:ease-out hover:after:scale-x-100",
-    active ? "after:scale-x-100" : "after:scale-x-0",
+    "pointer-events-none absolute inset-x-3 -bottom-px h-0.5 origin-left rounded-full bg-ring transition-transform duration-300 ease-out peer-hover:scale-x-100",
+    active ? "scale-x-100" : "scale-x-0",
   );
 
 export function TopBar({ user }: { user: TopBarUser }) {
@@ -67,9 +69,10 @@ export function TopBar({ user }: { user: TopBarUser }) {
       <nav aria-label="Main" className="hidden gap-1 self-stretch md:flex">
         {links.map(({ href, label }) => (
           <div key={href} className="relative flex items-center">
-            <Link href={href} aria-current={isActive(href) ? "page" : undefined} className={cn(linkClass(isActive(href)), barClass(isActive(href)))}>
+            <Link href={href} aria-current={isActive(href) ? "page" : undefined} className={cn(linkClass(isActive(href)), "peer")}>
               {label}
             </Link>
+            <span aria-hidden className={barClass(isActive(href))} />
           </div>
         ))}
       </nav>
