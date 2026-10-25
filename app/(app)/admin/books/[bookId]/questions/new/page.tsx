@@ -4,17 +4,22 @@ import { getBookAdmin, listSubjects } from "@/admin/queries";
 import { QuestionForm } from "@/components/admin/QuestionForm";
 import { connectDb } from "@/lib/db";
 
-export default async function NewQuestionPage({ params }: { params: Promise<{ bookId: string }> }) {
+export default async function NewQuestionPage({
+  params,
+}: {
+  params: Promise<{ bookId: string }>;
+}) {
   const { bookId } = await params;
   await connectDb();
-  const [data, subjects] = await Promise.all([getBookAdmin(bookId), listSubjects()]);
+  const [data, subjects] = await Promise.all([
+    getBookAdmin(bookId),
+    listSubjects(),
+  ]);
   if (!data || !data.book.parts.length) notFound();
 
   return (
     <section className="grid gap-4">
-      <BackLink href={`/admin/books/${bookId}`}>
-        ← {data.book.title}
-      </BackLink>
+      <BackLink href={`/admin/books/${bookId}`}>← {data.book.title}</BackLink>
       <h1 className="text-2xl font-semibold">New question</h1>
       <QuestionForm
         question={{

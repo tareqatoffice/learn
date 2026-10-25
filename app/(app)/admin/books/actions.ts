@@ -18,20 +18,32 @@ export async function saveBookAction(input: BookInput): Promise<Result> {
   return saveBook(input, user.email);
 }
 
-export async function saveQuestionAction(input: QuestionInput): Promise<Result> {
+export async function saveQuestionAction(
+  input: QuestionInput,
+): Promise<Result> {
   const user = await requireAdmin();
   await connectDb();
   return saveQuestion(input, user.email);
 }
 
-export async function setQuestionTopicLinkAction(questionId: string, nodeId: string, linked: boolean): Promise<Result> {
+export async function setQuestionTopicLinkAction(
+  questionId: string,
+  nodeId: string,
+  linked: boolean,
+): Promise<Result> {
   const user = await requireAdmin();
   await connectDb();
   return setQuestionTopicLink(questionId, nodeId, Boolean(linked), user.email);
 }
 
-export async function searchTopicsAction(query: string, subjects: string[]): Promise<{ id: string; title: string; graphTitle: string }[]> {
+export async function searchTopicsAction(
+  query: string,
+  subjects: string[],
+): Promise<{ id: string; title: string; graphTitle: string }[]> {
   await requireAdmin();
   await connectDb();
-  return searchTopics(String(query ?? "").slice(0, 100), Array.isArray(subjects) ? subjects.map(String).slice(0, 50) : []);
+  return searchTopics(
+    String(query ?? "").slice(0, 100),
+    Array.isArray(subjects) ? subjects.map(String).slice(0, 50) : [],
+  );
 }

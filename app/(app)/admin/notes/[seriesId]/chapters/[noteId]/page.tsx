@@ -4,10 +4,18 @@ import { getNoteAdmin, getSeriesAdmin, listSubjects } from "@/admin/queries";
 import { NoteForm } from "@/components/admin/NoteForm";
 import { connectDb } from "@/lib/db";
 
-export default async function EditChapterPage({ params }: { params: Promise<{ seriesId: string; noteId: string }> }) {
+export default async function EditChapterPage({
+  params,
+}: {
+  params: Promise<{ seriesId: string; noteId: string }>;
+}) {
   const { seriesId, noteId } = await params;
   await connectDb();
-  const [series, note, subjects] = await Promise.all([getSeriesAdmin(seriesId), getNoteAdmin(noteId), listSubjects()]);
+  const [series, note, subjects] = await Promise.all([
+    getSeriesAdmin(seriesId),
+    getNoteAdmin(noteId),
+    listSubjects(),
+  ]);
   if (!series || !note || note.seriesId !== seriesId) notFound();
   return (
     <section className="grid gap-4">

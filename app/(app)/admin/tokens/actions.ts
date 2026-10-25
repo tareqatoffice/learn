@@ -5,7 +5,9 @@ import { requireAdmin } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 
 /** Returns the new token once; only its hash is stored. */
-export async function createTokenAction(name: string): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
+export async function createTokenAction(
+  name: string,
+): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
   const user = await requireAdmin();
   const label = typeof name === "string" ? name.trim() : "";
   if (!label) return { ok: false, error: "Give the token a name" };

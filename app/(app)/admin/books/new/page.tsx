@@ -8,9 +8,7 @@ export default async function NewBookPage() {
   const subjects = await listSubjects();
   return (
     <section className="grid gap-4">
-      <BackLink href="/admin/books">
-        ← Question books
-      </BackLink>
+      <BackLink href="/admin/books">← Question books</BackLink>
       <h1 className="text-2xl font-semibold">New book</h1>
       <BookForm subjects={subjects} />
     </section>

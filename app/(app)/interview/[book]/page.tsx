@@ -5,14 +5,35 @@ import { getBookView } from "@/content/queries";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 import { Markdown } from "@/lib/markdown/Markdown";
+import { cache } from "react";
+import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo";
 
 const STATUS_LABEL = { got: "Got it", review: "Review" } as const;
 
-export default async function BookPage({ params }: PageProps<"/interview/[book]">) {
+const loadBook = cache(getBookView);
+
+export async function generateMetadata({
+  params,
+}: PageProps<"/interview/[book]">): Promise<Metadata> {
   const { book: slug } = await params;
   const user = await requireUser();
   await connectDb();
-  const view = await getBookView(user.userId, slug);
+  const view = await loadBook(user.userId, slug);
+  return buildMetadata({
+    title: view?.book.title ?? "Interview",
+    description: view?.book.intro,
+    path: `/interview/${encodeURIComponent(slug)}`,
+  });
+}
+
+export default async function BookPage({
+  params,
+}: PageProps<"/interview/[book]">) {
+  const { book: slug } = await params;
+  const user = await requireUser();
+  await connectDb();
+  const view = await loadBook(user.userId, slug);
   if (!view) notFound();
 
   const { book, parts, questions } = view;
@@ -21,7 +42,10 @@ export default async function BookPage({ params }: PageProps<"/interview/[book]"
   return (
     <article className="mx-auto w-full max-w-3xl">
       <p className="text-sm">
-        <Link href="/interview" className="text-muted-foreground hover:underline">
+        <Link
+          href="/interview"
+          className="text-muted-foreground hover:underline"
+        >
           Interview
         </Link>
       </p>
@@ -40,8 +64,13 @@ export default async function BookPage({ params }: PageProps<"/interview/[book]"
       {book.extras.length > 0 && (
         <div className="mt-6 grid gap-2">
           {book.extras.map((extra) => (
-            <details key={extra.key} className="rounded-lg border border-border bg-card px-4 py-3">
-              <summary className="cursor-pointer font-medium">{extra.title}</summary>
+            <details
+              key={extra.key}
+              className="rounded-lg border border-border bg-card px-4 py-3"
+            >
+              <summary className="cursor-pointer font-medium">
+                {extra.title}
+              </summary>
               <div className="mt-3">
                 <Markdown source={extra.body} />
               </div>
@@ -51,7 +80,11 @@ export default async function BookPage({ params }: PageProps<"/interview/[book]"
       )}
 
       {parts.map((part) => (
-        <section key={part.key} aria-labelledby={`part-${part.key}`} className="mt-10">
+        <section
+          key={part.key}
+          aria-labelledby={`part-${part.key}`}
+          className="mt-10"
+        >
           <div className="flex items-baseline justify-between gap-3">
             <h2 id={`part-${part.key}`} className="text-xl font-semibold">
               {part.title}
@@ -60,7 +93,11 @@ export default async function BookPage({ params }: PageProps<"/interview/[book]"
               {part.mastered} / {part.total}
             </span>
           </div>
-          <ProgressBar value={part.mastered} max={part.total} className="mt-2" />
+          <ProgressBar
+            value={part.mastered}
+            max={part.total}
+            className="mt-2"
+          />
           {part.intro && (
             <div className="mt-3">
               <Markdown source={part.intro} />
@@ -79,7 +116,13 @@ export default async function BookPage({ params }: PageProps<"/interview/[book]"
                       <Markdown source={q.question} inline insideLink />
                     </span>
                     {q.status && (
-                      <span className={q.status === "got" ? "shrink-0 text-xs text-ok" : "shrink-0 text-xs text-track-1"}>
+                      <span
+                        className={
+                          q.status === "got"
+                            ? "shrink-0 text-xs text-ok"
+                            : "shrink-0 text-xs text-track-1"
+                        }
+                      >
                         {STATUS_LABEL[q.status]}
                       </span>
                     )}

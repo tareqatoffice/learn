@@ -3,8 +3,14 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { listGraphsWithProgress } from "@/content/queries";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata = { title: "Graphs · Learn" };
+export const metadata = buildMetadata({
+  title: "Graphs",
+  description:
+    "Topic graphs laid out by prerequisite so you know what to learn next.",
+  path: "/graphs",
+});
 
 export default async function GraphsPage() {
   const user = await requireUser();
@@ -17,11 +23,16 @@ export default async function GraphsPage() {
         Learning graphs
       </h1>
       {graphs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No graphs published yet.</p>
+        <p className="text-sm text-muted-foreground">
+          No graphs published yet.
+        </p>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {graphs.map((g) => (
-            <li key={g.slug} className="rounded-xl border border-border bg-card p-4">
+            <li
+              key={g.slug}
+              className="rounded-xl border border-border bg-card p-4"
+            >
               <div className="flex items-baseline justify-between gap-3">
                 <Link
                   href={`/graphs/${g.slug}`}

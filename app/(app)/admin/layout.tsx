@@ -24,7 +24,11 @@ const NAV: AdminNavGroup[] = [
   },
 ];
 
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   try {
     await requireAdmin();
   } catch (error) {

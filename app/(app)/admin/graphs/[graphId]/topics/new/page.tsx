@@ -4,10 +4,17 @@ import { getGraphAdmin, listSubjects } from "@/admin/queries";
 import { NodeForm } from "@/components/admin/NodeForm";
 import { connectDb } from "@/lib/db";
 
-export default async function NewTopicPage({ params }: { params: Promise<{ graphId: string }> }) {
+export default async function NewTopicPage({
+  params,
+}: {
+  params: Promise<{ graphId: string }>;
+}) {
   const { graphId } = await params;
   await connectDb();
-  const [data, subjects] = await Promise.all([getGraphAdmin(graphId), listSubjects()]);
+  const [data, subjects] = await Promise.all([
+    getGraphAdmin(graphId),
+    listSubjects(),
+  ]);
   if (!data) notFound();
 
   return (

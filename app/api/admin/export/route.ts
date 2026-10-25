@@ -6,7 +6,8 @@ import { connectDb } from "@/lib/db";
 /** Streams every content collection as one canonical-EJSON download (signed-in admins only; API tokens never apply). */
 export async function GET(): Promise<Response> {
   const session = await auth();
-  if (!isAdminEmail(session?.user?.email)) return new Response("Forbidden", { status: 403 });
+  if (!isAdminEmail(session?.user?.email))
+    return new Response("Forbidden", { status: 403 });
   await connectDb();
 
   const encoder = new TextEncoder();

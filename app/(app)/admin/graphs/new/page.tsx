@@ -8,9 +8,7 @@ export default async function NewGraphPage() {
   const subjects = await listSubjects();
   return (
     <section className="grid gap-4">
-      <BackLink href="/admin/graphs">
-        ← Graphs
-      </BackLink>
+      <BackLink href="/admin/graphs">← Graphs</BackLink>
       <h1 className="text-2xl font-semibold">New graph</h1>
       <GraphForm subjects={subjects} />
     </section>

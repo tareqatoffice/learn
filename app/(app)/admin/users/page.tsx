@@ -1,8 +1,13 @@
 import { listUsersAdmin } from "@/admin/queries";
 import { connectDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata = { title: "Users · Admin" };
+export const metadata = buildMetadata({
+  title: "Users · Admin",
+  description: "Manage who can sign in to Learn.",
+  path: "/admin/users",
+});
 
 export default async function UsersPage() {
   await connectDb();
@@ -27,12 +32,22 @@ export default async function UsersPage() {
               <tr key={u.id}>
                 <td className="px-4 py-2">
                   {u.email}
-                  {u.role === "admin" && <span className="ml-2 text-xs text-muted-foreground">admin</span>}
+                  {u.role === "admin" && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      admin
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-2">{u.name}</td>
-                <td className="px-4 py-2">{u.lastLoginAt ? formatDateTime(u.lastLoginAt) : "—"}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{u.questions}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{u.topics}</td>
+                <td className="px-4 py-2">
+                  {u.lastLoginAt ? formatDateTime(u.lastLoginAt) : "—"}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {u.questions}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {u.topics}
+                </td>
                 <td className="px-4 py-2 text-right tabular-nums">{u.notes}</td>
               </tr>
             ))}

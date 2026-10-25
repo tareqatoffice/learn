@@ -3,8 +3,13 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { listSeriesWithProgress } from "@/content/queries";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata = { title: "Notes · Learn" };
+export const metadata = buildMetadata({
+  title: "Notes",
+  description: "Chaptered study notes that remember where you stopped.",
+  path: "/notes",
+});
 
 export default async function NotesPage() {
   const user = await requireUser();
@@ -21,7 +26,10 @@ export default async function NotesPage() {
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {series.map((s) => (
-            <li key={s.slug} className="rounded-xl border border-border bg-card p-4">
+            <li
+              key={s.slug}
+              className="rounded-xl border border-border bg-card p-4"
+            >
               <div className="flex items-baseline justify-between gap-3">
                 <Link
                   href={`/notes/${s.slug}`}

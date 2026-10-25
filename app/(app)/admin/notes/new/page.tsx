@@ -8,9 +8,7 @@ export default async function NewSeriesPage() {
   const subjects = await listSubjects();
   return (
     <section className="grid gap-4">
-      <BackLink href="/admin/notes">
-        ← Note series
-      </BackLink>
+      <BackLink href="/admin/notes">← Note series</BackLink>
       <h1 className="text-2xl font-semibold">New series</h1>
       <SeriesForm subjects={subjects} />
     </section>

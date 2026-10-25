@@ -5,7 +5,13 @@ import { z } from "zod";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 import type { MarkResult } from "@/progress/questions";
-import { createSession, finishSession, recordResult, type QuizFilter, type SessionView } from "@/progress/quiz";
+import {
+  createSession,
+  finishSession,
+  recordResult,
+  type QuizFilter,
+  type SessionView,
+} from "@/progress/quiz";
 
 const objectId = z.string().regex(/^[0-9a-f]{24}$/i);
 
@@ -18,7 +24,9 @@ const filterSchema = z.object({
 });
 
 /** Starts a quiz and redirects into it; an empty deck creates nothing and comes back as `{ empty: true }`. */
-export async function startQuizAction(filter: QuizFilter): Promise<{ empty: true }> {
+export async function startQuizAction(
+  filter: QuizFilter,
+): Promise<{ empty: true }> {
   const parsed = filterSchema.parse(filter);
   const user = await requireUser();
   await connectDb();
@@ -27,15 +35,30 @@ export async function startQuizAction(filter: QuizFilter): Promise<{ empty: true
   redirect(`/interview/quiz/${result.sessionId}`);
 }
 
-export async function recordResultAction(sessionId: string, questionId: string, result: MarkResult): Promise<SessionView> {
-  const input = z.object({ sessionId: objectId, questionId: objectId, result: z.enum(["got", "review", "skip"]) }).parse({
-    sessionId,
-    questionId,
-    result,
-  });
+export async function recordResultAction(
+  sessionId: string,
+  questionId: string,
+  result: MarkResult,
+): Promise<SessionView> {
+  const input = z
+    .object({
+      sessionId: objectId,
+      questionId: objectId,
+      result: z.enum(["got", "review", "skip"]),
+    })
+    .parse({
+      sessionId,
+      questionId,
+      result,
+    });
   const user = await requireUser();
   await connectDb();
-  return recordResult(user.userId, input.sessionId, input.questionId, input.result);
+  return recordResult(
+    user.userId,
+    input.sessionId,
+    input.questionId,
+    input.result,
+  );
 }
 
 export async function finishQuizAction(sessionId: string): Promise<void> {

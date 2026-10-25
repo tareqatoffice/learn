@@ -2,8 +2,13 @@ import { listTokens } from "@/admin/tokens";
 import { TokensEditor } from "@/components/admin/TokensEditor";
 import { connectDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata = { title: "API tokens · Admin" };
+export const metadata = buildMetadata({
+  title: "API tokens · Admin",
+  description: "Create and revoke API tokens for the content CLI.",
+  path: "/admin/tokens",
+});
 
 export default async function TokensPage() {
   await connectDb();
@@ -12,7 +17,8 @@ export default async function TokensPage() {
     <section className="grid max-w-3xl gap-4">
       <h1 className="text-2xl font-semibold">API tokens</h1>
       <p className="text-sm text-muted-foreground">
-        Tokens let the <code>npm run content</code> command line list, pull and import content. They cannot read users or progress.
+        Tokens let the <code>npm run content</code> command line list, pull and
+        import content. They cannot read users or progress.
       </p>
       <TokensEditor
         tokens={tokens.map((t) => ({

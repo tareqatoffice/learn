@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Noto_Sans_Bengali } from "next/font/google";
+import {
+  IBM_Plex_Mono,
+  IBM_Plex_Sans,
+  Noto_Sans_Bengali,
+} from "next/font/google";
+import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 import "./globals.css";
 
 const plexSans = IBM_Plex_Sans({
@@ -20,8 +25,17 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Learn",
-  description: "A personal learning platform",
+  metadataBase: getSiteUrl(),
+  applicationName: SITE_NAME,
+  title: { default: SITE_NAME, template: `%s · ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    siteName: SITE_NAME,
+    type: "website",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: { card: "summary", title: SITE_NAME, description: SITE_DESCRIPTION },
 };
 
 // Runs before first paint so a saved choice never flashes the wrong theme. Reads the key ThemeToggle writes.

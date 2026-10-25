@@ -108,11 +108,21 @@
   --sidebar-border: #c9d1dc;
   --sidebar-ring: #2563c9;
   --ok: #1b7f4b;
-  --t-0: #2563c9; --t-1: #b45309; --t-2: #0f7b6c; --t-3: #6b57c2; --t-4: #c2255c; --t-5: #4d7c0f;
+  --t-0: #2563c9;
+  --t-1: #b45309;
+  --t-2: #0f7b6c;
+  --t-3: #6b57c2;
+  --t-4: #c2255c;
+  --t-5: #4d7c0f;
   --code-bg: #f6f8fa;
   --code-fg: #24292f;
-  --hl-comment: #6e7781; --hl-keyword: #cf222e; --hl-string: #0a3069; --hl-number: #0550ae;
-  --hl-title: #8250df; --hl-type: #953800; --hl-meta: #116329;
+  --hl-comment: #6e7781;
+  --hl-keyword: #cf222e;
+  --hl-string: #0a3069;
+  --hl-number: #0550ae;
+  --hl-title: #8250df;
+  --hl-type: #953800;
+  --hl-meta: #116329;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -144,11 +154,21 @@
     --sidebar-border: #33405a;
     --sidebar-ring: #6ea8ff;
     --ok: #4cc58a;
-    --t-0: #6ea8ff; --t-1: #f0a14a; --t-2: #4fd1b8; --t-3: #a99cf0; --t-4: #ff7aa5; --t-5: #a3d65c;
+    --t-0: #6ea8ff;
+    --t-1: #f0a14a;
+    --t-2: #4fd1b8;
+    --t-3: #a99cf0;
+    --t-4: #ff7aa5;
+    --t-5: #a3d65c;
     --code-bg: #0a0f16;
     --code-fg: #dbe5f3;
-    --hl-comment: #8b949e; --hl-keyword: #ff7b72; --hl-string: #a5d6ff; --hl-number: #79c0ff;
-    --hl-title: #d2a8ff; --hl-type: #ffa657; --hl-meta: #7ee787;
+    --hl-comment: #8b949e;
+    --hl-keyword: #ff7b72;
+    --hl-string: #a5d6ff;
+    --hl-number: #79c0ff;
+    --hl-title: #d2a8ff;
+    --hl-type: #ffa657;
+    --hl-meta: #7ee787;
     color-scheme: dark;
   }
 }
@@ -181,11 +201,21 @@
   --sidebar-border: #33405a;
   --sidebar-ring: #6ea8ff;
   --ok: #4cc58a;
-  --t-0: #6ea8ff; --t-1: #f0a14a; --t-2: #4fd1b8; --t-3: #a99cf0; --t-4: #ff7aa5; --t-5: #a3d65c;
+  --t-0: #6ea8ff;
+  --t-1: #f0a14a;
+  --t-2: #4fd1b8;
+  --t-3: #a99cf0;
+  --t-4: #ff7aa5;
+  --t-5: #a3d65c;
   --code-bg: #0a0f16;
   --code-fg: #dbe5f3;
-  --hl-comment: #8b949e; --hl-keyword: #ff7b72; --hl-string: #a5d6ff; --hl-number: #79c0ff;
-  --hl-title: #d2a8ff; --hl-type: #ffa657; --hl-meta: #7ee787;
+  --hl-comment: #8b949e;
+  --hl-keyword: #ff7b72;
+  --hl-string: #a5d6ff;
+  --hl-number: #79c0ff;
+  --hl-title: #d2a8ff;
+  --hl-type: #ffa657;
+  --hl-meta: #7ee787;
   color-scheme: dark;
 }
 
@@ -389,12 +419,15 @@
  */
 @layer base {
   :where(a, button, summary, select, label, [role="button"], input, textarea) {
-    transition-property: color, background-color, border-color, text-decoration-color, box-shadow, opacity, scale,
-      translate, background-size;
+    transition-property:
+      color, background-color, border-color, text-decoration-color, box-shadow, opacity, scale, translate,
+      background-size;
     transition-duration: 180ms;
     transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   }
-  :where(button, summary, select, [role="button"], label[for], input[type="checkbox"], input[type="radio"]):not(:disabled) {
+  :where(button, summary, select, [role="button"], label[for], input[type="checkbox"], input[type="radio"]):not(
+    :disabled
+  ) {
     cursor: pointer;
   }
 }
@@ -428,14 +461,38 @@ select:focus-visible {
  * Inline text links: an underline grows in from the left and the text picks up the accent. Anchors
  * styled as controls (rounded, bordered, button slots) or laid out as boxes are left alone.
  */
-main a:not([class*="rounded"], [class*="border"], [data-slot], .block, .flex, .inline-flex, .grid, .underline, .md a, svg a) {
+main
+  a:not(
+    [class*="rounded"],
+    [class*="border"],
+    [data-slot],
+    .block,
+    .flex,
+    .inline-flex,
+    .grid,
+    .underline,
+    .md a,
+    svg a
+  ) {
   background-image: linear-gradient(currentColor, currentColor);
   background-position: 0 100%;
   background-repeat: no-repeat;
   background-size: 0% 1px;
   text-decoration-line: none;
 }
-main a:not([class*="rounded"], [class*="border"], [data-slot], .block, .flex, .inline-flex, .grid, .underline, .md a, svg a):hover {
+main
+  a:not(
+    [class*="rounded"],
+    [class*="border"],
+    [data-slot],
+    .block,
+    .flex,
+    .inline-flex,
+    .grid,
+    .underline,
+    .md a,
+    svg a
+  ):hover {
   background-size: 100% 1px;
   color: var(--ring);
 }
@@ -446,7 +503,10 @@ main a.underline:hover,
 
 /* Card tiles (list items and opted-in `.card-interactive` panels) answer the pointer; forms and panels don't. */
 main :is(li.rounded-xl.bg-card, .card-interactive) {
-  transition: border-color 220ms ease, box-shadow 220ms ease, translate 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    translate 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 main :is(li.rounded-xl.bg-card, .card-interactive):hover {
   border-color: color-mix(in oklch, var(--border), var(--ring) 45%);
@@ -470,7 +530,10 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
 }
 .graph-node .node-body {
   filter: drop-shadow(0 0.0625rem 0.09375rem color-mix(in oklch, var(--foreground) 14%, transparent));
-  transition: fill 180ms ease, stroke 180ms ease, filter 220ms ease;
+  transition:
+    fill 180ms ease,
+    stroke 180ms ease,
+    filter 220ms ease;
 }
 /* Touch screens keep :hover on the last tapped node, so only a real pointer gets the hover lift. */
 @media (hover: hover) {
@@ -487,12 +550,24 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
 
 @media (prefers-reduced-motion: no-preference) {
   /* Stagger index: position among siblings, capped at 5. */
-  :where(.page-enter *) { --i: 0; }
-  :where(.page-enter *:nth-child(2)) { --i: 1; }
-  :where(.page-enter *:nth-child(3)) { --i: 2; }
-  :where(.page-enter *:nth-child(4)) { --i: 3; }
-  :where(.page-enter *:nth-child(5)) { --i: 4; }
-  :where(.page-enter *:nth-child(n + 6)) { --i: 5; }
+  :where(.page-enter *) {
+    --i: 0;
+  }
+  :where(.page-enter *:nth-child(2)) {
+    --i: 1;
+  }
+  :where(.page-enter *:nth-child(3)) {
+    --i: 2;
+  }
+  :where(.page-enter *:nth-child(4)) {
+    --i: 3;
+  }
+  :where(.page-enter *:nth-child(5)) {
+    --i: 4;
+  }
+  :where(.page-enter *:nth-child(n + 6)) {
+    --i: 5;
+  }
 
   /*
    * The entry rules are wrapped in :where() so they carry no specificity: the scroll reveal below
@@ -555,15 +630,24 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
 }
 
 @keyframes edge-draw {
-  from { stroke-dashoffset: 1; }
+  from {
+    stroke-dashoffset: 1;
+  }
 }
 
 @keyframes page-fade {
-  from { opacity: 0; }
+  from {
+    opacity: 0;
+  }
 }
 @keyframes rise-in {
-  from { opacity: 0; translate: 0 0.625rem; }
+  from {
+    opacity: 0;
+    translate: 0 0.625rem;
+  }
 }
 @keyframes grow-x {
-  from { transform: scaleX(0); }
+  from {
+    transform: scaleX(0);
+  }
 }

@@ -6,14 +6,33 @@ import { AppHeader, containerClass } from "@/components/AppHeader";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { buildMetadata } from "@/lib/seo";
 
-const hasDevLogin = () => getProviders().some((p) => typeof p !== "function" && p.id === "credentials");
+const hasDevLogin = () =>
+  getProviders().some((p) => typeof p !== "function" && p.id === "credentials");
 
 const FEATURES = [
-  { icon: MessagesSquare, title: "Interview", text: "Question books with spaced review and quick quizzes." },
-  { icon: Network, title: "Graphs", text: "Topics laid out by prerequisite, so you always know what is next." },
-  { icon: BookOpen, title: "Notes", text: "Chaptered study notes that remember where you stopped." },
+  {
+    icon: MessagesSquare,
+    title: "Interview",
+    text: "Question books with spaced review and quick quizzes.",
+  },
+  {
+    icon: Network,
+    title: "Graphs",
+    text: "Topics laid out by prerequisite, so you always know what is next.",
+  },
+  {
+    icon: BookOpen,
+    title: "Notes",
+    text: "Chaptered study notes that remember where you stopped.",
+  },
 ];
+
+export const metadata = buildMetadata({
+  title: "Learn interview prep, topic by topic",
+  path: "/",
+});
 
 export default async function Home({ searchParams }: PageProps<"/">) {
   const session = await auth();
@@ -32,16 +51,23 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           <div className="grid items-center gap-8 py-6 lg:grid-cols-[minmax(0,1fr)_26.25rem] lg:gap-16 lg:py-16">
             <section aria-labelledby="welcome" className="grid gap-6">
               <div>
-                <h1 id="welcome" className="text-4xl font-bold tracking-tight sm:text-5xl">
+                <h1
+                  id="welcome"
+                  className="text-4xl font-bold tracking-tight sm:text-5xl"
+                >
                   Learn, and see it stick.
                 </h1>
                 <p className="mt-3 max-w-xl text-muted-foreground">
-                  Interview questions, learning graphs and study notes, with your progress tracked as you go.
+                  Interview questions, learning graphs and study notes, with
+                  your progress tracked as you go.
                 </p>
               </div>
               <ul className="grid gap-3 sm:grid-cols-3">
                 {FEATURES.map(({ icon: Icon, title, text }) => (
-                  <li key={title} className="group rounded-xl border border-border bg-card p-4">
+                  <li
+                    key={title}
+                    className="group rounded-xl border border-border bg-card p-4"
+                  >
                     <Icon
                       className="size-5 text-ring transition-transform duration-300 ease-out group-hover:-translate-y-0.5 group-hover:scale-110 motion-reduce:transition-none"
                       aria-hidden
@@ -53,11 +79,16 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               </ul>
             </section>
 
-            <section aria-labelledby="sign-in" className="rounded-xl border border-border bg-card p-6 shadow-sm">
+            <section
+              aria-labelledby="sign-in"
+              className="rounded-xl border border-border bg-card p-6 shadow-sm"
+            >
               <h2 id="sign-in" className="text-lg font-semibold">
                 Sign in
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">Use your Google account to pick up where you left off.</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Use your Google account to pick up where you left off.
+              </p>
 
               <form action={signInWithGoogle} className="mt-6">
                 <Button type="submit" size="lg" className="w-full">
@@ -66,7 +97,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               </form>
 
               {hasDevLogin() && (
-                <form action={signInDev} className="mt-6 grid gap-2 rounded-lg border border-dashed border-border p-4">
+                <form
+                  action={signInDev}
+                  className="mt-6 grid gap-2 rounded-lg border border-dashed border-border p-4"
+                >
                   <label htmlFor="dev-email" className="text-sm font-medium">
                     Dev login (local only)
                   </label>
@@ -82,7 +116,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                     Sign in as this email
                   </Button>
                   {error === "dev-login" && (
-                    <p role="alert" className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1">
+                    <p
+                      role="alert"
+                      className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1"
+                    >
                       Dev login failed. Check the email address.
                     </p>
                   )}

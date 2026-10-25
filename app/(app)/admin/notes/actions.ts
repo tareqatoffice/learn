@@ -1,6 +1,12 @@
 "use server";
 
-import { saveNote, saveSeries, type NoteInput, type Result, type SeriesInput } from "@/admin/service";
+import {
+  saveNote,
+  saveSeries,
+  type NoteInput,
+  type Result,
+  type SeriesInput,
+} from "@/admin/service";
 import { requireAdmin } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 

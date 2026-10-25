@@ -8,7 +8,14 @@ const rows = (model: typeof Graph) =>
     .find({}, { slug: 1, title: 1, status: 1 })
     .sort({ order: 1, _id: 1 })
     .lean<Row[]>()
-    .then((list) => list.map((r) => ({ id: String(r._id), slug: r.slug, title: r.title, status: r.status })));
+    .then((list) =>
+      list.map((r) => ({
+        id: String(r._id),
+        slug: r.slug,
+        title: r.title,
+        status: r.status,
+      })),
+    );
 
 /** Every book, series and graph (any status) so the CLI can pick a target. */
 export function GET(req: Request): Promise<Response> {
