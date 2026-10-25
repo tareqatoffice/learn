@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import { getNoteAdmin, getSeriesAdmin, listSubjects } from "@/admin/queries";
 import { NoteForm } from "@/components/admin/NoteForm";
@@ -11,9 +11,9 @@ export default async function EditChapterPage({ params }: { params: Promise<{ se
   if (!series || !note || note.seriesId !== seriesId) notFound();
   return (
     <section className="grid gap-4">
-      <Link href={`/admin/notes/${seriesId}`} className="text-sm text-muted-foreground hover:underline">
+      <BackLink href={`/admin/notes/${seriesId}`}>
         ← {series.series.title}
-      </Link>
+      </BackLink>
       <h1 className="text-2xl font-semibold">{note.title}</h1>
       <NoteForm note={note} subjects={subjects} />
     </section>

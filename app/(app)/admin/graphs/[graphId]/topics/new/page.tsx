@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import { getGraphAdmin, listSubjects } from "@/admin/queries";
 import { NodeForm } from "@/components/admin/NodeForm";
@@ -12,9 +12,9 @@ export default async function NewTopicPage({ params }: { params: Promise<{ graph
 
   return (
     <section className="grid gap-4">
-      <Link href={`/admin/graphs/${graphId}`} className="text-sm text-muted-foreground hover:underline">
+      <BackLink href={`/admin/graphs/${graphId}`}>
         ← {data.graph.title}
-      </Link>
+      </BackLink>
       <h1 className="text-2xl font-semibold">New topic</h1>
       <NodeForm
         node={{

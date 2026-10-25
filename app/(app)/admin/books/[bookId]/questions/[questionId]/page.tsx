@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import { getBookAdmin, getQuestionAdmin, listSubjects } from "@/admin/queries";
 import { QuestionForm } from "@/components/admin/QuestionForm";
@@ -12,9 +12,9 @@ export default async function EditQuestionPage({ params }: { params: Promise<{ b
 
   return (
     <section className="grid gap-4">
-      <Link href={`/admin/books/${bookId}`} className="text-sm text-muted-foreground hover:underline">
+      <BackLink href={`/admin/books/${bookId}`}>
         ← {book.book.title}
-      </Link>
+      </BackLink>
       <h1 className="text-2xl font-semibold">Edit question</h1>
       <QuestionForm question={data.question} parts={book.book.parts} subjects={subjects} topics={data.topics} />
     </section>

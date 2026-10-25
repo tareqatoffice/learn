@@ -23,4 +23,4 @@ export function SaveBar({ label, pending, saved, errors }: { label: string; pend
 }
 
 export const inputClass =
-  "w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-ring";
+  "w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm pointer-coarse:py-2 focus-visible:outline-2 focus-visible:outline-ring";

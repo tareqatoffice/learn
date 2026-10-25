@@ -19,7 +19,7 @@ export function Chip({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "rounded-full border px-3 py-1 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60",
+        "rounded-full border px-3 py-1 text-sm transition-colors pointer-coarse:px-3.5 pointer-coarse:py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60",
         on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground hover:bg-muted",
       )}
     >

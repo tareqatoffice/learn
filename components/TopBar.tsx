@@ -3,7 +3,7 @@
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { signOutAction } from "@/app/actions";
 import { AppHeader } from "@/components/AppHeader";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -41,13 +41,45 @@ export function TopBar({ user }: { user: TopBarUser }) {
   const [accountOpen, setAccountOpen] = useState(false);
   const links = user.isAdmin ? [...LINKS, ADMIN_LINK] : LINKS;
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const accountRef = useRef<HTMLDivElement>(null);
+  const accountButtonRef = useRef<HTMLButtonElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  // A new page closes both menus (the account menu has no links, but a back/forward navigation can happen with it open).
+  const [shownPath, setShownPath] = useState(pathname);
+  if (shownPath !== pathname) {
+    setShownPath(pathname);
+    setMenuOpen(false);
+    setAccountOpen(false);
+  }
+
+  // Escape closes whichever menu is open and puts focus back on its button, so it is not lost with the
+  // unmounted menu; a tap or click outside the account menu closes it.
+  useEffect(() => {
+    if (!menuOpen && !accountOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      (accountOpen ? accountButtonRef : menuButtonRef).current?.focus();
+      setMenuOpen(false);
+      setAccountOpen(false);
+    };
+    const onPointer = (e: PointerEvent) => {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) setAccountOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [menuOpen, accountOpen]);
 
   return (
     <AppHeader
       logoHref="/dashboard"
       below={
         menuOpen && (
-          <nav id="mobile-nav" aria-label="Mobile" className="border-t border-border px-4 py-2 animate-in fade-in-0 slide-in-from-top-2 duration-200 md:hidden">
+          <nav id="mobile-nav" aria-label="Mobile" className="border-t border-border px-4 py-2 sm:px-6 animate-in fade-in-0 slide-in-from-top-2 duration-200 md:hidden">
             <ul className="grid gap-1">
               {links.map(({ href, label }) => (
                 <li key={href}>
@@ -55,7 +87,7 @@ export function TopBar({ user }: { user: TopBarUser }) {
                     href={href}
                     aria-current={isActive(href) ? "page" : undefined}
                     onClick={() => setMenuOpen(false)}
-                    className={cn(linkClass(isActive(href)), "block py-2")}
+                    className={cn(linkClass(isActive(href)), "block py-2.5")}
                   >
                     {label}
                   </Link>
@@ -79,13 +111,14 @@ export function TopBar({ user }: { user: TopBarUser }) {
 
       <div className="ml-auto flex items-center gap-1">
         <ThemeToggle />
-        <div className="relative">
+        <div ref={accountRef} className="relative">
           <button
+            ref={accountButtonRef}
             type="button"
             aria-label="Account menu"
             aria-expanded={accountOpen}
             onClick={() => setAccountOpen((open) => !open)}
-            className="flex size-9 items-center justify-center overflow-hidden rounded-full border border-border bg-muted text-sm font-semibold transition-shadow hover:ring-2 hover:ring-ring/40 aria-expanded:ring-2 aria-expanded:ring-ring/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="flex size-9 pointer-coarse:size-10 items-center justify-center overflow-hidden rounded-full border border-border bg-muted text-sm font-semibold transition-shadow hover:ring-2 hover:ring-ring/40 aria-expanded:ring-2 aria-expanded:ring-ring/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             {user.image ? (
               // eslint-disable-next-line @next/next/no-img-element -- Google avatar host; next/image would need a remote pattern
@@ -100,7 +133,7 @@ export function TopBar({ user }: { user: TopBarUser }) {
               <form action={signOutAction}>
                 <button
                   type="submit"
-                  className="w-full rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-muted hover:pl-3 hover:text-foreground"
+                  className="w-full rounded-md px-2 py-1.5 pointer-coarse:py-2.5 text-left text-sm text-muted-foreground hover:bg-muted hover:pl-3 hover:text-foreground"
                 >
                   Sign out
                 </button>
@@ -109,12 +142,13 @@ export function TopBar({ user }: { user: TopBarUser }) {
           )}
         </div>
         <button
+          ref={menuButtonRef}
           type="button"
           aria-label="Menu"
           aria-expanded={menuOpen}
           aria-controls="mobile-nav"
           onClick={() => setMenuOpen((open) => !open)}
-          className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:hidden"
+          className="inline-flex size-9 pointer-coarse:size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:hidden"
         >
           {menuOpen ? <X className="size-5" aria-hidden /> : <Menu className="size-5" aria-hidden />}
         </button>

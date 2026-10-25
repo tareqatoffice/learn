@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import { getSeriesView } from "@/content/queries";
 import { requireUser } from "@/lib/authz";
@@ -16,9 +17,9 @@ export default async function SeriesPage({ params }: { params: Promise<{ series:
   return (
     <div className="grid max-w-3xl gap-6">
       <header className="grid gap-1">
-        <Link href="/notes" className="text-sm text-muted-foreground hover:underline">
+        <BackLink href="/notes">
           ← All notes
-        </Link>
+        </BackLink>
         <h1 className="text-2xl font-semibold">{view.series.title}</h1>
         <p className="text-sm text-muted-foreground">
           {read}/{view.chapters.length} chapters read
@@ -34,7 +35,7 @@ export default async function SeriesPage({ params }: { params: Promise<{ series:
             <li key={c.slug} className="flex items-center justify-between gap-3 py-2">
               <Link
                 href={`/notes/${view.series.slug}/${c.slug}`}
-                className="relative flex min-w-0 items-baseline gap-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                className="relative flex min-w-0 items-baseline gap-2 hover:underline pointer-coarse:py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 <span className="min-w-0">{c.title}</span>
                 {c.read && (

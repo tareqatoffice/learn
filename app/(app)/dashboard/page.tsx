@@ -28,7 +28,7 @@ function ProgressRows({ rows, empty }: { rows: { key: string; href: string; labe
     <ul className="grid gap-2">
       {rows.map((r) => (
         <li key={r.key} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3">
-          <Link href={r.href} className={`truncate text-sm ${linkClass}`}>
+          <Link href={r.href} className={`truncate text-sm pointer-coarse:py-2 ${linkClass}`}>
             {r.label}
           </Link>
           <span className="text-xs tabular-nums text-muted-foreground">
@@ -61,7 +61,7 @@ export default async function DashboardPage() {
             <>
               <Link
                 href={`/notes/${dash.continueReading.seriesSlug}/${dash.continueReading.chapterSlug}`}
-                className={`font-semibold ${linkClass}`}
+                className={`font-semibold pointer-coarse:py-1.5 ${linkClass}`}
               >
                 {dash.continueReading.seriesTitle} › {dash.continueReading.chapterTitle}
               </Link>

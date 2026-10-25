@@ -75,7 +75,7 @@ export function QuestionForm({
                 <button
                   type="button"
                   aria-label={`Unlink ${t.title}`}
-                  className="ml-1 text-muted-foreground hover:text-foreground"
+                  className="ml-1 inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground pointer-coarse:size-9"
                   onClick={() => link(t, false)}
                 >
                   ×

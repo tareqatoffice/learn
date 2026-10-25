@@ -97,6 +97,7 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
         <span className="font-medium">Files</span>
         <input
           type="file"
+          className="w-full min-w-0 text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-muted file:px-3 file:py-1.5 file:text-sm file:text-foreground hover:file:bg-secondary pointer-coarse:file:py-2.5"
           multiple={kind === "series"}
           accept={kind === "graph" ? ".json,application/json" : ".md,text/markdown"}
           onChange={async (e) =>

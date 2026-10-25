@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { listSubjects } from "@/admin/queries";
 import { BookForm } from "@/components/admin/BookForm";
 import { connectDb } from "@/lib/db";
@@ -8,9 +8,9 @@ export default async function NewBookPage() {
   const subjects = await listSubjects();
   return (
     <section className="grid gap-4">
-      <Link href="/admin/books" className="text-sm text-muted-foreground hover:underline">
+      <BackLink href="/admin/books">
         ← Question books
-      </Link>
+      </BackLink>
       <h1 className="text-2xl font-semibold">New book</h1>
       <BookForm subjects={subjects} />
     </section>

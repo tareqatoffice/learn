@@ -187,7 +187,7 @@ export function GraphView({ data }: { data: GraphData }) {
           ref={panelRef}
           tabIndex={-1}
           aria-label="Topic details"
-          className="rounded-xl border border-border bg-card p-5 outline-none lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-auto"
+          className="rounded-xl border border-border bg-card p-5 outline-none lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-auto"
         >
           {current ? (
             <>

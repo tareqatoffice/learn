@@ -57,7 +57,7 @@ export default async function InterviewPage() {
                   <div className="flex items-baseline justify-between gap-3">
                     <Link
                       href={`/interview/${book.slug}`}
-                      className="font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      className="inline-block font-medium hover:underline pointer-coarse:py-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     >
                       {book.title}
                     </Link>

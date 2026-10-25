@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import { getBookAdmin, listSubjects } from "@/admin/queries";
 import { BookForm } from "@/components/admin/BookForm";
@@ -17,9 +18,9 @@ export default async function AdminBookPage({ params }: { params: Promise<{ book
   return (
     <div className="grid gap-8">
       <section className="grid gap-4">
-        <Link href="/admin/books" className="text-sm text-muted-foreground hover:underline">
+        <BackLink href="/admin/books">
           ← Question books
-        </Link>
+        </BackLink>
         <h1 className="text-2xl font-semibold">{data.book.title}</h1>
         <BookForm book={data.book} subjects={subjects} />
       </section>

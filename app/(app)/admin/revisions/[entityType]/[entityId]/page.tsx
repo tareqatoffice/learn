@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { listRevisionsAdmin } from "@/admin/queries";
 import { RestoreButton } from "@/components/admin/RestoreButton";
 import { connectDb } from "@/lib/db";
@@ -12,9 +12,9 @@ export default async function EntityHistoryPage({ params }: { params: Promise<{ 
 
   return (
     <section className="grid gap-4">
-      <Link href="/admin/revisions" className="text-sm text-muted-foreground hover:underline">
+      <BackLink href="/admin/revisions">
         ← Revisions
-      </Link>
+      </BackLink>
       <h1 className="text-2xl font-semibold">
         History · {entityType} <span className="font-mono text-base text-muted-foreground">{entityId}</span>
       </h1>

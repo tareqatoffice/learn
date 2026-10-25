@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import { getBookAdmin, listSubjects } from "@/admin/queries";
 import { QuestionForm } from "@/components/admin/QuestionForm";
@@ -12,9 +12,9 @@ export default async function NewQuestionPage({ params }: { params: Promise<{ bo
 
   return (
     <section className="grid gap-4">
-      <Link href={`/admin/books/${bookId}`} className="text-sm text-muted-foreground hover:underline">
+      <BackLink href={`/admin/books/${bookId}`}>
         ← {data.book.title}
-      </Link>
+      </BackLink>
       <h1 className="text-2xl font-semibold">New question</h1>
       <QuestionForm
         question={{

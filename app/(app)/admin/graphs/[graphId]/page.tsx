@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import { getGraphAdmin, listSubjects } from "@/admin/queries";
 import { GraphForm } from "@/components/admin/GraphForm";
@@ -16,9 +17,9 @@ export default async function AdminGraphPage({ params }: { params: Promise<{ gra
   return (
     <div className="grid gap-8">
       <section className="grid gap-4">
-        <Link href="/admin/graphs" className="text-sm text-muted-foreground hover:underline">
+        <BackLink href="/admin/graphs">
           ← Graphs
-        </Link>
+        </BackLink>
         <h1 className="text-2xl font-semibold">{data.graph.title}</h1>
         <GraphForm graph={data.graph} subjects={subjects} />
       </section>
