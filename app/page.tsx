@@ -5,6 +5,8 @@ import { auth, getProviders } from "@/auth";
 import { AppHeader, containerClass } from "@/components/AppHeader";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
+import { accessStatusFor } from "@/lib/access";
+import { ACCESS_PATH } from "@/lib/authz";
 import { cn } from "@/lib/utils";
 import { buildMetadata } from "@/lib/seo";
 
@@ -36,7 +38,13 @@ export const metadata = buildMetadata({
 
 export default async function Home({ searchParams }: PageProps<"/">) {
   const session = await auth();
-  if (session?.user?.id) redirect("/dashboard");
+  const user = session?.user;
+  if (user?.id && user.email) {
+    // A stale session (user record gone) stays here to sign in again instead of bouncing back.
+    const status = await accessStatusFor({ userId: user.id, email: user.email });
+    if (status === "approved") redirect("/dashboard");
+    if (status) redirect(ACCESS_PATH);
+  }
   const { error } = await searchParams;
 
   return (
@@ -88,6 +96,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Use your Google account to pick up where you left off.
+                New accounts are reviewed by an admin before they get access.
               </p>
 
               <form action={signInWithGoogle} className="mt-6">

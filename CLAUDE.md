@@ -37,7 +37,7 @@ Layering (logic lives outside `app/`):
 - `app/(app)/**` — signed-in pages and Server Actions (`actions.ts` beside pages); `app/(app)/admin/**` admin-only UI; `app/api/content/*` token-authenticated content API (used by `scripts/content.ts`); `app/api/admin/export`.
 - `components/` — UI; `components/admin/` forms.
 
-Auth/access: `proxy.ts` calls `routeAccess()` (pure policy in `lib/authz.ts`): `/` and `/api/auth` open, `/api/content` open at proxy level (bearer token checked in the route via `lib/tokenAuth.ts`), `/admin` + `/api/admin` need an email in `ADMIN_EMAILS` (re-read on every call). Everything else needs sign-in. `auth.ts` configures NextAuth lazily, so `proxy()` awaits `auth(cb)`.
+Auth/access: `proxy.ts` calls `routeAccess()` (pure policy in `lib/authz.ts`): `/` and `/api/auth` open, `/api/content` open at proxy level (bearer token checked in the route via `lib/tokenAuth.ts`), `/admin` + `/api/admin` need an email in `ADMIN_EMAILS` (re-read on every call). Everything else needs sign-in **and** an approved account: new sign-ins start `pending` (`User.status`, admins start `approved`; users with no status count as approved) until an admin approves them in Admin → Users, and `blocked` users are shut out. The proxy re-reads the status from the DB on every non-public request (`lib/access.ts` `accessStatusFor`; `routeAccess(path, { email, status })`) and sends pending/blocked users to `/access` (API calls get 403); `requireUser()` only checks the session and does not repeat the lookup. `auth.ts` configures NextAuth lazily, so `proxy()` awaits `auth(cb)`.
 
 Env is validated through `lib/env.ts` (`getEnv()`); use it rather than `process.env`.
 

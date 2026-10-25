@@ -55,6 +55,27 @@ describe("sign-in", () => {
       expect((await User.findById(user.userId).lean())?.role).toBe("user");
     });
 
+    it("starts new users pending and new admins approved", async () => {
+      const user = await upsertUserOnSignIn({ sub: "g-u", email: "u@x.com", name: "U" });
+      const owner = await upsertUserOnSignIn({ sub: "g-o", email: "owner@x.com", name: "O" });
+      expect((await User.findById(user.userId).lean())?.status).toBe("pending");
+      expect((await User.findById(owner.userId).lean())?.status).toBe("approved");
+    });
+
+    it("keeps the status an admin set when the user signs in again", async () => {
+      const profile = { sub: "g-u", email: "u@x.com", name: "U" };
+      const { userId } = await upsertUserOnSignIn(profile);
+      await User.updateOne({ _id: userId }, { status: "blocked" });
+      await upsertUserOnSignIn(profile);
+      expect((await User.findById(userId).lean())?.status).toBe("blocked");
+    });
+
+    it("does not lock out users that predate the status field", async () => {
+      const old = await User.create({ email: "old@x.com", name: "Old", lastLoginAt: new Date() });
+      await upsertUserOnSignIn({ sub: "g-old", email: "old@x.com", name: "Old" });
+      expect((await User.findById(old._id).lean())?.status).toBeUndefined();
+    });
+
     it("demotes the stored role when the email leaves ADMIN_EMAILS", async () => {
       await upsertUserOnSignIn({ sub: "g-o", email: "owner@x.com", name: "O" });
       process.env.ADMIN_EMAILS = "";

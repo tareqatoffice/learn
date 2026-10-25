@@ -1,6 +1,7 @@
 export { STATUSES } from "./status";
 export type { Status } from "./status";
-export { User } from "./user";
+export { ACCESS_STATUSES, User } from "./user";
+export type { AccessStatus } from "./user";
 export { Subject } from "./subject";
 export { QuestionBook } from "./questionBook";
 export { Question } from "./question";

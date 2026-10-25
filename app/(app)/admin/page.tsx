@@ -19,7 +19,7 @@ export const metadata = buildMetadata({
 
 export default async function AdminHome() {
   await connectDb();
-  const [books, questions, graphs, topics, series, notes, users] =
+  const [books, questions, graphs, topics, series, notes, users, pendingUsers] =
     await Promise.all([
       QuestionBook.countDocuments(),
       Question.countDocuments(),
@@ -28,6 +28,7 @@ export default async function AdminHome() {
       NoteSeries.countDocuments(),
       Note.countDocuments(),
       User.countDocuments(),
+      User.countDocuments({ status: "pending" }),
     ]);
   const rows = [
     {
@@ -45,7 +46,11 @@ export default async function AdminHome() {
       label: "Note series",
       detail: `${series} series · ${notes} chapters`,
     },
-    { href: "/admin/users", label: "Users", detail: `${users} signed up` },
+    {
+      href: pendingUsers > 0 ? "/admin/users?status=pending" : "/admin/users",
+      label: "Users",
+      detail: `${users} signed up${pendingUsers > 0 ? ` · ${pendingUsers} waiting for review` : ""}`,
+    },
   ];
 
   return (

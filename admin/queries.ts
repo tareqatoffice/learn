@@ -1,4 +1,5 @@
 import { isValidObjectId, type Types } from "mongoose";
+import { isAdminEmail } from "@/lib/authz";
 import { byOrder, escapeRegex } from "@/lib/utils";
 import {
   Graph,
@@ -13,6 +14,7 @@ import {
   Revision,
   Subject,
   User,
+  type AccessStatus,
   type Status,
 } from "@/models";
 
@@ -347,12 +349,46 @@ export async function listRevisionsAdmin(filter: { entityType?: string; entityId
   }));
 }
 
-export async function listUsersAdmin(): Promise<
-  { id: string; email: string; name: string; role: string; lastLoginAt?: Date; questions: number; topics: number; notes: number }[]
-> {
-  const users = await User.find({}, { email: 1, name: 1, role: 1, lastLoginAt: 1 })
+export interface AdminUserRow {
+  id: string;
+  email: string;
+  name: string;
+  image?: string;
+  /** From ADMIN_EMAILS, not the stored role: admins can't be reviewed or blocked. */
+  isAdmin: boolean;
+  status: AccessStatus;
+  requestedAt?: Date;
+  requestNote?: string;
+  blockReason?: string;
+  reviewedAt?: Date;
+  reviewedBy?: string;
+  lastLoginAt?: Date;
+  questions: number;
+  topics: number;
+  notes: number;
+}
+
+export async function listUsersAdmin(): Promise<AdminUserRow[]> {
+  const users = await User.find(
+    {},
+    { email: 1, name: 1, image: 1, lastLoginAt: 1, status: 1, createdAt: 1, requestNote: 1, blockReason: 1, reviewedAt: 1, reviewedBy: 1 },
+  )
     .sort({ lastLoginAt: -1, _id: -1 })
-    .lean<{ _id: Id; email: string; name?: string; role?: string; lastLoginAt?: Date }[]>();
+    .lean<
+      {
+        _id: Id;
+        email: string;
+        name?: string;
+        image?: string;
+        lastLoginAt?: Date;
+        status?: AccessStatus;
+        createdAt?: Date;
+        requestNote?: string;
+        blockReason?: string;
+        reviewedAt?: Date;
+        reviewedBy?: string;
+      }[]
+    >();
   const count = async (model: typeof QuestionProgress) =>
     new Map((await model.aggregate<{ _id: Id; n: number }>([{ $group: { _id: "$userId", n: { $sum: 1 } } }])).map((r) => [String(r._id), r.n]));
   const [questions, topics, notes] = await Promise.all([count(QuestionProgress), count(NodeProgress), count(NoteProgress)]);
@@ -360,7 +396,15 @@ export async function listUsersAdmin(): Promise<
     id: String(u._id),
     email: u.email,
     name: u.name ?? "",
-    role: u.role ?? "user",
+    image: u.image,
+    isAdmin: isAdminEmail(u.email),
+    // Admins are always let in; accounts from before the review have no status and count as approved.
+    status: isAdminEmail(u.email) ? "approved" : (u.status ?? "approved"),
+    requestedAt: u.createdAt,
+    requestNote: u.requestNote,
+    blockReason: u.blockReason,
+    reviewedAt: u.reviewedAt,
+    reviewedBy: u.reviewedBy,
     lastLoginAt: u.lastLoginAt,
     questions: questions.get(String(u._id)) ?? 0,
     topics: topics.get(String(u._id)) ?? 0,

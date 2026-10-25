@@ -4,7 +4,9 @@ import { resetEnvCache } from "@/lib/env";
 const authMock = vi.fn();
 vi.mock("@/auth", () => ({ auth: () => authMock() }));
 
-import { ForbiddenError, isAdminEmail, requireAdmin, requireUser, routeAccess } from "@/lib/authz";
+import { ForbiddenError, isAdminEmail, isPublicPath, requireAdmin, requireUser, routeAccess } from "@/lib/authz";
+
+const approved = (email: string) => ({ email, status: "approved" as const });
 
 describe("authz", () => {
   let saved: string | undefined;
@@ -37,33 +39,67 @@ describe("authz", () => {
     });
 
     it("forbids /admin/* and /api/admin/* for non-admins", () => {
-      expect(routeAccess("/admin/books", { email: "u@x.com" })).toBe("forbidden");
-      expect(routeAccess("/api/admin/export", { email: "u@x.com" })).toBe("forbidden");
+      expect(routeAccess("/admin/books", approved("u@x.com"))).toBe("forbidden");
+      expect(routeAccess("/api/admin/export", approved("u@x.com"))).toBe("forbidden");
       expect(routeAccess("/admin/books", null)).toBe("signin");
     });
 
     it("matches admin emails case-insensitively", () => {
       process.env.ADMIN_EMAILS = "o@x.com, U@X.com";
       resetEnvCache();
-      expect(routeAccess("/admin/books", { email: "u@x.com" })).toBe("allow");
-      expect(routeAccess("/admin/books", { email: "U@x.COM" })).toBe("allow");
+      expect(routeAccess("/admin/books", approved("u@x.com"))).toBe("allow");
+      expect(routeAccess("/admin/books", approved("U@x.COM"))).toBe("allow");
     });
 
     it("does not treat look-alike paths as admin routes", () => {
-      expect(routeAccess("/administrator", { email: "u@x.com" })).toBe("allow");
+      expect(routeAccess("/administrator", approved("u@x.com"))).toBe("allow");
+    });
+
+    it("keeps pending and blocked users out of app pages and APIs, whatever the path", () => {
+      for (const status of ["pending", "blocked"] as const) {
+        expect(routeAccess("/dashboard", { email: "u@x.com", status })).toBe(status);
+        expect(routeAccess("/api/admin/export", { email: "u@x.com", status })).toBe(status);
+      }
+    });
+
+    it("keeps /access reachable for every status", () => {
+      for (const status of ["pending", "approved", "blocked"] as const) {
+        expect(routeAccess("/access", { email: "u@x.com", status })).toBe("allow");
+      }
+    });
+
+    it("treats a signed-in user whose record is gone as signed out", () => {
+      expect(routeAccess("/dashboard", { email: "u@x.com", status: null })).toBe("signin");
+      expect(routeAccess("/access", { email: "u@x.com", status: null })).toBe("signin");
+    });
+
+    it("does not look at the status on public paths", () => {
+      expect(routeAccess("/", { email: "u@x.com", status: "blocked" })).toBe("allow");
+      expect(routeAccess("/api/auth/signin", { email: "u@x.com", status: "pending" })).toBe("allow");
+    });
+  });
+
+  describe("isPublicPath", () => {
+    it("lists /, /api/auth/* and /api/content/* only", () => {
+      expect(isPublicPath("/")).toBe(true);
+      expect(isPublicPath("/api/auth/session")).toBe(true);
+      expect(isPublicPath("/api/content/books")).toBe(true);
+      expect(isPublicPath("/dashboard")).toBe(false);
+      expect(isPublicPath("/api/authentic")).toBe(false);
+      expect(isPublicPath("/access")).toBe(false);
     });
   });
 
   describe("removing an admin from ADMIN_EMAILS (Review Focus 5)", () => {
     it("revokes admin on the next call", () => {
       expect(isAdminEmail("o@x.com")).toBe(true);
-      expect(routeAccess("/admin", { email: "o@x.com" })).toBe("allow");
+      expect(routeAccess("/admin", approved("o@x.com"))).toBe("allow");
 
       process.env.ADMIN_EMAILS = "";
       resetEnvCache();
 
       expect(isAdminEmail("o@x.com")).toBe(false);
-      expect(routeAccess("/admin", { email: "o@x.com" })).toBe("forbidden");
+      expect(routeAccess("/admin", approved("o@x.com"))).toBe("forbidden");
     });
 
     it("is false for missing emails", () => {

@@ -16,7 +16,10 @@ export interface SignInProfile {
   picture?: string;
 }
 
-/** Creates or updates the user document and records the login time and role. */
+/**
+ * Creates or updates the user document and records the login time and role. A first sign-in is an
+ * access request: the new user starts "pending" until an admin approves it (admins start approved).
+ */
 export async function upsertUserOnSignIn(
   profile: SignInProfile,
 ): Promise<{ userId: string; role: "user" | "admin" }> {
@@ -36,7 +39,11 @@ export async function upsertUserOnSignIn(
   const doc =
     (await User.findOneAndUpdate({ googleId: profile.sub }, { $set: fields }, { returnDocument: "after" })) ??
     (await retryOnDuplicateKey(() =>
-      User.findOneAndUpdate({ email }, { $set: fields }, { returnDocument: "after", upsert: true }),
+      User.findOneAndUpdate(
+        { email },
+        { $set: fields, $setOnInsert: { status: role === "admin" ? "approved" : "pending" } },
+        { returnDocument: "after", upsert: true },
+      ),
     ));
   return { userId: String(doc._id), role };
 }
