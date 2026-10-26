@@ -1,7 +1,7 @@
-import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarkReadButton } from "@/components/NoteReader";
+import { OverlayMenu } from "@/components/OverlayMenu";
 import { getChapterView } from "@/content/queries";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
@@ -14,13 +14,10 @@ import { buildMetadata } from "@/lib/seo";
 
 const linkClass =
   "hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
-// Below lg the chapter list and page outline fold into these disclosures above the text, so the chapter
-// itself starts on the first screen; from lg they are the side columns.
-const disclosureClass =
-  "group rounded-lg border border-border bg-card text-sm lg:hidden";
-const summaryClass =
-  "flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-medium focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden";
-const sideClass = "hidden text-sm lg:sticky lg:top-20 lg:block lg:self-start";
+// Below lg the chapter list and page outline open as overlays above the text, so the chapter itself
+// stays put; from lg they are the side columns.
+const sideClass =
+  "hidden text-sm lg:sticky lg:top-20 lg:block lg:max-h-[calc(100dvh-5.5rem)] lg:self-start lg:overflow-y-auto";
 
 const loadChapter = cache(getChapterView);
 
@@ -52,7 +49,8 @@ export default async function ChapterPage({
 
   const position =
     view.series.chapters.findIndex((c) => c.slug === view.chapter.slug) + 1;
-  const chapterList = (
+  // Called twice: the overlay and the sidebar each need their own element tree.
+  const chapterList = () => (
     <ol className="mt-2 grid gap-1">
       {view.series.chapters.map((c) => (
         <li key={c.slug}>
@@ -79,7 +77,7 @@ export default async function ChapterPage({
       ))}
     </ol>
   );
-  const tocList = view.toc.length > 0 && (
+  const tocList = () => (
     <ul className="mt-2 grid gap-1">
       {view.toc.map((t) => (
         <li key={t.anchor} className={t.depth === 3 ? "pl-3" : undefined}>
@@ -96,48 +94,29 @@ export default async function ChapterPage({
 
   return (
     <div className="grid gap-4 lg:grid-cols-[13.75rem_minmax(0,1fr)_12.5rem] lg:gap-6">
-      <details className={disclosureClass}>
-        <summary className={summaryClass}>
-          <span className="min-w-0 truncate">
+      <OverlayMenu
+        navLabel={`${view.series.title} chapters`}
+        label={
+          <>
             {view.series.title}
             <span className="font-normal text-muted-foreground">
               {" · "}chapter {position} of {view.series.chapters.length}
             </span>
-          </span>
-          <ChevronDown
-            aria-hidden
-            className="size-4 shrink-0 transition-transform group-open:rotate-180"
-          />
-        </summary>
-        <nav
-          aria-label={`${view.series.title} chapters`}
-          className="border-t border-border px-2 pb-2"
+          </>
+        }
+      >
+        <Link
+          href={`/notes/${view.series.slug}`}
+          className={cn("mt-2 block px-2 py-2 font-semibold", linkClass)}
         >
-          <Link
-            href={`/notes/${view.series.slug}`}
-            className={cn("mt-2 block px-2 py-2 font-semibold", linkClass)}
-          >
-            All chapters
-          </Link>
-          {chapterList}
-        </nav>
-      </details>
-      {tocList && (
-        <details className={disclosureClass}>
-          <summary className={summaryClass}>
-            On this page
-            <ChevronDown
-              aria-hidden
-              className="size-4 shrink-0 transition-transform group-open:rotate-180"
-            />
-          </summary>
-          <nav
-            aria-label="On this page"
-            className="border-t border-border px-4 pb-3"
-          >
-            {tocList}
-          </nav>
-        </details>
+          All chapters
+        </Link>
+        {chapterList()}
+      </OverlayMenu>
+      {view.toc.length > 0 && (
+        <OverlayMenu navLabel="On this page" label="On this page">
+          <div className="px-2 pb-2">{tocList()}</div>
+        </OverlayMenu>
       )}
 
       <nav aria-label={`${view.series.title} chapters`} className={sideClass}>
@@ -147,7 +126,7 @@ export default async function ChapterPage({
         >
           {view.series.title}
         </Link>
-        {chapterList}
+        {chapterList()}
       </nav>
 
       <article aria-labelledby="chapter-title" className="mt-2 min-w-0 lg:mt-0">
@@ -202,10 +181,10 @@ export default async function ChapterPage({
         </footer>
       </article>
 
-      {tocList && (
+      {view.toc.length > 0 && (
         <nav aria-label="On this page" className={sideClass}>
           <p className="font-semibold text-muted-foreground">On this page</p>
-          {tocList}
+          {tocList()}
         </nav>
       )}
     </div>

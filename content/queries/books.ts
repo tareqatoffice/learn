@@ -82,19 +82,20 @@ export async function getBookView(
   const book = await QuestionBook.findOne({ slug, status: "published" }).lean<BookRow>();
   if (!book) return null;
 
-  const rows = await Question.find(await visibleQuestionFilter([String(book._id)]), { question: 1, partKey: 1 })
-    .sort({ order: 1, _id: 1 })
-    .lean<{ _id: Id; question: string; partKey: string }[]>();
+  const rows = await Question.find(await visibleQuestionFilter([String(book._id)]), { question: 1, partKey: 1, order: 1 })
+    .lean<{ _id: Id; question: string; partKey: string; order?: number }[]>();
   const status = await statusByQuestion(
     userId,
     rows.map((r) => r._id),
   );
 
   const parts = byOrder(book.parts);
-  const partRank = new Map(parts.map((p, i) => [p.key, i]));
-  const questions = rows
-    .map((r) => ({ id: String(r._id), question: r.question, partKey: r.partKey, status: status.get(String(r._id)) ?? null }))
-    .toSorted((a, b) => (partRank.get(a.partKey) ?? parts.length) - (partRank.get(b.partKey) ?? parts.length));
+  const questions = inPartOrder(parts, rows).map((r) => ({
+    id: String(r._id),
+    question: r.question,
+    partKey: r.partKey,
+    status: status.get(String(r._id)) ?? null,
+  }));
 
   return {
     book: {
@@ -118,31 +119,109 @@ export async function getBookView(
   };
 }
 
-/** One visible question of the given book, with the first visible graph topic that lists it; null when not visible. */
+/** A neighboring question in reading order, with the section it belongs to. */
+export type QuestionStep = {
+  id: string;
+  question: string;
+  partKey: string;
+  partTitle: string;
+};
+
+/**
+ * Reading order: section order, then `order` inside the section, then id.
+ * A question whose part is not one of `parts` sorts after every real section.
+ */
+function inPartOrder<T extends { _id: Id; partKey: string; order?: number }>(parts: { key: string }[], rows: T[]): T[] {
+  const rank = new Map(parts.map((part, index) => [part.key, index]));
+  return rows.toSorted((a, b) => {
+    const byPart = (rank.get(a.partKey) ?? parts.length) - (rank.get(b.partKey) ?? parts.length);
+    if (byPart !== 0) return byPart;
+    const byOrder = (a.order ?? 0) - (b.order ?? 0);
+    if (byOrder !== 0) return byOrder;
+    const aId = String(a._id);
+    const bId = String(b._id);
+    return aId < bId ? -1 : aId > bId ? 1 : 0;
+  });
+}
+
+/**
+ * One visible question of the given book, with the first visible graph topic that lists it,
+ * the book's sections, and the previous and next question in reading order (crossing into the
+ * next section when this one ends). Null when not visible.
+ */
 export async function getQuestionView(
   bookSlug: string,
   questionId: string,
 ): Promise<{
   question: { id: string; question: string; prompt: string; answer: string };
   book: { slug: string; title: string };
+  part: { key: string; title: string };
+  parts: { key: string; title: string; firstQuestionId?: string }[];
+  prev?: QuestionStep;
+  next?: QuestionStep;
   topic?: QuestionTopic;
 } | null> {
   if (!isValidObjectId(questionId)) return null;
-  const book = await QuestionBook.findOne({ slug: bookSlug, status: "published" }, { slug: 1, title: 1 }).lean<BookRow>();
+  const book = await QuestionBook.findOne(
+    { slug: bookSlug, status: "published" },
+    { slug: 1, title: 1, parts: 1 },
+  ).lean<BookRow>();
   if (!book) return null;
 
-  const q = await Question.findOne({ ...(await visibleQuestionFilter([String(book._id)])), _id: questionId }).lean<{
+  const q = await Question.findOne(
+    { ...(await visibleQuestionFilter([String(book._id)])), _id: questionId },
+    { question: 1, prompt: 1, answer: 1, partKey: 1 },
+  ).lean<{
     _id: Id;
     question: string;
     prompt?: string;
     answer: string;
+    partKey: string;
   }>();
   if (!q) return null;
+
+  const parts = byOrder(book.parts);
+  const partKeys = new Set(parts.map((part) => part.key));
+  const rows = await Question.find(await visibleQuestionFilter([String(book._id)]), { question: 1, partKey: 1, order: 1 })
+    .lean<{ _id: Id; question: string; partKey: string; order?: number }[]>();
+  // The book page only lists questions that belong to a section, so prev/next follows that list.
+  const ordered = inPartOrder(
+    parts,
+    rows.filter((row) => partKeys.has(row.partKey)),
+  );
+  const index = ordered.findIndex((row) => String(row._id) === String(q._id));
+  const titles = new Map(parts.map((part) => [part.key, part.title]));
+  const partKey = ordered[index]?.partKey ?? q.partKey;
+
+  const firstQuestionId = new Map<string, string>();
+  for (const row of ordered) {
+    if (!firstQuestionId.has(row.partKey)) firstQuestionId.set(row.partKey, String(row._id));
+  }
+
+  const step = (row: (typeof ordered)[number] | undefined): QuestionStep | undefined =>
+    row
+      ? {
+          id: String(row._id),
+          question: row.question,
+          partKey: row.partKey,
+          partTitle: titles.get(row.partKey) ?? "",
+        }
+      : undefined;
+  const prev = index > 0 ? step(ordered[index - 1]) : undefined;
+  const next = index >= 0 && index < ordered.length - 1 ? step(ordered[index + 1]) : undefined;
   const topic = await topicForQuestion(q._id);
 
   return {
     question: { id: String(q._id), question: q.question, prompt: q.prompt ?? "", answer: q.answer },
     book: { slug: book.slug, title: book.title },
+    part: { key: partKey, title: titles.get(partKey) ?? "" },
+    parts: parts.map((part) => ({
+      key: part.key,
+      title: part.title,
+      ...(firstQuestionId.has(part.key) ? { firstQuestionId: firstQuestionId.get(part.key) } : {}),
+    })),
+    ...(prev ? { prev } : {}),
+    ...(next ? { next } : {}),
     ...(topic ? { topic } : {}),
   };
 }

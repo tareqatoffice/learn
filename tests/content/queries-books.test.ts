@@ -139,6 +139,80 @@ describe("getQuestionView", () => {
     expect((await getQuestionView("b", id))!.topic).toBeUndefined();
   });
 
+  it("steps into the next section and lists each section's first question", async () => {
+    const book = await seedBook("b");
+    const p1 = await seedQuestions(book, 2, "p1");
+    const p2 = await seedQuestions(book, 1, "p2");
+    await seedQuestions(book, 1, "p2", "draft");
+
+    const first = await getQuestionView("b", p1[0]);
+    expect(first!.prev).toBeUndefined();
+    expect(first!.part).toEqual({ key: "p1", title: "Part One" });
+    expect(first!.next).toMatchObject({ id: p1[1], partKey: "p1", partTitle: "Part One", question: "p1 question 1" });
+    expect(first!.parts).toEqual([
+      { key: "p1", title: "Part One", firstQuestionId: p1[0] },
+      { key: "p2", title: "Part Two", firstQuestionId: p2[0] },
+    ]);
+
+    const lastOfSection = await getQuestionView("b", p1[1]);
+    expect(lastOfSection!.next).toMatchObject({ id: p2[0], partKey: "p2", partTitle: "Part Two" });
+    expect(lastOfSection!.prev).toMatchObject({ id: p1[0], partKey: "p1" });
+
+    const end = await getQuestionView("b", p2[0]);
+    expect(end!.next).toBeUndefined();
+    expect(end!.prev).toMatchObject({ id: p1[1], partKey: "p1", partTitle: "Part One" });
+  });
+
+  it("follows section order, skips hidden questions, and leaves questions outside a section unlinked", async () => {
+    const book = await QuestionBook.create({
+      slug: "b",
+      title: "Book",
+      status: "published",
+      parts: [
+        { key: "later", title: "Later", order: 1 },
+        { key: "early", title: "Early", order: 0 },
+        { key: "empty", title: "Empty", order: 2 },
+      ],
+    });
+    const id = String(book._id);
+    const [later] = await seedQuestions(id, 1, "later");
+    await Question.updateOne({ _id: later }, { order: -5 });
+    const orphan = await Question.create({
+      bookId: id,
+      partKey: "missing",
+      order: -9,
+      question: "orphan",
+      answer: "a",
+      status: "published",
+    });
+    const [earlyFirst] = await seedQuestions(id, 1, "early");
+    const [hidden] = await seedQuestions(id, 1, "early", "draft");
+    const [earlySecond] = await seedQuestions(id, 1, "early");
+    await Question.updateOne({ _id: earlyFirst }, { order: 1 });
+    await Question.updateOne({ _id: earlySecond }, { order: 0 });
+
+    const start = await getQuestionView("b", earlySecond);
+    expect(start!.prev).toBeUndefined();
+    expect(start!.next).toMatchObject({ id: earlyFirst, partKey: "early" });
+    expect(start!.next!.id).not.toBe(hidden);
+    expect(start!.parts).toEqual([
+      { key: "early", title: "Early", firstQuestionId: earlySecond },
+      { key: "later", title: "Later", firstQuestionId: later },
+      { key: "empty", title: "Empty" },
+    ]);
+
+    const lastOfEarly = await getQuestionView("b", earlyFirst);
+    expect(lastOfEarly!.next).toMatchObject({ id: later, partKey: "later", partTitle: "Later" });
+
+    const orphanView = await getQuestionView("b", String(orphan._id));
+    expect(orphanView!.part).toEqual({ key: "missing", title: "" });
+    expect(orphanView!.prev).toBeUndefined();
+    expect(orphanView!.next).toBeUndefined();
+
+    const listed = await getBookView(newUserId(), "b");
+    expect(listed!.questions.map((q) => q.id)).toEqual([earlySecond, earlyFirst, later, String(orphan._id)]);
+  });
+
   it("returns null for hidden, wrong-book and malformed requests", async () => {
     const book = await seedBook("b");
     const [id] = await seedQuestions(book, 1);
