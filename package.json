@@ -26,6 +26,7 @@
     "mongoose": "^9.11.2",
     "next": "16.4.2",
     "next-auth": "^5.0.0-beta.32",
+    "nextjs-toploader": "^3.9.17",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-markdown": "^10.1.0",

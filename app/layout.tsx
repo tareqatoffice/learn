@@ -4,6 +4,7 @@ import {
   IBM_Plex_Sans,
   Noto_Sans_Bengali,
 } from "next/font/google";
+import NextTopLoader from "nextjs-toploader";
 import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 import "./globals.css";
 
@@ -51,7 +52,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <NextTopLoader
+          color="#2563c9"
+          height={2}
+          showSpinner={false}
+          shadow={false}
+          crawl
+        />
+        {children}
+      </body>
     </html>
   );
 }
