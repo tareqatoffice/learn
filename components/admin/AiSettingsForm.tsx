@@ -14,7 +14,7 @@ export type AiSettingsDraft = { enabled: boolean; primaryModel: string; fallback
 const CUSTOM = "__custom__";
 
 const optionLabel = (m: CatalogModel) =>
-  `${m.name}${m.contextLength ? ` · ${Math.round(m.contextLength / 1000)}k context` : ""}`;
+  `${m.name}${m.contextLength ? ` · ${Math.round(m.contextLength / 1000)}k context` : ""}${m.json === false ? " · no JSON mode" : ""}`;
 
 /**
  * A model from OpenRouter's catalogue (free ones, plus paid ones when `showPaid`), or any model id
@@ -111,6 +111,11 @@ export function ModelPicker({
           <span className="text-xs text-muted-foreground">
             <code>{value}</code>
             {current && (current.free ? " · free" : " · paid")}
+            {current?.json === false && (
+              <span className="block text-destructive">
+                Does not support JSON replies, so answer checks may fail. Pick a model that does, or use one as the backup only.
+              </span>
+            )}
           </span>
         )
       )}

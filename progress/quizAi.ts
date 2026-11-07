@@ -258,7 +258,7 @@ export async function askFollowUp(
   ];
 
   const { text: reply, model } = await metered(userId, settings, () =>
-    chatCompletion(messages, { ...options, apiKey, models: modelChain(settings), maxTokens: 600, temperature: 0.4 }),
+    chatCompletion(messages, { ...options, apiKey, models: modelChain(settings), maxTokens: 1500, temperature: 0.4 }),
   );
   const content = reply.slice(0, AI_REPLY_MAX);
   const turns = [

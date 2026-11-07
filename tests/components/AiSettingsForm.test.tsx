@@ -15,9 +15,9 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 import { AiSettingsForm } from "@/components/admin/AiSettingsForm";
 
 const catalog: CatalogModel[] = [
-  { id: "meta/llama:free", name: "Llama (free)", free: true, contextLength: 131072 },
-  { id: "google/gemma:free", name: "Gemma (free)", free: true, contextLength: 8192 },
-  { id: "openai/gpt-4o-mini", name: "GPT-4o mini", free: false, contextLength: 128000 },
+  { id: "meta/llama:free", name: "Llama (free)", free: true, contextLength: 131072, json: true },
+  { id: "google/gemma:free", name: "Gemma (free)", free: true, contextLength: 8192, json: false },
+  { id: "openai/gpt-4o-mini", name: "GPT-4o mini", free: false, contextLength: 128000, json: true },
 ];
 
 const initial = { enabled: true, primaryModel: "meta/llama:free", fallbackModel: "", dailyLimit: 100 };
@@ -40,12 +40,17 @@ describe("AiSettingsForm", () => {
     const primary = screen.getByLabelText("Primary model");
     expect(optionTexts(primary)).toEqual([
       "Llama (free) · 131k context",
-      "Gemma (free) · 8k context",
+      "Gemma (free) · 8k context · no JSON mode",
       "Other model id…",
     ]);
     expect(optionTexts(screen.getByLabelText("Backup model"))[0]).toBe("No backup");
     await user.click(screen.getByLabelText(/also list paid models/i));
     expect(optionTexts(primary)).toContain("GPT-4o mini · 128k context");
+  });
+
+  it("warns when the chosen model has no JSON mode", () => {
+    setup({ initial: { ...initial, primaryModel: "google/gemma:free" } });
+    expect(screen.getByText(/does not support JSON replies/i)).toBeTruthy();
   });
 
   it("saves a backup model, a custom primary id and the daily limit", async () => {
