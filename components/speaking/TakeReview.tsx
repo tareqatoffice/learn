@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { deleteTakeAction, transcribeTakeAction } from "@/app/(app)/speaking/actions";
 import { firstError } from "@/admin/result";
 import { Notice } from "@/components/Notice";
@@ -11,26 +11,17 @@ import { CoachPanel, type CoachAi } from "./CoachPanel";
 import { SelfRatingForm, type SelfRating } from "./SelfRatingForm";
 import { ShadowPlayer } from "./ShadowPlayer";
 
-const POLL_MS = 4000;
-const POLL_TRIES = 20;
-
-function Transcript({ takeId, status, transcript }: { takeId: string; status: string; transcript?: string }) {
+/**
+ * The take's transcript and its status. A freshly saved take arrives "pending": this starts the
+ * transcription once, here rather than in the recorder, so navigating to this page never waits on it.
+ */
+export function TakeTranscript({ takeId, status, transcript }: { takeId: string; status: string; transcript?: string }) {
   const router = useRouter();
   const [text, setText] = useState(transcript);
   const [state, setState] = useState(status);
-  const [tries, setTries] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  // The recorder started transcription in the background; refresh until it lands.
-  useEffect(() => {
-    if (state !== "pending" || tries >= POLL_TRIES) return;
-    const timer = setTimeout(() => {
-      setTries((n) => n + 1);
-      router.refresh();
-    }, POLL_MS);
-    return () => clearTimeout(timer);
-  }, [state, tries, router]);
+  const startedFor = useRef<string | null>(null);
 
   // A refresh brings the server's latest status down as props.
   const [shown, setShown] = useState({ status, transcript });
@@ -40,7 +31,7 @@ function Transcript({ takeId, status, transcript }: { takeId: string; status: st
     setText(transcript);
   }
 
-  async function run() {
+  const run = useCallback(async () => {
     setBusy(true);
     setError("");
     try {
@@ -48,17 +39,25 @@ function Transcript({ takeId, status, transcript }: { takeId: string; status: st
       if (res.ok) {
         setText(res.transcript);
         setState("done");
-        router.refresh();
       } else {
         setError(firstError(res.errors) ?? "Couldn't transcribe the recording. Try again.");
         setState("failed");
       }
     } catch {
       setError("Couldn't transcribe the recording. Try again.");
+      setState("failed");
     } finally {
       setBusy(false);
+      // Bring down the stored status (and let the coach see the transcript).
+      router.refresh();
     }
-  }
+  }, [takeId, router]);
+
+  useEffect(() => {
+    if (status !== "pending" || startedFor.current === takeId) return;
+    startedFor.current = takeId;
+    void run();
+  }, [status, takeId, run]);
 
   let body: React.ReactNode;
   if (state === "done" && text?.trim()) {
@@ -66,19 +65,18 @@ function Transcript({ takeId, status, transcript }: { takeId: string; status: st
   } else if (state === "done") {
     body = <p className="text-sm text-muted-foreground">No speech was heard in this recording.</p>;
   } else if (state === "pending") {
-    body =
-      tries < POLL_TRIES ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          Transcribing your recording… this usually takes under a minute.
-        </p>
-      ) : (
-        <div className="grid gap-2">
-          <p className="text-sm text-muted-foreground">The transcript is taking longer than usual.</p>
-          <Button variant="outline" size="sm" className="justify-self-start" onClick={run} disabled={busy}>
-            {busy ? "Transcribing…" : "Transcribe now"}
-          </Button>
-        </div>
-      );
+    body = busy ? (
+      <p role="status" className="text-sm text-muted-foreground">
+        Transcribing your recording… this usually takes under a minute.
+      </p>
+    ) : (
+      <div className="grid gap-2">
+        <p className="text-sm text-muted-foreground">This recording hasn&apos;t been transcribed yet.</p>
+        <Button variant="outline" size="sm" className="justify-self-start" onClick={run}>
+          Transcribe now
+        </Button>
+      </div>
+    );
   } else if (state === "failed") {
     body = (
       <div className="grid gap-2">
@@ -117,7 +115,7 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
   const [self, setSelf] = useState<SelfRating | undefined>(take.self);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  // Refreshes (transcript polling) bring new presigned URLs; keep the first so playback isn't reset.
+  // Refreshes (after transcription) bring new presigned URLs; keep the first so playback isn't reset.
   const [urls] = useState({ media: take.mediaUrl, audio: take.audioUrl, source: take.sourceAudioUrl });
   const video = take.kind === "video";
   const reference = take.task === "recordReview" ? take.material.prompt : take.material.text;
@@ -175,7 +173,7 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
           )}
         </section>
 
-        <Transcript takeId={take.id} status={take.transcriptStatus} transcript={take.transcript} />
+        <TakeTranscript takeId={take.id} status={take.transcriptStatus} transcript={take.transcript} />
 
         {reference && (
           <details className="rounded-xl border border-border bg-card p-5">

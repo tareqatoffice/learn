@@ -3,19 +3,28 @@
 import { Circle, Square } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { confirmTakeAction, generateMaterialAction, startTakeAction, transcribeTakeAction } from "@/app/(app)/speaking/actions";
+import { confirmTakeAction, deleteTakeAction, generateMaterialAction, startTakeAction } from "@/app/(app)/speaking/actions";
 import { firstError } from "@/admin/result";
 import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { UploadError, uploadTake } from "@/lib/uploadTake";
 import { type RecorderResult, useRecorder } from "@/lib/useRecorder";
-import { takeCapSec } from "@/speaking/schedule";
+import { localDate, takeCapSec } from "@/speaking/schedule";
 import type { TaskKey } from "@/speaking/tasks";
 import { clock } from "./format";
 
 export type Material = { title?: string; text?: string; prompt?: string; generated: boolean };
 
-type Started = { takeId: string; uploadUrl: string; audioUploadUrl?: string; at: number; main: boolean; audio: boolean };
+type Started = {
+  takeId: string;
+  uploadUrl: string;
+  audioUploadUrl?: string;
+  maxBytes: number;
+  capSec: number;
+  at: number;
+  main: boolean;
+  audio: boolean;
+};
 type Save =
   | { phase: "idle" }
   | { phase: "saving"; step: string }
@@ -24,6 +33,18 @@ type Save =
 
 // Presigned upload URLs live 10 minutes; past this a retry starts a fresh take for new URLs.
 const REUSE_MS = 8 * 60 * 1000;
+const CLIP_FAILED = "The clip didn't start. Tap Start again.";
+const MB = 1024 * 1024;
+
+/** The learner's local calendar date now (YYYY-MM-DD), so a take started before midnight keeps its day. */
+function todayHere(fallback: string): string {
+  try {
+    return localDate(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone);
+  } catch {
+    return fallback;
+  }
+}
+
 // Shadowing: one pass of the clip is one take, so recording stops shortly after the clip ends.
 const AFTER_CLIP_MS = 1500;
 
@@ -69,11 +90,13 @@ export function TaskRecorder({
   const [save, setSave] = useState<Save>({ phase: "idle" });
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState("");
+  const [clipError, setClipError] = useState("");
 
   const kind = video ? "video" : "audio";
   const capSec = takeCapSec(task, clipSec);
   const rec = useRecorder({ kind, capSec });
   const shadowing = task === "shadowing";
+  const resetRecorder = rec.reset;
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
@@ -81,6 +104,7 @@ export function TaskRecorder({
   const savedFor = useRef<RecorderResult | null>(null);
   const clipTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const clipPlaying = useRef(false);
+  const takeDate = useRef(date);
 
   // Live camera preview while recording video.
   useEffect(() => {
@@ -92,15 +116,26 @@ export function TaskRecorder({
     const audio = audioRef.current;
     if (!shadowing || !audio) return;
     if (rec.state === "recording") {
+      if (clipPlaying.current) return;
       clipPlaying.current = true;
       audio.muted = false;
       audio.currentTime = 0;
-      void audio.play()?.catch(() => {});
-    } else {
+      void audio.play()?.catch(() => {
+        // Without the clip there is nothing to shadow: drop this take rather than save silence.
+        clipPlaying.current = false;
+        setClipError(CLIP_FAILED);
+        resetRecorder();
+      });
+    } else if (rec.state !== "asking") {
+      // Leave the primed clip alone while the permission prompt is open (pausing it aborts the
+      // iOS unlock); reset it once recording has finished or failed.
+      clipPlaying.current = false;
       audio.pause();
+      audio.muted = false;
+      audio.currentTime = 0;
       clearTimeout(clipTimer.current);
     }
-  }, [rec.state, shadowing]);
+  }, [rec.state, shadowing, resetRecorder]);
 
   const unsaved = rec.state === "recording" || (rec.result !== null && save.phase !== "saved");
   useEffect(() => {
@@ -122,10 +157,16 @@ export function TaskRecorder({
       setSave({ phase: "saving", step: "Preparing the upload…" });
       try {
         let s = started.current;
-        if (!s || Date.now() - s.at > REUSE_MS) {
+        if (s && Date.now() - s.at > REUSE_MS) {
+          // Its upload URLs have expired: remove the unconfirmed take before starting a new one.
+          const old = s.takeId;
+          started.current = s = null;
+          await deleteTakeAction(old).catch(() => undefined);
+        }
+        if (!s) {
           const res = await startTakeAction({
             task,
-            date,
+            date: takeDate.current,
             lessonId,
             material: material ?? { generated: false },
             kind: result.mime.startsWith("video/") ? "video" : "audio",
@@ -138,10 +179,17 @@ export function TaskRecorder({
             takeId: res.takeId,
             uploadUrl: res.uploadUrl,
             audioUploadUrl: res.audioUploadUrl,
+            maxBytes: res.maxBytes,
+            capSec: res.capSec,
             at: Date.now(),
             main: false,
             audio: false,
           };
+        }
+        if (result.blob.size > s.maxBytes) {
+          return fail(
+            `This recording is larger than the ${Math.floor(s.maxBytes / MB)} MB limit for a take, so it can't be saved. Discard it and record a shorter take.`,
+          );
         }
         const two = Boolean(s.audioUploadUrl && result.audioBlob);
         if (!s.main) {
@@ -154,7 +202,13 @@ export function TaskRecorder({
           await uploadTake(s.audioUploadUrl!, result.audioBlob!, result.audioMime!);
           s.audio = true;
         }
-        setSave({ phase: "saving", step: "Saving…" });
+        setSave({
+          phase: "saving",
+          step:
+            result.durationSec > s.capSec
+              ? `Saving… (takes are capped at ${clock(s.capSec)}; only that much counts)`
+              : "Saving…",
+        });
         const confirmed = await confirmTakeAction(s.takeId, result.durationSec);
         if (!confirmed.ok) {
           // The stored objects didn't check out: upload again on retry.
@@ -163,14 +217,13 @@ export function TaskRecorder({
           return fail(firstError(confirmed.errors) ?? "Couldn't save the recording. Try again.");
         }
         setSave({ phase: "saved" });
-        // Transcription runs on the server; the review page shows its progress.
-        void transcribeTakeAction(s.takeId).catch(() => {});
+        // Navigate first: the review page starts transcription, so nothing here waits on it.
         router.push(`/speaking/takes/${s.takeId}`);
       } catch (e) {
         fail(e instanceof UploadError ? e.message : "Couldn't save the recording. Check your connection and try again.");
       }
     },
-    [task, date, lessonId, material, clipSec, router],
+    [task, lessonId, material, clipSec, router],
   );
 
   useEffect(() => {
@@ -183,22 +236,17 @@ export function TaskRecorder({
   function begin() {
     const audio = audioRef.current;
     if (shadowing && audio) {
-      // Unlock playback inside this tap; the effect above plays it from the top once recording starts.
+      // Unlock playback inside this tap with a muted play; the effect above unmutes it and plays
+      // from the top once recording starts.
       clipPlaying.current = false;
       audio.muted = true;
-      const p = audio.play();
-      void p?.then(
-        () => {
-          if (clipPlaying.current) return;
-          audio.pause();
-          audio.muted = false;
-          audio.currentTime = 0;
-        },
-        () => {
-          audio.muted = false;
-        },
-      );
+      audio.currentTime = 0;
+      void audio.play()?.catch(() => {
+        audio.muted = false;
+      });
     }
+    takeDate.current = todayHere(date);
+    setClipError("");
     setSave({ phase: "idle" });
     void rec.start();
   }
@@ -277,6 +325,8 @@ export function TaskRecorder({
           preload="auto"
           playsInline
           onEnded={() => {
+            // A primed clip can end during the permission prompt; only a playing pass ends the take.
+            if (!clipPlaying.current) return;
             clearTimeout(clipTimer.current);
             clipTimer.current = setTimeout(() => rec.stop(), AFTER_CLIP_MS);
           }}
@@ -341,6 +391,7 @@ export function TaskRecorder({
           )}
         </div>
         {rec.state === "error" && <Notice>{rec.error}</Notice>}
+        {clipError && <Notice>{clipError}</Notice>}
 
         {save.phase === "saving" && (
           <div className="grid gap-1.5" role="status">

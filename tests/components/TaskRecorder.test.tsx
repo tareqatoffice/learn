@@ -4,6 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TaskRecorder } from "@/components/speaking/TaskRecorder";
 import type { RecorderResult, RecorderState } from "@/lib/useRecorder";
+import { localDate } from "@/speaking/schedule";
+
+const localToday = () => localDate(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone);
 
 const recorder = vi.hoisted(() => ({
   value: {
@@ -35,6 +38,7 @@ const actions = vi.hoisted(() => ({
   })),
   confirmTakeAction: vi.fn<(...args: unknown[]) => Promise<object>>(async () => ({ ok: true as const })),
   transcribeTakeAction: vi.fn<(...args: unknown[]) => Promise<object>>(async () => ({ ok: true as const, transcript: "hi" })),
+  deleteTakeAction: vi.fn<(...args: unknown[]) => Promise<object>>(async () => ({ ok: true as const })),
   generateMaterialAction: vi.fn(),
 }));
 vi.mock("@/app/(app)/speaking/actions", () => actions);
@@ -101,7 +105,7 @@ describe("TaskRecorder", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/upload failed/i);
     expect(actions.confirmTakeAction).not.toHaveBeenCalled();
     expect(actions.startTakeAction).toHaveBeenCalledWith(
-      expect.objectContaining({ task: "readAloud", kind: "audio", mime: "audio/webm", date: "2026-11-10" }),
+      expect.objectContaining({ task: "readAloud", kind: "audio", mime: "audio/webm", date: localToday() }),
     );
     expect(upload.uploadTake).toHaveBeenCalledWith("https://r2.test/put", expect.any(Blob), "audio/webm");
 
@@ -109,8 +113,71 @@ describe("TaskRecorder", () => {
     await waitFor(() => expect(actions.confirmTakeAction).toHaveBeenCalledWith("64b000000000000000000009", 42));
     // The retry reuses the take it already started.
     expect(actions.startTakeAction).toHaveBeenCalledTimes(1);
-    expect(actions.transcribeTakeAction).toHaveBeenCalledWith("64b000000000000000000009");
     expect(push).toHaveBeenCalledWith("/speaking/takes/64b000000000000000000009");
+    // The review page starts transcription; the recorder only navigates.
+    expect(actions.transcribeTakeAction).not.toHaveBeenCalled();
+  });
+
+  it("deletes the expired take and starts a new one when a retry comes after the upload URLs lapse", async () => {
+    const user = userEvent.setup();
+    const t0 = Date.now();
+    const now = vi.spyOn(Date, "now").mockReturnValue(t0);
+    upload.uploadTake.mockRejectedValueOnce(new upload.UploadError("The upload failed (500). Try again."));
+    recorder.value = {
+      ...recorder.value,
+      state: "stopped",
+      result: { blob: new Blob(["x"]), mime: "audio/webm", durationSec: 5 },
+    };
+    render(<TaskRecorder {...base} task="readAloud" material={{ title: "P", text: "Read me.", generated: false }} />);
+    const retry = await screen.findByRole("button", { name: /try again/i });
+
+    now.mockReturnValue(t0 + 9 * 60 * 1000);
+    actions.startTakeAction.mockResolvedValueOnce({
+      ok: true as const,
+      takeId: "64b00000000000000000000a",
+      uploadUrl: "https://r2.test/put2",
+      maxBytes: 1_000_000,
+      capSec: 600,
+    });
+    await user.click(retry);
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/speaking/takes/64b00000000000000000000a"));
+    expect(actions.deleteTakeAction).toHaveBeenCalledWith("64b000000000000000000009");
+    expect(actions.startTakeAction).toHaveBeenCalledTimes(2);
+    now.mockRestore();
+  });
+
+  it("refuses a recording bigger than the take's byte limit from startTake", async () => {
+    actions.startTakeAction.mockResolvedValueOnce({
+      ok: true as const,
+      takeId: "64b000000000000000000009",
+      uploadUrl: "https://r2.test/put",
+      maxBytes: 2,
+      capSec: 600,
+    });
+    recorder.value = {
+      ...recorder.value,
+      state: "stopped",
+      result: { blob: new Blob(["too big"]), mime: "audio/webm", durationSec: 5 },
+    };
+    render(<TaskRecorder {...base} task="readAloud" material={{ title: "P", text: "Read me.", generated: false }} />);
+    expect((await screen.findByRole("alert")).textContent).toMatch(/larger than/i);
+    expect(upload.uploadTake).not.toHaveBeenCalled();
+  });
+
+  it("drops the take and asks to start again when the clip won't play", async () => {
+    recorder.value = { ...recorder.value, state: "recording" };
+    vi.mocked(window.HTMLMediaElement.prototype.play).mockImplementation(() => Promise.reject(new Error("NotAllowed")));
+    render(
+      <TaskRecorder
+        {...base}
+        task="shadowing"
+        material={{ title: "Lesson 1", text: "Hello there.", generated: false }}
+        sourceAudioUrl="https://example.test/clip.mp3"
+        clipSec={30}
+      />,
+    );
+    expect((await screen.findByRole("alert")).textContent).toBe("The clip didn't start. Tap Start again.");
+    expect(recorder.value.reset).toHaveBeenCalled();
   });
 
   it("surfaces a startTake failure message", async () => {
