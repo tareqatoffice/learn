@@ -16,6 +16,7 @@ export type TopBarUser = { name: string; image?: string; isAdmin: boolean };
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/interview", label: "Interview" },
+  { href: "/speaking", label: "Speaking" },
   { href: "/graphs", label: "Graphs" },
   { href: "/notes", label: "Notes" },
 ];

@@ -15,9 +15,9 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 import { AiSettingsForm } from "@/components/admin/AiSettingsForm";
 
 const catalog: CatalogModel[] = [
-  { id: "meta/llama:free", name: "Llama (free)", free: true, contextLength: 131072, json: true },
-  { id: "google/gemma:free", name: "Gemma (free)", free: true, contextLength: 8192, json: false },
-  { id: "openai/gpt-4o-mini", name: "GPT-4o mini", free: false, contextLength: 128000, json: true },
+  { id: "meta/llama:free", name: "Llama (free)", free: true, contextLength: 131072, json: true, images: false },
+  { id: "google/gemma:free", name: "Gemma (free)", free: true, contextLength: 8192, json: false, images: false },
+  { id: "openai/gpt-4o-mini", name: "GPT-4o mini", free: false, contextLength: 128000, json: true, images: true },
 ];
 
 const initial = { enabled: true, primaryModel: "meta/llama:free", fallbackModel: "", dailyLimit: 100 };
@@ -73,6 +73,17 @@ describe("AiSettingsForm", () => {
     });
     expect(await screen.findByText("Saved.")).toBeTruthy();
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("saves a vision model chosen from image-capable models", async () => {
+    saveAiSettingsAction.mockResolvedValue({ ok: true });
+    const user = setup();
+    await user.click(screen.getByLabelText(/also list paid models/i));
+    const vision = screen.getByLabelText("Vision model");
+    expect(optionTexts(vision)).toEqual(["Use the primary model", "GPT-4o mini · 128k context", "Other model id…"]);
+    await user.selectOptions(vision, "openai/gpt-4o-mini");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+    expect(saveAiSettingsAction).toHaveBeenCalledWith(expect.objectContaining({ visionModel: "openai/gpt-4o-mini" }));
   });
 
   it("shows a saved model that is not in the catalogue as a custom id", () => {
