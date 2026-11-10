@@ -47,7 +47,17 @@ function audioDuration(file: File): Promise<number> {
   });
 }
 
-function AudioUpload({ lessonId, currentKey, storageReady }: { lessonId: string; currentKey: string; storageReady: boolean }) {
+function AudioUpload({
+  lessonId,
+  currentKey,
+  storageReady,
+  onConfirmed,
+}: {
+  lessonId: string;
+  currentKey: string;
+  storageReady: boolean;
+  onConfirmed: (durationSec: number) => void;
+}) {
   const { run, pending, errors, setErrors, saved } = useAdminAction();
   const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -67,7 +77,7 @@ function AudioUpload({ lessonId, currentKey, storageReady }: { lessonId: string;
         return;
       }
       const duration = await audioDuration(file);
-      run(() => confirmLessonAudioAction(lessonId, started.key, duration));
+      run(() => confirmLessonAudioAction(lessonId, started.key, duration), { onSuccess: () => onConfirmed(duration) });
     } catch {
       setErrors({ _: "The upload failed. Try again." });
     } finally {
@@ -124,6 +134,13 @@ export function SpeakingLessonForm({
   const [durationText, setDurationText] = useState(String(lesson.shadowDurationSec));
   const { run, pending, errors, saved, touch } = useAdminAction();
   const del = useAdminAction();
+
+  // Re-seed after the server page refreshes with new data (e.g. an uploaded file's length).
+  const [seenDuration, setSeenDuration] = useState(lesson.shadowDurationSec);
+  if (seenDuration !== lesson.shadowDurationSec) {
+    setSeenDuration(lesson.shadowDurationSec);
+    setDurationText(String(lesson.shadowDurationSec));
+  }
 
   const set = <K extends keyof AdminLesson>(key: K, value: AdminLesson[K]) => {
     touch();
@@ -201,7 +218,12 @@ export function SpeakingLessonForm({
         <ActionStatus saved={false} errors={del.errors} />
       </form>
 
-      <AudioUpload lessonId={draft.id} currentKey={lesson.shadowAudioKey} storageReady={storageReady} />
+      <AudioUpload
+        lessonId={draft.id}
+        currentKey={lesson.shadowAudioKey}
+        storageReady={storageReady}
+        onConfirmed={(sec) => setDurationText(String(sec))}
+      />
     </div>
   );
 }

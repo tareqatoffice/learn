@@ -4,7 +4,18 @@ import { AdminCard, AdminPage } from "@/components/admin/layout";
 import { SpeakingLessonForm } from "@/components/admin/SpeakingLessonForm";
 import { connectDb } from "@/lib/db";
 import { storageConfigured } from "@/lib/r2";
+import { buildMetadata } from "@/lib/seo";
 import { Subject } from "@/models";
+
+export async function generateMetadata({ params }: { params: Promise<{ lessonId: string }> }) {
+  const { lessonId } = await params;
+  const lesson = lessonId === "new" ? null : await getLessonAdmin(lessonId);
+  return buildMetadata({
+    title: `${lesson?.title ?? "New lesson"} · Admin`,
+    description: "Edit a speaking lesson: shadowing audio, read-aloud passage and speaking prompt.",
+    path: `/admin/speaking/${lessonId}`,
+  });
+}
 
 /** `/admin/speaking/new` creates a lesson; any other segment is a lesson id. */
 export default async function AdminSpeakingLessonPage({ params }: { params: Promise<{ lessonId: string }> }) {
