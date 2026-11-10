@@ -62,9 +62,20 @@ export async function transcribeTake(
       return fail("This recording can't be transcribed.");
     }
     return ok({ transcript });
-  } catch {
-    await refund();
-    await SpeakingTake.updateOne(filter, { $set: { transcriptStatus: "failed" } });
+  } catch (error) {
+    // Only the take id and the error message: never the audio bytes or the STT credentials.
+    console.error(`Transcription failed for take ${takeId}: ${error instanceof Error ? error.message : String(error)}`);
+    // Each step on its own, so a failed refund still marks the take failed (and neither can throw).
+    for (const [what, step] of [
+      ["refund the transcription", refund],
+      ["mark the take failed", () => SpeakingTake.updateOne(filter, { $set: { transcriptStatus: "failed" } })],
+    ] as const) {
+      try {
+        await step();
+      } catch (cleanup) {
+        console.error(`Couldn't ${what} for take ${takeId}: ${cleanup instanceof Error ? cleanup.message : String(cleanup)}`);
+      }
+    }
     return fail("Couldn't transcribe the recording. Try again.");
   }
 }

@@ -65,6 +65,24 @@ describe("speaking coach", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("speechFeedback refuses an empty self-rating", async () => {
+    const id = await makeTake(user, { self: {} });
+    const fetch = vi.fn();
+    expect(await speechFeedback(user, id, { fetch })).toEqual({ ok: false, error: "Rate yourself first, then ask the coach." });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("speechFeedback rejects a null, empty or false score and refunds the call", async () => {
+    for (const bad of [null, "", false]) {
+      await resetDb();
+      const id = await makeTake(user);
+      const result = await speechFeedback(user, id, { fetch: async () => reply({ ...SPEECH, fluency: bad }) });
+      expect(result.ok).toBe(false);
+      expect(await usage(user)).toBe(0);
+      expect((await SpeakingTake.findById(id).lean<{ ai?: unknown }>())?.ai).toBeUndefined();
+    }
+  });
+
   it("speechFeedback refuses another user's take and bad ids", async () => {
     const id = await makeTake(user);
     const fetch = vi.fn();
@@ -117,6 +135,19 @@ describe("speaking coach", () => {
     const id = await makeTake(user, { media: VIDEO });
     const fetch = vi.fn();
     expect((await bodyFeedback(user, id, [FRAME], { fetch })).ok).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("bodyFeedback refuses before self-rating, even with an empty self", async () => {
+    await SpeakingProfile.create({ userId: user, bodyConsentAt: new Date() });
+    const fetch = vi.fn();
+    for (const self of [undefined, {}]) {
+      const id = await makeTake(user, { media: VIDEO, self });
+      expect(await bodyFeedback(user, id, [FRAME], { fetch })).toEqual({
+        ok: false,
+        error: "Rate yourself first, then ask the coach.",
+      });
+    }
     expect(fetch).not.toHaveBeenCalled();
   });
 
