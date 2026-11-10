@@ -42,10 +42,32 @@ describe("speaking lessons", () => {
   it("assigns the first unfinished published lesson and keeps it all day", async () => {
     const u = user();
     const l1 = await lesson(1);
-    await lesson(2);
+    const l2 = await lesson(2);
     expect((await todaysLesson(u, "2026-11-10", ALL))?.id).toBe(l1);
     await take(u, l1, "readAloud");
+    await take(u, l1, "recordReview");
     expect((await todaysLesson(u, "2026-11-10", ALL))?.id).toBe(l1);
+    expect((await todaysLesson(u, "2026-11-11", ALL))?.id).toBe(l2);
+  });
+
+  it("returns null when every lesson is finished and stores no day", async () => {
+    const u = user();
+    const l1 = await lesson(1);
+    await take(u, l1, "readAloud");
+    await take(u, l1, "recordReview");
+    expect(await todaysLesson(u, "2026-11-10", ALL)).toBeNull();
+    expect(await SpeakingDay.countDocuments({ userId: u })).toBe(0);
+  });
+
+  it("counts a lesson with no part for any enabled task as finished", async () => {
+    const u = user();
+    await lesson(1, { passage: undefined });
+    const onlyRead = { shadowing: false, readAloud: true, recordReview: false };
+    expect(await todaysLesson(u, "2026-11-10", onlyRead)).toBeNull();
+  });
+
+  it("swapLesson fails on a malformed id", async () => {
+    expect((await swapLesson(user(), "2026-11-10", "nope")).ok).toBe(false);
   });
 
   it("moves on only when every enabled part has a take", async () => {
@@ -103,5 +125,8 @@ describe("speaking lessons", () => {
     expect(lessonHasPart({ ...base, shadow: { audioUrl: "u", text: "t" } }, "shadowing")).toBe(true);
     expect(lessonHasPart({ ...base, passage: "p" }, "readAloud")).toBe(true);
     expect(lessonHasPart({ ...base, prompt: "p" }, "recordReview")).toBe(true);
+    expect(lessonHasPart({ ...base, passage: "   " }, "readAloud")).toBe(false);
+    expect(lessonHasPart({ ...base, prompt: " " }, "recordReview")).toBe(false);
+    expect(lessonHasPart({ ...base, shadow: { audioKey: "k", text: "  " } }, "shadowing")).toBe(false);
   });
 });

@@ -77,6 +77,7 @@ export async function saveProfile(
     if (input.enabled?.[task] !== undefined) $set[`enabled.${task}`] = Boolean(input.enabled[task]);
     if (input.video?.[task] !== undefined) $set[`video.${task}`] = Boolean(input.video[task]);
   }
+  if (!Object.keys($set).length) return ok();
   await connectDb();
   await SpeakingProfile.updateOne({ userId }, { $set }, { upsert: true });
   return ok();

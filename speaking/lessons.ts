@@ -1,3 +1,4 @@
+import { Types } from "mongoose";
 import { connectDb, retryOnDuplicateKey } from "@/lib/db";
 import { SpeakingDay, SpeakingLesson, SpeakingTake } from "@/models";
 import { type ActionResult, fail, ok } from "@/admin/result";
@@ -30,9 +31,12 @@ function toView(doc: LessonDoc): LessonView {
 }
 
 export function lessonHasPart(lesson: LessonView, task: TaskKey): boolean {
-  if (task === "shadowing") return Boolean(lesson.shadow && (lesson.shadow.audioKey || lesson.shadow.audioUrl) && lesson.shadow.text);
-  if (task === "readAloud") return Boolean(lesson.passage);
-  return Boolean(lesson.prompt);
+  if (task === "shadowing") {
+    const sh = lesson.shadow;
+    return Boolean(sh && (sh.audioKey || sh.audioUrl) && sh.text?.trim());
+  }
+  if (task === "readAloud") return Boolean(lesson.passage.trim());
+  return Boolean(lesson.prompt.trim());
 }
 
 export async function listPublishedLessons(): Promise<{ id: string; title: string; order: number }[]> {
@@ -42,6 +46,7 @@ export async function listPublishedLessons(): Promise<{ id: string; title: strin
 }
 
 async function publishedLesson(id: string): Promise<LessonView | null> {
+  if (!Types.ObjectId.isValid(id)) return null;
   const doc = await SpeakingLesson.findOne({ _id: id, status: "published" }).lean<LessonDoc>();
   return doc ? toView(doc) : null;
 }
@@ -74,8 +79,9 @@ export async function todaysLesson(
   const finished = (l: LessonView) =>
     TASKS.every((task) => !enabled[task] || !lessonHasPart(l, task) || done.has(`${l.id}:${task}`));
 
-  // When every lesson is finished, start over from the first one.
-  const pick = lessons.find((l) => !finished(l)) ?? lessons[0];
+  // Everything finished: no assignment, so the UI can offer generated material.
+  const pick = lessons.find((l) => !finished(l));
+  if (!pick) return null;
   await assign(userId, date, pick.id);
   return pick;
 }
