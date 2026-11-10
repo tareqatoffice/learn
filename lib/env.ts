@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const DEFAULT_OPENROUTER_MODEL = "openai/gpt-4o-mini";
 export const DEFAULT_DAILY_LIMIT = 100;
+export const DEFAULT_STT_LIMIT = 200;
 
 const schema = z.object({
   MONGODB_URI: z.string().min(1),
@@ -48,13 +49,13 @@ const schema = z.object({
   R2_BUCKET: z.string().default(""),
   /** Cloudflare Workers AI token for speech-to-text. */
   CF_AI_TOKEN: z.string().default(""),
-  /** Speech-to-text calls per user per UTC day; a bad value falls back to 200. */
+  /** Speech-to-text calls per user per UTC day; a bad value falls back to DEFAULT_STT_LIMIT. */
   STT_DAILY_LIMIT: z
     .string()
     .default("")
     .transform((value) => {
-      const n = Number(value.trim() || 200);
-      return Number.isInteger(n) && n >= 0 ? n : 200;
+      const n = Number(value.trim() || DEFAULT_STT_LIMIT);
+      return Number.isInteger(n) && n >= 0 ? n : DEFAULT_STT_LIMIT;
     }),
 });
 

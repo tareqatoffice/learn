@@ -25,6 +25,7 @@ export async function transcribe(
   try {
     res = await doFetch(url, {
       method: "POST",
+      signal: AbortSignal.timeout(60_000),
       headers: {
         Authorization: `Bearer ${env.CF_AI_TOKEN}`,
         "Content-Type": "application/json",

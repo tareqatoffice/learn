@@ -42,6 +42,20 @@ describe("r2", () => {
     expect(url).toContain("X-Amz-Expires=600");
   });
 
+  it("presigned PUT carries no checksum params", async () => {
+    stubAll();
+    const url = new URL(await presignPut("k", "audio/webm"));
+    const names = [...url.searchParams.keys()].map((k) => k.toLowerCase());
+    expect(names.filter((n) => n.startsWith("x-amz-checksum"))).toEqual([]);
+    expect(names).not.toContain("x-amz-sdk-checksum-algorithm");
+  });
+
+  it("deleteObjects throws when R2 reports per-key errors", async () => {
+    stubAll();
+    setR2Client(fake(vi.fn().mockResolvedValue({ Errors: [{ Key: "a", Code: "x" }] })));
+    await expect(deleteObjects(["a"])).rejects.toThrow();
+  });
+
   it("presignGet signs a GET for the key", async () => {
     stubAll();
     const url = await presignGet("takes/u/t.webm");

@@ -33,6 +33,8 @@ function client(): S3Client {
       key,
       client: new S3Client({
         region: "auto",
+        requestChecksumCalculation: "WHEN_REQUIRED",
+        responseChecksumValidation: "WHEN_REQUIRED",
         endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
         credentials: {
           accessKeyId: env.R2_ACCESS_KEY_ID,
@@ -84,11 +86,12 @@ export async function getObjectBytes(key: string): Promise<Uint8Array> {
 export async function deleteObjects(keys: string[]): Promise<void> {
   for (let i = 0; i < keys.length; i += 1000) {
     const batch = keys.slice(i, i + 1000);
-    await client().send(
+    const res = await client().send(
       new DeleteObjectsCommand({
         Bucket: bucket(),
         Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
       }),
     );
+    if (res.Errors?.length) throw new Error(`R2 failed to delete ${res.Errors.length} object(s)`);
   }
 }
