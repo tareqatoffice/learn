@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: { params: Promise<{ lessonId:
   const { lessonId } = await params;
   const lesson = lessonId === "new" ? null : await getLessonAdmin(lessonId);
   return buildMetadata({
-    title: `${lesson?.title ?? "New lesson"} · Admin`,
+    title: `${lesson?.title ?? "New lesson"} Â· Admin`,
     description: "Edit a speaking lesson: shadowing audio, read-aloud passage and speaking prompt.",
     path: `/admin/speaking/${lessonId}`,
   });
