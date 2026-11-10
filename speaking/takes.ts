@@ -45,8 +45,11 @@ export async function startTake(
   input: StartTakeInput,
 ): Promise<ActionResult<{ takeId: string; uploadUrl: string; audioUploadUrl?: string; maxBytes: number; capSec: number }>> {
   if (!storageConfigured()) return fail("Recording storage isn't set up yet.");
+  if (!isId(userId)) return fail("Recording not found.");
   if (!TASKS.includes(input.task)) return fail("Unknown task.");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return fail("Invalid date.");
+  const dayDiff = Math.abs(Date.parse(`${input.date}T00:00:00Z`) - Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`)) / 86_400_000;
+  if (!(dayDiff <= 1)) return fail("That date isn't today.");
   if (input.kind !== "audio" && input.kind !== "video") return fail("Unknown recording type.");
 
   const mime = baseMime(input.mime ?? "");
@@ -70,7 +73,11 @@ export async function startTake(
 
   let lessonId: Types.ObjectId | undefined;
   if (input.lessonId) {
-    if (!isId(input.lessonId)) return fail("Unknown lesson.");
+    if (!isId(input.lessonId)) return fail("That lesson is not available.");
+    await connectDb();
+    if (!(await SpeakingLesson.exists({ _id: input.lessonId, status: "published" }))) {
+      return fail("That lesson is not available.");
+    }
     lessonId = new Types.ObjectId(input.lessonId);
   }
 
@@ -147,6 +154,7 @@ export async function confirmTake(userId: string, takeId: string, durationSec: n
   }
 
   const { media } = take;
+  if (media.stored) return ok();
   const main = await headObject(media.key);
   if (!main || main.size <= 0 || main.size > takeCapBytes(media.capSec, media.kind === "video")) {
     return fail(UPLOAD_FAILED);
@@ -157,7 +165,7 @@ export async function confirmTake(userId: string, takeId: string, durationSec: n
   }
 
   await SpeakingTake.updateOne(
-    { _id: takeId, userId },
+    { _id: takeId, userId, "media.stored": false },
     {
       $set: {
         "media.stored": true,

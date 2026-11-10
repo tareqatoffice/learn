@@ -20,7 +20,7 @@ import { resetDb } from "../setup/mongo";
 const user = () => String(new Types.ObjectId());
 const base = {
   task: "readAloud" as const,
-  date: "2026-11-10",
+  date: new Date().toISOString().slice(0, 10),
   lessonId: null,
   material: { text: "hello", generated: false },
   kind: "audio" as const,
@@ -64,6 +64,15 @@ describe("speaking takes", () => {
     expect((await startTake(user(), { ...base, mime: "text/html" })).ok).toBe(false);
   });
 
+  it("startTake rejects unpublished lessons, far dates and bad user ids", async () => {
+    const draft = await SpeakingLesson.create({ title: "D", order: 1, status: "draft", shadow: { audioKey: "k", text: "t" } });
+    expect((await startTake(user(), { ...base, lessonId: String(draft._id) })).ok).toBe(false);
+    expect((await startTake(user(), { ...base, lessonId: String(new Types.ObjectId()) })).ok).toBe(false);
+    expect((await startTake(user(), { ...base, lessonId: "nope" })).ok).toBe(false);
+    expect((await startTake(user(), { ...base, date: "2020-01-01" })).ok).toBe(false);
+    expect((await startTake("bad", base)).ok).toBe(false);
+  });
+
   it("startTake caps shadowing at twice the clip length", async () => {
     const res = await start(user(), { task: "shadowing", clipSec: 90 });
     expect(res.capSec).toBe(180);
@@ -98,6 +107,17 @@ describe("speaking takes", () => {
     expect(doc!.media.size).toBe(1000);
     expect(doc!.media.durationSec).toBe(capSec);
     expect(doc!.transcriptStatus).toBe("pending");
+  });
+
+  it("confirmTake on a stored take changes nothing", async () => {
+    const u = user();
+    const { takeId } = await start(u);
+    await confirmTake(u, takeId, 10);
+    await SpeakingTake.updateOne({ _id: takeId }, { $set: { transcriptStatus: "done" } });
+    expect((await confirmTake(u, takeId, 500)).ok).toBe(true);
+    const doc = await SpeakingTake.findById(takeId).lean<{ media: { durationSec: number }; transcriptStatus: string }>();
+    expect(doc!.media.durationSec).toBe(10);
+    expect(doc!.transcriptStatus).toBe("done");
   });
 
   it("confirmTake heads the audio key for video takes", async () => {
