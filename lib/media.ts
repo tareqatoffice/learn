@@ -7,7 +7,10 @@ const PREFERRED: Record<"audio" | "video", string[]> = {
 };
 
 /** First container the browser can record, in preference order (Chrome: webm; iOS Safari: mp4). */
-export function pickMime(kind: "audio" | "video", isSupported: (m: string) => boolean): string | null {
+export function pickMime(
+  kind: "audio" | "video",
+  isSupported: (m: string) => boolean,
+): string | null {
   return PREFERRED[kind].find((m) => isSupported(m)) ?? null;
 }
 
@@ -19,12 +22,17 @@ export function baseMime(mime: string): string {
 /** File extension for a recorded mime type; accepts the full recorder string or the base type. */
 export function extFor(mime: string): "webm" | "mp4" | "m4a" {
   const base = baseMime(mime);
-  if (base === "audio/mp4" || base === "audio/x-m4a" || base === "audio/aac") return "m4a";
+  if (base === "audio/mp4" || base === "audio/x-m4a" || base === "audio/aac")
+    return "m4a";
   if (base.endsWith("/mp4")) return "mp4";
   return "webm";
 }
 
-function once(target: EventTarget, event: string, timeoutMs = 5000): Promise<void> {
+function once(
+  target: EventTarget,
+  event: string,
+  timeoutMs = 5000,
+): Promise<void> {
   return new Promise((resolve) => {
     const done = () => {
       clearTimeout(timer);
@@ -40,24 +48,40 @@ function once(target: EventTarget, event: string, timeoutMs = 5000): Promise<voi
  * Evenly spaced JPEG snapshots (data URLs, quality 0.7, at most `maxWidth` wide) of a loaded
  * video, for the vision coach. Seeks the element, so pass a playback copy of the take.
  */
-export async function grabFrames(video: HTMLVideoElement, count: number, maxWidth = 512): Promise<string[]> {
+export async function grabFrames(
+  video: HTMLVideoElement,
+  count: number,
+  maxWidth = 512,
+): Promise<string[]> {
   if (count <= 0) return [];
+  // The video must be same-origin or a blob: URL, or drawing it taints the canvas and toDataURL throws.
   if (video.readyState < 1) await once(video, "loadedmetadata");
+  // Drawing needs a decoded frame, not just metadata.
+  if (video.readyState < 2) await once(video, "loadeddata");
 
   // MediaRecorder webm files report an infinite duration until the end has been seeked to.
   if (!Number.isFinite(video.duration)) {
     const known = once(video, "durationchange");
+    const atEnd = once(video, "seeked", 1000);
     video.currentTime = 1e101;
     await known;
+    await atEnd;
+    const back = once(video, "seeked", 1000);
     video.currentTime = 0;
-    await once(video, "seeked", 1000);
+    await back;
   }
   const duration = Number.isFinite(video.duration) ? video.duration : 0;
 
   const scale = Math.min(1, maxWidth / (video.videoWidth || maxWidth));
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round((video.videoWidth || maxWidth) * scale));
-  canvas.height = Math.max(1, Math.round((video.videoHeight || (maxWidth * 3) / 4) * scale));
+  canvas.width = Math.max(
+    1,
+    Math.round((video.videoWidth || maxWidth) * scale),
+  );
+  canvas.height = Math.max(
+    1,
+    Math.round((video.videoHeight || (maxWidth * 3) / 4) * scale),
+  );
   const ctx = canvas.getContext("2d");
   if (!ctx) return [];
 

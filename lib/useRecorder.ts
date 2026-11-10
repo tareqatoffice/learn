@@ -73,6 +73,7 @@ export function useRecorder({
   const startedAt = useRef(0);
   const finishing = useRef(false);
   const asking = useRef(false);
+  const askId = useRef(0);
   const timers = useRef<{
     tick?: ReturnType<typeof setInterval>;
     cap?: ReturnType<typeof setTimeout>;
@@ -97,7 +98,7 @@ export function useRecorder({
     const takes = [main.current, side.current].filter((t): t is Take => !!t);
     const durationSec = Math.min(
       capSec,
-      Math.max(0, Math.round((Date.now() - startedAt.current) / 1000)),
+      Math.max(1, Math.round((Date.now() - startedAt.current) / 1000)),
     );
     let pending = takes.length;
     const settle = () => {
@@ -160,6 +161,7 @@ export function useRecorder({
     }
 
     asking.current = true;
+    const myAsk = ++askId.current;
     setError("");
     setResult(null);
     setElapsedSec(0);
@@ -179,10 +181,16 @@ export function useRecorder({
           : { audio: true },
       );
     } catch (e) {
+      if (myAsk !== askId.current) return; // cancelled while asking
       asking.current = false;
       if (!mounted.current) return;
       setError(errorMessage(e));
       setState("error");
+      return;
+    }
+    if (myAsk !== askId.current) {
+      // reset() or a page hide happened while the permission prompt was open.
+      media.getTracks().forEach((t) => t.stop());
       return;
     }
     asking.current = false;
@@ -207,7 +215,14 @@ export function useRecorder({
         main.current = makeTake(media, mime, { audioBitsPerSecond: AUDIO_BPS });
         side.current = null;
       }
+      // The recorder can end on its own (mic unplugged, permission revoked, iOS audio interruption).
       main.current.recorder.onerror = () => finish();
+      for (const t of [main.current, side.current]) {
+        if (t) t.recorder.onstop = () => finish();
+      }
+      media
+        .getTracks()
+        .forEach((t) => t.addEventListener("ended", () => finish()));
       finishing.current = false;
       startedAt.current = Date.now();
       main.current.recorder.start();
@@ -225,17 +240,27 @@ export function useRecorder({
     setState("recording");
     timers.current.tick = setInterval(() => {
       setElapsedSec(
-        Math.min(capSec, Math.floor((Date.now() - startedAt.current) / 1000)),
+        Math.min(capSec, Math.round((Date.now() - startedAt.current) / 1000)),
       );
     }, 250);
     timers.current.cap = setTimeout(finish, capSec * 1000);
   }, [kind, capSec, finish]);
 
+  const cancelAsking = () => {
+    if (!asking.current) return;
+    askId.current++;
+    asking.current = false;
+    setState("idle");
+  };
+
   const stop = useCallback(() => {
+    cancelAsking();
     if (main.current) finish();
   }, [finish]);
 
   const reset = useCallback(() => {
+    askId.current++;
+    asking.current = false;
     if (main.current) {
       // Discard an in-flight take without producing a result.
       finishing.current = true;

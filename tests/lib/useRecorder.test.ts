@@ -33,7 +33,15 @@ class FakeRecorder {
 }
 
 function fakeStream(kinds: ("audio" | "video")[]) {
-  const tracks = kinds.map((kind) => ({ kind, stop: vi.fn() }));
+  const tracks = kinds.map((kind) => {
+    const listeners: Record<string, (() => void)[]> = {};
+    return {
+      kind,
+      stop: vi.fn(),
+      addEventListener: (e: string, fn: () => void) => (listeners[e] ??= []).push(fn),
+      fire: (e: string) => listeners[e]?.forEach((fn) => fn()),
+    };
+  });
   return {
     tracks,
     stream: {
@@ -197,6 +205,57 @@ describe("useRecorder", () => {
       await result.current.start();
     });
     unmount();
+    expect(tracks[0].stop).toHaveBeenCalled();
+  });
+
+  it("finishes when the recorder stops on its own", async () => {
+    const { tracks, stream } = fakeStream(["audio"]);
+    getUserMedia.mockResolvedValue(stream);
+    const { result } = renderHook(() => useRecorder({ kind: "audio", capSec: 60 }));
+    await act(async () => {
+      await result.current.start();
+    });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+      FakeRecorder.instances[0].stop();
+    });
+    expect(result.current.state).toBe("stopped");
+    expect(result.current.result?.durationSec).toBe(2);
+    expect(tracks[0].stop).toHaveBeenCalled();
+  });
+
+  it("finishes when a track ends", async () => {
+    const { tracks, stream } = fakeStream(["audio"]);
+    getUserMedia.mockResolvedValue(stream);
+    const { result } = renderHook(() => useRecorder({ kind: "audio", capSec: 60 }));
+    await act(async () => {
+      await result.current.start();
+    });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+      tracks[0].fire("ended");
+    });
+    expect(result.current.state).toBe("stopped");
+    expect(result.current.result).not.toBeNull();
+  });
+
+  it("does not start recording if reset during the permission prompt", async () => {
+    const { tracks, stream } = fakeStream(["audio"]);
+    let resolve!: (s: MediaStream) => void;
+    getUserMedia.mockReturnValue(new Promise<MediaStream>((r) => (resolve = r)));
+    const { result } = renderHook(() => useRecorder({ kind: "audio", capSec: 60 }));
+    let started!: Promise<void>;
+    act(() => {
+      started = result.current.start();
+    });
+    expect(result.current.state).toBe("asking");
+    act(() => result.current.reset());
+    await act(async () => {
+      resolve(stream);
+      await started;
+    });
+    expect(result.current.state).toBe("idle");
+    expect(FakeRecorder.instances).toHaveLength(0);
     expect(tracks[0].stop).toHaveBeenCalled();
   });
 });

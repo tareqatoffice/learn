@@ -10,6 +10,7 @@ describe("uploadTake", () => {
       method: "PUT",
       headers: { "Content-Type": "audio/webm" },
       body: blob,
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -30,5 +31,21 @@ describe("uploadTake", () => {
     await expect(
       uploadTake("u", new Blob(["x"]), "audio/mp4", fetchImpl as unknown as typeof fetch),
     ).rejects.toBeInstanceOf(UploadError);
+  });
+
+  it("times out a stalled PUT with UploadError so it can be retried", async () => {
+    const ctrl = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(ctrl.signal);
+    const fetchImpl = vi.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((_res, rej) => {
+          init.signal?.addEventListener("abort", () => rej(new DOMException("timed out", "TimeoutError")));
+        }),
+    );
+    const p = uploadTake("u", new Blob(["x"]), "audio/mp4", fetchImpl as unknown as typeof fetch);
+    expect(timeout).toHaveBeenCalledWith(120_000);
+    ctrl.abort();
+    await expect(p).rejects.toBeInstanceOf(UploadError);
+    timeout.mockRestore();
   });
 });

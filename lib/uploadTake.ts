@@ -1,3 +1,5 @@
+const UPLOAD_TIMEOUT_MS = 120_000;
+
 export class UploadError extends Error {
   constructor(
     message: string,
@@ -21,9 +23,20 @@ export async function uploadTake(
 ): Promise<void> {
   let res: Response;
   try {
-    res = await fetchImpl(url, { method: "PUT", headers: { "Content-Type": mime }, body: blob });
+    res = await fetchImpl(url, {
+      method: "PUT",
+      headers: { "Content-Type": mime },
+      body: blob,
+      signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+    });
   } catch {
-    throw new UploadError("The upload failed. Check your connection and try again.");
+    throw new UploadError(
+      "The upload failed. Check your connection and try again.",
+    );
   }
-  if (!res.ok) throw new UploadError(`The upload failed (${res.status}). Try again.`, res.status);
+  if (!res.ok)
+    throw new UploadError(
+      `The upload failed (${res.status}). Try again.`,
+      res.status,
+    );
 }
