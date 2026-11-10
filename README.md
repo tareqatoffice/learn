@@ -57,6 +57,30 @@ are sent, and only for a visible question in the learner's own session. Follow-u
 history is kept on the server (`aiconversations`, removed a week after the last
 message), so the model only sees replies it actually wrote.
 
+## Speaking practice (Cloudflare R2 + Workers AI)
+
+Speaking practice records audio or video in the browser, stores it in a private
+Cloudflare R2 bucket and transcribes it with Workers AI. Recording is off until the
+R2 keys are set.
+
+1. Create an R2 bucket (keep it private) and set `R2_BUCKET` and `R2_ACCOUNT_ID`.
+2. Create an R2 API token with **Object Read & Write** on that bucket and set
+   `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`.
+3. Set the bucket **CORS** policy to allow the app origins (production and
+   `http://localhost:3000`) with methods `PUT, GET, HEAD` and the header
+   `Content-Type`. Uploads use `PUT`; playback and grabbing video frames in the
+   browser need `GET`.
+4. Create a Cloudflare API token with Workers AI access and set `CF_AI_TOKEN`
+   (speech-to-text).
+5. Optional: `STT_DAILY_LIMIT` caps transcriptions per learner per UTC day (default
+   200, `0` means no limit).
+6. Optional: for body-language feedback on video takes, pick an image-capable
+   **vision model** in **Admin → AI coach**.
+
+Storage cost: audio is about 360 KB per minute and video about 4-6 MB per minute.
+The R2 free tier is 10 GB, then about $0.015 per GB-month. A heavy video user can fill
+10 GB in about 3 months. There is no automatic retention in v1.
+
 ## Deploy (Vercel + MongoDB Atlas)
 
 1. **Database.** Create a MongoDB Atlas cluster (the free tier works), a database

@@ -4,9 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TaskRecorder } from "@/components/speaking/TaskRecorder";
 import type { RecorderResult, RecorderState } from "@/lib/useRecorder";
-import { localDate } from "@/speaking/schedule";
 
-const localToday = () => localDate(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone);
 
 const recorder = vi.hoisted(() => ({
   value: {
@@ -105,7 +103,7 @@ describe("TaskRecorder", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/upload failed/i);
     expect(actions.confirmTakeAction).not.toHaveBeenCalled();
     expect(actions.startTakeAction).toHaveBeenCalledWith(
-      expect.objectContaining({ task: "readAloud", kind: "audio", mime: "audio/webm", date: localToday() }),
+      expect.objectContaining({ task: "readAloud", kind: "audio", mime: "audio/webm", date: base.date }),
     );
     expect(upload.uploadTake).toHaveBeenCalledWith("https://r2.test/put", expect.any(Blob), "audio/webm");
 
