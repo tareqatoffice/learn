@@ -27,6 +27,8 @@ export type AiSettingsView = {
   primaryModel: string;
   /** "" for none. */
   fallbackModel: string;
+  /** Model that reads images; "" = use the primary chain. */
+  visionModel: string;
   /** Calls per user per UTC day; 0 means no limit. */
   dailyLimit: number;
 };
@@ -35,6 +37,7 @@ type Row = {
   enabled?: boolean;
   primaryModel?: string;
   fallbackModel?: string;
+  visionModel?: string;
   dailyLimit?: number;
   apiKeyEncrypted?: string;
   apiKeyHint?: string;
@@ -64,6 +67,7 @@ export async function getAiConfig(): Promise<{ settings: AiSettingsView; apiKey:
       active: Boolean(apiKey) && enabled,
       primaryModel,
       fallbackModel: row?.fallbackModel && row.fallbackModel !== primaryModel ? row.fallbackModel : "",
+      visionModel: row?.visionModel ?? "",
       dailyLimit: row?.dailyLimit ?? env.OPENROUTER_DAILY_LIMIT,
     },
   };
@@ -88,6 +92,7 @@ export const aiSettingsInput = z
     enabled: z.boolean(),
     primaryModel: modelId,
     fallbackModel: z.union([z.literal(""), modelId]),
+    visionModel: z.union([z.literal(""), modelId]).optional(),
     dailyLimit: z.number({ error: "Enter a whole number" }).int("Enter a whole number").min(0).max(100_000),
   })
   .refine((s) => s.fallbackModel !== s.primaryModel, {

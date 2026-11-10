@@ -48,6 +48,7 @@ export default async function AiSettingsPage() {
             enabled: settings.enabled,
             primaryModel: settings.primaryModel,
             fallbackModel: settings.fallbackModel,
+            visionModel: settings.visionModel,
             dailyLimit: settings.dailyLimit,
           }}
           keyConfigured={settings.keyConfigured}
