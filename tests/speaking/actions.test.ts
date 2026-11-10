@@ -31,6 +31,7 @@ const input = {
   material: { text: "hello", generated: true },
   kind: "audio" as const,
   mime: "audio/webm",
+  size: 1000,
 };
 
 describe("speaking actions", () => {
@@ -81,6 +82,22 @@ describe("speaking actions", () => {
     expect((await actions.swapLessonAction(String(lesson._id))).ok).toBe(true);
     const day = await SpeakingDay.findOne({ userId: me }).lean<{ lessonId: Types.ObjectId }>();
     expect(String(day?.lessonId)).toBe(String(lesson._id));
+  });
+
+  it("passes the declared sizes through to startTake", async () => {
+    session.userId = id();
+    const r2 = await import("@/lib/r2");
+    const started = await actions.startTakeAction({
+      ...input,
+      kind: "video",
+      mime: "video/webm",
+      audioMime: "audio/webm",
+      size: 4000,
+      audioSize: 900,
+    });
+    if (!started.ok) throw new Error(JSON.stringify(started.errors));
+    expect(vi.mocked(r2.presignPut)).toHaveBeenCalledWith(expect.stringMatching(/\.webm$/), "video/webm", 4000);
+    expect(vi.mocked(r2.presignPut)).toHaveBeenCalledWith(expect.stringMatching(/\.audio\.webm$/), "audio/webm", 900);
   });
 
   it("confirms the caller's own take", async () => {

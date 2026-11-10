@@ -48,11 +48,20 @@ function client(): S3Client {
 
 const bucket = () => getEnv().R2_BUCKET;
 
-export function presignPut(key: string, contentType: string): Promise<string> {
+/**
+ * A presigned PUT for `key`. With `contentLength`, the length is a signed header, so R2 refuses an
+ * upload of any other size.
+ */
+export function presignPut(key: string, contentType: string, contentLength?: number): Promise<string> {
   return getSignedUrl(
     client(),
-    new PutObjectCommand({ Bucket: bucket(), Key: key, ContentType: contentType }),
-    { expiresIn: EXPIRES_IN },
+    new PutObjectCommand({
+      Bucket: bucket(),
+      Key: key,
+      ContentType: contentType,
+      ...(contentLength !== undefined ? { ContentLength: contentLength } : {}),
+    }),
+    { expiresIn: EXPIRES_IN, ...(contentLength !== undefined ? { signableHeaders: new Set(["content-length"]) } : {}) },
   );
 }
 
@@ -92,6 +101,8 @@ export async function deleteObjects(keys: string[]): Promise<void> {
         Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
       }),
     );
-    if (res.Errors?.length) throw new Error(`R2 failed to delete ${res.Errors.length} object(s)`);
+    // A key that is already gone is what we wanted.
+    const errors = (res.Errors ?? []).filter((e) => e.Code !== "NoSuchKey");
+    if (errors.length) throw new Error(`R2 failed to delete ${errors.length} object(s)`);
   }
 }

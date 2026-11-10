@@ -103,7 +103,7 @@ describe("TaskRecorder", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/upload failed/i);
     expect(actions.confirmTakeAction).not.toHaveBeenCalled();
     expect(actions.startTakeAction).toHaveBeenCalledWith(
-      expect.objectContaining({ task: "readAloud", kind: "audio", mime: "audio/webm", date: base.date }),
+      expect.objectContaining({ task: "readAloud", kind: "audio", mime: "audio/webm", date: base.date, size: 1 }),
     );
     expect(upload.uploadTake).toHaveBeenCalledWith("https://r2.test/put", expect.any(Blob), "audio/webm");
 
@@ -142,6 +142,55 @@ describe("TaskRecorder", () => {
     expect(actions.deleteTakeAction).toHaveBeenCalledWith("64b000000000000000000009");
     expect(actions.startTakeAction).toHaveBeenCalledTimes(2);
     now.mockRestore();
+  });
+
+  it("sends both blob sizes for a video take", async () => {
+    upload.uploadTake.mockRejectedValueOnce(new upload.UploadError("The upload failed (500). Try again."));
+    recorder.value = {
+      ...recorder.value,
+      state: "stopped",
+      result: {
+        blob: new Blob(["video!"], { type: "video/webm" }),
+        mime: "video/webm",
+        audioBlob: new Blob(["aud"], { type: "audio/webm" }),
+        audioMime: "audio/webm",
+        durationSec: 5,
+      },
+    };
+    render(<TaskRecorder {...base} task="readAloud" material={{ title: "P", text: "Read me.", generated: false }} />);
+    await screen.findByRole("button", { name: /try again/i });
+    expect(actions.startTakeAction).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "video", mime: "video/webm", audioMime: "audio/webm", size: 6, audioSize: 3 }),
+    );
+  });
+
+  it("Discard deletes the take it started", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    upload.uploadTake.mockRejectedValueOnce(new upload.UploadError("The upload failed (500). Try again."));
+    recorder.value = {
+      ...recorder.value,
+      state: "stopped",
+      result: { blob: new Blob(["x"]), mime: "audio/webm", durationSec: 5 },
+    };
+    render(<TaskRecorder {...base} task="readAloud" material={{ title: "P", text: "Read me.", generated: false }} />);
+    await user.click(await screen.findByRole("button", { name: /discard/i }));
+    expect(actions.deleteTakeAction).toHaveBeenCalledWith("64b000000000000000000009");
+    expect(recorder.value.reset).toHaveBeenCalled();
+  });
+
+  it("Discard with no started take deletes nothing", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    actions.startTakeAction.mockResolvedValueOnce({ ok: false, errors: { _: "Invalid recording size." } } as never);
+    recorder.value = {
+      ...recorder.value,
+      state: "stopped",
+      result: { blob: new Blob(["x"]), mime: "audio/webm", durationSec: 5 },
+    };
+    render(<TaskRecorder {...base} task="readAloud" material={{ title: "P", text: "Read me.", generated: false }} />);
+    await user.click(await screen.findByRole("button", { name: /discard/i }));
+    expect(actions.deleteTakeAction).not.toHaveBeenCalled();
   });
 
   it("refuses a recording bigger than the take's byte limit from startTake", async () => {

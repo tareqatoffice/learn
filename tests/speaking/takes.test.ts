@@ -25,7 +25,9 @@ const base = {
   material: { text: "hello", generated: false },
   kind: "audio" as const,
   mime: "audio/webm",
+  size: 1000,
 };
+const VIDEO = { kind: "video", mime: "video/webm", audioMime: "audio/webm", size: 5000, audioSize: 1000 };
 
 async function start(u: string, over: Record<string, unknown> = {}) {
   const res = await startTake(u, { ...base, ...over } as never);
@@ -51,9 +53,34 @@ describe("speaking takes", () => {
     const a = await start(u);
     expect(a.uploadUrl).toContain(`takes/${u}/${a.takeId}.webm`);
     expect(a.audioUploadUrl).toBeUndefined();
-    const v = await start(u, { kind: "video", mime: "video/mp4", audioMime: "audio/mp4" });
+    const v = await start(u, { ...VIDEO, mime: "video/mp4", audioMime: "audio/mp4" });
     expect(v.uploadUrl).toContain(`takes/${u}/${v.takeId}.mp4`);
     expect(v.audioUploadUrl).toContain(`takes/${u}/${v.takeId}.audio.m4a`);
+  });
+
+  it("startTake signs the declared sizes into the upload URLs", async () => {
+    const u = user();
+    const v = await start(u, VIDEO);
+    expect(vi.mocked(r2.presignPut)).toHaveBeenCalledWith(`takes/${u}/${v.takeId}.webm`, "video/webm", 5000);
+    expect(vi.mocked(r2.presignPut)).toHaveBeenCalledWith(`takes/${u}/${v.takeId}.audio.webm`, "audio/webm", 1000);
+  });
+
+  it("startTake refuses a declared size over the cap, or a missing or bad size, without saving", async () => {
+    const u = user();
+    const { maxBytes } = await start(u);
+    await SpeakingTake.deleteMany({});
+    const over = await startTake(u, { ...base, size: maxBytes + 1 });
+    expect(over).toEqual({ ok: false, errors: { _: expect.stringMatching(/larger than the \d+ MB limit/) } });
+    for (const size of [undefined, 0, -1, 1.5, Number.NaN, "1000"]) {
+      expect((await startTake(u, { ...base, size } as never)).ok).toBe(false);
+    }
+    const video = await start(u, VIDEO);
+    await SpeakingTake.deleteMany({});
+    expect((await startTake(u, { ...VIDEO, size: video.maxBytes + 1 } as never)).ok).toBe(false);
+    expect((await startTake(u, { ...VIDEO, audioSize: undefined } as never)).ok).toBe(false);
+    expect((await startTake(u, { ...VIDEO, audioSize: 100 * 1024 * 1024 } as never)).ok).toBe(false);
+    expect(await SpeakingTake.countDocuments({})).toBe(0);
+    expect(vi.mocked(r2.presignPut)).toHaveBeenCalledTimes(3);
   });
 
   it("startTake refuses when storage is not configured, text too long, or bad mime", async () => {
@@ -64,11 +91,23 @@ describe("speaking takes", () => {
     expect((await startTake(user(), { ...base, mime: "text/html" })).ok).toBe(false);
   });
 
-  it("startTake rejects unpublished lessons, far dates and bad user ids", async () => {
+  it("startTake saves without a lesson link when the lesson is unpublished, deleted or malformed", async () => {
+    const u = user();
     const draft = await SpeakingLesson.create({ title: "D", order: 1, status: "draft", shadow: { audioKey: "k", text: "t" } });
-    expect((await startTake(user(), { ...base, lessonId: String(draft._id) })).ok).toBe(false);
-    expect((await startTake(user(), { ...base, lessonId: String(new Types.ObjectId()) })).ok).toBe(false);
-    expect((await startTake(user(), { ...base, lessonId: "nope" })).ok).toBe(false);
+    for (const lessonId of [String(draft._id), String(new Types.ObjectId()), "nope"]) {
+      const { takeId } = await start(u, { task: "shadowing", lessonId, material: { text: "kept", generated: false } });
+      const doc = await SpeakingTake.findById(takeId).lean<{ lessonId?: unknown; material: { text: string } }>();
+      expect(doc!.lessonId ?? null).toBeNull();
+      expect(doc!.material.text).toBe("kept");
+      await confirmTake(u, takeId, 5);
+      const view = await getTake(u, takeId);
+      expect(view!.lessonId).toBeUndefined();
+      expect(view!.sourceAudioUrl).toBeUndefined();
+    }
+    expect(vi.mocked(r2.presignGet)).not.toHaveBeenCalledWith("k");
+  });
+
+  it("startTake rejects far dates and bad user ids", async () => {
     expect((await startTake(user(), { ...base, date: "2020-01-01" })).ok).toBe(false);
     expect((await startTake("bad", base)).ok).toBe(false);
   });
@@ -86,13 +125,34 @@ describe("speaking takes", () => {
     const res = await confirmTake(u, takeId, 30);
     expect(res.ok).toBe(false);
     expect((await SpeakingTake.findById(takeId).lean<{ media: { stored: boolean } }>())!.media.stored).toBe(false);
+    // Any partial upload is removed; the take stays so the client can upload again and retry.
+    expect(vi.mocked(r2.deleteObjects)).toHaveBeenCalledWith([`takes/${u}/${takeId}.webm`]);
   });
 
-  it("confirmTake rejects oversize object", async () => {
+  it("confirmTake rejects oversize object and deletes both of its R2 objects", async () => {
     const u = user();
-    const { takeId, maxBytes } = await start(u);
-    vi.mocked(r2.headObject).mockResolvedValue({ size: maxBytes + 1, contentType: "audio/webm" });
+    const { takeId, maxBytes } = await start(u, VIDEO);
+    vi.mocked(r2.headObject).mockResolvedValue({ size: maxBytes + 1, contentType: "video/webm" });
     expect((await confirmTake(u, takeId, 30)).ok).toBe(false);
+    expect(vi.mocked(r2.deleteObjects)).toHaveBeenCalledWith([`takes/${u}/${takeId}.webm`, `takes/${u}/${takeId}.audio.webm`]);
+    expect(await SpeakingTake.countDocuments({ _id: takeId })).toBe(1);
+  });
+
+  it("confirmTake still reports the upload failure when the clean-up fails", async () => {
+    const u = user();
+    const { takeId } = await start(u);
+    vi.mocked(r2.headObject).mockResolvedValue(null);
+    vi.mocked(r2.deleteObjects).mockRejectedValueOnce(new Error("boom"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await confirmTake(u, takeId, 30)).toEqual({ ok: false, errors: { _: "Your recording didn't finish uploading. Try again." } });
+  });
+
+  it("confirmTake accepts the retried upload after a rejection", async () => {
+    const u = user();
+    const { takeId } = await start(u);
+    vi.mocked(r2.headObject).mockResolvedValueOnce(null);
+    expect((await confirmTake(u, takeId, 30)).ok).toBe(false);
+    expect((await confirmTake(u, takeId, 30)).ok).toBe(true);
   });
 
   it("confirmTake stores the take and clamps duration", async () => {
@@ -122,7 +182,7 @@ describe("speaking takes", () => {
 
   it("confirmTake heads the audio key for video takes", async () => {
     const u = user();
-    const { takeId } = await start(u, { kind: "video", mime: "video/webm" });
+    const { takeId } = await start(u, VIDEO);
     await confirmTake(u, takeId, 10);
     expect(vi.mocked(r2.headObject)).toHaveBeenCalledTimes(2);
   });
@@ -172,16 +232,16 @@ describe("speaking takes", () => {
     const tooMany = Array.from({ length: 51 }, () => ({ atSec: 1, label: "m" }));
     expect((await rate({ fluency: 3, confidence: 3, markers: tooMany })).ok).toBe(false);
     expect((await rate({ fluency: 4, confidence: 2, note: "ok", markers: [{ atSec: 5, label: "pause" }] })).ok).toBe(true);
-    const v = await start(u, { kind: "video", mime: "video/webm" });
+    const v = await start(u, VIDEO);
     await confirmTake(u, v.takeId, 60);
     expect((await saveSelfRating(u, v.takeId, { fluency: 3, confidence: 3, eyeContact: 4, gestures: 2 })).ok).toBe(true);
     const doc = await SpeakingTake.findById(v.takeId).lean<{ self: { eyeContact: number } }>();
     expect(doc!.self.eyeContact).toBe(4);
   });
 
-  it("deleteTake removes both R2 keys and the document", async () => {
+  it("deleteTake removes both R2 keys and the document of a started, unstored take", async () => {
     const u = user();
-    const { takeId } = await start(u, { kind: "video", mime: "video/webm", audioMime: "audio/webm" });
+    const { takeId } = await start(u, VIDEO);
     expect((await deleteTake(u, takeId)).ok).toBe(true);
     expect(vi.mocked(r2.deleteObjects)).toHaveBeenCalledWith([
       `takes/${u}/${takeId}.webm`,

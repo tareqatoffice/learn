@@ -173,6 +173,9 @@ export function TaskRecorder({
             mime: result.mime,
             audioMime: result.audioMime,
             clipSec,
+            // Signed into the upload URLs; the server refuses a take over its byte limit here.
+            size: result.blob.size,
+            audioSize: result.audioBlob?.size,
           });
           if (!res.ok) return fail(firstError(res.errors) ?? "Couldn't save the recording. Try again.");
           s = started.current = {
@@ -253,6 +256,9 @@ export function TaskRecorder({
 
   function discard() {
     if (!window.confirm("Discard this recording? It hasn't been saved.")) return;
+    // Remove the started (unconfirmed) take and anything it uploaded; best effort.
+    const takeId = started.current?.takeId;
+    if (takeId) void deleteTakeAction(takeId).catch(() => undefined);
     started.current = null;
     savedFor.current = null;
     setSave({ phase: "idle" });

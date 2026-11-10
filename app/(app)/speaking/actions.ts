@@ -22,8 +22,8 @@ async function session(): Promise<string> {
 
 export async function startTakeAction(input: StartTakeInput) {
   const userId = await session();
-  const { task, date, lessonId, material, kind, mime, audioMime, clipSec } = input ?? ({} as StartTakeInput);
-  return startTake(userId, { task, date, lessonId: lessonId ?? null, material, kind, mime, audioMime, clipSec });
+  const { task, date, lessonId, material, kind, mime, audioMime, clipSec, size, audioSize } = input ?? ({} as StartTakeInput);
+  return startTake(userId, { task, date, lessonId: lessonId ?? null, material, kind, mime, audioMime, clipSec, size, audioSize });
 }
 
 export async function confirmTakeAction(takeId: string, durationSec: number): Promise<ActionResult> {

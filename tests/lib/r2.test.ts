@@ -50,10 +50,26 @@ describe("r2", () => {
     expect(names).not.toContain("x-amz-sdk-checksum-algorithm");
   });
 
+  it("presignPut signs the content length when given, and still carries no checksum params", async () => {
+    stubAll();
+    const url = new URL(await presignPut("k", "audio/webm", 1234));
+    expect(url.searchParams.get("X-Amz-SignedHeaders")?.split(";")).toContain("content-length");
+    const names = [...url.searchParams.keys()].map((k) => k.toLowerCase());
+    expect(names.filter((n) => n.startsWith("x-amz-checksum"))).toEqual([]);
+    const plain = new URL(await presignPut("k", "audio/webm"));
+    expect(plain.searchParams.get("X-Amz-SignedHeaders")?.split(";")).not.toContain("content-length");
+  });
+
   it("deleteObjects throws when R2 reports per-key errors", async () => {
     stubAll();
     setR2Client(fake(vi.fn().mockResolvedValue({ Errors: [{ Key: "a", Code: "x" }] })));
     await expect(deleteObjects(["a"])).rejects.toThrow();
+  });
+
+  it("deleteObjects ignores keys that are already gone", async () => {
+    stubAll();
+    setR2Client(fake(vi.fn().mockResolvedValue({ Errors: [{ Key: "a", Code: "NoSuchKey" }] })));
+    await expect(deleteObjects(["a"])).resolves.toBeUndefined();
   });
 
   it("presignGet signs a GET for the key", async () => {

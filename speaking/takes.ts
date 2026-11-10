@@ -14,6 +14,10 @@ const MAX_LABEL = 60;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 const UPLOAD_FAILED = "Your recording didn't finish uploading. Try again.";
+const MB = 1024 * 1024;
+const tooLarge = (maxBytes: number) =>
+  `This recording is larger than the ${Math.floor(maxBytes / MB)} MB limit for a take, so it can't be saved. Discard it and record a shorter take.`;
+const isSize = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n > 0;
 
 const EXT: Record<string, string> = {
   "audio/webm": "webm",
@@ -35,6 +39,10 @@ export type StartTakeInput = {
   mime: string;
   audioMime?: string;
   clipSec?: number;
+  /** Byte size of the recorded blob; it is signed into the upload URL, so only that size uploads. */
+  size: number;
+  /** Byte size of the audio-only blob (video takes). */
+  audioSize?: number;
 };
 
 const mainKey = (userId: string, takeId: string, ext: string) => `takes/${userId}/${takeId}.${ext}`;
@@ -71,22 +79,26 @@ export async function startTake(
     }
   }
 
-  let lessonId: Types.ObjectId | undefined;
-  if (input.lessonId) {
-    if (!isId(input.lessonId)) return fail("That lesson is not available.");
-    await connectDb();
-    if (!(await SpeakingLesson.exists({ _id: input.lessonId, status: "published" }))) {
-      return fail("That lesson is not available.");
-    }
-    lessonId = new Types.ObjectId(input.lessonId);
-  }
-
   const clipSec = typeof input.clipSec === "number" && Number.isFinite(input.clipSec) ? input.clipSec : undefined;
   const capSec = takeCapSec(input.task, clipSec);
   const video = input.kind === "video";
   const maxBytes = takeCapBytes(capSec, video);
+  if (!isSize(input.size)) return fail("Invalid recording size.");
+  if (input.size > maxBytes) return fail(tooLarge(maxBytes));
+  if (video) {
+    const audioMax = takeCapBytes(capSec, false);
+    if (!isSize(input.audioSize)) return fail("Invalid recording size.");
+    if (input.audioSize > audioMax) return fail(tooLarge(audioMax));
+  }
 
   await connectDb();
+  // The take keeps a copy of its material, so a lesson unpublished or deleted mid-session (or a bad
+  // id) only drops the link; the recording still saves.
+  let lessonId: Types.ObjectId | null = null;
+  if (input.lessonId && isId(input.lessonId) && (await SpeakingLesson.exists({ _id: input.lessonId, status: "published" }))) {
+    lessonId = new Types.ObjectId(input.lessonId);
+  }
+
   const _id = new Types.ObjectId();
   const takeId = String(_id);
   const key = mainKey(userId, takeId, ext);
@@ -102,8 +114,8 @@ export async function startTake(
     media: { kind: input.kind, key, mime, audioKey, audioMime, durationSec: 0, capSec, stored: false },
   });
 
-  const uploadUrl = await presignPut(key, mime);
-  const audioUploadUrl = audioKey && audioMime ? await presignPut(audioKey, audioMime) : undefined;
+  const uploadUrl = await presignPut(key, mime, input.size);
+  const audioUploadUrl = audioKey && audioMime ? await presignPut(audioKey, audioMime, input.audioSize) : undefined;
   return ok({ takeId, uploadUrl, ...(audioUploadUrl ? { audioUploadUrl } : {}), maxBytes, capSec });
 }
 
@@ -124,7 +136,7 @@ type TakeDoc = {
   userId: Types.ObjectId;
   date: string;
   task: TaskKey;
-  lessonId?: Types.ObjectId;
+  lessonId?: Types.ObjectId | null;
   material?: { title?: string; text?: string; prompt?: string; generated?: boolean };
   media: MediaDoc;
   transcript?: string;
@@ -155,13 +167,21 @@ export async function confirmTake(userId: string, takeId: string, durationSec: n
 
   const { media } = take;
   if (media.stored) return ok();
-  const main = await headObject(media.key);
-  if (!main || main.size <= 0 || main.size > takeCapBytes(media.capSec, media.kind === "video")) {
+  // A rejected take keeps its document (the client uploads again to the same URLs and retries), but
+  // whatever reached R2 is removed so nothing oversize or partial is left in the bucket.
+  const reject = async () => {
+    try {
+      await deleteObjects(keysOf(media));
+    } catch (error) {
+      console.error(`Couldn't remove the rejected upload for take ${takeId}`, error);
+    }
     return fail(UPLOAD_FAILED);
-  }
+  };
+  const main = await headObject(media.key);
+  if (!main || main.size <= 0 || main.size > takeCapBytes(media.capSec, media.kind === "video")) return reject();
   if (media.audioKey) {
     const audio = await headObject(media.audioKey);
-    if (!audio || audio.size <= 0 || audio.size > takeCapBytes(media.capSec, false)) return fail(UPLOAD_FAILED);
+    if (!audio || audio.size <= 0 || audio.size > takeCapBytes(media.capSec, false)) return reject();
   }
 
   await SpeakingTake.updateOne(
@@ -306,6 +326,7 @@ function keysOf(media: MediaDoc): string[] {
   return media.audioKey ? [media.key, media.audioKey] : [media.key];
 }
 
+/** Deletes a take, stored or only started: its R2 objects (missing ones are fine), then the document. */
 export async function deleteTake(userId: string, takeId: string): Promise<ActionResult> {
   const take = await ownTake(userId, takeId);
   if (!take) return fail("Recording not found.");
