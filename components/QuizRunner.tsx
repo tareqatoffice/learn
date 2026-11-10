@@ -8,6 +8,7 @@ import {
   recordResultAction,
 } from "@/app/(app)/interview/actions";
 import { type QuizCoach, QuizCard } from "@/components/QuizCard";
+import type { QuizAttempt } from "@/lib/quiz-answer";
 import type { MarkResult } from "@/progress/questions";
 import type { SessionView } from "@/progress/quiz";
 
@@ -16,9 +17,9 @@ export function QuizRunner({ initial, aiEnabled = false }: { initial: SessionVie
   const [view, setView] = useState(initial);
   const [, startTransition] = useTransition();
 
-  async function onResult(result: MarkResult): Promise<SessionView> {
+  async function onResult(result: MarkResult, attempt?: QuizAttempt): Promise<SessionView> {
     if (!view.current) return view;
-    const next = await recordResultAction(view.sessionId, view.current.id, result);
+    const next = await recordResultAction(view.sessionId, view.current.id, result, attempt);
     setView(next);
     return next;
   }

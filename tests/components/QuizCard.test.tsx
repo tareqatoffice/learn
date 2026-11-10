@@ -59,17 +59,17 @@ describe("QuizCard", () => {
   it("maps G, R and S to got, review and skip", async () => {
     const { onResult, user } = setup();
     await user.keyboard("g");
-    expect(onResult).toHaveBeenLastCalledWith("got");
+    expect(onResult).toHaveBeenLastCalledWith("got", undefined);
     cleanup();
 
     const review = setup();
     await review.user.keyboard("r");
-    expect(review.onResult).toHaveBeenLastCalledWith("review");
+    expect(review.onResult).toHaveBeenLastCalledWith("review", undefined);
     cleanup();
 
     const skip = setup();
     await skip.user.keyboard("S");
-    expect(skip.onResult).toHaveBeenLastCalledWith("skip");
+    expect(skip.onResult).toHaveBeenLastCalledWith("skip", undefined);
   });
 
   it("sends one result when G is pressed again while the first call is pending", async () => {
@@ -160,9 +160,14 @@ describe("QuizCard", () => {
       return { coach, onResult, user: userEvent.setup() };
     }
 
-    it("has no answer box without a coach", () => {
-      setup();
-      expect(screen.queryByLabelText("Your answer")).toBeNull();
+    it("has an answer box but no AI check without a coach, and sends the answer with the mark", async () => {
+      const { onResult, user } = setup();
+      expect(screen.queryByRole("button", { name: /check with ai/i })).toBeNull();
+      await user.type(screen.getByLabelText("Your answer"), "  My answer ");
+      await user.click(screen.getByRole("button", { name: /show answer/i }));
+      expect(screen.getByText("My answer")).toBeTruthy();
+      await user.click(screen.getByRole("button", { name: /got it/i }));
+      expect(onResult).toHaveBeenLastCalledWith("got", { answer: "My answer", mode: "typed" });
     });
 
     it("grades the typed answer, then shows feedback, the reference answer and the suggestion", async () => {
@@ -207,7 +212,7 @@ describe("QuizCard", () => {
       await act(async () => resolve(graded));
       expect(await screen.findByText("Values or variables?")).toBeTruthy();
       await user.keyboard("g");
-      expect(onResult).toHaveBeenCalledWith("got");
+      expect(onResult).toHaveBeenCalledWith("got", { answer: "Keeps scope", mode: "typed" });
     });
 
     it("shows a coach error and keeps the answer hidden", async () => {
@@ -253,6 +258,76 @@ describe("QuizCard", () => {
       expect((await screen.findByRole("alert")).textContent).toBe("Busy.");
       expect((screen.getByLabelText("Message the AI coach") as HTMLTextAreaElement).value).toBe("Why?");
       expect(screen.queryByText("Why?", { selector: "p" })).toBeNull();
+    });
+  });
+
+  describe("voice answers", () => {
+    type Fake = { onresult: ((e: unknown) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void; abort: () => void };
+    let last: Fake | null = null;
+    class FakeRecognition {
+      lang = "";
+      continuous = false;
+      interimResults = false;
+      onresult: Fake["onresult"] = null;
+      onerror = null;
+      onend: Fake["onend"] = null;
+      constructor() {
+        last = this as unknown as Fake;
+      }
+      start() {}
+      stop() {
+        this.onend?.();
+      }
+      abort() {}
+    }
+    const say = (text: string, isFinal: boolean) =>
+      act(() => last!.onresult!({ resultIndex: 0, results: [{ isFinal, 0: { transcript: text } }] }));
+
+    afterEach(() => {
+      delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+      last = null;
+    });
+
+    it("has no voice button where the browser cannot transcribe", () => {
+      setup();
+      expect(screen.queryByRole("button", { name: /answer by voice/i })).toBeNull();
+    });
+
+    it("dictates into the answer box and sends the answer as mixed with the mark", async () => {
+      (window as unknown as Record<string, unknown>).webkitSpeechRecognition = FakeRecognition;
+      const { onResult, user } = setup();
+      await user.type(screen.getByLabelText("Your answer"), "Closures");
+      await user.click(await screen.findByRole("button", { name: /answer by voice/i }));
+      expect(screen.getByRole("button", { name: /stop recording/i }).getAttribute("aria-pressed")).toBe("true");
+
+      await say("keep their", false);
+      expect(screen.getByText("keep their")).toBeTruthy();
+      await say("keep their scope", true);
+      expect((screen.getByLabelText("Your answer") as HTMLTextAreaElement).value).toBe("Closures keep their scope");
+
+      // Mid-dictation, marks and the reveal wait: the phrase being spoken is not in the answer yet.
+      expect((screen.getByRole("button", { name: /got it/i }) as HTMLButtonElement).disabled).toBe(true);
+      expect((screen.getByRole("button", { name: /show answer/i }) as HTMLButtonElement).disabled).toBe(true);
+      (document.activeElement as HTMLElement).blur();
+      await user.keyboard("g");
+      expect(onResult).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole("button", { name: /stop recording/i }));
+      expect(screen.getByRole("button", { name: /answer by voice/i })).toBeTruthy();
+      await user.click(screen.getByRole("button", { name: /got it/i }));
+      expect(onResult).toHaveBeenLastCalledWith("got", { answer: "Closures keep their scope", mode: "mixed" });
+    });
+
+    it("counts only what is in the box now: cleared typing then dictation is a voice answer", async () => {
+      (window as unknown as Record<string, unknown>).webkitSpeechRecognition = FakeRecognition;
+      const { onResult, user } = setup();
+      await user.type(screen.getByLabelText("Your answer"), "x");
+      await user.clear(screen.getByLabelText("Your answer"));
+      await user.click(await screen.findByRole("button", { name: /answer by voice/i }));
+      await say("spoken only", true);
+      await user.click(screen.getByRole("button", { name: /stop recording/i }));
+      await user.click(screen.getByRole("button", { name: /got it/i }));
+      expect(onResult).toHaveBeenLastCalledWith("got", { answer: "spoken only", mode: "voice" });
     });
   });
 });

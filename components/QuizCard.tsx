@@ -6,6 +6,7 @@ import { AnswerBox, FeedbackPanel, FollowUpChat } from "@/components/QuizCoach";
 import { Notice } from "@/components/Notice";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Markdown } from "@/lib/markdown/Markdown";
+import { answerModeOf, type QuizAttempt } from "@/lib/quiz-answer";
 import type { MarkResult } from "@/progress/questions";
 import type { SessionView } from "@/progress/quiz";
 import type { AiGrade, AiReply, AiResult } from "@/progress/quizAi";
@@ -15,8 +16,8 @@ type Card = NonNullable<SessionView["current"]>;
 
 export type QuizCardProps = {
   view: SessionView;
-  /** Records the mark and resolves with the session as it now stands. */
-  onResult: (result: MarkResult) => Promise<SessionView>;
+  /** Records the mark (with the learner's answer, if any) and resolves with the session as it now stands. */
+  onResult: (result: MarkResult, attempt?: QuizAttempt) => Promise<SessionView>;
   onFinish: () => void;
   /** The AI coach (OpenRouter); without it the card is a plain flashcard. */
   coach?: QuizCoach;
@@ -70,7 +71,29 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const [answer, setAnswer] = useState("");
+  // How the answer was given, saved with the mark: refs, since only `mark` reads them.
+  const typed = useRef(false);
+  const spoken = useRef(false);
+  const answerRef = useRef("");
   const [grade, setGrade] = useState<AiGrade | null>(null);
+
+  function changeAnswer(value: string, source: "typed" | "voice") {
+    // Clearing the box starts the answer over, so its mode counts only what is there now.
+    if (!value.trim()) typed.current = spoken.current = false;
+    else if (source === "voice") spoken.current = true;
+    else typed.current = true;
+    answerRef.current = value;
+    setAnswer(value);
+  }
+
+  // While dictating, the phrase being spoken is not in the answer yet: marking, revealing or checking
+  // then would drop it, so they wait until the recording stops.
+  const [recording, setRecording] = useState(false);
+  const recordingRef = useRef(false);
+  const onRecordingChange = useCallback((on: boolean) => {
+    recordingRef.current = on;
+    setRecording(on);
+  }, []);
   const [checking, setChecking] = useState(false);
   const [coachError, setCoachError] = useState("");
   // Like `busy`: blocks a second check, and every shortcut, while a check is in flight.
@@ -100,12 +123,13 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
 
   const mark = useCallback(
     async (result: MarkResult) => {
-      if (busy.current || checkingRef.current) return;
+      if (busy.current || checkingRef.current || recordingRef.current) return;
       busy.current = true;
       setPending(true);
       setFailed(false);
+      const text = answerRef.current.trim();
       try {
-        await onResult(result);
+        await onResult(result, text ? { answer: text, mode: answerModeOf(typed.current, spoken.current) } : undefined);
       } catch {
         setFailed(true);
       } finally {
@@ -118,7 +142,7 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (ignoresShortcut(e) || checkingRef.current) return;
+      if (ignoresShortcut(e) || checkingRef.current || recordingRef.current) return;
       if (e.key === " ") {
         if (activatesOnSpace(e.target)) return;
         e.preventDefault();
@@ -157,15 +181,21 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
         </div>
       )}
 
-      {coach && !revealed && (
+      {!revealed && (
         <div className="mt-4">
-          <AnswerBox value={answer} onChange={setAnswer} onCheck={() => void check()} pending={checking} />
+          <AnswerBox
+            value={answer}
+            onChange={changeAnswer}
+            onCheck={coach ? () => void check() : undefined}
+            pending={checking}
+            onRecordingChange={onRecordingChange}
+          />
           {coachError && <Notice className="mt-2">{coachError}</Notice>}
         </div>
       )}
 
       <div aria-live="polite" className="mt-4 grid gap-4">
-        {revealed && coach && answer.trim() && !feedback && (
+        {revealed && answer.trim() && !feedback && (
           <div className="rounded-lg border border-dashed border-border p-3 text-sm">
             <p className="text-muted-foreground">Your answer</p>
             <p className="mt-1 whitespace-pre-wrap">{answer}</p>
@@ -174,12 +204,12 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
         {grade && <FeedbackPanel feedback={grade.feedback} model={grade.model} />}
         {revealed ? (
           <div className="rounded-lg border border-border bg-background p-4">
-            {coach && <p className="mb-2 text-sm text-muted-foreground">Reference answer</p>}
+            {(coach || answer.trim()) && <p className="mb-2 text-sm text-muted-foreground">Reference answer</p>}
             <Markdown source={card.answer} />
           </div>
         ) : (
           <div>
-            <Button type="button" variant="outline" disabled={checking} onClick={() => setRevealed(true)}>
+            <Button type="button" variant="outline" disabled={checking || recording} onClick={() => setRevealed(true)}>
               Show answer
               <KeyHint>Space</KeyHint>
             </Button>
@@ -200,7 +230,7 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
-            disabled={pending || checking}
+            disabled={pending || checking || recording}
             onClick={() => void mark("got")}
             aria-describedby={feedback?.suggested === "got" ? "quiz-suggested" : undefined}
             className={cn("bg-ok text-background hover:bg-ok/85", feedback?.suggested === "got" && suggestedRing)}
@@ -210,7 +240,7 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
           </Button>
           <Button
             type="button"
-            disabled={pending || checking}
+            disabled={pending || checking || recording}
             onClick={() => void mark("review")}
             aria-describedby={feedback?.suggested === "review" ? "quiz-suggested" : undefined}
             className={cn("bg-track-1 text-background hover:bg-track-1/85", feedback?.suggested === "review" && suggestedRing)}
@@ -218,7 +248,7 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
             Review
             <KeyHint>R</KeyHint>
           </Button>
-          <Button type="button" variant="outline" disabled={pending || checking} onClick={() => void mark("skip")}>
+          <Button type="button" variant="outline" disabled={pending || checking || recording} onClick={() => void mark("skip")}>
             Skip
             <KeyHint>S</KeyHint>
           </Button>
@@ -267,9 +297,14 @@ function Done({ view }: { view: SessionView }) {
           </div>
         ))}
       </div>
-      <Link href="/interview" className={cn(buttonVariants(), "mt-6")}>
-        Back to Interview
-      </Link>
+      <div className="mt-6 flex flex-wrap justify-center gap-2">
+        <Link href="/interview" className={buttonVariants()}>
+          Back to Interview
+        </Link>
+        <Link href={`/interview/history/${view.sessionId}`} className={buttonVariants({ variant: "outline" })}>
+          Review my answers
+        </Link>
+      </div>
     </section>
   );
 }

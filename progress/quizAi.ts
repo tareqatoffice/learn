@@ -207,6 +207,14 @@ export async function gradeAnswer(
     questionId,
     answer,
     messages: feedback.followUp ? [{ role: "assistant", content: feedback.followUp }] : [],
+    feedback: {
+      verdict: feedback.verdict,
+      score: feedback.score,
+      summary: feedback.summary,
+      strengths: feedback.strengths,
+      missing: feedback.missing,
+      model,
+    },
   });
   return { feedback, conversationId: String(conversation._id), model };
 }

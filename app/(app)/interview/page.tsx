@@ -25,7 +25,15 @@ export default async function InterviewPage() {
 
   return (
     <div className="grid gap-4">
-      <h1 className={pageTitleClass}>Interview prep</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className={pageTitleClass}>Interview prep</h1>
+        <Link
+          href="/interview/history"
+          className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          My quiz answers
+        </Link>
+      </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <QuizSetup
           books={books.map(({ id, title, parts }) => ({ id, title, parts }))}
