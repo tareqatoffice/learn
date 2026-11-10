@@ -41,6 +41,21 @@ const schema = z.object({
       const n = Number(value.trim() || DEFAULT_DAILY_LIMIT);
       return Number.isInteger(n) && n >= 0 ? n : DEFAULT_DAILY_LIMIT;
     }),
+  /** Cloudflare R2 (speaking-practice audio). All four blank turns storage off. */
+  R2_ACCOUNT_ID: z.string().default(""),
+  R2_ACCESS_KEY_ID: z.string().default(""),
+  R2_SECRET_ACCESS_KEY: z.string().default(""),
+  R2_BUCKET: z.string().default(""),
+  /** Cloudflare Workers AI token for speech-to-text. */
+  CF_AI_TOKEN: z.string().default(""),
+  /** Speech-to-text calls per user per UTC day; a bad value falls back to 200. */
+  STT_DAILY_LIMIT: z
+    .string()
+    .default("")
+    .transform((value) => {
+      const n = Number(value.trim() || 200);
+      return Number.isInteger(n) && n >= 0 ? n : 200;
+    }),
 });
 
 export type Env = z.output<typeof schema>;
