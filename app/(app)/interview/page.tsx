@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ClearProgress } from "@/components/ClearProgress";
 import { ProgressBar } from "@/components/ProgressBar";
 import { QuizSetup } from "@/components/QuizSetup";
 import { listBooksWithProgress } from "@/content/queries";
@@ -106,6 +107,10 @@ export default async function InterviewPage() {
               </ul>
             )}
           </section>
+
+          {books.length > 0 && (
+            <ClearProgress books={books.map(({ id, title }) => ({ id, title }))} />
+          )}
         </div>
       </div>
     </div>

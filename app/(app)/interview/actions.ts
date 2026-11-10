@@ -6,7 +6,7 @@ import { AI_ANSWER_MAX, AI_MESSAGE_MAX } from "@/lib/ai-limits";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 import { AiError } from "@/lib/openrouter";
-import type { MarkResult } from "@/progress/questions";
+import { clearQuestionProgress, type MarkResult } from "@/progress/questions";
 import { type AiGrade, type AiReply, type AiResult, askFollowUp, gradeAnswer } from "@/progress/quizAi";
 import {
   createSession,
@@ -62,6 +62,14 @@ export async function recordResultAction(
     input.questionId,
     input.result,
   );
+}
+
+/** Clears the user's question progress for the given books (empty list = every book). */
+export async function clearProgressAction(bookIds: string[]): Promise<{ cleared: number }> {
+  const ids = z.array(objectId).max(100).parse(bookIds);
+  const user = await requireUser();
+  await connectDb();
+  return { cleared: await clearQuestionProgress(user.userId, ids) };
 }
 
 export async function finishQuizAction(sessionId: string): Promise<void> {
