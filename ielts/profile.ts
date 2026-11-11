@@ -118,7 +118,11 @@ function planView(doc: PlanDoc): PlanView {
   };
 }
 
-function toPlanInputs(data: z.output<typeof profileInput>, today: string): PlanInputs {
+/** Plan inputs from a profile (validated input or stored view). */
+export function toPlanInputs(
+  data: Pick<z.output<typeof profileInput>, "testDate" | "target" | "current" | "minutesPerDay" | "studyDays">,
+  today: string,
+): PlanInputs {
   const current = pickBands(data.current);
   return {
     today,
@@ -173,27 +177,49 @@ export async function currentPlan(userId: string): Promise<PlanView | null> {
   return doc ? planView(doc) : null;
 }
 
-export async function previewProfile(
-  userId: string,
-  input: ProfileInput,
-  today: string,
-): Promise<ActionResult<{ before: PlanView | null; after: PlanView; dropped: Adjustment[] }>> {
-  const v = validate(input, today);
-  if ("errors" in v) return v.errors as ActionResult<never>;
-  await connectDb();
-  const prev = await latestPlanDoc(userId);
+export type PlanPreview = { before: PlanView | null; after: PlanView; dropped: Adjustment[] };
+
+type PlanCtx = { metCriteria?: Criterion[] };
+
+async function buildPreview(
+  prev: PlanDoc | null,
+  inputs: PlanInputs,
+  adjustments: Adjustment[],
+  reason: string,
+  ctx: PlanCtx,
+): Promise<PlanPreview> {
   const settings = await getIeltsSettings();
-  const plan = generatePlan(toPlanInputs(v.data, today), prev?.adjustments ?? [], settings);
+  const plan = generatePlan(inputs, adjustments, settings, ctx);
   const after = planView({
     version: (prev?.version ?? 0) + 1,
-    reason: CHANGED_REASON,
+    reason,
     createdAt: new Date(),
     phases: plan.phases,
     weeks: plan.weeks,
     hours: plan.hours,
     adjustments: plan.kept,
   });
-  return ok({ before: prev ? planView(prev) : null, after, dropped: plan.dropped });
+  return { before: prev ? planView(prev) : null, after, dropped: plan.dropped };
+}
+
+/** What the next version would look like, against the current one. Writes nothing. */
+export async function previewPlan(
+  userId: string,
+  inputs: PlanInputs,
+  adjustments: Adjustment[],
+  reason: string,
+  ctx: PlanCtx = {},
+): Promise<PlanPreview> {
+  await connectDb();
+  return buildPreview(await latestPlanDoc(userId), inputs, adjustments, reason, ctx);
+}
+
+export async function previewProfile(userId: string, input: ProfileInput, today: string): Promise<ActionResult<PlanPreview>> {
+  const v = validate(input, today);
+  if ("errors" in v) return v.errors as ActionResult<never>;
+  await connectDb();
+  const prev = await latestPlanDoc(userId);
+  return ok(await buildPreview(prev, toPlanInputs(v.data, today), prev?.adjustments ?? [], CHANGED_REASON, {}));
 }
 
 /** Generates a plan from `inputs` and stores it as the next version. Returns the new version number. */
@@ -202,10 +228,11 @@ export async function writePlanVersion(
   inputs: PlanInputs,
   adjustments: Adjustment[],
   reason: string,
+  ctx: PlanCtx = {},
 ): Promise<number> {
   await connectDb();
   const settings = await getIeltsSettings();
-  const plan = generatePlan(inputs, adjustments, settings);
+  const plan = generatePlan(inputs, adjustments, settings, ctx);
   return retryOnDuplicateKey(async () => {
     const last = await IeltsPlan.findOne({ userId }).sort({ version: -1 }).select("version").lean<{ version: number }>();
     const version = (last?.version ?? 0) + 1;
