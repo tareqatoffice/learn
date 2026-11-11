@@ -12,6 +12,8 @@ import {
   Question,
   QuestionBook,
   QuestionProgress,
+  SpeakingDay,
+  SpeakingProfile,
   User,
 } from "@/models";
 import { resetDb } from "../setup/mongo";
@@ -75,6 +77,16 @@ describe("model indexes and validation", () => {
   it("rejects a second ApiToken with the same tokenHash", async () => {
     const doc = { name: "cli", tokenHash: "abc123", createdBy: oid() };
     await expectDuplicate(ApiToken.create(doc), () => ApiToken.create(doc));
+  });
+
+  it("rejects a second SpeakingDay for the same user and date", async () => {
+    const doc = { userId: oid(), date: "2026-11-10", lessonId: oid() };
+    await expectDuplicate(SpeakingDay.create(doc), () => SpeakingDay.create(doc));
+  });
+
+  it("rejects a second SpeakingProfile for the same user", async () => {
+    const doc = { userId: oid() };
+    await expectDuplicate(SpeakingProfile.create(doc), () => SpeakingProfile.create(doc));
   });
 
   it("rejects a second User with the same email", async () => {

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { startQuizAction } from "@/app/(app)/interview/actions";
 import { Chip } from "@/components/Chip";
 import { Button } from "@/components/ui/button";
+import { toggleItem } from "@/lib/utils";
 import type { QuizMode } from "@/progress/quiz";
 
 export type SetupBook = { id: string; title: string; parts: { key: string; title: string }[] };
@@ -29,7 +30,7 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const toggle = (list: string[], item: string) => (list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
+const toggle = toggleItem<string>;
 
 export function QuizSetup({ books }: { books: SetupBook[] }) {
   const [bookIds, setBookIds] = useState<string[]>([]);

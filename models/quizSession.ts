@@ -1,4 +1,5 @@
 import mongoose, { Schema, model } from "mongoose";
+import { ANSWER_MODES } from "@/lib/quiz-answer";
 
 const filterSchema = new Schema(
   {
@@ -10,11 +11,37 @@ const filterSchema = new Schema(
   { _id: false },
 );
 
+const chatSchema = new Schema(
+  {
+    role: { type: String, enum: ["user", "assistant"], required: true },
+    content: { type: String, required: true },
+  },
+  { _id: false },
+);
+
+/** The AI coach's grade of the attempt and the follow-up chat, copied in when the card is marked (conversations expire). */
+const coachSchema = new Schema(
+  {
+    verdict: { type: String, enum: ["correct", "partial", "incorrect"] },
+    score: Number,
+    summary: String,
+    strengths: { type: [String], default: undefined },
+    missing: { type: [String], default: undefined },
+    model: String,
+    chat: { type: [chatSchema], default: undefined },
+  },
+  { _id: false },
+);
+
 const resultSchema = new Schema(
   {
     questionId: { type: Schema.Types.ObjectId, required: true },
     result: { type: String, enum: ["got", "review", "skip"], required: true },
     at: { type: Date, default: Date.now },
+    /** What the learner wrote or dictated before marking; absent when they only revealed the answer. */
+    answer: String,
+    answerMode: { type: String, enum: ANSWER_MODES },
+    coach: { type: coachSchema, default: undefined },
   },
   { _id: false },
 );

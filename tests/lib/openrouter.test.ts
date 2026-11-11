@@ -128,6 +128,7 @@ describe("openrouter", () => {
           context_length: 131072,
           pricing: { prompt: "0", completion: "0" },
           supported_parameters: ["temperature", "response_format"],
+          architecture: { input_modalities: ["text", "image"] },
         },
         { id: "a/zero", name: "Ay Zero", pricing: { prompt: "0", completion: "0" } },
         { id: "i/image", name: "Image only", pricing: { prompt: "0", completion: "0" }, architecture: { output_modalities: ["image"] } },
@@ -140,10 +141,10 @@ describe("openrouter", () => {
 
     it("lists text models with free ones first, sorted by name", () => {
       expect(parseCatalog(raw)).toEqual([
-        { id: "b/model:free", name: "Bee Free", free: true, contextLength: 131072, json: true },
-        { id: "a/zero", name: "Ay Zero", free: true, contextLength: null, json: null },
-        { id: "openrouter/auto", name: "Auto", free: false, contextLength: null, json: null },
-        { id: "z/paid", name: "Zed Paid", free: false, contextLength: 8000, json: false },
+        { id: "b/model:free", name: "Bee Free", free: true, contextLength: 131072, json: true, images: true },
+        { id: "a/zero", name: "Ay Zero", free: true, contextLength: null, json: null, images: false },
+        { id: "openrouter/auto", name: "Auto", free: false, contextLength: null, json: null, images: false },
+        { id: "z/paid", name: "Zed Paid", free: false, contextLength: 8000, json: false, images: false },
       ]);
       expect(parseCatalog(null)).toEqual([]);
     });

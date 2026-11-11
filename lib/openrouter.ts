@@ -1,7 +1,9 @@
 export const OPENROUTER_API = "https://openrouter.ai/api/v1";
 export const OPENROUTER_URL = `${OPENROUTER_API}/chat/completions`;
 
-export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+export type ContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+
+export type ChatMessage = { role: "system" | "user" | "assistant"; content: string | ContentPart[] };
 
 /**
  * A failure the learner may see as is. `detail` carries OpenRouter's own reason (for admins, e.g. the
@@ -167,6 +169,8 @@ export type CatalogModel = {
   contextLength: number | null;
   /** Accepts a JSON schema reply format; null when the catalogue does not say. */
   json: boolean | null;
+  /** Accepts images as input. */
+  images: boolean;
 };
 
 const CATALOG_TTL_MS = 10 * 60 * 1000;
@@ -182,7 +186,7 @@ type RawModel = {
   name?: unknown;
   context_length?: unknown;
   pricing?: { prompt?: unknown; completion?: unknown };
-  architecture?: { output_modalities?: unknown };
+  architecture?: { output_modalities?: unknown; input_modalities?: unknown };
   supported_parameters?: unknown;
 };
 
@@ -212,6 +216,7 @@ export function parseCatalog(data: unknown): CatalogModel[] {
       free: m.id.endsWith(":free") || (isZero(m.pricing?.prompt) && isZero(m.pricing?.completion)),
       contextLength: typeof m.context_length === "number" ? m.context_length : null,
       json: supportsJson(m.supported_parameters),
+      images: Array.isArray(m.architecture?.input_modalities) && m.architecture.input_modalities.includes("image"),
     }))
     .sort(
       (a, b) =>
