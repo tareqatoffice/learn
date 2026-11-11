@@ -9,15 +9,13 @@ import { transcribeMedia } from "@/recording/transcribe";
 import { playbackUrls, prepareUpload, removeMedia, verifyUpload } from "@/recording/upload";
 import { type Kind, type QuestionSet, pickQuestions } from "./questions";
 
-export type Part = "p1" | "p2" | "p3";
+import { KIND_PARTS, PART_CAP_SEC, type Part } from "./timing";
+
+export { KIND_PARTS, PART_CAP_SEC, type Part };
 type Status = "inProgress" | "complete" | "incomplete";
 type Marker = { atSec: number; label: string };
 
 const KINDS: Kind[] = ["mock", "part1", "part2", "part3"];
-/** The parts each kind records, in order. */
-export const KIND_PARTS: Record<Kind, Part[]> = { mock: ["p1", "p2", "p3"], part1: ["p1"], part2: ["p2"], part3: ["p3"] };
-/** Hard recording caps (R14): Part 1 and 3 run to 420 s, Part 2 to 150 s. */
-export const PART_CAP_SEC: Record<Part, number> = { p1: 420, p2: 150, p3: 420 };
 
 const MAX_MARKERS = 50;
 const MAX_LABEL = 60;
