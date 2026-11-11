@@ -4,8 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MockRunner, type MockActions, type MockQuestions } from "@/components/ielts/MockRunner";
 import type { RecorderResult, RecorderState } from "@/lib/useRecorder";
 
-// A stateful stand-in for useRecorder: start records, stop (or the cap) yields a result.
-const rec = vi.hoisted(() => ({ starts: [] as number[] }));
+// A stateful stand-in for useRecorder: start records, stop (or the cap) yields a result. With
+// `holdAsking`, start waits on the mic prompt; stopping then (or hiding the page) returns to idle.
+const rec = vi.hoisted(() => ({ starts: [] as number[], holdAsking: false }));
 vi.mock("@/lib/useRecorder", async () => {
   const React = await import("react");
   return {
@@ -13,10 +14,13 @@ vi.mock("@/lib/useRecorder", async () => {
       const [state, setState] = React.useState<RecorderState>("idle");
       const [elapsedSec, setElapsedSec] = React.useState(0);
       const [result, setResult] = React.useState<RecorderResult | null>(null);
-      const t = React.useRef<{ at: number; tick?: ReturnType<typeof setInterval>; cap?: ReturnType<typeof setTimeout>; on: boolean }>({
-        at: 0,
-        on: false,
-      });
+      const t = React.useRef<{
+        at: number;
+        tick?: ReturnType<typeof setInterval>;
+        cap?: ReturnType<typeof setTimeout>;
+        on: boolean;
+        asking: boolean;
+      }>({ at: 0, on: false, asking: false });
       const finish = React.useCallback(() => {
         if (!t.current.on) return;
         t.current.on = false;
@@ -30,6 +34,11 @@ vi.mock("@/lib/useRecorder", async () => {
       }, [kind, capSec]);
       const start = React.useCallback(async () => {
         rec.starts.push(capSec);
+        if (rec.holdAsking) {
+          t.current.asking = true;
+          setState("asking");
+          return;
+        }
         t.current.on = true;
         t.current.at = Date.now();
         setResult(null);
@@ -38,7 +47,21 @@ vi.mock("@/lib/useRecorder", async () => {
         t.current.tick = setInterval(() => setElapsedSec(Math.min(capSec, Math.round((Date.now() - t.current.at) / 1000))), 250);
         t.current.cap = setTimeout(finish, capSec * 1000);
       }, [capSec, finish]);
-      return { state, error: "", elapsedSec, stream: null, result, start, stop: finish, reset: vi.fn() };
+      const stop = React.useCallback(() => {
+        if (t.current.asking) {
+          t.current.asking = false;
+          setState("idle");
+        }
+        finish();
+      }, [finish]);
+      React.useEffect(() => {
+        const onHidden = () => {
+          if (document.visibilityState === "hidden") stop();
+        };
+        document.addEventListener("visibilitychange", onHidden);
+        return () => document.removeEventListener("visibilitychange", onHidden);
+      }, [stop]);
+      return { state, error: "", elapsedSec, stream: null, result, start, stop, reset: vi.fn() };
     },
   };
 });
@@ -99,6 +122,7 @@ function renderRunner(kind: "mock" | "part1" | "part2" | "part3" = "mock") {
 beforeEach(() => {
   vi.useFakeTimers();
   rec.starts = [];
+  rec.holdAsking = false;
   actions = makeActions();
   vi.stubGlobal("speechSynthesis", undefined);
 });
@@ -266,5 +290,122 @@ describe("MockRunner", () => {
     expect(actions.confirmPart).toHaveBeenCalledWith(ID, "p3", expect.objectContaining({ durationSec: 30 }));
     await click(/finish/i);
     expect(actions.finishAttempt).toHaveBeenCalledWith(ID, { paused: true });
+  });
+
+  it("offers a restart when the page hides during the mic prompt", async () => {
+    rec.holdAsking = true;
+    renderRunner("part1");
+    await click(/^start/i);
+    expect(screen.getByText(/allow the microphone/i)).toBeTruthy();
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    visibility.mockReturnValue("visible");
+    rec.holdAsking = false;
+    await click(/start part 1 again/i);
+    expect(recording()).toBe(true);
+    expect(rec.starts).toEqual([420, 420]);
+  });
+
+  it("counts a part stopped by the page hiding as paused", async () => {
+    renderRunner("part3");
+    await click(/^start/i);
+    await tick(20_000);
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    visibility.mockReturnValue("visible");
+    expect(screen.getByText(/paused\. part 3 is kept/i)).toBeTruthy();
+    expect(actions.confirmPart).toHaveBeenCalledWith(ID, "p3", expect.objectContaining({ durationSec: 20 }));
+    await click(/finish/i);
+    await tick(0);
+    expect(actions.finishAttempt).toHaveBeenCalledWith(ID, { paused: true });
+  });
+
+  it("keeps the take and retries after a failed startPart", async () => {
+    actions.startPart.mockResolvedValueOnce({ ok: false, errors: { _: "Recording storage isn't set up yet." } });
+    renderRunner("part1");
+    await click(/^start/i);
+    await tick(5_000);
+    await click(/end part 1/i);
+    expect(screen.getByRole("alert").textContent).toMatch(/storage isn't set up/i);
+    expect(upload.uploadTake).not.toHaveBeenCalled();
+    await click(/try again/i);
+    expect(actions.startPart).toHaveBeenCalledTimes(2);
+    expect(actions.confirmPart).toHaveBeenCalledWith(ID, "p1", expect.objectContaining({ durationSec: 5 }));
+    await tick(0);
+    expect(actions.finishAttempt).toHaveBeenCalled();
+  });
+
+  it("asks for fresh upload URLs after a failed confirm", async () => {
+    actions.confirmPart.mockResolvedValueOnce({ ok: false, errors: { _: "This part was started again. Upload it again." } });
+    renderRunner("part1");
+    await click(/^start/i);
+    await click(/end part 1/i);
+    expect(screen.getByRole("alert").textContent).toMatch(/started again/i);
+    await click(/try again/i);
+    expect(actions.startPart).toHaveBeenCalledTimes(2);
+    expect(upload.uploadTake).toHaveBeenCalledTimes(2);
+    expect(actions.confirmPart).toHaveBeenCalledTimes(2);
+    await tick(0);
+    expect(push).toHaveBeenCalledWith(`/ielts/speaking/${ID}/review`);
+  });
+
+  it("finishes without a failed part only after the learner confirms", async () => {
+    upload.uploadTake.mockRejectedValue(new upload.UploadError("The upload failed (500). Try again."));
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderRunner("part1");
+    await click(/^start/i);
+    await click(/end part 1/i);
+    await click(/finish without/i);
+    expect(confirm).toHaveBeenCalledWith("Part 1 hasn't saved. Finish without it?");
+    await tick(0);
+    expect(actions.finishAttempt).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    await click(/finish without/i);
+    await tick(0);
+    expect(actions.finishAttempt).toHaveBeenCalledWith(ID, { paused: false });
+  });
+});
+
+describe("MockRunner headphones gate", () => {
+  let speak: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    speak = vi.fn();
+    vi.stubGlobal("speechSynthesis", { speak, cancel: vi.fn(), getVoices: () => [], addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    vi.stubGlobal(
+      "SpeechSynthesisUtterance",
+      class {
+        lang = "";
+        constructor(public text: string) {}
+        addEventListener() {}
+      },
+    );
+  });
+
+  it("keeps Start disabled until headphones are ticked when the examiner speaks", async () => {
+    renderRunner("part1");
+    const start = screen.getByRole("button", { name: /^start/i }) as HTMLButtonElement;
+    expect(start.disabled).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox", { name: /i'm wearing headphones/i }));
+    expect(start.disabled).toBe(false);
+    await click(/^start/i);
+    expect(speak).toHaveBeenCalledTimes(1);
+    expect(recording()).toBe(true);
+  });
+
+  it("reads the questions on screen instead, without speaking", async () => {
+    renderRunner("part1");
+    await click(/read questions on screen instead/i);
+    expect(screen.queryByRole("checkbox", { name: /headphones/i })).toBeNull();
+    await click(/^start/i);
+    expect(recording()).toBe(true);
+    expect(screen.getByText("Where do you live?")).toBeTruthy();
+    await click(/next question/i);
+    expect(speak).not.toHaveBeenCalled();
   });
 });

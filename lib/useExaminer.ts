@@ -32,6 +32,7 @@ export function useExaminer({ enabled }: { enabled: boolean }) {
   );
   const [failed, setFailed] = useState(false);
   const failedRef = useRef(false);
+  const voices = useRef<SpeechSynthesisVoice[]>([]);
 
   const speak = useCallback(
     (text: string): Promise<void> => {
@@ -49,7 +50,8 @@ export function useExaminer({ enabled }: { enabled: boolean }) {
         try {
           const u = new SpeechSynthesisUtterance(text);
           u.lang = "en-GB";
-          const voice = pickVoice(s.getVoices?.() ?? []);
+          const now = s.getVoices?.() ?? [];
+          const voice = pickVoice(now.length ? now : voices.current);
           if (voice) u.voice = voice;
           u.addEventListener("end", done);
           u.addEventListener("error", (e: SpeechSynthesisErrorEvent) => {
@@ -72,7 +74,20 @@ export function useExaminer({ enabled }: { enabled: boolean }) {
     [enabled],
   );
 
-  useEffect(() => () => synth()?.cancel(), []);
+  // Some browsers (Chrome) load voices after the page: keep the list once it arrives.
+  useEffect(() => {
+    const s = synth();
+    if (!s) return;
+    const load = () => {
+      voices.current = s.getVoices?.() ?? [];
+    };
+    load();
+    s.addEventListener?.("voiceschanged", load, { once: true });
+    return () => {
+      s.removeEventListener?.("voiceschanged", load);
+      s.cancel();
+    };
+  }, []);
 
   return { speak, supported, failed };
 }

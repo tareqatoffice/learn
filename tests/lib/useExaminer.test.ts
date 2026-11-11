@@ -71,6 +71,27 @@ describe("useExaminer", () => {
     expect(FakeUtterance.last?.voice?.name).toBe("Karen");
   });
 
+  it("uses the en-GB voice once voices load after the page", () => {
+    let loaded: { lang: string; name: string }[] = [];
+    const listeners: Record<string, () => void> = {};
+    vi.stubGlobal("speechSynthesis", {
+      speak: vi.fn(),
+      cancel: vi.fn(),
+      getVoices: () => loaded,
+      addEventListener: (type: string, fn: () => void) => (listeners[type] = fn),
+      removeEventListener: vi.fn(),
+    });
+    vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
+    const { result } = renderHook(() => useExaminer({ enabled: true }));
+    expect(listeners.voiceschanged).toBeTypeOf("function");
+    loaded = [{ lang: "en-GB", name: "Daniel" }];
+    listeners.voiceschanged();
+    // A browser that then reports no voices on the call still gets the loaded one.
+    loaded = [];
+    void result.current.speak("Hello");
+    expect(FakeUtterance.last?.voice?.name).toBe("Daniel");
+  });
+
   it("sets failed after an error event, and later calls resolve at once without speaking", async () => {
     const synth = installSpeech();
     const { result } = renderHook(() => useExaminer({ enabled: true }));

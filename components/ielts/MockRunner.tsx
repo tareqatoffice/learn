@@ -98,7 +98,10 @@ export function MockRunner({
   actions: MockActions;
 }) {
   const router = useRouter();
-  const examiner = useExaminer({ enabled: examinerVoice });
+  // R21: a spoken question leaks into the recording, so the voice needs headphones or is switched off for this run.
+  const [voice, setVoice] = useState(examinerVoice);
+  const [headphones, setHeadphones] = useState(false);
+  const examiner = useExaminer({ enabled: voice });
   const mock = kind === "mock";
   const parts = KIND_PARTS[kind].filter((p) => hasContent(p, questions));
   const prompts: Record<Part, Prompt[]> = {
@@ -329,7 +332,13 @@ export function MockRunner({
 
   // A locked phone mid-prep pauses the countdown, so the talk never starts recording on a hidden page.
   const onHidden = useEffectEvent(() => {
-    if (document.visibilityState === "hidden" && stage === "prep" && prep.pausedLeftMs === null) pause();
+    if (document.visibilityState !== "hidden") return;
+    if (stage === "prep" && prep.pausedLeftMs === null) pause();
+    else if (stage === "live") {
+      // useRecorder stops the part itself; count it as a pause, like prep.
+      setPaused(true);
+      pausing.current = true;
+    }
   });
   useEffect(() => {
     const listener = () => onHidden();
@@ -367,7 +376,8 @@ export function MockRunner({
   function finishWithout() {
     const failed = (Object.keys(uploads) as Part[]).filter((p) => uploads[p]?.status === "failed");
     const names = failed.map((p) => NAME[p]).join(" and ");
-    if (!window.confirm(`${names} hasn't saved. Finish without it?`)) return;
+    const many = failed.length > 1;
+    if (!window.confirm(`${names} ${many ? "haven't" : "hasn't"} saved. Finish without ${many ? "them" : "it"}?`)) return;
     for (const p of failed) takes.current.delete(p);
     setUploads((all) => Object.fromEntries(Object.entries(all).filter(([p]) => !failed.includes(p as Part))));
   }
@@ -387,7 +397,10 @@ export function MockRunner({
 
   if (parts.length === 0) return <Notice>This practice has no questions. Start a new one.</Notice>;
 
-  const voiceOff = examinerVoice && (!examiner.supported || examiner.failed);
+  const voiceOff = voice && (!examiner.supported || examiner.failed);
+  const needHeadphones = voice && examiner.supported && !examiner.failed;
+  // Idle in a live part means the start never got going (the page hid during the mic prompt).
+  const notStarted = rec.state === "error" || rec.state === "idle";
   const prompt = prompts[part][promptIdx];
   const recording = rec.state === "recording";
   const prepLeftSec = Math.ceil((prep.pausedLeftMs ?? Math.max(0, prep.endsAt - prep.now)) / 1000);
@@ -410,10 +423,24 @@ export function MockRunner({
             {parts.includes("p3") && <li>Part 3: a discussion of broader questions, for 4 to 5 minutes.</li>}
           </ul>
           <p className="text-sm">
-            {examinerVoice ? "The examiner reads each question aloud. " : ""}
+            {needHeadphones ? "The examiner reads each question aloud. " : "Read each question on screen. "}
             {parts[0] === "p2" ? "Preparation starts when you tap Start." : "Recording starts when you tap Start."}
           </p>
-          <Button size="lg" className="w-full sm:w-auto" onClick={() => enter(parts[0])}>
+          {needHeadphones && (
+            <div className="grid gap-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={headphones} onChange={(e) => setHeadphones(e.target.checked)} className="size-4" />
+                I&apos;m wearing headphones
+              </label>
+              <p className="text-xs text-muted-foreground">
+                The examiner&apos;s voice plays while you record, so wear headphones or the microphone picks it up.
+              </p>
+              <Button variant="outline" size="sm" className="justify-self-start" onClick={() => setVoice(false)}>
+                Read questions on screen instead
+              </Button>
+            </div>
+          )}
+          <Button size="lg" className="w-full sm:w-auto" disabled={needHeadphones && !headphones} onClick={() => enter(parts[0])}>
             <Circle className="fill-current text-destructive" /> {mock ? "Start the test" : "Start"}
           </Button>
         </section>
@@ -502,9 +529,9 @@ export function MockRunner({
             <Notice tone="info">Time to move on. Finish your answer and end this part when you&apos;re ready.</Notice>
           )}
 
-          {rec.state === "error" ? (
+          {notStarted ? (
             <div className="grid gap-3">
-              <Notice>{rec.error}</Notice>
+              <Notice>{rec.error || `Recording didn't start. Tap below to start ${NAME[part]} again.`}</Notice>
               <Button size="lg" onClick={() => record(part)}>
                 <Circle className="fill-current text-destructive" /> Start {NAME[part]} again
               </Button>
