@@ -1,7 +1,7 @@
 import mongoose, { Types } from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectDb } from "@/lib/db";
-import { IeltsProfile, IeltsSpeakingAttempt, IeltsStudyLog, SpeakingTake } from "@/models";
+import { IeltsPlan, IeltsProfile, IeltsSpeakingAttempt, IeltsStudyLog, SpeakingTake } from "@/models";
 import { addDays } from "@/speaking/schedule";
 import { currentPlan, saveProfile } from "@/ielts/profile";
 import { dailyMinutes, logStudy, todayList, weekProgress } from "@/ielts/progress";
@@ -98,18 +98,93 @@ describe("ielts progress", () => {
     const speaking = list.filter((i) => i.skill === "speaking");
     expect(speaking).toHaveLength(1);
     expect(speaking[0]).toMatchObject({ kind: "mock", href: "/ielts/speaking?start=mock", done: false });
-    const next = await todayList(u, addDays(TODAY, 1), TZ);
-    expect(next.find((i) => i.skill === "speaking")).toMatchObject({ kind: "drill", href: "/ielts/speaking" });
     const others = list.filter((i) => i.skill !== "speaking");
     expect(others.every((i) => i.kind === "log" && i.href === undefined)).toBe(true);
     expect(list.reduce((s, i) => s + i.minutes, 0)).toBeLessThanOrEqual(60);
     await attempt(u, TODAY, { kind: "mock" });
     expect((await todayList(u, TODAY, TZ)).find((i) => i.skill === "speaking")).toMatchObject({ kind: "mock", done: true });
+    const next = await todayList(u, addDays(TODAY, 1), TZ);
+    expect(next.find((i) => i.skill === "speaking")).toMatchObject({ kind: "drill", href: "/ielts/speaking" });
+  });
+
+  it("re-offers the first mock after a skipped first study day", async () => {
+    const { u } = await setup();
+    const day3 = addDays(TODAY, 2);
+    expect((await todayList(u, day3, TZ)).find((i) => i.skill === "speaking")).toMatchObject({ kind: "mock", done: false });
+  });
+
+  it("a mock done on a later day ends the offer", async () => {
+    const { u } = await setup();
+    const day3 = addDays(TODAY, 2);
+    await attempt(u, day3, { kind: "mock" });
+    expect((await todayList(u, day3, TZ)).find((i) => i.skill === "speaking")).toMatchObject({ kind: "mock", done: true });
+    expect((await todayList(u, addDays(day3, 1), TZ)).find((i) => i.skill === "speaking")?.kind).toBe("drill");
+  });
+
+  it("second mock waits 3 days after the first, then stays on offer", async () => {
+    const { u, plan } = await setup();
+    await IeltsPlan.updateOne({ userId: u, version: plan.version }, { $set: { "weeks.0.mocks": 2 } });
+    await attempt(u, TODAY, { kind: "mock" });
+    const kind = async (d: string) => (await todayList(u, d, TZ)).find((i) => i.skill === "speaking")?.kind;
+    expect(await kind(addDays(TODAY, 1))).toBe("drill");
+    expect(await kind(addDays(TODAY, 2))).toBe("drill");
+    expect(await kind(addDays(TODAY, 3))).toBe("mock");
+    expect(await kind(addDays(TODAY, 5))).toBe("mock");
+  });
+
+  describe("sizing", () => {
+    const setWeek = (u: string, version: number, minutes: Record<string, number>, mocks = 0) =>
+      IeltsPlan.updateOne({ userId: u, version }, { $set: { "weeks.0.minutes": minutes, "weeks.0.mocks": mocks } });
+
+    it("rounds each item up to 5", async () => {
+      const { u, plan } = await setup({ minutesPerDay: 480 });
+      await setWeek(u, plan.version, { listening: 70, reading: 71, writing: 7, speaking: 70 });
+      const list = await todayList(u, TODAY, TZ);
+      const m = Object.fromEntries(list.map((i) => [i.skill, i.minutes]));
+      expect(m).toEqual({ listening: 10, reading: 15, writing: 5, speaking: 10 });
+    });
+
+    it("scales proportionally, floors to 5 and stays within minutesPerDay", async () => {
+      const { u, plan } = await setup({ minutesPerDay: 25 });
+      await setWeek(u, plan.version, { listening: 140, reading: 70, writing: 70, speaking: 70 }); // wants 20/10/10/10 = 50
+      const list = await todayList(u, TODAY, TZ);
+      const m = Object.fromEntries(list.map((i) => [i.skill, i.minutes]));
+      expect(m).toEqual({ listening: 10, reading: 5, writing: 5, speaking: 5 });
+      expect(list.reduce((s, i) => s + i.minutes, 0)).toBeLessThanOrEqual(25);
+    });
+
+    it("counts a mock's minutes in the cap even when the speaking share is 0", async () => {
+      const { u, plan } = await setup({ minutesPerDay: 30 });
+      await setWeek(u, plan.version, { listening: 140, reading: 140, writing: 0, speaking: 0 }, 1); // wants 20/20/0 + 15
+      const list = await todayList(u, TODAY, TZ);
+      expect(list.find((i) => i.skill === "speaking")).toMatchObject({ kind: "mock" });
+      expect(list.reduce((s, i) => s + i.minutes, 0)).toBeLessThanOrEqual(30);
+    });
+
+    it("omits a skill already complete for the week", async () => {
+      const { u, plan } = await setup({ minutesPerDay: 480 });
+      await setWeek(u, plan.version, { listening: 70, reading: 70, writing: 70, speaking: 70 });
+      await logStudy(u, { date: TODAY, skill: "listening", minutes: 70 });
+      const list = await todayList(u, addDays(TODAY, 1), TZ);
+      expect(list.map((i) => i.skill)).toEqual(["reading", "writing", "speaking"]);
+    });
+  });
+
+  it("profile cut-off uses the learner's local day", async () => {
+    const { u, plan } = await setup();
+    await IeltsPlan.updateOne({ userId: u, version: plan.version }, { $set: { "weeks.0.minutes.speaking": 140 } });
+    // 23:30 UTC on the 12th is already the 13th in Dhaka (UTC+6).
+    await IeltsProfile.collection.updateOne({ userId: new Types.ObjectId(u) }, { $set: { createdAt: new Date("2026-11-12T23:30:00Z") } });
+    const week = { weeks: [{ ...plan.weeks[0], minutes: { ...plan.weeks[0].minutes, speaking: 140 } }] };
+    await take(u, "2026-11-12", 60); // the UTC day: before the Dhaka cut-off
+    expect((await weekProgress(u, week, 0, "Asia/Dhaka")).fromPractice).toBe(0);
+    await take(u, "2026-11-13", 60);
+    expect((await weekProgress(u, week, 0, "Asia/Dhaka")).fromPractice).toBe(1);
+    expect((await weekProgress(u, week, 0, "UTC")).fromPractice).toBe(2); // UTC cut-off is the 12th
   });
 
   it("focus drill label", async () => {
     const { u, plan } = await setup();
-    const { IeltsPlan } = await import("@/models");
     await IeltsPlan.updateOne({ userId: u, version: plan.version }, { $set: { "weeks.0.focus": "fluency", "weeks.0.mocks": 0 } });
     const item = (await todayList(u, TODAY, TZ)).find((i) => i.skill === "speaking")!;
     expect(item.kind).toBe("drill");

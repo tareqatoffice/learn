@@ -116,9 +116,15 @@ export async function todayList(userId: string, today: string, timeZone: string)
   const before = await progressThrough(userId, week, addDays(today, -1), timeZone);
   const daysLeft = Math.max(1, studyDaysBetween(today, week.end, profile.studyDays));
 
+  // The first mock is re-offered on every study day until done; the second waits for the gap after the first.
+  const mock =
+    before.mocksDone < week.mocks && (before.mocksDone === 0 || today >= addDays(before.mockDates[0], MOCK_GAP_DAYS));
+
   const wanted = Object.fromEntries(
     SKILLS.map((s) => [s, roundUp5(Math.max(0, week.minutes[s] - before.done[s]) / daysLeft)]),
   ) as Record<Skill, number>;
+  // A mock takes time even when the Speaking share is spent, so it counts toward the daily cap.
+  if (mock) wanted.speaking = Math.max(wanted.speaking, DEFAULT_MOCK_MINUTES);
   const total = SKILLS.reduce((s, k) => s + wanted[k], 0);
   const scale = total > profile.minutesPerDay ? profile.minutesPerDay / total : 1;
   const minutes = Object.fromEntries(
@@ -127,12 +133,6 @@ export async function todayList(userId: string, today: string, timeZone: string)
 
   const todayMinutes = (await dailyMinutes(userId, today, today))[today];
   const todayMocks = await completeMockDates(userId, today, today);
-
-  let mock = false;
-  if (before.mocksDone < week.mocks) {
-    const firstStudyDay = dayRange(week.start, week.end).find((d) => profile.studyDays.includes(weekday(d)));
-    mock = before.mocksDone === 0 ? today === firstStudyDay : today >= addDays(before.mockDates[0], MOCK_GAP_DAYS);
-  }
 
   const items: TodayItem[] = [];
   for (const skill of SKILLS) {
@@ -143,7 +143,7 @@ export async function todayList(userId: string, today: string, timeZone: string)
           skill,
           kind: "mock",
           label: "Speaking mock test",
-          minutes: minutes.speaking || DEFAULT_MOCK_MINUTES,
+          minutes: minutes.speaking || 5,
           done: todayMocks.length > 0,
           href: "/ielts/speaking?start=mock",
         });
