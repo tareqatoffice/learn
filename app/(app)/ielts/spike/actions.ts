@@ -43,6 +43,7 @@ export async function spikeSttShapeAction(takeId: string) {
   return {
     ok: res.ok,
     status: res.status,
+    errors: res.ok ? undefined : (json as { errors?: unknown } | null)?.errors ?? null,
     resultKeys: Object.keys(result),
     hasWordTimestamps: Array.isArray(words) && words.length > 0,
     hasSegmentTimestamps: Array.isArray(segments) && segments.length > 0,

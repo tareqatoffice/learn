@@ -46,14 +46,30 @@ export function SpikeClient() {
   }, [rec.result]);
 
   // (a) speechSynthesis while recording audio from the same tap
+  const micRef = useRef<MediaStream | null>(null);
+  const trackInfo = (s: MediaStream) =>
+    s
+      .getAudioTracks()
+      .map((t) => `muted=${t.muted},readyState=${t.readyState}`)
+      .join(";");
+
+  // Tap 1: get the mic (permission prompt) so tap 2 can start recording + speech inside a clean gesture.
+  async function prepareMic() {
+    try {
+      micRef.current?.getTracks().forEach((t) => t.stop());
+      micRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      add(`(a) mic ready: ${trackInfo(micRef.current)}. Now tap "speak while recording".`);
+    } catch (e) {
+      add(`(a) FAIL getUserMedia: ${(e as Error).name}`);
+    }
+  }
+
   async function speakWhileRecording() {
     if (!("speechSynthesis" in window)) return add("(a) FAIL speechSynthesis missing");
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (e) {
-      return add(`(a) FAIL getUserMedia: ${(e as Error).name}`);
-    }
+    const stream = micRef.current;
+    if (!stream || stream.getAudioTracks().every((t) => t.readyState !== "live"))
+      return add('(a) tap "prepare mic" first');
+    add(`(a) tracks before: ${trackInfo(stream)}`);
     const mime = ["audio/webm;codecs=opus", "audio/mp4"].find((m) => MediaRecorder.isTypeSupported(m));
     const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
     const chunks: Blob[] = [];
@@ -68,27 +84,41 @@ export function SpikeClient() {
     const ended = new Promise<void>((r) => (mr.onstop = () => r()));
     let trackEnded = false;
     stream.getTracks().forEach((t) => t.addEventListener("ended", () => (trackEnded = true)));
-    mr.start(500);
-    const u = new SpeechSynthesisUtterance("Good morning. Let's talk about your hometown. Where are you from?");
+    mr.start(250);
+    await new Promise((r) => setTimeout(r, 600)); // let chunks flow before speech
+    const chunksAtStart = chunks.length;
+    const lastAtStart = lastChunk;
+    const u =new SpeechSynthesisUtterance("Good morning. Let's talk about your hometown. Where are you from?");
     const spoke = new Promise<string>((resolve) => {
       u.onend = () => resolve("ended");
       u.onerror = (e) => resolve(`error:${(e as SpeechSynthesisErrorEvent).error}`);
       setTimeout(() => resolve("timeout-15s"), 15000);
     });
     speechSynthesis.speak(u);
+    const midTimer = setTimeout(() => add(`(a) tracks during speech: ${trackInfo(stream)}`), 1000);
     const outcome = await spoke;
+    clearTimeout(midTimer);
+    const chunksAtEnd = chunks.length;
+    const lastAtEnd = lastChunk;
     const stateAfter = mr.state;
-    await new Promise((r) => setTimeout(r, 1500)); // keep recording briefly after speech
+    add(`(a) tracks after speech: ${trackInfo(stream)}`);
+    await new Promise((r) => setTimeout(r, 500));
     mr.stop();
     await ended;
-    stream.getTracks().forEach((t) => t.stop());
     const total = chunks.reduce((n, c) => n + c.size, 0);
+    const during = chunksAtEnd - chunksAtStart;
     add(
-      `(a) speech=${outcome}; recorder state right after speech=${stateAfter}; trackEnded=${trackEnded}; chunks=${chunks.length}; bytes=${total}; last chunk at ${lastChunk}ms; mime=${mr.mimeType}`,
+      `(a) speech=${outcome}; recorder state after speech=${stateAfter}; trackEnded=${trackEnded}; chunks at speech start=${chunksAtStart} (last ${lastAtStart}ms), at end=${chunksAtEnd} (last ${lastAtEnd}ms), during speech=${during}; total bytes=${total}; mime=${mr.mimeType}`,
     );
-    add(
-      `(a) VERDICT: recording ${stateAfter === "recording" && total > 0 && !trackEnded ? "KEPT WORKING" : "BROKE"} while speaking`,
-    );
+    if (outcome !== "ended") {
+      add(`(a) VERDICT: INCONCLUSIVE: speech did not play (${outcome})`);
+    } else if (during > 0 && stateAfter === "recording" && !trackEnded) {
+      add("(a) VERDICT: PASS: speech played and recorder chunks kept arriving during it");
+    } else {
+      add(
+        `(a) VERDICT: FAIL: speech played but ${during === 0 ? "no recorder chunks arrived during speech" : `recorder state=${stateAfter}, trackEnded=${trackEnded}`}`,
+      );
+    }
   }
 
   // (d) upload via the existing Speaking path
@@ -155,6 +185,14 @@ export function SpikeClient() {
     add(`(f) transcribeTakeAction: ${r.ok ? `OK text="${r.transcript.slice(0, 120)}"` : JSON.stringify(r.errors)}`);
   }
 
+  async function guard(label: string, fn: () => Promise<unknown>) {
+    try {
+      await fn();
+    } catch (e) {
+      add(`${label} THREW: ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`);
+    }
+  }
+
   async function cleanup() {
     if (!takeId) return;
     const r = await deleteTakeAction(takeId);
@@ -180,13 +218,14 @@ export function SpikeClient() {
         </label>
       </div>
       <div className="flex flex-wrap gap-2">
+        <button className={btn} onClick={prepareMic}>(a0) prepare mic</button>
         <button className={btn} onClick={speakWhileRecording}>(a) speak while recording</button>
         <button className={btn} onClick={() => rec.start()} disabled={rec.state === "recording" || rec.state === "asking"}>(b) start recording</button>
         <button className={btn} onClick={() => rec.stop()} disabled={rec.state !== "recording"}>stop</button>
         <button className={btn} onClick={frames}>(c) grab 4 frames</button>
-        <button className={btn} onClick={upload}>(d) upload</button>
+        <button className={btn} onClick={() => guard("(d)", upload)}>(d) upload</button>
         <button className={btn} onClick={playback}>(e) playback</button>
-        <button className={btn} onClick={stt}>(f) transcribe</button>
+        <button className={btn} onClick={() => guard("(f)", stt)}>(f) transcribe</button>
         <button className={btn} onClick={cleanup}>delete spike take</button>
       </div>
       <p className="text-sm">recorder: {rec.state} {rec.elapsedSec}s {rec.error}</p>
@@ -201,7 +240,7 @@ export function SpikeClient() {
           }}
         />
       )}
-      {localUrl && <video ref={videoRef} src={localUrl} className="hidden" playsInline muted preload="auto" />}
+      {localUrl && <video ref={videoRef} src={localUrl} className="pointer-events-none fixed left-0 top-0 h-px w-px opacity-0" playsInline muted preload="auto" />}
       {playUrl && (
         <video
           src={playUrl}
