@@ -38,7 +38,7 @@ describe("exportContent", () => {
     expect(doc.version).toBe(1);
     expect(doc.exportedAt).toBeInstanceOf(Date);
     expect(Object.keys(doc.collections).sort()).toEqual(
-      ["graphnodes", "graphs", "notes", "noteseries", "questionbooks", "questions", "speakinglessons", "speakingsettings", "subjects"].sort(),
+      ["graphnodes", "graphs", "ieltssettings", "ieltsspeakingitems", "notes", "noteseries", "questionbooks", "questions", "speakinglessons", "speakingsettings", "subjects"].sort(),
     );
     expect(doc.collections.questions).toHaveLength(2);
     expect(doc.collections.questions[0]._id).toBeInstanceOf(Types.ObjectId);
