@@ -71,6 +71,7 @@ describe("ielts speaking attempts", () => {
     await resetDb();
     vi.clearAllMocks();
     vi.mocked(r2.storageConfigured).mockReturnValue(true);
+    vi.mocked(r2.presignPut).mockImplementation(async (key: string) => `https://r2.test/put/${key}`);
     vi.mocked(r2.headObject).mockResolvedValue({ size: 1000, contentType: "audio/webm" });
   });
   afterEach(() => {
@@ -160,6 +161,54 @@ describe("ielts speaking attempts", () => {
 
     await confirmPart(u, id, "p1", { durationSec: 10, markers: [] });
     expect(await startPart(u, id, { part: "p1", ...AUDIO })).toEqual({ ok: false, errors: { _: "This part is already saved." } });
+  });
+
+  /** Holds the first presign of each of two calls until both have read the attempt, forcing the race. */
+  function gatePresign() {
+    let arrived = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    vi.mocked(r2.presignPut).mockImplementation(async (key: string) => {
+      if (arrived < 2) {
+        arrived++;
+        if (arrived === 2) release();
+        await gate;
+      }
+      return `https://r2.test/put/${key}`;
+    });
+  }
+  const VIDEO_MP4 = { kind: "video" as const, mime: "video/mp4", audioMime: "audio/mp4", size: 5000, audioSize: 1000 };
+
+  for (const replacing of [true, false]) {
+    it(`concurrent startPart on the same ${replacing ? "unstored" : "new"} part lets exactly one win`, async () => {
+      const u = user();
+      const id = await start(u);
+      if (replacing) await startPart(u, id, { part: "p1", kind: "video", mime: "video/webm", audioMime: "audio/webm", size: 5000, audioSize: 1000 });
+      gatePresign();
+      vi.mocked(r2.deleteObjects).mockClear();
+      const results = await Promise.all([startPart(u, id, { part: "p1", ...AUDIO }), startPart(u, id, { part: "p1", ...VIDEO_MP4 })]);
+      expect(results.filter((r) => r.ok)).toHaveLength(1);
+
+      const doc = await IeltsSpeakingAttempt.findById(id).lean<{ parts: { media: { key: string; audioKey?: string } }[] }>();
+      expect(doc!.parts).toHaveLength(1);
+      const winnerKeys = [doc!.parts[0].media.key, doc!.parts[0].media.audioKey].filter(Boolean);
+      const loserKeys = results[0].ok ? [`ielts/${u}/${id}/p1.mp4`, `ielts/${u}/${id}/p1.audio.m4a`] : [`ielts/${u}/${id}/p1.webm`];
+      expect(r2.deleteObjects).toHaveBeenCalledWith(loserKeys);
+      for (const call of vi.mocked(r2.deleteObjects).mock.calls.slice(replacing ? 2 : 0)) {
+        for (const k of winnerKeys) expect(call[0]).not.toContain(k);
+      }
+    });
+  }
+
+  it("a part confirmed after finish completes the attempt", async () => {
+    const u = user();
+    const id = await start(u);
+    await store(u, id, "p1");
+    await store(u, id, "p2");
+    await startPart(u, id, { part: "p3", ...AUDIO });
+    expect(await finishAttempt(u, id, { paused: false })).toEqual({ ok: true, status: "incomplete" });
+    expect((await confirmPart(u, id, "p3", { durationSec: 20, markers: [] })).ok).toBe(true);
+    expect((await getAttempt(u, id))!.status).toBe("complete");
   });
 
   it("confirmPart rejects missing object", async () => {

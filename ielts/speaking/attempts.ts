@@ -1,10 +1,10 @@
 import { Types } from "mongoose";
 import { type ActionResult, fail, ok } from "@/admin/result";
 import { connectDb } from "@/lib/db";
-import { storageConfigured } from "@/lib/r2";
+import { deleteObjects, storageConfigured } from "@/lib/r2";
 import { type transcribe, sttConfigured } from "@/lib/stt";
 import { IeltsBandEntry, IeltsSpeakingAttempt } from "@/models";
-import type { MediaDoc } from "@/recording/mediaCore";
+import { type MediaDoc, keysOf } from "@/recording/mediaCore";
 import { transcribeMedia } from "@/recording/transcribe";
 import { playbackUrls, prepareUpload, removeMedia, verifyUpload } from "@/recording/upload";
 import { type Kind, type QuestionSet, pickQuestions } from "./questions";
@@ -143,7 +143,7 @@ export async function startPart(
   if (existing?.media.stored) return fail("This part is already saved.");
 
   const upload = await prepareUpload({
-    keyBase: `ielts/${userId}/${attemptId}/${part}`,
+    keyBase: `ielts/${userId}/${String(attempt._id)}/${part}`,
     kind: input.kind,
     mime: input.mime,
     audioMime: input.audioMime,
@@ -161,20 +161,50 @@ export async function startPart(
     } catch {
       return fail("Couldn't replace the earlier recording. Try again.");
     }
+    // Matching the old key means a concurrent start that already replaced this part makes us lose.
     const res = await IeltsSpeakingAttempt.updateOne(
-      { _id: attemptId, userId, parts: { $elemMatch: { part, "media.stored": false } } },
+      { _id: attemptId, userId, parts: { $elemMatch: { part, "media.stored": false, "media.key": existing.media.key } } },
       { $set: { "parts.$.media": media, "parts.$.transcriptStatus": "none", "parts.$.markers": [], ...video }, $unset: { "parts.$.transcript": 1 } },
     );
-    if (!res.matchedCount) return fail("This part is already saved.");
+    if (!res.matchedCount) return lostRace(userId, attemptId, part, media);
   } else {
     const res = await IeltsSpeakingAttempt.updateOne(
       { _id: attemptId, userId, "parts.part": { $ne: part } },
       { $push: { parts: { part, media } }, $set: video },
     );
-    // Lost a race with another start for the same part: the client starts again and replaces it.
-    if (!res.matchedCount) return fail("Your recording didn't finish uploading. Try again.");
+    if (!res.matchedCount) return lostRace(userId, attemptId, part, media);
   }
   return ok({ uploadUrl, ...(audioUploadUrl ? { audioUploadUrl } : {}), maxBytes });
+}
+
+/**
+ * Another start for the same part wrote first. Removes the R2 keys this call presigned, except any the
+ * winner's media also uses, so nothing untracked can be left in the bucket.
+ */
+async function lostRace(userId: string, attemptId: string, part: Part, media: MediaDoc): Promise<{ ok: false; errors: Record<string, string> }> {
+  const current = (await ownAttempt(userId, attemptId))?.parts.find((p) => p.part === part);
+  const kept = new Set(current ? keysOf(current.media) : []);
+  const orphans = keysOf(media).filter((k) => !kept.has(k));
+  try {
+    if (orphans.length) await deleteObjects(orphans);
+  } catch (error) {
+    console.error(`Couldn't remove the presigned keys of a superseded upload ${media.key}`, error);
+  }
+  return current?.media.stored ? fail("This part is already saved.") : fail("This part was started again elsewhere. Try again.");
+}
+
+/** Sets `complete` once every part the kind needs is stored; a no-op otherwise. Atomic against concurrent confirms. */
+async function promoteIfComplete(userId: string, attemptId: string, kind: Kind): Promise<boolean> {
+  const res = await IeltsSpeakingAttempt.updateOne(
+    {
+      _id: attemptId,
+      userId,
+      status: "incomplete",
+      parts: { $all: KIND_PARTS[kind].map((part) => ({ $elemMatch: { part, "media.stored": true } })) },
+    },
+    { $set: { status: "complete" } },
+  );
+  return res.modifiedCount > 0;
 }
 
 const isMarker = (m: Marker, capSec: number) =>
@@ -211,8 +241,9 @@ export async function confirmPart(
   const main = await verifyUpload(row.media);
   if (!main.ok) return fail(main.error);
 
-  await IeltsSpeakingAttempt.updateOne(
-    { _id: attemptId, userId, parts: { $elemMatch: { part, "media.stored": false } } },
+  // Keyed on the verified media, so a part replaced by a concurrent startPart isn't marked stored.
+  const res = await IeltsSpeakingAttempt.updateOne(
+    { _id: attemptId, userId, parts: { $elemMatch: { part, "media.stored": false, "media.key": row.media.key } } },
     {
       $set: {
         "parts.$.media.stored": true,
@@ -223,13 +254,13 @@ export async function confirmPart(
       },
     },
   );
-  // A part confirmed after the attempt was finished can complete it.
-  if (attempt.status === "incomplete") {
-    const stored = new Set([...attempt.parts.filter((p) => p.media.stored).map((p) => p.part), part]);
-    if (KIND_PARTS[attempt.kind].every((p) => stored.has(p))) {
-      await IeltsSpeakingAttempt.updateOne({ _id: attemptId, userId, status: "incomplete" }, { $set: { status: "complete" } });
-    }
+  if (!res.matchedCount) {
+    const now = (await ownAttempt(userId, attemptId))?.parts.find((p) => p.part === part);
+    // Stored meanwhile by a concurrent confirm of the same upload: fine. Otherwise the part was replaced.
+    if (!(now?.media.stored && now.media.key === row.media.key)) return fail("This part was started again. Upload it again.");
   }
+  // A part confirmed after the attempt was finished can complete it.
+  await promoteIfComplete(userId, attemptId, attempt.kind);
   return ok();
 }
 
@@ -277,6 +308,8 @@ export async function finishAttempt(
   if (input.paused === true) set.paused = true;
   if (input.notes?.trim()) set.notes = input.notes.trim();
   await IeltsSpeakingAttempt.updateOne({ _id: attemptId, userId }, { $set: set });
+  // A part confirmed between our read and write would otherwise leave a full attempt marked incomplete.
+  if (status === "incomplete" && (await promoteIfComplete(userId, attemptId, attempt.kind))) return ok({ status: "complete" as Status });
   return ok({ status });
 }
 
