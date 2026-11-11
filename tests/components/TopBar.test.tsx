@@ -33,6 +33,7 @@ describe("TopBar", () => {
     expect(href("Dashboard")).toBe("/dashboard");
     expect(href("Interview")).toBe("/interview");
     expect(href("Speaking")).toBe("/speaking");
+    expect(href("IELTS")).toBe("/ielts");
     expect(href("Graphs")).toBe("/graphs");
     expect(href("Notes")).toBe("/notes");
     expect(href("Learn")).toBe("/dashboard");

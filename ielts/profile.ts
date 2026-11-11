@@ -178,6 +178,17 @@ export async function currentPlan(userId: string): Promise<PlanView | null> {
   return doc ? planView(doc) : null;
 }
 
+export type PlanVersionSummary = { version: number; reason: string; createdAt: string };
+
+/** Every stored plan version, newest first: "changed on …, because …". */
+export async function planHistory(userId: string): Promise<PlanVersionSummary[]> {
+  await connectDb();
+  const docs = await IeltsPlan.find({ userId }).sort({ version: -1 }).select("version reason createdAt").lean<
+    { version: number; reason: string; createdAt: Date }[]
+  >();
+  return docs.map((d) => ({ version: d.version, reason: d.reason, createdAt: iso(d.createdAt) }));
+}
+
 export type PlanPreview = { before: PlanView | null; after: PlanView; dropped: Adjustment[] };
 
 type PlanCtx = { metCriteria?: Criterion[] };
