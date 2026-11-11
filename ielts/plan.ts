@@ -111,18 +111,38 @@ function skillWeights(inputs: PlanInputs): Record<Skill, number> {
   return Object.fromEntries(SKILLS.map((s, i) => [s, shares[i]])) as Record<Skill, number>;
 }
 
-/** Whole minutes per skill summing to round(total); Speaking takes the rounding remainder. */
+/** Rounds `amounts` (summing to the integer `whole`) to integers with the same sum, largest remainder first. */
+function largestRemainder(amounts: number[], whole: number): number[] {
+  const out = amounts.map((a) => Math.floor(a));
+  let left = whole - out.reduce((a, b) => a + b, 0);
+  const order = amounts.map((_, i) => i).sort((i, j) => amounts[j] - Math.floor(amounts[j]) - (amounts[i] - Math.floor(amounts[i])));
+  for (let k = 0; left > 0; k = (k + 1) % order.length, left--) out[order[k]]++;
+  return out;
+}
+
+/**
+ * Whole minutes per skill summing exactly to round(total). Every skill first gets
+ * ceil(whole × 15 %); the rest is shared by each skill's weight above 15 % (which keeps the
+ * weights' proportions, since the weights already include the floor), with largest-remainder
+ * rounding. Ruling R7: when the week is too small for the floor (whole < 4 × ceil(whole × 15 %),
+ * e.g. a week with no study days and only spread minutes), the floor is skipped and the minutes
+ * are split by weight with largest remainder.
+ */
 function splitMinutes(total: number, weights: Record<Skill, number>): Record<Skill, number> {
   const whole = Math.round(total);
-  const out = {} as Record<Skill, number>;
-  let used = 0;
-  for (const s of SKILLS) {
-    if (s === "speaking") continue;
-    out[s] = Math.round(whole * weights[s]);
-    used += out[s];
+  const w = SKILLS.map((s) => weights[s]);
+  const floor = Math.ceil(whole * MIN_SKILL_SHARE);
+  let minutes: number[];
+  if (whole < SKILLS.length * floor) {
+    minutes = largestRemainder(w.map((x) => whole * x), whole);
+  } else {
+    const rest = whole - SKILLS.length * floor;
+    const excess = w.map((x) => Math.max(x - MIN_SKILL_SHARE, 0));
+    const excessSum = excess.reduce((a, b) => a + b, 0);
+    const shares = excessSum > 0 ? excess.map((x) => x / excessSum) : w;
+    minutes = largestRemainder(shares.map((x) => rest * x), rest).map((m) => m + floor);
   }
-  out.speaking = whole - used;
-  return out;
+  return Object.fromEntries(SKILLS.map((s, i) => [s, minutes[i]])) as Record<Skill, number>;
 }
 
 /** The UTC calendar date an adjustment was created on. */
@@ -140,7 +160,7 @@ function createdDate(a: Adjustment): string {
  * - `spreadShortfall` adds minutes / (weeks − fromWeek) to each week from `fromWeek` on, split by
  *   the skill weights; dropped when `fromWeek` is past the last week.
  * - `shiftCriterion` sets `focus` on the week containing its creation date (UTC) and every later
- *   week, in creation order so a later shift wins; dropped when its criterion is in `metCriteria`.
+ *   week, in `createdAt` order so the newest shift wins; dropped when its criterion is in `metCriteria`.
  */
 export function generatePlan(
   inputs: PlanInputs,
@@ -149,7 +169,8 @@ export function generatePlan(
   ctx: { metCriteria?: Criterion[] } = {},
 ): Plan {
   const days = daysBetween(inputs.today, inputs.testDate);
-  if (days <= 0) throw new RangeError("test date has passed");
+  if (days < 0) throw new RangeError("test date has passed");
+  if (days === 0) throw new RangeError("no days left before the test");
   const last = addDays(inputs.testDate, -1);
 
   const phases: Phase[] = [];
@@ -183,7 +204,7 @@ export function generatePlan(
       kept.push(a);
     }
   }
-  shifts.sort((a, b) => createdDate(a).localeCompare(createdDate(b)));
+  shifts.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
   const weights = skillWeights(inputs);
   const weeks: Week[] = [];

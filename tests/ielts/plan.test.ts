@@ -85,6 +85,12 @@ describe("generatePlan phases", () => {
       new RangeError("test date has passed"),
     );
   });
+
+  it("test date today: throws", () => {
+    expect(() => generatePlan(inputs({ testDate: TODAY }), [], SETTINGS)).toThrow(
+      new RangeError("no days left before the test"),
+    );
+  });
 });
 
 describe("phaseOn / weekOn", () => {
@@ -113,8 +119,36 @@ describe("weekly minutes", () => {
     for (const w of plan.weeks) {
       expect(w.minutes.writing).toBeGreaterThan(w.minutes.reading);
       const total = weekTotal(w);
-      for (const s of SKILLS) expect(w.minutes[s]).toBeGreaterThanOrEqual(Math.floor(total * 0.15));
+      for (const s of SKILLS) expect(w.minutes[s]).toBeGreaterThanOrEqual(Math.ceil(total * 0.15));
     }
+  });
+
+  it.each([30, 150])("keeps every skill at 15 %% or more of a small week (%i min)", (perWeek) => {
+    // One study day a week (Wednesday, the start day), Speaking already at target.
+    const plan = generatePlan(
+      inputs({
+        minutesPerDay: perWeek,
+        studyDays: [3],
+        target: { overall: 7, listening: 7, reading: 7, writing: 7, speaking: 7 },
+        current: { overall: 5, listening: 5, reading: 5, writing: 5, speaking: 7 },
+      }),
+      [],
+      SETTINGS,
+    );
+    for (const w of plan.weeks) {
+      expect(weekTotal(w)).toBe(perWeek);
+      for (const s of SKILLS) expect(w.minutes[s]).toBeGreaterThanOrEqual(Math.ceil(perWeek * 0.15));
+      expect(w.minutes.writing).toBeGreaterThan(w.minutes.speaking);
+    }
+  });
+
+  it("skips the floor when a week is too small for it, keeping the total", () => {
+    // Sundays only: the last, 2-day week (Wed..Thu) has no study days, so only spread minutes.
+    const adj: Adjustment = { id: "a1", kind: "spreadShortfall", minutes: 3, fromWeek: 14, createdAt: new Date() };
+    const plan = generatePlan(inputs({ studyDays: [0] }), [adj], SETTINGS);
+    const w = plan.weeks[14];
+    expect(weekTotal(w)).toBe(3);
+    for (const s of SKILLS) expect(w.minutes[s]).toBeGreaterThanOrEqual(0);
   });
 
   it("raises a small skill share to 15 %", () => {
@@ -212,6 +246,18 @@ describe("adjustments", () => {
     expect(plan.kept).toEqual([adj]);
     expect(plan.weeks.map((w) => w.focus)).toEqual([undefined, undefined, ...Array(13).fill("grammar")]);
     expect(plan.weeks.map((w) => w.minutes)).toEqual(base.weeks.map((w) => w.minutes));
+  });
+
+  it("the newest shiftCriterion wins on the same day", () => {
+    const later: Adjustment = {
+      id: "s2",
+      kind: "shiftCriterion",
+      criterion: "fluency",
+      createdAt: new Date("2026-11-11T18:00:00Z"),
+    };
+    const earlier: Adjustment = { id: "s1", kind: "shiftCriterion", criterion: "grammar", createdAt: created };
+    const plan = generatePlan(inputs(), [later, earlier], SETTINGS);
+    expect(plan.weeks.every((w) => w.focus === "fluency")).toBe(true);
   });
 
   it("shiftCriterion dropped when the criterion is met", () => {
