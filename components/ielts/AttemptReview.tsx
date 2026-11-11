@@ -39,8 +39,9 @@ function asSelf(raw: Record<string, unknown> | undefined): SelfBands | null {
 type TranscriptState = { status: string; text?: string };
 
 /**
- * One part's transcript. A freshly stored part arrives "pending": the runner never transcribes, so this
- * starts the transcription once when the review page opens, and finishing a mock never waits on it.
+ * One part's transcript. The runner starts transcription in the background after each part is stored. If a
+ * part is still "pending" when this page opens (that request didn't finish or failed), this starts it once;
+ * a repeat for a part that is already done is refused or refunded server-side.
  */
 function PartTranscript({
   attemptId,
