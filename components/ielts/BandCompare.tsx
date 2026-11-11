@@ -52,6 +52,7 @@ export function BandCompare({ self, ai }: { self: Record<Criterion, number>; ai:
             >
               <td className="py-1.5 pr-2">
                 {r.label}
+                {r.differs && <span className="sr-only"> (differs by 1.0 or more)</span>}
                 {r.greyed && <p className="mt-1 max-w-prose text-xs font-normal">{PRONUNCIATION_NOTE}</p>}
               </td>
               <td className="py-1.5 pr-2">{r.you}</td>
@@ -64,7 +65,7 @@ export function BandCompare({ self, ai }: { self: Record<Criterion, number>; ai:
       </table>
       <p className="text-sm text-muted-foreground">
         {anyDiffers && "Highlighted rows differ by 1.0 or more. "}
-        The AI&apos;s bands are estimates from the transcript. Your own judgement stands: you heard the whole recording.
+        Pronunciation is never highlighted because the AI can&apos;t hear it. The AI&apos;s bands are estimates from the transcript. Your own judgement stands: you heard the whole recording.
       </p>
     </div>
   );

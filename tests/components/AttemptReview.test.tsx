@@ -139,6 +139,12 @@ describe("BandCompare", () => {
     expect(screen.getByText(/your own judgement stands/i)).toBeTruthy();
   });
 
+  it("never highlights the pronunciation row", () => {
+    render(<BandCompare self={{ ...SELF, pronunciation: 6 }} ai={{ ...AI, bands: { ...AI.bands, pronunciation: 8 } }} />);
+    expect(screen.getByText("Pronunciation").closest("tr")!.getAttribute("data-differs")).toBeNull();
+    expect(screen.getByText(/pronunciation is never highlighted/i)).toBeTruthy();
+  });
+
   it("does not highlight a difference under 1.0", () => {
     render(<BandCompare self={SELF} ai={{ ...AI, bands: { ...AI.bands, fluency: 6.5, grammar: 6 }, overall: 6 }} />);
     expect(screen.getByText("Fluency and Coherence").closest("tr")!.getAttribute("data-differs")).toBeNull();

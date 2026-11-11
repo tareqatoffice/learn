@@ -19,37 +19,16 @@ import { CRITERIA, CRITERION_LABEL, type Criterion } from "@/ielts/bands";
 import type { AttemptView, PartView } from "@/ielts/speaking/attempts";
 import type { AiEstimate } from "@/ielts/speaking/score";
 import { KIND_PARTS, type Part } from "@/ielts/speaking/timing";
-import { grabFrames } from "@/lib/media";
+import { framesOf } from "@/lib/media";
 import type { BodyFeedback } from "@/speaking/coach";
 import { BandCompare } from "./BandCompare";
 import { SelfBandsForm, type SelfBands } from "./SelfBandsForm";
 
 const PART_NAME: Record<Part, string> = { p1: "Part 1", p2: "Part 2", p3: "Part 3" };
 export const KIND_NAME = { mock: "Full mock", part1: "Part 1 drill", part2: "Part 2 drill", part3: "Part 3 drill" } as const;
-const FRAME_COUNT = 5;
 
 const card = "grid gap-3 rounded-xl border border-border bg-card p-5";
 const DATE = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" });
-
-/** Five evenly spaced stills of the recording, read from a same-origin blob copy so the canvas isn't tainted. */
-async function framesOf(mediaUrl: string): Promise<string[]> {
-  const res = await fetch(mediaUrl);
-  if (!res.ok) throw new Error(`fetch ${res.status}`);
-  const url = URL.createObjectURL(await res.blob());
-  const video = document.createElement("video");
-  video.muted = true;
-  video.playsInline = true;
-  video.preload = "auto";
-  video.src = url;
-  try {
-    video.load();
-    return await grabFrames(video, FRAME_COUNT);
-  } finally {
-    video.removeAttribute("src");
-    video.load();
-    URL.revokeObjectURL(url);
-  }
-}
 
 /** A saved self-rating has a number for every criterion. */
 function asSelf(raw: Record<string, unknown> | undefined): SelfBands | null {
@@ -60,8 +39,8 @@ function asSelf(raw: Record<string, unknown> | undefined): SelfBands | null {
 type TranscriptState = { status: string; text?: string };
 
 /**
- * One part's transcript. A freshly stored part arrives "pending": this starts the transcription once,
- * here rather than in the runner, so finishing a mock never waits on it.
+ * One part's transcript. A freshly stored part arrives "pending": the runner never transcribes, so this
+ * starts the transcription once when the review page opens, and finishing a mock never waits on it.
  */
 function PartTranscript({
   attemptId,
