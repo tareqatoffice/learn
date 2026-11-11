@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   confirmLessonAudioAction,
   createLessonAction,
@@ -14,6 +14,9 @@ import { Field, StatusField, SubjectsField, TextField } from "@/components/admin
 import { ActionStatus, SaveBar, inputClass } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
+import { FileDropzone } from "@/components/ui/FileDropzone";
+import { putFile } from "@/lib/uploadFile";
+import { UploadError } from "@/lib/uploadTake";
 
 const EMPTY: AdminLesson = {
   id: "",
@@ -60,10 +63,11 @@ function AudioUpload({
 }) {
   const { run, pending, errors, setErrors, saved } = useAdminAction();
   const [busy, setBusy] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
+  const [progress, setProgress] = useState(0);
 
   const upload = async (file: File) => {
     setBusy(true);
+    setProgress(0);
     setErrors({});
     try {
       const started = await startLessonAudioUploadAction(lessonId, file.type, file.size);
@@ -71,18 +75,13 @@ function AudioUpload({
         setErrors(started.errors);
         return;
       }
-      const put = await fetch(started.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-      if (!put.ok) {
-        setErrors({ _: "The upload failed. Check the bucket's CORS settings and try again." });
-        return;
-      }
+      await putFile(started.uploadUrl, file, setProgress);
       const duration = await audioDuration(file);
       run(() => confirmLessonAudioAction(lessonId, started.key, duration), { onSuccess: () => onConfirmed(duration) });
-    } catch {
-      setErrors({ _: "The upload failed. Try again." });
+    } catch (e) {
+      setErrors({ _: e instanceof UploadError ? e.message : "The upload failed. Try again." });
     } finally {
       setBusy(false);
-      if (input.current) input.current.value = "";
     }
   };
 
@@ -97,21 +96,17 @@ function AudioUpload({
         <p className="text-sm text-muted-foreground">Save the lesson first, then upload its audio here.</p>
       ) : (
         <div className="grid gap-2">
-          {currentKey && <span className="text-xs text-muted-foreground">Uploaded: <code>{currentKey}</code></span>}
-          <input
-            ref={input}
-            type="file"
+          <FileDropzone
+            label="Upload shadowing audio"
             accept="audio/*"
-            aria-label="Upload shadowing audio"
-            disabled={busy || pending}
-            className="text-sm"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void upload(file);
-            }}
+            icon="audio"
+            disabled={pending}
+            busy={busy}
+            progress={progress}
+            hint={`Audio only, ${MAX_AUDIO_MB} MB at most. Replacing a file deletes the old one.`}
+            files={currentKey ? [{ name: currentKey.split("/").pop() ?? currentKey, size: 0 }] : []}
+            onFiles={([file]) => void upload(file)}
           />
-          <span className="text-xs text-muted-foreground">Audio only, {MAX_AUDIO_MB} MB at most. Replacing a file deletes the old one.</span>
-          {busy && <span role="status" className="text-sm text-muted-foreground">Uploading…</span>}
           <ActionStatus saved={saved && !busy} errors={errors} savedText="Audio uploaded." />
         </div>
       )}
