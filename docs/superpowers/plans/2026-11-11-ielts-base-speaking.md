@@ -246,7 +246,7 @@ Rules not already fixed in Global Constraints:
 - `shiftCriterion { criterion, share }` sets `week.focus = criterion` on every week from its creation date onwards. It never changes minutes. It is dropped when the criterion is in `ctx.metCriteria`. The full signature is `generatePlan(inputs, adjustments, settings, ctx: { metCriteria?: Criterion[] } = {})`; Task 9 fills `metCriteria` with the criteria whose latest mock band (min(self, AI)) is ≥ target.speaking.
 
 - [ ] **Step 1: Write the failing tests:**
-  - "100 days, all study days, 60 min": phases 30/45/25 days, ending the day before testDate; `hours.available === 99`.
+  - "100 days, all study days, 60 min": testDate = today + 100; phases 30/45/25 days covering today..testDate−1 (100 days); `hours.available === 100`.
   - "5 days left": one phase, `mocks`.
   - "20 days left": phases skills then mocks, 12/8 days.
   - "test date past": throws `RangeError("test date has passed")`.
