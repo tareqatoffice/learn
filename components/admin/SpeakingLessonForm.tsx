@@ -14,6 +14,7 @@ import { Field, StatusField, SubjectsField, TextField } from "@/components/admin
 import { ActionStatus, SaveBar, inputClass } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
+import { MediaPlayer } from "@/components/MediaPlayer";
 import { FileDropzone } from "@/components/ui/FileDropzone";
 import { putFile } from "@/lib/uploadFile";
 import { UploadError } from "@/lib/uploadTake";
@@ -53,17 +54,25 @@ function audioDuration(file: File): Promise<number> {
 function AudioUpload({
   lessonId,
   currentKey,
+  previewUrl,
   storageReady,
   onConfirmed,
 }: {
   lessonId: string;
   currentKey: string;
+  previewUrl?: string;
   storageReady: boolean;
   onConfirmed: (durationSec: number) => void;
 }) {
   const { run, pending, errors, setErrors, saved } = useAdminAction();
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  // A presigned link is new on every page refresh; keep the first one per stored file so a refresh
+  // (e.g. after saving) doesn't reload the player and lose its position.
+  const audioId = currentKey || previewUrl || "";
+  const [shown, setShown] = useState({ id: audioId, url: previewUrl });
+  if (shown.id !== audioId) setShown({ id: audioId, url: previewUrl });
 
   const upload = async (file: File) => {
     setBusy(true);
@@ -107,6 +116,7 @@ function AudioUpload({
             files={currentKey ? [{ name: currentKey.split("/").pop() ?? currentKey, size: 0 }] : []}
             onFiles={([file]) => void upload(file)}
           />
+          {shown.url && !busy && <MediaPlayer key={shown.id} src={shown.url} label="uploaded audio" />}
           <ActionStatus saved={saved && !busy} errors={errors} savedText="Audio uploaded." />
         </div>
       )}
@@ -118,8 +128,11 @@ export function SpeakingLessonForm({
   lesson = EMPTY,
   subjects,
   storageReady,
+  audioPreviewUrl,
 }: {
   lesson?: AdminLesson;
+  /** A playable link to the uploaded audio (presigned), for the admin to check it. */
+  audioPreviewUrl?: string;
   /** `slug` carries the subject's id. */
   subjects: { slug: string; name: string }[];
   storageReady: boolean;
@@ -216,6 +229,7 @@ export function SpeakingLessonForm({
       <AudioUpload
         lessonId={draft.id}
         currentKey={lesson.shadowAudioKey}
+        previewUrl={audioPreviewUrl}
         storageReady={storageReady}
         onConfirmed={(sec) => setDurationText(String(sec))}
       />
