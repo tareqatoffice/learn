@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectDb } from "@/lib/db";
 import { Graph, GraphNode, Note, NoteProgress, Question } from "@/models";
+import { endPlan, saveProfile } from "@/ielts/profile";
 import { getDashboard } from "@/progress/dashboard";
 import { setNodeStatus } from "@/progress/graph";
 import { openNote, setNoteRead } from "@/progress/notes";
@@ -122,5 +123,26 @@ describe("getDashboard", () => {
     expect(dash.recentQuizzes).toEqual([]);
     expect(dash.graphs.every((x) => x.done === 0)).toBe(true);
     expect(dash.books.every((x) => x.mastered === 0)).toBe(true);
+  });
+
+  it("shows ielts only with a profile, with days left from local today", async () => {
+    const user = newUserId();
+    const now = new Date("2026-11-11T23:30:00Z");
+    expect((await getDashboard(user, "UTC", now)).ielts).toBeUndefined();
+
+    const res = await saveProfile(
+      user,
+      { testDate: "2026-12-11", target: { overall: 7 }, current: { overall: 6 }, minutesPerDay: 60, studyDays: [0, 1, 2, 3, 4, 5, 6] },
+      "2026-11-11",
+    );
+    expect(res.ok).toBe(true);
+    // 23:30 UTC is already 12 Nov in Auckland, so one day fewer remains there.
+    const utc = (await getDashboard(user, "UTC", now)).ielts;
+    expect(utc).toMatchObject({ daysLeft: 30, done: 0 });
+    expect(utc!.total).toBeGreaterThan(0);
+    expect((await getDashboard(user, "Pacific/Auckland", now)).ielts).toMatchObject({ daysLeft: 29 });
+
+    await endPlan(user);
+    expect((await getDashboard(user, "UTC", now)).ielts).toBeUndefined();
   });
 });
