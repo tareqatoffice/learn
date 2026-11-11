@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { MODEL_ID_MAX } from "@/lib/ai-limits";
 import type { CatalogModel, ModelCheck } from "@/lib/openrouter";
 
-export type AiSettingsDraft = { enabled: boolean; primaryModel: string; fallbackModel: string; dailyLimit: number };
+export type AiSettingsDraft = { enabled: boolean; primaryModel: string; fallbackModel: string; visionModel?: string; dailyLimit: number };
 
 const CUSTOM = "__custom__";
 
@@ -210,6 +210,16 @@ export function AiSettingsForm({
         showPaid={showPaid}
         noneLabel="No backup"
         error={errors.fallbackModel}
+      />
+
+      <ModelPicker
+        label="Vision model"
+        value={draft.visionModel ?? ""}
+        onChange={(v) => set("visionModel", v)}
+        catalog={catalog.filter((m) => m.images)}
+        showPaid={showPaid}
+        noneLabel="Use the primary model"
+        error={errors.visionModel}
       />
 
       <Field label="AI calls per learner per day" error={errors.dailyLimit}>

@@ -1,8 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Mic, MicOff } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AI_ANSWER_MAX, AI_MESSAGE_MAX } from "@/lib/ai-limits";
+import { useSpeechInput } from "@/lib/useSpeechInput";
 import { Markdown } from "@/lib/markdown/Markdown";
 import { cn } from "@/lib/utils";
 import type { AiChatMessage, AiFeedback, AiReply, AiResult, AiVerdict } from "@/progress/quizAi";
@@ -13,18 +15,49 @@ const fieldClass =
 
 const isSubmitChord = (e: React.KeyboardEvent) => e.key === "Enter" && (e.ctrlKey || e.metaKey);
 
-/** Where the learner types an answer before revealing; Ctrl/Cmd+Enter checks it. */
+/** Appends a dictated phrase to the answer, with a space between it and what is already there. */
+export function appendSpoken(current: string, phrase: string): string {
+  const joined = current && !/\s$/.test(current) ? `${current} ${phrase}` : current + phrase;
+  return joined.slice(0, AI_ANSWER_MAX);
+}
+
+/**
+ * Where the learner writes or dictates an answer before revealing. With a coach, Ctrl/Cmd+Enter
+ * (or the button) checks it; `onChange` says whether the new text was typed or spoken.
+ */
 export function AnswerBox({
   value,
   onChange,
   onCheck,
-  pending,
+  pending = false,
+  onRecordingChange,
 }: {
   value: string;
-  onChange: (value: string) => void;
-  onCheck: () => void;
-  pending: boolean;
+  onChange: (value: string, source: "typed" | "voice") => void;
+  onCheck?: () => void;
+  pending?: boolean;
+  /** Told when dictation starts and stops, so the card can hold marks until the last phrase is in. */
+  onRecordingChange?: (recording: boolean) => void;
 }) {
+  // The latest value, so a phrase that finishes after a keystroke appends to the current text.
+  const valueRef = useRef(value);
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+  const speech = useSpeechInput((phrase) => {
+    const next = appendSpoken(valueRef.current, phrase);
+    valueRef.current = next;
+    onChange(next, "voice");
+  });
+  useEffect(() => {
+    onRecordingChange?.(speech.listening);
+  }, [speech.listening, onRecordingChange]);
+  // Checking mid-dictation would grade the answer without the phrase still being spoken.
+  const canCheck = Boolean(value.trim()) && !pending && !speech.listening;
+  const check = () => {
+    if (canCheck) onCheck?.();
+  };
+
   return (
     <div className="grid gap-2">
       <label htmlFor="quiz-answer" className="text-sm text-muted-foreground">
@@ -38,21 +71,52 @@ export function AnswerBox({
         // Read-only rather than disabled: a disabled box drops focus to <body>, where Space and G/R/S are shortcuts.
         readOnly={pending}
         aria-busy={pending}
-        placeholder="Answer as you would in an interview, then let the AI coach check it."
-        onChange={(e) => onChange(e.target.value)}
+        placeholder={
+          onCheck
+            ? "Answer as you would in an interview (write or speak), then let the AI coach check it."
+            : "Answer as you would in an interview (write or speak), then show the answer."
+        }
+        onChange={(e) => onChange(e.target.value, "typed")}
         onKeyDown={(e) => {
-          if (isSubmitChord(e)) {
+          if (onCheck && isSubmitChord(e)) {
             e.preventDefault();
-            if (value.trim() && !pending) onCheck();
+            check();
           }
         }}
         className={fieldClass}
       />
-      <div>
-        <Button type="button" disabled={pending || !value.trim()} onClick={onCheck}>
-          {pending ? "Checking…" : "Check with AI"}
-          {!pending && <kbd className="ml-1 rounded border border-current/30 px-1 text-xs opacity-80">Ctrl+Enter</kbd>}
-        </Button>
+      {speech.listening && (
+        <p aria-live="polite" className="text-sm text-muted-foreground">
+          <span aria-hidden className="mr-1.5 inline-block size-2 animate-pulse rounded-full bg-destructive align-middle" />
+          Listening… {speech.interim && <span className="italic">{speech.interim}</span>}
+          <span className="block text-xs">Stop recording to show, check or mark the answer.</span>
+        </p>
+      )}
+      {speech.supported && !speech.listening && (
+        <p className="text-xs text-muted-foreground">
+          Voice answers are transcribed by your browser&apos;s speech service (in Chrome, Google&apos;s servers).
+        </p>
+      )}
+      {speech.error && <Notice>{speech.error}</Notice>}
+      <div className="flex flex-wrap gap-2">
+        {speech.supported && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={pending}
+            aria-pressed={speech.listening}
+            onClick={speech.listening ? speech.stop : speech.start}
+          >
+            {speech.listening ? <MicOff aria-hidden /> : <Mic aria-hidden />}
+            {speech.listening ? "Stop recording" : "Answer by voice"}
+          </Button>
+        )}
+        {onCheck && (
+          <Button type="button" disabled={!canCheck} onClick={check}>
+            {pending ? "Checking…" : "Check with AI"}
+            {!pending && <kbd className="ml-1 rounded border border-current/30 px-1 text-xs opacity-80">Ctrl+Enter</kbd>}
+          </Button>
+        )}
       </div>
     </div>
   );

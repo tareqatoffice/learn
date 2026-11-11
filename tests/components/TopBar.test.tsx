@@ -32,6 +32,7 @@ describe("TopBar", () => {
     const href = (name: string) => screen.getByRole("link", { name }).getAttribute("href");
     expect(href("Dashboard")).toBe("/dashboard");
     expect(href("Interview")).toBe("/interview");
+    expect(href("Speaking")).toBe("/speaking");
     expect(href("Graphs")).toBe("/graphs");
     expect(href("Notes")).toBe("/notes");
     expect(href("Learn")).toBe("/dashboard");

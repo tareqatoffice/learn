@@ -4,6 +4,11 @@ import { StartReviewButton } from "@/components/StartReviewButton";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 import { getDashboard } from "@/progress/dashboard";
+import { mins } from "@/components/speaking/format";
+import { TimeZoneCookie } from "@/components/speaking/TimeZoneCookie";
+import { getToday } from "@/speaking/progress";
+import { TASKS, TASK_LABEL, TASK_SLUG } from "@/speaking/tasks";
+import { readTimeZone } from "@/speaking/timezone";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -141,7 +146,12 @@ function TopicLinks({
 export default async function DashboardPage() {
   const user = await requireUser();
   await connectDb();
-  const dash = await getDashboard(user.userId);
+  const timeZone = await readTimeZone();
+  const [dash, speaking] = await Promise.all([
+    getDashboard(user.userId),
+    getToday(user.userId, timeZone),
+  ]);
+  const speakingTasks = TASKS.filter((t) => speaking.settings.enabled[t]);
   // requireUser falls back to the email when the Google profile has no name; never greet with an address.
   const firstName =
     user.name && user.name !== user.email ? user.name.split(" ")[0] : undefined;
@@ -154,6 +164,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="grid gap-8">
+      <TimeZoneCookie current={timeZone} />
       <header>
         <h1 className={pageTitleClass}>
           Welcome back{firstName ? `, ${firstName}` : ""}
@@ -276,6 +287,28 @@ export default async function DashboardPage() {
                 max: b.total,
               }))}
               empty="No books published yet."
+            />
+          </Card>
+
+          <Card title="Speaking today">
+            <p className="text-sm">
+              <Link href="/speaking" className={`font-medium ${linkClass}`}>
+                {speaking.streak} {speaking.streak === 1 ? "day" : "days"} streak
+              </Link>
+              <span className="text-muted-foreground">
+                {" "}
+                · best {speaking.best}
+              </span>
+            </p>
+            <ProgressRows
+              rows={speakingTasks.map((t) => ({
+                key: t,
+                href: `/speaking/${TASK_SLUG[t]}`,
+                label: `${speaking.done[t] ? "✓ " : ""}${TASK_LABEL[t]}`,
+                value: Number(mins(speaking.minutes[t] ?? 0)),
+                max: speaking.settings.targets[t],
+              }))}
+              empty="Every speaking task is turned off."
             />
           </Card>
 

@@ -95,6 +95,7 @@ describe("quiz coach", () => {
         active: true,
         primaryModel: DEFAULT_OPENROUTER_MODEL,
         fallbackModel: "",
+        visionModel: "",
         dailyLimit: 3,
       });
       const admin = newUserId();

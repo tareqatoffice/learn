@@ -1,8 +1,10 @@
 import { isValidObjectId, type Types } from "mongoose";
 import { type QuestionTopic, topicForQuestion } from "@/content/queries/books";
 import { visibleQuestionFilter } from "@/content/visibility";
+import { AI_ANSWER_MAX } from "@/lib/ai-limits";
 import { ForbiddenError } from "@/lib/authz";
-import { Question, QuestionBook, QuestionProgress, QuizSession } from "@/models";
+import type { QuizAttempt } from "@/lib/quiz-answer";
+import { AiConversation, Question, QuestionBook, QuestionProgress, QuizSession } from "@/models";
 import { markQuestion, type MarkResult } from "./questions";
 
 export type QuizMode = "unseen" | "review" | "all";
@@ -200,6 +202,30 @@ export async function getSessionView(userId: string, sessionId: string): Promise
   return session && buildView(await skipHidden(session));
 }
 
+type CoachRow = {
+  messages: { role: "user" | "assistant"; content: string }[];
+  feedback?: { verdict: string; score: number; summary: string; strengths: string[]; missing: string[]; model: string };
+};
+
+/**
+ * The coach's grade and follow-up chat for the card on screen, to keep with the attempt: the newest
+ * conversation about it since the previous mark (so a requeued card does not reuse its earlier chat).
+ */
+async function coachSnapshot(userId: string, session: SessionRow, questionId: Id) {
+  const since = session.results.at(-1)?.at ?? session.startedAt;
+  const row = await AiConversation.findOne(
+    { userId, sessionId: session._id, questionId, updatedAt: { $gte: since } },
+    { messages: 1, feedback: 1 },
+  )
+    .sort({ updatedAt: -1, _id: -1 })
+    .lean<CoachRow>();
+  if (!row || (!row.feedback && !row.messages.length)) return null;
+  return {
+    ...(row.feedback ?? {}),
+    ...(row.messages.length ? { chat: row.messages.map(({ role, content }) => ({ role, content })) } : {}),
+  };
+}
+
 /**
  * Applies a mark to the current card. A mark for any other card, or on a finished session, is a
  * no-op returning the current view, so double submits and stale tabs are harmless: the session
@@ -211,6 +237,7 @@ export async function recordResult(
   questionId: string,
   result: MarkResult,
   rand: () => number = Math.random,
+  attempt?: QuizAttempt,
 ): Promise<SessionView> {
   const loaded = await loadOwned(userId, sessionId);
   if (!loaded) throw new ForbiddenError("Quiz session not available");
@@ -226,9 +253,18 @@ export async function recordResult(
     questionIds,
     ...(cursor >= questionIds.length ? { finishedAt: new Date() } : {}),
   };
+  const answer = attempt?.answer.trim().slice(0, AI_ANSWER_MAX);
+  const coach = await coachSnapshot(userId, session, current);
+  const entry = {
+    questionId: current,
+    result,
+    at: new Date(),
+    ...(answer && attempt ? { answer, answerMode: attempt.mode } : {}),
+    ...(coach ? { coach } : {}),
+  };
   const applied = await QuizSession.updateOne(
     { _id: session._id, userId, cursor: session.cursor, finishedAt: null },
-    { $push: { results: { questionId: current, result, at: new Date() } }, $set: set },
+    { $push: { results: entry }, $set: set },
   );
   if (applied.matchedCount) await markQuestion(userId, questionId, result);
 

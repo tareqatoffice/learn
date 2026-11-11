@@ -20,6 +20,21 @@ const aiConversationSchema = new Schema(
     /** The learner's typed answer to the card, if any. */
     answer: { type: String, default: "" },
     messages: { type: [messageSchema], default: [] },
+    /** The grade, when the conversation was opened by grading the answer. */
+    feedback: {
+      type: new Schema(
+        {
+          verdict: String,
+          score: Number,
+          summary: String,
+          strengths: [String],
+          missing: [String],
+          model: String,
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
   },
   { timestamps: true },
 );

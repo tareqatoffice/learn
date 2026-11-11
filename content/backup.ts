@@ -17,6 +17,11 @@ import {
   QuestionProgress,
   QuizSession,
   Revision,
+  SpeakingDay,
+  SpeakingLesson,
+  SpeakingProfile,
+  SpeakingSettings,
+  SpeakingTake,
   Subject,
   User,
 } from "@/models";
@@ -32,6 +37,8 @@ export const CONTENT_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["graphnodes", GraphNode],
   ["noteseries", NoteSeries],
   ["notes", Note],
+  ["speakinglessons", SpeakingLesson],
+  ["speakingsettings", SpeakingSettings],
 ];
 
 const ejson = (value: unknown) => EJSON.stringify(value, { relaxed: false });
@@ -65,6 +72,9 @@ export const ALL_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["revisions", Revision],
   ["apitokens", ApiToken],
   ["aisettings", AiSettings],
+  ["speakingtakes", SpeakingTake],
+  ["speakingprofiles", SpeakingProfile],
+  ["speakingdays", SpeakingDay],
 ];
 
 const countsOf = async (collections: typeof ALL_COLLECTIONS) =>

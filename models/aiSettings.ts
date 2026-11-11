@@ -11,6 +11,8 @@ const aiSettingsSchema = new Schema(
     enabled: { type: Boolean, default: true },
     primaryModel: String,
     fallbackModel: { type: String, default: "" },
+    /** Reads still frames for speaking body-language feedback; empty = use the primary chain. */
+    visionModel: { type: String, default: "" },
     dailyLimit: Number,
     apiKeyEncrypted: String,
     apiKeyHint: String,
