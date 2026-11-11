@@ -153,7 +153,8 @@ describe("ielts speaking attempts", () => {
     await startPart(u, id, { part: "p1", kind: "video", mime: "video/webm", audioMime: "audio/webm", size: 5000, audioSize: 1000 });
     vi.mocked(r2.deleteObjects).mockClear();
     await startPart(u, id, { part: "p1", ...AUDIO });
-    expect(r2.deleteObjects).toHaveBeenCalledWith([`ielts/${u}/${id}/p1.webm`, `ielts/${u}/${id}/p1.audio.webm`]);
+    // p1.webm is reused by the new media, so only the old audio-only copy goes.
+    expect(r2.deleteObjects).toHaveBeenCalledWith([`ielts/${u}/${id}/p1.audio.webm`]);
     const doc = await IeltsSpeakingAttempt.findById(id).lean<{ parts: { media: { kind: string; audioKey?: string } }[] }>();
     expect(doc!.parts).toHaveLength(1);
     expect(doc!.parts[0].media.kind).toBe("audio");
@@ -199,6 +200,42 @@ describe("ielts speaking attempts", () => {
       }
     });
   }
+
+  it("a stalled replace never deletes the object a concurrent winner uploaded to the same key", async () => {
+    const u = user();
+    const id = await start(u);
+    await startPart(u, id, { part: "p1", ...AUDIO }); // old media: p1.webm, not stored
+    const key = `ielts/${u}/${id}/p1.webm`;
+
+    // The loser reads the attempt, then stalls in its first presign until the winner is done.
+    let reached!: () => void;
+    const stalled = new Promise<void>((r) => (reached = r));
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let first = true;
+    vi.mocked(r2.presignPut).mockImplementation(async (k: string) => {
+      if (first) {
+        first = false;
+        reached();
+        await gate;
+      }
+      return `https://r2.test/put/${k}`;
+    });
+    vi.mocked(r2.deleteObjects).mockClear();
+
+    const loser = startPart(u, id, { part: "p1", ...VIDEO_MP4 });
+    await stalled;
+    const winner = await startPart(u, id, { part: "p1", ...AUDIO }); // reuses p1.webm
+    expect(winner.ok).toBe(true);
+    const uploaded = vi.mocked(r2.deleteObjects).mock.calls.length; // the winner "uploads" p1.webm now
+    release();
+    expect((await loser).ok).toBe(false);
+
+    for (const [keys] of vi.mocked(r2.deleteObjects).mock.calls.slice(uploaded)) expect(keys).not.toContain(key);
+    expect((await confirmPart(u, id, "p1", { durationSec: 10, markers: [] })).ok).toBe(true);
+    const doc = await IeltsSpeakingAttempt.findById(id).lean<{ parts: { media: { key: string; stored: boolean } }[] }>();
+    expect(doc!.parts[0].media).toMatchObject({ key, stored: true });
+  });
 
   it("a part confirmed after finish completes the attempt", async () => {
     const u = user();

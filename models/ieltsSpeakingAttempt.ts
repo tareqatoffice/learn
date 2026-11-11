@@ -46,6 +46,8 @@ const partSchema = new Schema(
   {
     part: { type: String, enum: ["p1", "p2", "p3"], required: true },
     media: { type: mediaSchema, required: true },
+    /** Set on each startPart, so concurrent starts and confirms of the same part can tell uploads apart. */
+    uploadId: String,
     transcript: String,
     transcriptStatus: { type: String, enum: ["none", "pending", "done", "failed", "unavailable"], default: "none" },
     markers: { type: [markerSchema], default: [] },

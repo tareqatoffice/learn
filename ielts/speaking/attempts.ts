@@ -28,7 +28,7 @@ const MAX_LIMIT = 200;
 const NOT_FOUND = "Recording not found.";
 const isId = (id: unknown): id is string => typeof id === "string" && Types.ObjectId.isValid(id);
 
-type PartDoc = { part: Part; media: MediaDoc; transcript?: string; transcriptStatus?: string; markers?: Marker[] };
+type PartDoc = { part: Part; media: MediaDoc; uploadId?: string; transcript?: string; transcriptStatus?: string; markers?: Marker[] };
 type AttemptDoc = {
   _id: Types.ObjectId;
   date: string;
@@ -154,23 +154,31 @@ export async function startPart(
   if (!upload.ok) return upload;
   const { media, uploadUrl, audioUploadUrl, maxBytes } = upload;
   const video = media.kind === "video" ? { videoUsed: true } : {};
+  // Names this upload, so a concurrent start that replaced the row first is detected even when both reuse a key.
+  const uploadId = String(new Types.ObjectId());
 
   if (existing) {
-    try {
-      await removeMedia([existing.media]);
-    } catch {
-      return fail("Couldn't replace the earlier recording. Try again.");
-    }
-    // Matching the old key means a concurrent start that already replaced this part makes us lose.
+    // Update first: only the call that wins the row touches the old R2 objects.
     const res = await IeltsSpeakingAttempt.updateOne(
-      { _id: attemptId, userId, parts: { $elemMatch: { part, "media.stored": false, "media.key": existing.media.key } } },
-      { $set: { "parts.$.media": media, "parts.$.transcriptStatus": "none", "parts.$.markers": [], ...video }, $unset: { "parts.$.transcript": 1 } },
+      { _id: attemptId, userId, parts: { $elemMatch: { part, "media.stored": false, uploadId: existing.uploadId ?? null } } },
+      {
+        $set: { "parts.$.media": media, "parts.$.uploadId": uploadId, "parts.$.transcriptStatus": "none", "parts.$.markers": [], ...video },
+        $unset: { "parts.$.transcript": 1 },
+      },
     );
     if (!res.matchedCount) return lostRace(userId, attemptId, part, media);
+    const reused = new Set(keysOf(media));
+    const stale = keysOf(existing.media).filter((k) => !reused.has(k));
+    try {
+      if (stale.length) await deleteObjects(stale);
+    } catch (error) {
+      // The row already points at the new upload; an old object left behind is only storage.
+      console.error(`Couldn't remove the replaced upload ${existing.media.key}`, error);
+    }
   } else {
     const res = await IeltsSpeakingAttempt.updateOne(
       { _id: attemptId, userId, "parts.part": { $ne: part } },
-      { $push: { parts: { part, media } }, $set: video },
+      { $push: { parts: { part, media, uploadId } }, $set: video },
     );
     if (!res.matchedCount) return lostRace(userId, attemptId, part, media);
   }
@@ -241,9 +249,9 @@ export async function confirmPart(
   const main = await verifyUpload(row.media);
   if (!main.ok) return fail(main.error);
 
-  // Keyed on the verified media, so a part replaced by a concurrent startPart isn't marked stored.
+  // Keyed on the verified upload, so a part replaced by a concurrent startPart isn't marked stored.
   const res = await IeltsSpeakingAttempt.updateOne(
-    { _id: attemptId, userId, parts: { $elemMatch: { part, "media.stored": false, "media.key": row.media.key } } },
+    { _id: attemptId, userId, parts: { $elemMatch: { part, "media.stored": false, uploadId: row.uploadId ?? null } } },
     {
       $set: {
         "parts.$.media.stored": true,
@@ -257,7 +265,7 @@ export async function confirmPart(
   if (!res.matchedCount) {
     const now = (await ownAttempt(userId, attemptId))?.parts.find((p) => p.part === part);
     // Stored meanwhile by a concurrent confirm of the same upload: fine. Otherwise the part was replaced.
-    if (!(now?.media.stored && now.media.key === row.media.key)) return fail("This part was started again. Upload it again.");
+    if (!(now?.media.stored && now.uploadId === row.uploadId)) return fail("This part was started again. Upload it again.");
   }
   // A part confirmed after the attempt was finished can complete it.
   await promoteIfComplete(userId, attemptId, attempt.kind);
