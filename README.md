@@ -81,6 +81,48 @@ Storage cost: audio is about 360 KB per minute and video about 4-6 MB per minute
 The R2 free tier is 10 GB, then about $0.015 per GB-month. A heavy video user can fill
 10 GB in about 3 months. There is no automatic retention in v1.
 
+## IELTS Prep
+
+IELTS Prep lives under `/ielts` and needs no new env: it reuses the Speaking Practice
+R2 and Workers AI setup above and the shared AI coach settings.
+
+Learner pages:
+
+- `/ielts` shows the home page, or setup if there is no profile yet.
+- `/ielts/profile` holds the target band and exam date.
+- `/ielts/plan` shows the study plan.
+- `/ielts/calculator` is the band calculator.
+- `/ielts/history` shows past attempts and band charts.
+- `/ielts/speaking` is the Speaking hub.
+- `/ielts/speaking/[id]` runs an attempt.
+- `/ielts/speaking/[id]/review` reviews it.
+
+Admin sections: **Content → IELTS Speaking** (`/admin/ielts/speaking`: Part 1 topics,
+Part 2 cue cards, Part 3 discussions) and **Settings → IELTS settings**
+(`/admin/ielts/settings`).
+
+Shared limits: there is one daily transcription cap across Speaking Practice and IELTS
+(`STT_DAILY_LIMIT`, counted in `SpeakingUsage`) and one shared AI limit.
+
+Storage: IELTS recordings go to R2 under `ielts/<userId>/<attemptId>/<part>.<ext>`
+(and `<part>.audio.<ext>` for the audio track of a video take). The bucket CORS must
+allow the app origins, exactly as Speaking Practice already needs.
+
+Notes:
+
+- The examiner voice uses the browser `speechSynthesis`. Without it the app falls back
+  to on-screen text only. Use headphones (or read the on-screen questions) so the
+  examiner's words stay out of your transcript.
+- Pronunciation is estimated from the transcript only.
+
+**Before deploying this branch:** production has real Speaking Practice data. Run
+`npm run backup -- <file>.json` against production first. The `SpeakingTake` stored
+shape is unchanged.
+
+Known gaps: the phone test (iPhone Safari / Android Chrome) has not been run; the
+throwaway spike page lives in commit `009daca` if needed; in-app navigation during a
+mock test does not warn (`beforeunload` only covers reload and close).
+
 ## Deploy (Vercel + MongoDB Atlas)
 
 1. **Database.** Create a MongoDB Atlas cluster (the free tier works), a database
