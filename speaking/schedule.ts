@@ -68,6 +68,4 @@ export function takeCapSec(task: TaskKey, clipSec?: number): number {
 }
 
 /** Upload size ceiling: 8 kB/s audio, 120 kB/s video. */
-export function takeCapBytes(capSec: number, video: boolean): number {
-  return capSec * (video ? 120_000 : 8_000);
-}
+export { capBytes as takeCapBytes } from "@/recording/mediaCore";
