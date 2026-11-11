@@ -72,7 +72,7 @@ export async function transcribeMedia(
     // Each step on its own, so a failed refund still marks the record failed (and neither can throw).
     for (const [what, step] of [
       ["refund the transcription", refund],
-      ["mark the take failed", deps.onError ?? (async () => {})],
+      ["mark the recording failed", deps.onError ?? (async () => {})],
     ] as const) {
       try {
         await step();

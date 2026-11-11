@@ -54,20 +54,47 @@ describe("recording transcription", () => {
     process.env.STT_DAILY_LIMIT = "2";
     resetEnvCache();
     const t = stub();
-    expect((await transcribeMedia(user, media, { transcribe: t })).ok).toBe(true);
-    expect((await transcribeMedia(user, media, { transcribe: t })).ok).toBe(true);
-    const res = await transcribeMedia(user, media, { transcribe: t });
+    const uid = String(legacyUserId);
+    await mongoose.connection.collection("speakingtakes").insertOne({ ...legacyTake, transcriptStatus: "pending" });
+    // One call from the IELTS-style path, one from Speaking Practice: same user, same counter.
+    expect((await transcribeMedia(uid, media, { transcribe: t })).ok).toBe(true);
+    expect((await transcribeTake(uid, String(legacyTakeId), { transcribe: t })).ok).toBe(true);
+    const res = await transcribeMedia(uid, media, { transcribe: t });
     expect(res).toEqual({ ok: false, errors: { _: TRANSCRIBE_LIMIT_MESSAGE } });
     expect(t).toHaveBeenCalledTimes(2);
-    expect(await usageCount(user)).toBe(2);
+    expect(await usageCount(uid)).toBe(2);
   });
 
   it("refunds on an STT error", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await transcribeMedia(user, media, {
       transcribe: vi.fn(async () => {
+        expect(await usageCount(user)).toBe(1);
         throw new SttError("boom");
       }),
+    });
+    expect(res).toEqual({ ok: false, errors: { _: "Couldn't transcribe the recording. Try again." } });
+    expect(await usageCount(user)).toBe(0);
+    log.mockRestore();
+  });
+
+  it("refunds and skips onError when save reports nothing stored", async () => {
+    const onError = vi.fn(async () => {});
+    const res = await transcribeMedia(user, media, { transcribe: stub(), save: async () => false, onError });
+    expect(res).toEqual({ ok: false, errors: { _: "This recording can't be transcribed." } });
+    expect(await usageCount(user)).toBe(0);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("still returns the failure and refunds when onError throws", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await transcribeMedia(user, media, {
+      transcribe: vi.fn(async () => {
+        throw new SttError("boom");
+      }),
+      onError: async () => {
+        throw new Error("db down");
+      },
     });
     expect(res).toEqual({ ok: false, errors: { _: "Couldn't transcribe the recording. Try again." } });
     expect(await usageCount(user)).toBe(0);
