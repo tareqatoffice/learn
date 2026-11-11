@@ -1,4 +1,4 @@
-import mongoose, { Schema, model } from "mongoose";
+import mongoose, { type Types, Schema, model } from "mongoose";
 import { CRITERIA } from "@/ielts/bands";
 import { bodySchema, mediaSchema } from "@/recording/media";
 
@@ -29,6 +29,13 @@ const questionsSchema = new Schema(
   },
   { _id: false },
 );
+
+/** The questions an attempt was given (bank item ids, or the text itself for AI-written sets). */
+export type IeltsSpeakingQuestions = {
+  part1?: { itemIds: Types.ObjectId[]; frames: { title: string; questions: string[] }[] };
+  part2?: { itemId?: Types.ObjectId; cue: { topic: string; bullets: string[]; explain: string; roundOff: string[] } };
+  part3?: { itemId?: Types.ObjectId; questions: string[] };
+};
 
 const markerSchema = new Schema(
   { atSec: { type: Number, required: true }, label: { type: String, required: true } },

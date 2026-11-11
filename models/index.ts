@@ -30,5 +30,5 @@ export { IeltsPlanSuggestion } from "./ieltsPlanSuggestion";
 export { IeltsStudyLog } from "./ieltsStudyLog";
 export { IeltsBandEntry } from "./ieltsBandEntry";
 export { IeltsSpeakingItem } from "./ieltsSpeakingItem";
-export { IeltsSpeakingAttempt } from "./ieltsSpeakingAttempt";
+export { IeltsSpeakingAttempt, type IeltsSpeakingQuestions } from "./ieltsSpeakingAttempt";
 export { IeltsSettings } from "./ieltsSettings";

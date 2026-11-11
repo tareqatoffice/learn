@@ -44,7 +44,7 @@ describe("pickQuestions", () => {
     const c = await p1("Gamma");
     await attempt("2026-01-05", { part1: { itemIds: [a._id], frames: [] } });
     await attempt("2026-01-01", { part1: { itemIds: [b._id], frames: [] } });
-    await attempt("2026-01-02", { part1: { itemIds: [b._id], frames: [] } }, new Types.ObjectId());
+    await attempt("2026-01-10", { part1: { itemIds: [b._id] , frames: [] } }, new Types.ObjectId());
 
     let res = await pickQuestions(userId, "part1");
     expect(res.exhausted).toBe(false);
@@ -107,6 +107,55 @@ describe("pickQuestions", () => {
     expect(res.exhausted).toBe(true);
     expect(res.questions.part3).toBeUndefined();
     expect(res.questions.part2).toBeDefined();
+  });
+
+  it("mock picks the least recently used per slot, ignoring other users", async () => {
+    const about = await p1("About me", { aboutYou: true });
+    const food = await p1("Food");
+    const travel = await p1("Travel");
+    const work = await p1("Work");
+    const old = await p2("Old card");
+    const recent = await p2("Recent card");
+    await attempt("2026-01-01", { part1: { itemIds: [about._id, food._id, travel._id], frames: [] }, part2: { itemId: old._id, cue: { topic: "t" } } });
+    await attempt("2026-01-09", { part2: { itemId: recent._id, cue: { topic: "t" } } });
+    await attempt("2026-01-10", { part2: { itemId: old._id, cue: { topic: "t" } } }, new Types.ObjectId());
+    const { questions } = await pickQuestions(userId, "mock");
+    expect(questions.part1?.itemIds.slice(0, 2).map(String)).toEqual([String(about._id), String(work._id)]);
+    expect(questions.part2?.itemId).toEqual(old._id);
+  });
+
+  it("a mock with only 2 part1 items is exhausted", async () => {
+    await p1("About me", { aboutYou: true });
+    await p1("Food");
+    await p2("Card");
+    await p3("Set");
+    const res = await pickQuestions(userId, "mock");
+    expect(res.questions.part1?.frames).toHaveLength(2);
+    expect(res.exhausted).toBe(true);
+  });
+
+  it("a mock is exhausted when part1 is fresh but every part2 is used", async () => {
+    await p1("About me", { aboutYou: true });
+    await p1("Food");
+    await p1("Travel");
+    const card = await p2("Card");
+    await p3("Set", { cardId: card._id });
+    expect((await pickQuestions(userId, "mock")).exhausted).toBe(false);
+    await attempt("2026-01-01", { part2: { itemId: card._id, cue: { topic: "t" } } });
+    expect((await pickQuestions(userId, "mock")).exhausted).toBe(true);
+  });
+
+  it("a fresh part3 linked to a different card doesn't count", async () => {
+    await p1("About me", { aboutYou: true });
+    await p1("Food");
+    await p1("Travel");
+    const card = await p2("Card");
+    const mine = await p3("Mine", { cardId: card._id });
+    await p3("Elsewhere", { cardId: new Types.ObjectId() });
+    await attempt("2026-01-01", { part3: { itemId: mine._id, questions: [] } });
+    const res = await pickQuestions(userId, "mock");
+    expect(res.questions.part3?.itemId).toEqual(mine._id);
+    expect(res.exhausted).toBe(true);
   });
 
   it("exhausted when bank empty", async () => {

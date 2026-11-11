@@ -3,18 +3,14 @@ import { INSTRUCTIONS, JSON_SCHEMAS, SYSTEM_PROMPT, draftFromRaw, type ItemType 
 import { getAiConfig, modelChain } from "@/lib/aiSettings";
 import { connectDb } from "@/lib/db";
 import { AiError, type ChatOptions, chatCompletion, extractJson } from "@/lib/openrouter";
-import { IeltsSpeakingAttempt, IeltsSpeakingItem } from "@/models";
+import { IeltsSpeakingAttempt, IeltsSpeakingItem, type IeltsSpeakingQuestions } from "@/models";
 import { type AiResult, metered } from "@/progress/quizAi";
 
 export type Kind = "mock" | "part1" | "part2" | "part3";
 type Id = Types.ObjectId;
 type Cue = { topic: string; bullets: string[]; explain: string; roundOff: string[] };
 type Frame = { title: string; questions: string[] };
-export type QuestionSet = {
-  part1?: { itemIds: Id[]; frames: Frame[] };
-  part2?: { itemId?: Id; cue: Cue };
-  part3?: { itemId?: Id; questions: string[] };
-};
+export type QuestionSet = IeltsSpeakingQuestions;
 
 type Item = {
   _id: Id;
@@ -77,7 +73,6 @@ export async function pickQuestions(
   const ofType = (type: ItemType) => items.filter((i) => i.type === type);
   const order = (list: Item[]) => leastRecent(list, lastUsed, rng);
   const questions: QuestionSet = {};
-  const needed: ItemType[] = kind === "mock" ? ["part1", "part2", "part3"] : [kind];
 
   if (kind === "mock") {
     const p1 = ofType("part1");
@@ -104,9 +99,18 @@ export async function pickQuestions(
     if (it) questions.part3 = { itemId: it._id, questions: it.questions ?? [] };
   }
 
-  const anyFresh = needed.some((type) => ofType(type).some((i) => !lastUsed.has(String(i._id))));
-  const missingPart = kind === "mock" && !(questions.part1 && questions.part2 && questions.part3);
-  return { questions, exhausted: !anyFresh || missingPart };
+  // Exhausted when some needed type has nothing this user hasn't used, or a mock can't be filled.
+  const fresh = (list: Item[]) => list.some((i) => !lastUsed.has(String(i._id)));
+  let pickable: Item[][];
+  if (kind === "mock") {
+    const cardId = questions.part2?.itemId;
+    const sets = ofType("part3").filter((s) => !s.cardId || (cardId && String(s.cardId) === String(cardId)));
+    pickable = [ofType("part1"), ofType("part2"), sets];
+  } else {
+    pickable = [ofType(kind)];
+  }
+  const incomplete = kind === "mock" && !((questions.part1?.frames?.length ?? 0) >= 3 && questions.part2 && questions.part3);
+  return { questions, exhausted: incomplete || !pickable.every(fresh) };
 }
 
 // ---- learner AI fill ----
@@ -114,10 +118,10 @@ export async function pickQuestions(
 type Deps = Pick<ChatOptions, "fetch">;
 
 const MOCK_INSTRUCTIONS = [
-  "Write one full Speaking test. Keys: part1 (exactly 3 frames, each with title and questions; the first frame is about the candidate themselves, e.g. home, work or studies;",
-  `${INSTRUCTIONS.part1.replace(/^Write one Part 1 frame: /, "each frame is ")}),`,
-  `part2 (${INSTRUCTIONS.part2.replace(/^Write one Part 2 cue card on a topic of your choice\. Keys: /, "one cue card with keys ")}),`,
-  "part3 (one discussion set on the same theme as the part2 card: 5 abstract, opinion-based questions, each under 30 words; keys title and questions).",
+  "Write one full Speaking test. Keys: part1, part2, part3.",
+  "part1: exactly 3 frames, each an object with title (the topic, short) and questions (4 short, friendly questions about the candidate, each under 20 words); the first frame is about the candidate themselves, such as home, work or studies.",
+  'part2: one cue card with keys title (short), topic (the "Describe ..." line), bullets (exactly 3 short "You should say" prompts), explain (the closing line, starting "and explain ..."), roundOff (up to 2 short follow-up questions; may be empty).',
+  "part3: one discussion set on the same theme as the part2 card, with keys title and questions (5 abstract, opinion-based questions, each under 30 words).",
 ].join(" ");
 
 const MOCK_SCHEMA = {
@@ -131,8 +135,13 @@ const MOCK_SCHEMA = {
   },
 };
 
+/** Card text for the prompt: cut to the schema's lengths and unable to close the tag early. */
+const clip = (s: string) => s.replace(/<\/?card>/gi, "").trim().slice(0, 200);
 const cardBlock = (cue: Cue) =>
-  `\n\nThe set follows this Part 2 cue card:\n<card>\n${cue.topic}\n${cue.bullets.map((b) => `- ${b}`).join("\n")}\n${cue.explain}\n</card>`;
+  `\n\nThe set follows this Part 2 cue card:\n<card>\n${clip(cue.topic)}\n${cue.bullets
+    .slice(0, 4)
+    .map((b) => `- ${clip(b)}`)
+    .join("\n")}\n${clip(cue.explain)}\n</card>`;
 
 /** A validated set from a model reply, or null when it doesn't fit the same bounds as admin drafts. */
 function toSet(kind: Kind, reply: string): QuestionSet | null {
