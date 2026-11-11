@@ -1,9 +1,9 @@
 import mongoose, { Types } from "mongoose";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectDb } from "@/lib/db";
-import { IeltsPlan, IeltsPlanSuggestion, IeltsProfile, IeltsSpeakingAttempt } from "@/models";
+import { IeltsPlan, IeltsPlanSuggestion, IeltsProfile, IeltsSpeakingAttempt, SpeakingTake } from "@/models";
 import type { Criterion } from "@/ielts/bands";
-import { currentPlan, getProfile, previewProfile, saveProfile, type ProfileInput } from "@/ielts/profile";
+import { currentPlan, getProfile, previewPlan, previewProfile, saveProfile, toPlanInputs, type ProfileInput } from "@/ielts/profile";
 import { logStudy } from "@/ielts/progress";
 import {
   approveSuggestion,
@@ -81,14 +81,49 @@ describe("ielts suggestions", () => {
 
   it("missed raises minutes per day when spreading would overload a day", async () => {
     const u = await setup({ testDate: addDays(TODAY, 21) });
-    // Nothing done in week 0 (420 min); spread over the one week after next it would double each day.
+    // Nothing done in week 0 (420 min). Spread over the one week after this it would put 120 min
+    // on each day (> 90), so instead: (14 days × 60 + 420) / 14 study days left = 90 a day.
     await runChecks(u, WEEK1, TZ);
     const [s] = await pending(u);
     expect(s.kind).toBe("missed");
-    expect(s.proposal).toEqual({ inputs: { minutesPerDay: 120 } });
+    expect(s.proposal).toEqual({ inputs: { minutesPerDay: 90 } });
     const id = (await listPending(u, WEEK1))[0].id;
     expect((await approveSuggestion(u, id, WEEK1)).ok).toBe(true);
-    expect((await getProfile(u))!.minutesPerDay).toBe(120);
+    expect((await getProfile(u))!.minutesPerDay).toBe(90);
+  });
+
+  it("a failed plan write leaves the profile and suggestion unchanged", async () => {
+    const u = await setup({ testDate: addDays(TODAY, 21) });
+    await runChecks(u, WEEK1, TZ);
+    const [s] = await listPending(u, WEEK1);
+    const spy = vi.spyOn(IeltsPlan, "create").mockRejectedValueOnce(new Error("write failed"));
+    await expect(approveSuggestion(u, s.id, WEEK1)).rejects.toThrow("write failed");
+    spy.mockRestore();
+    expect((await getProfile(u))!.minutesPerDay).toBe(60);
+    expect((await pending(u)).map((p) => p.kind)).toEqual(["missed"]);
+    expect((await currentPlan(u))!.version).toBe(1);
+  });
+
+  it("an approved shortfall is not spread again on a later rebuild", async () => {
+    const { u } = await missedWeek();
+    const low = { fluency: 5, lexical: 5, grammar: 5, pronunciation: 5 };
+    await mock(u, TODAY, low, low);
+    await mock(u, addDays(TODAY, 1), low, low);
+    await runChecks(u, WEEK1, TZ);
+    for (const s of await listPending(u, WEEK1)) expect((await approveSuggestion(u, s.id, WEEK1)).ok).toBe(true);
+    const plan = (await currentPlan(u))!;
+    expect(plan.adjustments.map((a) => a.kind).sort()).toEqual(["shiftCriterion", "spreadShortfall"]);
+    const shift = plan.adjustments.find((a) => a.kind === "shiftCriterion")!;
+    const spread = plan.adjustments.find((a) => a.kind === "spreadShortfall")!;
+
+    const next = addDays(WEEK1, 1);
+    const preview = await previewPlan(u, toPlanInputs((await getProfile(u))!, next), plan.adjustments.map((a) => ({ ...a, createdAt: new Date(a.createdAt) })), "x");
+    expect(preview.dropped.map((a) => a.id)).toEqual([spread.id]);
+    expect((await removeAdjustment(u, shift.id, next)).ok).toBe(true);
+    const after = (await currentPlan(u))!;
+    expect(after.adjustments).toEqual([]);
+    // 52 study days left at 60 min, with nothing extra.
+    expect(after.weeks.reduce((n, w) => n + total(w.minutes), 0)).toBe(52 * 60);
   });
 
   it("missed after 3 study days in a row with nothing done", async () => {
@@ -246,6 +281,30 @@ describe("ielts suggestions", () => {
     await suggestCurrentBand(u, "mocks", { speaking: 6 }, TODAY);
     expect(await pending(u)).toEqual([]);
     await suggestCurrentBand(u, "mocks", { speaking: 6.5 }, TODAY);
-    expect((await pending(u))[0].proposal).toEqual({ inputs: { current: { overall: 6, speaking: 6.5 } } });
+    expect((await pending(u))[0].proposal).toEqual({ inputs: { current: { speaking: 6.5 } } });
+  });
+
+  it("currentBand approve keeps a band edited after the suggestion", async () => {
+    const u = await setup({ current: { overall: 6, speaking: 6 } });
+    await suggestCurrentBand(u, "mocks", { speaking: 6.5 }, TODAY);
+    expect((await saveProfile(u, { ...base, current: { overall: 6, speaking: 6, listening: 7 } }, TODAY)).ok).toBe(true);
+    const [s] = await listPending(u, TODAY);
+    expect(s.preview.after.version).toBe(3);
+    expect((await approveSuggestion(u, s.id, TODAY)).ok).toBe(true);
+    expect((await getProfile(u))!.current).toEqual({ overall: 6, speaking: 6.5, listening: 7 });
+  });
+
+  it("Speaking Practice takes break a zero-day streak", async () => {
+    const u = await setup();
+    for (let i = 0; i < 3; i++) {
+      await SpeakingTake.create({
+        userId: u,
+        date: addDays(TODAY, i),
+        task: "readAloud",
+        media: { kind: "audio", key: "k", mime: "audio/webm", durationSec: 60, capSec: 420, stored: true },
+      });
+    }
+    await runChecks(u, addDays(TODAY, 3), TZ);
+    expect(await pending(u)).toEqual([]);
   });
 });

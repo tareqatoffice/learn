@@ -158,7 +158,9 @@ function createdDate(a: Adjustment): string {
  * - A week's mocks come from the phase its first day falls in, capped at its study days. Week 0
  *   gets 1 diagnostic mock when it is a foundation week and the current band is unknown.
  * - `spreadShortfall` adds minutes / (weeks − fromWeek) to each week from `fromWeek` on, split by
- *   the skill weights; dropped when `fromWeek` is past the last week.
+ *   the skill weights. It is one-shot (ruling R12): kept only on the rebuild dated its creation
+ *   day (UTC date of `createdAt` = `today`), and dropped on later rebuilds or when `fromWeek` is
+ *   past the last week.
  * - `shiftCriterion` sets `focus` on the week containing its creation date (UTC) and every later
  *   week, in `createdAt` order so the newest shift wins; dropped when its criterion is in `metCriteria`.
  */
@@ -189,7 +191,7 @@ export function generatePlan(
   for (const a of adjustments) {
     if (a.kind === "spreadShortfall") {
       const from = Math.max(a.fromWeek ?? 0, 0);
-      if (from >= weekCount) {
+      if (from >= weekCount || createdDate(a) !== inputs.today) {
         dropped.push(a);
         continue;
       }

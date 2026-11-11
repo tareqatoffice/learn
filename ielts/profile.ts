@@ -1,3 +1,4 @@
+import type { ClientSession } from "mongoose";
 import { z } from "zod";
 import { connectDb, retryOnDuplicateKey } from "@/lib/db";
 import { IeltsPlan, IeltsProfile } from "@/models";
@@ -222,21 +223,26 @@ export async function previewProfile(userId: string, input: ProfileInput, today:
   return ok(await buildPreview(prev, toPlanInputs(v.data, today), prev?.adjustments ?? [], CHANGED_REASON, {}));
 }
 
-/** Generates a plan from `inputs` and stores it as the next version. Returns the new version number. */
+/** Generates a plan from `inputs` and stores it as the next version (inside `ctx.session` when given). Returns the new version number. */
 export async function writePlanVersion(
   userId: string,
   inputs: PlanInputs,
   adjustments: Adjustment[],
   reason: string,
-  ctx: PlanCtx = {},
+  ctx: PlanCtx & { session?: ClientSession } = {},
 ): Promise<number> {
   await connectDb();
   const settings = await getIeltsSettings();
-  const plan = generatePlan(inputs, adjustments, settings, ctx);
+  const { session, ...planCtx } = ctx;
+  const plan = generatePlan(inputs, adjustments, settings, planCtx);
   return retryOnDuplicateKey(async () => {
-    const last = await IeltsPlan.findOne({ userId }).sort({ version: -1 }).select("version").lean<{ version: number }>();
+    const last = await IeltsPlan.findOne({ userId })
+      .sort({ version: -1 })
+      .select("version")
+      .session(session ?? null)
+      .lean<{ version: number }>();
     const version = (last?.version ?? 0) + 1;
-    await IeltsPlan.create({
+    const doc = {
       userId,
       version,
       startDate: inputs.today,
@@ -247,7 +253,8 @@ export async function writePlanVersion(
       weeks: plan.weeks,
       hours: plan.hours,
       reason,
-    });
+    };
+    await IeltsPlan.create([doc], { session });
     return version;
   });
 }

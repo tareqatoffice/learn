@@ -4,8 +4,8 @@
 
 import { randomUUID } from "node:crypto";
 import { isValidObjectId, type Types } from "mongoose";
-import { connectDb } from "@/lib/db";
-import { IeltsPlanSuggestion, IeltsProfile, IeltsSpeakingAttempt } from "@/models";
+import { connectDb, inTransaction } from "@/lib/db";
+import { IeltsPlanSuggestion, IeltsProfile, IeltsSpeakingAttempt, SpeakingTake } from "@/models";
 import { type ActionResult, fail, ok } from "@/admin/result";
 import { CRITERIA, CRITERION_LABEL, SKILLS, speakingBand, type Criterion, type Skill } from "@/ielts/bands";
 import { type Adjustment, generatePlan, hoursCheck, phaseOn, type PlanInputs, studyDaysBetween, type Week, weekOn } from "@/ielts/plan";
@@ -21,13 +21,16 @@ import {
 } from "@/ielts/profile";
 import { dailyMinutes, weekProgress } from "@/ielts/progress";
 import { getIeltsSettings, type IeltsSettingsView } from "@/ielts/settings";
-import { addDays } from "@/speaking/schedule";
+import { addDays, localDate } from "@/speaking/schedule";
 
 export type SuggestionKind = "missed" | "weak" | "hoursShort" | "phase" | "currentBand";
 
 type Bands = Partial<Record<"overall" | Skill, number>>;
 
-/** Stored in `IeltsPlanSuggestion.proposal`. Empty for `hoursShort` and `phase`. */
+/**
+ * Stored in `IeltsPlanSuggestion.proposal`. Empty for `hoursShort` and `phase`. `inputs.current`
+ * holds only the bands that change; they are merged over the live profile when used.
+ */
 type Proposal = {
   inputs?: { minutesPerDay?: number; current?: Bands };
   adjustment?: Omit<Adjustment, "id" | "createdAt">;
@@ -58,6 +61,11 @@ const band = (n: number) => n.toFixed(1);
 const fromView = (a: AdjustmentView): Adjustment => ({ ...a, createdAt: new Date(a.createdAt) });
 const speakingTarget = (p: ProfileView) => p.target.speaking ?? p.target.overall;
 const changesPlan = (p: Proposal) => Boolean(p.inputs || p.adjustment);
+/**
+ * `createdAt` for a new adjustment: now's time of day on `today`, so its UTC date is the day of
+ * the rebuild it is made for (spreadShortfall is one-shot: ruling R12).
+ */
+const createdOn = (today: string) => new Date(`${today}T${new Date().toISOString().slice(11)}`);
 
 type MockBands = { date: string; low: Partial<Record<Criterion, number>>; self: Partial<Record<Criterion, number>> };
 
@@ -98,11 +106,19 @@ async function planContext(userId: string, today: string): Promise<PlanContext |
   };
 }
 
-/** Inputs and adjustments with `proposal` applied, rebuilt from `today`. */
+/** Inputs and adjustments with `proposal` applied over the live profile, rebuilt from `today`. */
 function applied(ctx: PlanContext, proposal: Proposal, today: string): { inputs: PlanInputs; adjustments: Adjustment[] } {
-  const inputs = toPlanInputs({ ...ctx.profile, ...proposal.inputs }, today);
+  const { minutesPerDay, current } = proposal.inputs ?? {};
+  const inputs = toPlanInputs(
+    {
+      ...ctx.profile,
+      ...(minutesPerDay !== undefined ? { minutesPerDay } : {}),
+      current: { ...ctx.profile.current, ...current },
+    },
+    today,
+  );
   const adjustments = proposal.adjustment
-    ? [...ctx.adjustments, { ...proposal.adjustment, id: randomUUID(), createdAt: new Date() }]
+    ? [...ctx.adjustments, { ...proposal.adjustment, id: randomUUID(), createdAt: createdOn(today) }]
     : ctx.adjustments;
   return { inputs, adjustments };
 }
@@ -128,8 +144,11 @@ async function quietKinds(userId: string, today: string, dismissDays: number): P
   return new Set(rows.map((r) => r.kind));
 }
 
-/** `n` when the last `n` study days before today (within the plan) had no minutes at all, else 0. */
-async function zeroStreak(userId: string, ctx: PlanContext, today: string, n: number): Promise<number> {
+/**
+ * `n` when the last `n` study days before today (within the plan) had no IELTS minutes and no
+ * stored Speaking Practice take (counted from the profile's creation day), else 0.
+ */
+async function zeroStreak(userId: string, ctx: PlanContext, today: string, timeZone: string, n: number): Promise<number> {
   const start = ctx.plan.weeks[0]?.start;
   if (!start) return 0;
   const days: string[] = [];
@@ -137,8 +156,16 @@ async function zeroStreak(userId: string, ctx: PlanContext, today: string, n: nu
     if (ctx.profile.studyDays.includes(weekday(d))) days.push(d);
   }
   if (days.length < n) return 0;
-  const totals = await dailyMinutes(userId, days[days.length - 1], days[0]);
-  return days.every((d) => total(totals[d]) === 0) ? n : 0;
+  const from = days[days.length - 1];
+  const created = localDate(new Date(ctx.profile.createdAt), timeZone);
+  const [totals, takes] = await Promise.all([
+    dailyMinutes(userId, from, days[0]),
+    SpeakingTake.find({ userId, "media.stored": true, date: { $gte: created > from ? created : from, $lte: days[0] } })
+      .select("date")
+      .lean<{ date: string }[]>(),
+  ]);
+  const practised = new Set(takes.map((t) => t.date));
+  return days.every((d) => total(totals[d]) === 0 && !practised.has(d)) ? n : 0;
 }
 
 async function missedCheck(
@@ -162,7 +189,7 @@ async function missedCheck(
     }
   }
   if (!shortfall) {
-    const streak = await zeroStreak(userId, ctx, today, t.missedStreak);
+    const streak = await zeroStreak(userId, ctx, today, timeZone, t.missedStreak);
     if (streak) {
       shortfall = streak * ctx.profile.minutesPerDay;
       why = `You did nothing on your last ${streak} study days.`;
@@ -172,9 +199,8 @@ async function missedCheck(
 
   // A rebuild starts today, so today's week is week 0 and the spread starts at week 1.
   const adjustment = { kind: "spreadShortfall" as const, minutes: shortfall, fromWeek: 1 };
-  const spread = generatePlan(ctx.inputs, [...ctx.adjustments, { ...adjustment, id: "preview", createdAt: new Date() }], settings, {
-    metCriteria: ctx.met,
-  });
+  const plan = (extra: Adjustment[]) => generatePlan(ctx.inputs, [...ctx.adjustments, ...extra], settings, { metCriteria: ctx.met });
+  const spread = plan([{ ...adjustment, id: "preview", createdAt: createdOn(today) }]);
   const studyDays = (w: Week) => studyDaysBetween(w.start, w.end, ctx.profile.studyDays);
   const cap = ctx.profile.minutesPerDay * DAY_CAP;
   const later = spread.weeks.slice(adjustment.fromWeek);
@@ -187,11 +213,12 @@ async function missedCheck(
     };
   }
 
-  // Too much for some days: raise minutes per day to cover the remaining weeks (or this one, if it's the last).
-  const span = later.length ? later : spread.weeks.slice(0, 1);
-  const days = span.reduce((n, w) => n + studyDays(w), 0);
+  // Too much for some days: raise minutes per day so the study days left (today included) cover
+  // all the planned minutes plus the shortfall.
+  const weeks = plan([]).weeks;
+  const days = weeks.reduce((n, w) => n + studyDays(w), 0);
   if (!days) return null;
-  const needed = (span.reduce((n, w) => n + total(w.minutes), 0) + (later.length ? 0 : shortfall)) / days;
+  const needed = (weeks.reduce((n, w) => n + total(w.minutes), 0) + shortfall) / days;
   const minutesPerDay = Math.min(Math.ceil(needed / 5) * 5, MAX_MINUTES);
   if (minutesPerDay <= ctx.profile.minutesPerDay) return null;
   return {
@@ -327,22 +354,25 @@ export async function approveSuggestion(userId: string, id: string, today: strin
   await connectDb();
   const ctx = await planContext(userId, today);
   if (!ctx) return fail(NO_PLAN);
-  const s = await IeltsPlanSuggestion.findOneAndUpdate(
-    { _id: id, userId, status: "pending" },
-    { $set: { status: "approved", decidedAt: new Date() } },
-  ).lean<SuggestionDoc>();
-  if (!s) return fail(NOT_PENDING);
-  const proposal = s.proposal ?? {};
-  if (!changesPlan(proposal)) return ok({ version: ctx.plan.version });
-  try {
-    if (proposal.inputs) await IeltsProfile.updateOne({ userId }, { $set: proposal.inputs });
+  // One transaction: a failed plan write leaves the suggestion pending and the profile unchanged.
+  return inTransaction(async (session) => {
+    const s = await IeltsPlanSuggestion.findOneAndUpdate(
+      { _id: id, userId, status: "pending" },
+      { $set: { status: "approved", decidedAt: new Date() } },
+      { session },
+    ).lean<SuggestionDoc>();
+    if (!s) return fail(NOT_PENDING);
+    const proposal = s.proposal ?? {};
+    if (!changesPlan(proposal)) return ok({ version: ctx.plan.version });
+    const { minutesPerDay, current } = proposal.inputs ?? {};
+    const $set: Record<string, number> = {};
+    if (minutesPerDay !== undefined) $set.minutesPerDay = minutesPerDay;
+    for (const [k, v] of Object.entries(current ?? {})) $set[`current.${k}`] = v;
+    if (Object.keys($set).length) await IeltsProfile.updateOne({ userId }, { $set }, { session });
     const { inputs, adjustments } = applied(ctx, proposal, today);
-    const version = await writePlanVersion(userId, inputs, adjustments, versionReason(proposal), { metCriteria: ctx.met });
+    const version = await writePlanVersion(userId, inputs, adjustments, versionReason(proposal), { metCriteria: ctx.met, session });
     return ok({ version });
-  } catch (e) {
-    await IeltsPlanSuggestion.updateOne({ _id: s._id }, { $set: { status: "pending" }, $unset: { decidedAt: 1 } });
-    throw e;
-  }
+  });
 }
 
 export async function dismissSuggestion(userId: string, id: string): Promise<ActionResult> {
@@ -367,8 +397,8 @@ export async function removeAdjustment(userId: string, adjustmentId: string, tod
 }
 
 /**
- * Suggests updating the profile's current band. `official`: the entered result becomes the
- * current band (replacing any pending current-band suggestion, and not held back by a recent
+ * Suggests updating the profile's current band. The proposal holds only the bands that change.
+ * `official`: the entered result becomes the current band (replacing any pending current-band suggestion, and not held back by a recent
  * dismissal, since the user entered it). `mocks`: `bands.speaking` (the caller's figure from the
  * last 2 mocks) is suggested when it is at least `currentBandGap` from the profile's Speaking band.
  */
@@ -380,7 +410,6 @@ export async function suggestCurrentBand(userId: string, source: "official" | "m
   for (const k of ["overall", ...SKILLS] as const) if (typeof bands[k] === "number") given[k] = bands[k];
 
   if (source === "official") {
-    const current = { ...profile.current, ...given };
     const keys = Object.keys(given) as (keyof Bands)[];
     if (!keys.length || keys.every((k) => profile.current[k] === given[k])) return;
     const list = keys.map((k) => `${k} ${band(given[k]!)}`).join(", ");
@@ -389,7 +418,7 @@ export async function suggestCurrentBand(userId: string, source: "official" | "m
       {
         $set: {
           reason: `You entered an official result (${list}). This makes it your current band and rebuilds the plan.`,
-          proposal: { inputs: { current } },
+          proposal: { inputs: { current: given } },
           forDate: today,
         },
       },
@@ -408,7 +437,7 @@ export async function suggestCurrentBand(userId: string, source: "official" | "m
     userId,
     kind: "currentBand",
     reason: `Your last 2 mocks put your Speaking at about ${band(speaking)}${from}. This updates your current Speaking band and rebuilds the plan.`,
-    proposal: { inputs: { current: { ...profile.current, speaking } } },
+    proposal: { inputs: { current: { speaking } } },
     forDate: today,
   });
 }

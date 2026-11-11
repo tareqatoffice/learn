@@ -144,7 +144,7 @@ describe("weekly minutes", () => {
 
   it("skips the floor when a week is too small for it, keeping the total", () => {
     // Sundays only: the last, 2-day week (Wed..Thu) has no study days, so only spread minutes.
-    const adj: Adjustment = { id: "a1", kind: "spreadShortfall", minutes: 3, fromWeek: 14, createdAt: new Date() };
+    const adj: Adjustment = { id: "a1", kind: "spreadShortfall", minutes: 3, fromWeek: 14, createdAt: new Date(`${TODAY}T09:00:00Z`) };
     const plan = generatePlan(inputs({ studyDays: [0] }), [adj], SETTINGS);
     const w = plan.weeks[14];
     expect(weekTotal(w)).toBe(3);
@@ -231,6 +231,16 @@ describe("adjustments", () => {
     expect(plan.kept).toEqual([]);
     expect(plan.dropped).toEqual([adj]);
     expect(plan.weeks).toEqual(base.weeks);
+  });
+
+  it("spreadShortfall is one-shot: kept the day it was made, dropped the next day", () => {
+    const adj: Adjustment = { id: "a1", kind: "spreadShortfall", minutes: 300, fromWeek: 1, createdAt: created };
+    expect(generatePlan(inputs(), [adj], SETTINGS).kept).toEqual([adj]);
+    const tomorrow = inputs({ today: addDays(TODAY, 1) });
+    const next = generatePlan(tomorrow, [adj], SETTINGS);
+    expect(next.kept).toEqual([]);
+    expect(next.dropped).toEqual([adj]);
+    expect(next.weeks).toEqual(generatePlan(tomorrow, [], SETTINGS).weeks);
   });
 
   it("shiftCriterion sets focus from its creation week on, without changing minutes", () => {
