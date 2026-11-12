@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { Types } from "mongoose";
 import { z } from "zod";
 import { type ActionResult, fail, ok } from "@/admin/result";
+import { AUDIO_EXT } from "@/lib/audioTypes";
 import { connectDb } from "@/lib/db";
 import { deleteObjects, headObject, presignPut, storageConfigured } from "@/lib/r2";
 import { SpeakingLesson } from "@/models";
@@ -119,18 +120,6 @@ export async function moveLesson(id: string, dir: "up" | "down"): Promise<Action
   return ok();
 }
 
-const EXT: Record<string, string> = {
-  "audio/mpeg": "mp3",
-  "audio/mp3": "mp3",
-  "audio/mp4": "m4a",
-  "audio/x-m4a": "m4a",
-  "audio/aac": "aac",
-  "audio/wav": "wav",
-  "audio/x-wav": "wav",
-  "audio/webm": "webm",
-  "audio/ogg": "ogg",
-};
-
 export async function startLessonAudioUpload(
   id: string,
   mime: string,
@@ -144,7 +133,7 @@ export async function startLessonAudioUpload(
   if (!storageConfigured()) return fail(NO_STORAGE);
   await connectDb();
   if (!(await SpeakingLesson.exists({ _id: id }))) return fail(NOT_FOUND);
-  const ext = EXT[type] ?? "audio";
+  const ext = AUDIO_EXT[type] ?? "audio";
   const key = `lessons/${id}/${randomBytes(12).toString("hex")}.${ext}`;
   // The length is signed, so R2 refuses an upload of any other size (the 50 MB cap can't be dodged).
   return ok({ uploadUrl: await presignPut(key, type, size), key });

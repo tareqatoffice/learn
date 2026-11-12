@@ -382,6 +382,35 @@ describe("ielts speaking attempts", () => {
     expect((await getAttempt(u, id))!.parts[0].transcriptStatus).toBe("failed");
   });
 
+  it("transcribePart runs once when two requests race", async () => {
+    const u = user();
+    const id = await start(u);
+    await store(u, id, "p1");
+    let release: (t: string) => void = () => {};
+    const stt = vi.fn(() => new Promise<string>((resolve) => (release = resolve)));
+    const first = transcribePart(u, id, "p1", { transcribe: stt });
+    await vi.waitFor(() => expect(stt).toHaveBeenCalledTimes(1));
+    expect((await getAttempt(u, id))!.parts[0].transcriptStatus).toBe("running");
+    const second = await transcribePart(u, id, "p1", { transcribe: stt });
+    expect(second.ok).toBe(false);
+    release("hello");
+    expect(await first).toEqual({ ok: true, transcript: "hello" });
+    expect(stt).toHaveBeenCalledTimes(1);
+    expect((await SpeakingUsage.findOne({ userId: u, day: today }).lean<{ count: number }>())!.count).toBe(1);
+  });
+
+  it("transcribePart takes over a claim abandoned long ago, but not a fresh one", async () => {
+    const u = user();
+    const id = await start(u);
+    await store(u, id, "p1");
+    const claim = (at: Date) =>
+      IeltsSpeakingAttempt.updateOne({ _id: id, "parts.part": "p1" }, { $set: { "parts.$.transcriptStatus": "running", "parts.$.transcribeStartedAt": at } });
+    await claim(new Date(Date.now() - 60_000));
+    expect((await transcribePart(u, id, "p1", { transcribe: vi.fn(async () => "x") })).ok).toBe(false);
+    await claim(new Date(Date.now() - 10 * 60_000));
+    expect(await transcribePart(u, id, "p1", { transcribe: vi.fn(async () => "ok") })).toEqual({ ok: true, transcript: "ok" });
+  });
+
   it("getAttempt returns plain JSON with playback URLs only for stored parts", async () => {
     const u = user();
     const id = await start(u);

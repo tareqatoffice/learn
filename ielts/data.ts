@@ -1,6 +1,15 @@
 import { Types } from "mongoose";
 import { connectDb } from "@/lib/db";
-import { IeltsBandEntry, IeltsPlan, IeltsPlanSuggestion, IeltsProfile, IeltsSpeakingAttempt, IeltsStudyLog } from "@/models";
+import {
+  IeltsBandEntry,
+  IeltsPlan,
+  IeltsPlanSuggestion,
+  IeltsProfile,
+  IeltsSpeakingAttempt,
+  IeltsStudyLog,
+  IeltsTestAttempt,
+  IeltsWritingAttempt,
+} from "@/models";
 import type { MediaDoc } from "@/recording/mediaCore";
 import { removeMedia } from "@/recording/upload";
 
@@ -18,6 +27,8 @@ export async function deleteAllIeltsData(userId: string): Promise<void> {
   const medias = attempts.flatMap((a) => a.parts.map((p) => p.media));
   if (medias.length) await removeMedia(medias);
   await Promise.all(
-    [IeltsSpeakingAttempt, IeltsBandEntry, IeltsStudyLog, IeltsPlanSuggestion, IeltsPlan, IeltsProfile].map((M) => M.deleteMany({ userId })),
+    [IeltsSpeakingAttempt, IeltsTestAttempt, IeltsWritingAttempt, IeltsBandEntry, IeltsStudyLog, IeltsPlanSuggestion, IeltsPlan, IeltsProfile].map(
+      (M) => M.deleteMany({ userId }),
+    ),
   );
 }

@@ -1,5 +1,5 @@
 import { connectDb } from "@/lib/db";
-import { IeltsSpeakingAttempt, IeltsStudyLog, SpeakingTake } from "@/models";
+import { IeltsSpeakingAttempt, IeltsStudyLog, IeltsTestAttempt, IeltsWritingAttempt, SpeakingTake } from "@/models";
 import { type ActionResult, fail, ok } from "@/admin/result";
 import { CRITERION_LABEL, SKILLS, type Skill } from "@/ielts/bands";
 import { type Week, studyDaysBetween, weekOn } from "@/ielts/plan";
@@ -41,16 +41,20 @@ export async function dailyMinutes(userId: string, from: string, to: string): Pr
   if (from > to) return out;
   await connectDb();
   const match = { userId, date: { $gte: from, $lte: to } };
-  const [attempts, logs] = await Promise.all([
+  const [attempts, logs, tests, writings] = await Promise.all([
     IeltsSpeakingAttempt.find(match)
       .select("date parts.media")
       .lean<{ date: string; parts: { media: { durationSec: number; stored?: boolean } }[] }[]>(),
     IeltsStudyLog.find(match).select("date skill minutes").lean<{ date: string; skill: Skill; minutes: number }[]>(),
+    IeltsTestAttempt.find({ ...match, status: "submitted" }).select("date skill timeSec").lean<{ date: string; skill: Skill; timeSec: number }[]>(),
+    IeltsWritingAttempt.find({ ...match, status: "submitted" }).select("date tasks.timeSec").lean<{ date: string; tasks: { timeSec: number }[] }[]>(),
   ]);
   for (const a of attempts) {
     for (const p of a.parts) if (p.media.stored) out[a.date].speaking += p.media.durationSec / 60;
   }
   for (const l of logs) out[l.date][l.skill] += l.minutes;
+  for (const t of tests) out[t.date][t.skill] += t.timeSec / 60;
+  for (const w of writings) out[w.date].writing += w.tasks.reduce((s, t) => s + t.timeSec, 0) / 60;
   return out;
 }
 
@@ -160,12 +164,13 @@ export async function todayList(userId: string, today: string, timeZone: string)
       }
     } else if (minutes[skill] > 0) {
       items.push({
-        id: `${skill}-log`,
+        id: `${skill}-practice`,
         skill,
-        kind: "log",
+        kind: "drill",
         label: `${SKILL_NAME[skill]} practice`,
         minutes: minutes[skill],
         done: todayMinutes[skill] >= minutes[skill],
+        href: `/ielts/${skill}`,
       });
     }
   }

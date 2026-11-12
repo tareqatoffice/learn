@@ -49,7 +49,9 @@ const partSchema = new Schema(
     /** Set on each startPart, so concurrent starts and confirms of the same part can tell uploads apart. */
     uploadId: String,
     transcript: String,
-    transcriptStatus: { type: String, enum: ["none", "pending", "done", "failed", "unavailable"], default: "none" },
+    transcriptStatus: { type: String, enum: ["none", "pending", "running", "done", "failed", "unavailable"], default: "none" },
+    /** When the running transcription was claimed; a claim older than a few minutes can be taken over. */
+    transcribeStartedAt: Date,
     markers: { type: [markerSchema], default: [] },
   },
   { _id: false },

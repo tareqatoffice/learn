@@ -94,7 +94,9 @@ export function TodayList({ items }: { items: TodayItem[] }) {
                     {item.label} <span className="font-normal text-muted-foreground no-underline">· {item.minutes} min</span>
                   </p>
                   <p className="sr-only">{item.done ? "Done" : "Not done yet"}</p>
-                  {item.kind === "log" && !item.done && <p className="text-xs text-muted-foreground">Study outside the app, then log your minutes.</p>}
+                  {item.skill !== "speaking" && !item.done && (
+                    <p className="text-xs text-muted-foreground">Practise here, or study elsewhere and log your minutes.</p>
+                  )}
                 </div>
               </div>
               {item.href && !item.done && (
@@ -105,7 +107,7 @@ export function TodayList({ items }: { items: TodayItem[] }) {
                   Start
                 </Link>
               )}
-              {item.kind === "log" && !item.done && <LogMinutes item={item} />}
+              {item.skill !== "speaking" && !item.done && <LogMinutes item={item} />}
             </li>
           ))}
         </ul>

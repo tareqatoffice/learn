@@ -15,6 +15,8 @@ export const ADMIN_NAV: AdminSectionGroup[] = [
       { href: "/admin/notes", label: "Note series", description: "Chaptered notes." },
       { href: "/admin/speaking", label: "Speaking lessons", description: "Shadowing audio, read-aloud passages and speaking prompts." },
       { href: "/admin/ielts/speaking", label: "IELTS Speaking", description: "Part 1 topics, Part 2 cue cards and Part 3 discussions." },
+      { href: "/admin/ielts/tests", label: "IELTS Reading & Listening", description: "Passages, audio sections and questions for practice tests." },
+      { href: "/admin/ielts/writing", label: "IELTS Writing", description: "Task 1 and Task 2 prompts." },
       { href: "/admin/subjects", label: "Subjects", description: "Tags that link books, graphs and notes." },
     ],
   },

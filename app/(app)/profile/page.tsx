@@ -55,7 +55,7 @@ function History({ rows, empty }: { rows: { key: string; main: React.ReactNode; 
 }
 
 const KIND: Record<string, string> = { mock: "Full mock", part1: "Part 1 drill", part2: "Part 2 drill", part3: "Part 3 drill" };
-const SOURCE: Record<string, string> = { official: "Official", practice: "Practice test", mockSelf: "Mock (self)", mockAi: "Mock (AI)", other: "Other" };
+const SOURCE: Record<string, string> = { official: "Official", practice: "Practice test", mockSelf: "Mock (self)", mockAi: "Mock (AI)", writingSelf: "Writing (self)", writingAi: "Writing (AI)", other: "Other" };
 
 function Overview({ d }: { d: ProfileData }) {
   return (

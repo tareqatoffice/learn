@@ -16,5 +16,7 @@ const ieltsPlanSuggestionSchema = new Schema(
 );
 
 ieltsPlanSuggestionSchema.index({ userId: 1, status: 1 });
+// At most one pending suggestion of each kind per user, even when two checks race.
+ieltsPlanSuggestionSchema.index({ userId: 1, kind: 1 }, { unique: true, partialFilterExpression: { status: "pending" } });
 
 export const IeltsPlanSuggestion = mongoose.models.IeltsPlanSuggestion || model("IeltsPlanSuggestion", ieltsPlanSuggestionSchema);

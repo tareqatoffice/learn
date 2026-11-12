@@ -12,7 +12,8 @@ const ieltsBandEntrySchema = new Schema(
       speaking: Number,
     },
     overall: Number,
-    attemptId: { type: Schema.Types.ObjectId, ref: "IeltsSpeakingAttempt" },
+    /** The Speaking, Writing, Listening or Reading attempt this entry came from (the source says which). */
+    attemptId: { type: Schema.Types.ObjectId },
   },
   { timestamps: true },
 );

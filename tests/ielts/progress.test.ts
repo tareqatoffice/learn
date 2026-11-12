@@ -99,7 +99,7 @@ describe("ielts progress", () => {
     expect(speaking).toHaveLength(1);
     expect(speaking[0]).toMatchObject({ kind: "mock", href: "/ielts/speaking?start=mock", done: false });
     const others = list.filter((i) => i.skill !== "speaking");
-    expect(others.every((i) => i.kind === "log" && i.href === undefined)).toBe(true);
+    expect(others.every((i) => i.kind === "drill" && i.href === `/ielts/${i.skill}`)).toBe(true);
     expect(list.reduce((s, i) => s + i.minutes, 0)).toBeLessThanOrEqual(60);
     await attempt(u, TODAY, { kind: "mock" });
     expect((await todayList(u, TODAY, TZ)).find((i) => i.skill === "speaking")).toMatchObject({ kind: "mock", done: true });

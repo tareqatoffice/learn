@@ -65,6 +65,15 @@ export default async function IeltsPage() {
           <Link href="/ielts/speaking" className={linkClass}>
             Speaking
           </Link>
+          <Link href="/ielts/listening" className={linkClass}>
+            Listening
+          </Link>
+          <Link href="/ielts/reading" className={linkClass}>
+            Reading
+          </Link>
+          <Link href="/ielts/writing" className={linkClass}>
+            Writing
+          </Link>
           <Link href="/ielts/plan" className={linkClass}>
             Plan
           </Link>
