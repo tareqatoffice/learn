@@ -1,11 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { computeTiers, layoutGraph, readyNext } from "@/graph/layout";
+import { computeTiers, dependentsOf, layoutGraph, prereqMessage, readyNext, unmetPrereqs } from "@/graph/layout";
 
 const abc = [
   { id: "a", prereqIds: [] },
   { id: "b", prereqIds: ["a"] },
   { id: "c", prereqIds: ["a", "b"] },
 ];
+
+describe("prerequisite helpers", () => {
+  const known = new Set(["a", "b", "c"]);
+
+  it("unmetPrereqs lists known prerequisites that are not done and ignores unknown ones", () => {
+    const c = { id: "c", prereqIds: ["a", "b", "gone"] };
+    expect(unmetPrereqs(c, known, { a: "done", b: "learning" })).toEqual(["b"]);
+    expect(unmetPrereqs(c, known, { a: "done", b: "done" })).toEqual([]);
+  });
+
+  it("dependentsOf follows prerequisites transitively, once each", () => {
+    expect(dependentsOf(abc, "a").sort()).toEqual(["b", "c"]);
+    expect(dependentsOf(abc, "b")).toEqual(["c"]);
+    expect(dependentsOf(abc, "c")).toEqual([]);
+  });
+
+  it("prereqMessage names the topics to finish", () => {
+    expect(prereqMessage(["A", "B"])).toBe("Finish first: A, B");
+  });
+});
 
 describe("computeTiers", () => {
   it("puts a node one tier below its deepest prerequisite", () => {

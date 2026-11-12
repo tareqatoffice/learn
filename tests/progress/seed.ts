@@ -39,11 +39,12 @@ export async function seedGraph(slug: string, status = "published") {
 export async function seedNode(
   graphId: string,
   slug: string,
-  opts: { status?: string; questionIds?: string[]; order?: number } = {},
+  opts: { status?: string; questionIds?: string[]; order?: number; prereqIds?: string[] } = {},
 ) {
   const node = await GraphNode.create({
     graphId,
     slug,
+    prereqIds: opts.prereqIds ?? [],
     trackKey: "t",
     title: `${slug} title`,
     order: opts.order ?? 0,

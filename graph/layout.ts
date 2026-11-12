@@ -34,12 +34,34 @@ export function computeTiers(nodes: Prereqs[]): Record<string, number> {
   return tiers;
 }
 
+/** The (known) prerequisites of a topic that are not done yet. `known` is the set of topic ids in the graph. */
+export function unmetPrereqs(node: Prereqs, known: ReadonlySet<string>, progress: Progress): string[] {
+  return node.prereqIds.filter((p) => known.has(p) && progress[p] !== "done");
+}
+
+/** What a topic with unfinished prerequisites tells the user; shared by the server's refusal and the panel. */
+export const prereqMessage = (titles: string[]) => `Finish first: ${titles.join(", ")}`;
+
+/** Every topic that depends on `id`, directly or through other topics. */
+export function dependentsOf(nodes: Prereqs[], id: string): string[] {
+  const children = new Map<string, string[]>();
+  for (const n of nodes) for (const p of n.prereqIds) children.set(p, [...(children.get(p) ?? []), n.id]);
+  const found = new Set<string>();
+  const stack = [id];
+  while (stack.length) {
+    for (const child of children.get(stack.pop()!) ?? []) {
+      if (found.has(child) || child === id) continue;
+      found.add(child);
+      stack.push(child);
+    }
+  }
+  return [...found];
+}
+
 /** Topics not started yet whose (known) prerequisites are all done. */
 export function readyNext(nodes: Prereqs[], progress: Progress): string[] {
   const known = new Set(nodes.map((n) => n.id));
-  return nodes
-    .filter((n) => !progress[n.id] && n.prereqIds.every((p) => !known.has(p) || progress[p] === "done"))
-    .map((n) => n.id);
+  return nodes.filter((n) => !progress[n.id] && unmetPrereqs(n, known, progress).length === 0).map((n) => n.id);
 }
 
 export function layoutGraph(

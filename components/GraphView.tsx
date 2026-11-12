@@ -11,7 +11,7 @@ import { TopicPanel, type TopicPanelProps } from "@/components/TopicPanel";
 import { TopicReader } from "@/components/TopicReader";
 import { Button } from "@/components/ui/button";
 import type { GraphView as GraphData } from "@/content/queries";
-import { layoutGraph, LBL, NH, NW, readyNext } from "@/graph/layout";
+import { dependentsOf, layoutGraph, LBL, NH, NW, readyNext, unmetPrereqs } from "@/graph/layout";
 import type { NodeStatus } from "@/progress/graph";
 import { pageTitleClass } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -86,6 +86,7 @@ export function GraphView({ data }: { data: GraphData }) {
   const trackIdx = useMemo(() => new Map(graph.tracks.map((t, i) => [t.key, i])), [graph.tracks]);
   const trackName = useMemo(() => new Map(graph.tracks.map((t) => [t.key, t.name])), [graph.tracks]);
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
+  const knownIds = useMemo(() => new Set(byId.keys()), [byId]);
   // Each topic's dependents: the topics it unlocks.
   const children = useMemo(() => {
     const m = new Map<string, string[]>();
@@ -236,14 +237,21 @@ export function GraphView({ data }: { data: GraphData }) {
     const before = progress;
     setPending(true);
     setError(null);
+    // Taking a done topic back also clears what depends on it, as the server does.
+    const cleared = before[nodeId] === "done" && status !== "done" ? dependentsOf(nodes, nodeId) : [];
     setProgress((p) => {
       const next = { ...p };
+      for (const id of cleared) delete next[id];
       if (status === "none") delete next[nodeId];
       else next[nodeId] = status;
       return next;
     });
     try {
-      await setNodeStatusAction(nodeId, status);
+      const result = await setNodeStatusAction(nodeId, status);
+      if (result.error) {
+        setProgress(before);
+        setError(result.error);
+      }
     } catch {
       setProgress(before);
       setError("Could not save. Try again.");
@@ -258,6 +266,7 @@ export function GraphView({ data }: { data: GraphData }) {
     node: { ...current, trackName: trackName.get(current.trackKey) ?? "", trackColor: colorOf(current.trackKey) },
     status: statusOf(progress, current.id),
     onStatus: (s) => changeStatus(current.id, s),
+    blockedBy: unmetPrereqs(current, knownIds, progress).map((id) => byId.get(id)!.title),
     pending,
     error,
     related: {

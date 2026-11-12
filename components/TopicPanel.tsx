@@ -7,6 +7,7 @@ import { startQuizAction } from "@/app/(app)/interview/actions";
 import { Chip } from "@/components/Chip";
 import { type NodeState, STATE_LABEL, StatusGlyph } from "@/components/StatusIcon";
 import { Button } from "@/components/ui/button";
+import { prereqMessage } from "@/graph/layout";
 import { Markdown } from "@/lib/markdown/Markdown";
 import type { NodeStatus } from "@/progress/graph";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,8 @@ export type TopicPanelProps = {
     /** Topics this one is a prerequisite of. */
     unlocks?: RelatedTopic[];
   };
+  /** Titles of prerequisites not done yet; while any remain, the topic can't be started or finished. */
+  blockedBy?: string[];
   /** Disables the status chips while a change is being saved. */
   pending?: boolean;
   /** A failed status save, shown under the status chips. */
@@ -87,11 +90,12 @@ function TopicLinks({ title, items, topicHref }: { title: string; items: Related
   );
 }
 
-export function TopicPanel({ node, status, onStatus, related, pending, error, topicHref = (s) => `?topic=${s}`, variant = "panel", action }: TopicPanelProps) {
+export function TopicPanel({ node, status, onStatus, related, blockedBy = [], pending, error, topicHref = (s) => `?topic=${s}`, variant = "panel", action }: TopicPanelProps) {
   const [quizMessage, setQuizMessage] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const full = variant === "full";
   const unlocks = related.unlocks ?? [];
+  const locked = blockedBy.length > 0;
   // The reader and the side panel can both be on the page, so each gets its own heading id.
   const headingId = `${full ? "reader-" : ""}topic-${node.slug}`;
 
@@ -135,11 +139,23 @@ export function TopicPanel({ node, status, onStatus, related, pending, error, to
       {full && <h3 className="text-sm font-semibold">Your progress</h3>}
       <div role="group" aria-label="Your status" className="flex flex-wrap gap-2">
         {STATUSES.map((s) => (
-          <Chip key={s.value} on={status === s.value} disabled={pending} onClick={() => onStatus(s.value)}>
+          <Chip
+            key={s.value}
+            on={status === s.value}
+            // "Not started" stays available so a stale status can always be cleared.
+            disabled={pending || (locked && s.value !== "none")}
+            onClick={() => onStatus(s.value)}
+          >
             {s.label}
           </Chip>
         ))}
       </div>
+      {locked && (
+        <Notice>
+          {prereqMessage(blockedBy)}
+          {status !== "none" && ". Set this topic to Not started to clear it."}
+        </Notice>
+      )}
       {error && <Notice>{error}</Notice>}
     </div>
   );
