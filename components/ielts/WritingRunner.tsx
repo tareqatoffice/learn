@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { saveWritingTextAction, submitWritingAction } from "@/app/(app)/ielts/practice-actions";
 import { ActionStatus } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
@@ -11,6 +11,8 @@ import { MAX_TEXT_CHARS, MIN_WORDS, TASK_LIMIT_SEC, wordCount } from "@/ielts/wr
 import { cn } from "@/lib/utils";
 
 const SAVE_DELAY_MS = 1500;
+const RETRY_MS = 5000;
+const TIME_SAVE_MS = 30_000;
 const clock = (s: number) => `${Math.floor(Math.abs(s) / 60)}:${String(Math.abs(s) % 60).padStart(2, "0")}`;
 
 /** Writes the task(s): live word count, timers that never cut you off, autosave, then submit. */
@@ -31,15 +33,45 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
     return () => clearInterval(t);
   }, [active]);
 
+  const [retry, setRetry] = useState(0);
+  // Sends every task with unsaved text or time. A failed save keeps the task and tries again shortly.
+  const flush = useCallback(() => {
+    for (const i of [...dirty.current]) {
+      dirty.current.delete(i);
+      saveWritingTextAction(view.id, i, latest.current.texts[i], latest.current.secs[i]).catch(() => {
+        dirty.current.add(i);
+        setTimeout(() => setRetry((n) => n + 1), RETRY_MS);
+      });
+    }
+  }, [view.id]);
+
   useEffect(() => {
-    const t = setTimeout(() => {
-      for (const i of [...dirty.current]) {
-        dirty.current.delete(i);
-        void saveWritingTextAction(view.id, i, latest.current.texts[i], latest.current.secs[i]).catch(() => dirty.current.add(i));
-      }
-    }, SAVE_DELAY_MS);
+    if (!dirty.current.size) return;
+    const t = setTimeout(flush, SAVE_DELAY_MS);
     return () => clearTimeout(t);
-  }, [texts, view.id]);
+  }, [texts, retry, flush]);
+
+  // Time spent counts towards the plan, so it is saved now and then even while the learner is thinking.
+  useEffect(() => {
+    const t = setInterval(() => {
+      dirty.current.add(active);
+      setRetry((n) => n + 1);
+    }, TIME_SAVE_MS);
+    return () => clearInterval(t);
+  }, [active]);
+
+  // Best effort when the tab is hidden or closed.
+  useEffect(() => {
+    const hide = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", hide);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", hide);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [flush]);
 
   const full = view.kind === "full";
   const totalLimit = view.tasks.reduce((n, t) => n + TASK_LIMIT_SEC[t.task], 0);

@@ -7,7 +7,7 @@ import { type ActionResult, fail, ok, type FieldErrors } from "@/admin/result";
 import { isHalfBand, listeningBand, overallBand, readingBand, SKILLS, type Skill } from "@/ielts/bands";
 import { suggestCurrentBand } from "@/ielts/suggestions";
 
-export type BandSource = "official" | "practice" | "mockSelf" | "mockAi" | "other";
+export type BandSource = "official" | "practice" | "mockSelf" | "mockAi" | "writingSelf" | "writingAi" | "other";
 type Bands = Partial<Record<Skill, number>>;
 
 export type CalculatorInput = {
@@ -87,6 +87,7 @@ export async function deleteBandEntry(userId: string, id: string): Promise<Actio
   const entry = await IeltsBandEntry.findOne({ _id: id, userId }).select("source").lean<{ source: BandSource }>();
   if (!entry) return fail("That entry doesn't exist. Reload the page.");
   if (entry.source === "mockSelf" || entry.source === "mockAi") return fail("Mock bands are removed when you delete the mock attempt.");
+  if (entry.source === "writingSelf" || entry.source === "writingAi") return fail("Writing bands are removed when you delete the Writing attempt.");
   await IeltsBandEntry.deleteOne({ _id: id, userId });
   return ok();
 }

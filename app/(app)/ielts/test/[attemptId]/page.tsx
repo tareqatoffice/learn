@@ -4,15 +4,17 @@ import { TestReview } from "@/components/ielts/TestReview";
 import { TestRunner } from "@/components/ielts/TestRunner";
 import { getAttempt } from "@/ielts/practice/attempts";
 import { requireUser } from "@/lib/authz";
-import { presignGet, storageConfigured } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
 
-export const metadata = buildMetadata({
-  title: "IELTS practice test",
-  description: "Answer an IELTS Listening or Reading test, or review the marked result.",
-  path: "/ielts/test",
-});
+export async function generateMetadata({ params }: { params: Promise<{ attemptId: string }> }) {
+  const { attemptId } = await params;
+  return buildMetadata({
+    title: "IELTS practice test",
+    description: "Answer an IELTS Listening or Reading test, or review the marked result.",
+    path: `/ielts/test/${attemptId}`,
+  });
+}
 
 export default async function IeltsTestPage({ params }: { params: Promise<{ attemptId: string }> }) {
   const { attemptId } = await params;
@@ -20,12 +22,7 @@ export default async function IeltsTestPage({ params }: { params: Promise<{ atte
   const got = await getAttempt(user.userId, attemptId);
   if (!got) notFound();
 
-  // Audio links are signed per request; the answer key never reaches the run view.
-  const audioUrls =
-    got.state === "run" && got.view.skill === "listening" && storageConfigured()
-      ? await Promise.all(got.view.audioKeys.map((k) => (k ? presignGet(k) : Promise.resolve(""))))
-      : [];
-
+  // Neither the answer key nor any audio link is in the run view: audio is signed when Play is pressed.
   return (
     <div className="mx-auto grid w-full max-w-5xl gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -37,7 +34,7 @@ export default async function IeltsTestPage({ params }: { params: Promise<{ atte
           Back to {got.view.skill}
         </Link>
       </div>
-      {got.state === "run" ? <TestRunner view={got.view} audioUrls={audioUrls} /> : <TestReview view={got.view} />}
+      {got.state === "run" ? <TestRunner view={got.view} /> : <TestReview view={got.view} />}
     </div>
   );
 }

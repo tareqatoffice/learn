@@ -284,6 +284,13 @@ describe("ielts suggestions", () => {
     expect((await pending(u))[0].proposal).toEqual({ inputs: { current: { speaking: 6.5 } } });
   });
 
+  it("currentBand from mocks is raised once even when two saves race", async () => {
+    const u = await setup({ current: { overall: 6, speaking: 6 } });
+    await IeltsPlanSuggestion.init();
+    await Promise.all([suggestCurrentBand(u, "mocks", { speaking: 6.5 }, TODAY), suggestCurrentBand(u, "mocks", { speaking: 7 }, TODAY)]);
+    expect((await pending(u)).filter((s) => s.kind === "currentBand")).toHaveLength(1);
+  });
+
   it("currentBand approve keeps a band edited after the suggestion", async () => {
     const u = await setup({ current: { overall: 6, speaking: 6 } });
     await suggestCurrentBand(u, "mocks", { speaking: 6.5 }, TODAY);

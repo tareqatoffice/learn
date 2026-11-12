@@ -3,6 +3,7 @@
 import { Types } from "mongoose";
 import { type ActionResult, fail, ok } from "@/admin/result";
 import { connectDb } from "@/lib/db";
+import { presignGet, storageConfigured } from "@/lib/r2";
 import { IeltsBandEntry, IeltsListeningTest, IeltsReadingTest, IeltsTestAttempt } from "@/models";
 import { numberSections, scoreSections, toPublic, type PublicSection, type Score, type Section } from "./marking";
 
@@ -157,11 +158,14 @@ export type RunView = {
   startedAt: string;
   answers: Record<string, string>;
   sections: PublicSection[];
-  /** Per section: the R2 key of its audio ("" when none). The page turns keys into URLs. */
-  audioKeys: string[];
-  /** Per section: the script the browser voice reads when there is no audio file (else ""). */
-  scripts: string[];
+  /**
+   * Per section: "file" (a recording), "voice" (the browser reads the script) or "none". Neither the
+   * audio link nor the script is in the page: both come from `claimSection` when Play is pressed.
+   */
+  audio: SectionAudioKind[];
 };
+
+export type SectionAudioKind = "file" | "voice" | "none";
 
 export type ReviewView = {
   id: string;
@@ -216,10 +220,45 @@ export async function getAttempt(
       startedAt: new Date(a.startedAt).toISOString(),
       answers: plainAnswers(a.answers),
       sections: toPublic(a.sections),
-      audioKeys: a.sections.map((s) => s.audioKey),
-      scripts: a.sections.map((s) => (s.audioKey ? "" : s.script)),
+      audio: a.sections.map((s): SectionAudioKind => (s.audioKey ? "file" : s.script ? "voice" : "none")),
     },
   };
+}
+
+/** Long enough for any section to play through, signed only when Play is pressed. */
+export const AUDIO_LINK_SEC = 30 * 60;
+
+export type SectionPlay = { kind: "file"; url: string } | { kind: "voice"; script: string };
+
+/**
+ * What a Listening section plays, handed out when Play is pressed: a freshly signed link to its
+ * recording, or the script for the browser voice (the script holds the answers). Only while the
+ * attempt is open, and in a full test only once per section, recorded here rather than in the browser.
+ */
+export async function claimSection(
+  userId: string,
+  attemptId: string,
+  index: number,
+  deps: { sign?: (key: string, expiresIn: number) => Promise<string>; storage?: () => boolean } = {},
+): Promise<ActionResult<{ play: SectionPlay }>> {
+  const { sign = presignGet, storage = storageConfigured } = deps;
+  if (!isId(attemptId) || !isId(userId) || !Number.isInteger(index) || index < 0) return fail(NOT_FOUND);
+  await connectDb();
+  const a = await IeltsTestAttempt.findOne({ _id: attemptId, userId, status: "in_progress" })
+    .select("skill scope sections")
+    .lean<{ skill: TestSkill; scope: string; sections: Section[] }>();
+  const section = a?.sections[index];
+  if (!a || a.skill !== "listening" || !section || (!section.audioKey && !section.script)) return fail("There is no audio for this section.");
+  if (section.audioKey && !storage()) return fail("Audio storage isn't set up.");
+  if (a.scope === "full") {
+    const claimed = await IeltsTestAttempt.updateOne(
+      { _id: attemptId, userId, status: "in_progress", played: { $ne: index } },
+      { $addToSet: { played: index } },
+    );
+    if (!claimed.matchedCount) return fail("This section has already been played. A full test plays it once.");
+  }
+  if (section.audioKey) return ok({ play: { kind: "file", url: await sign(section.audioKey, AUDIO_LINK_SEC) } });
+  return ok({ play: { kind: "voice", script: section.script } });
 }
 
 export type AttemptListItem = {

@@ -8,6 +8,7 @@ import { type ActionResult, fail, ok, type FieldErrors } from "@/admin/result";
 import { formatQuestions, parseQuestions } from "@/ielts/practice/format";
 import { numberSections, type Section } from "@/ielts/practice/marking";
 import { getAiConfig, modelChain } from "@/lib/aiSettings";
+import { AUDIO_EXT } from "@/lib/audioTypes";
 import { connectDb } from "@/lib/db";
 import { AiError, type ChatOptions, chatCompletion, extractJson } from "@/lib/openrouter";
 import { deleteObjects, headObject, presignPut, storageConfigured } from "@/lib/r2";
@@ -22,6 +23,7 @@ const NOT_FOUND = "That item no longer exists.";
 const NO_STORAGE = "File storage isn't configured. Set the R2_* environment variables.";
 const AUDIO_MAX_BYTES = 80 * 1024 * 1024;
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const NEEDS_IMAGE = "Upload the chart image before publishing a Task 1 prompt. Save it as a draft first.";
 const model = (kind: TestKind) => (kind === "reading" ? IeltsReadingTest : IeltsListeningTest);
 
 // ---- tests ----
@@ -29,7 +31,8 @@ const model = (kind: TestKind) => (kind === "reading" ? IeltsReadingTest : Ielts
 export type TestInput = {
   title: string;
   status: PublishStatus;
-  sections: { title: string; passage?: string; script?: string; questions: string }[];
+  /** `audioKey` is the file the section already has; it travels with the section, not its position. */
+  sections: { title: string; passage?: string; script?: string; questions: string; audioKey?: string }[];
 };
 
 export type AdminTest = {
@@ -69,18 +72,22 @@ function build(kind: TestKind, input: TestInput, previous: Section[] = []): { se
   if (!Array.isArray(input?.sections) || !input.sections.length) errors.sections = "Add at least one section.";
   else if (input.sections.length > (kind === "reading" ? 3 : 4)) errors.sections = `A ${kind} test has at most ${kind === "reading" ? 3 : 4} sections.`;
   const sections: Section[] = [];
+  // Audio follows the file the form sends back, never the section's position, so removing or
+  // reordering sections can't attach a recording to the wrong questions.
+  const known = new Map(previous.filter((p) => p.audioKey).map((p) => [p.audioKey, p.durationSec ?? 0]));
   (input?.sections ?? []).forEach((s, i) => {
     if (!s.title?.trim()) errors[`sections.${i}.title`] = "Give the section a title.";
     if (kind === "reading" && !s.passage?.trim()) errors[`sections.${i}.passage`] = "Paste the passage.";
     const parsed = parseQuestions(s.questions ?? "");
     if (!parsed.ok) errors[`sections.${i}.questions`] = parsed.errors.slice(0, 5).join(" ");
     else {
+      const audioKey = kind === "listening" && s.audioKey && known.has(s.audioKey) ? s.audioKey : "";
       sections.push({
         title: (s.title ?? "").trim(),
         passage: kind === "reading" ? (s.passage ?? "").trim() : "",
         script: kind === "listening" ? (s.script ?? "").trim() : "",
-        audioKey: previous[i]?.audioKey ?? "",
-        durationSec: previous[i]?.durationSec ?? 0,
+        audioKey,
+        durationSec: audioKey ? (known.get(audioKey) ?? 0) : 0,
         groups: parsed.groups,
       });
     }
@@ -103,12 +110,16 @@ export async function saveTest(kind: TestKind, id: string | null, input: TestInp
   if (input?.status !== "draft" && input?.status !== "published") return fail({ status: "Choose draft or published." });
   const built = build(kind, input, previous);
   if ("errors" in built) return fail(built.errors);
-  if (input.status === "published" && !built.sections.some((s) => countOf(s) > 0)) return fail({ status: "Add questions before publishing." });
+  if (input.status === "published") {
+    const problem = publishProblem(kind, built.sections);
+    if (problem) return fail({ status: problem });
+  }
   const data = { title: input.title.trim(), status: input.status, sections: built.sections };
   if (id) {
     await model(kind).updateOne({ _id: id }, { $set: data });
-    // Audio of removed sections is no longer referenced.
-    const dropped = previous.slice(built.sections.length).map((s) => s.audioKey).filter(Boolean);
+    // Recordings no section references any more.
+    const kept = new Set(built.sections.map((s) => s.audioKey));
+    const dropped = previous.map((s) => s.audioKey).filter((k) => k && !kept.has(k));
     if (dropped.length) await removeFiles(dropped);
     return ok({ id });
   }
@@ -123,6 +134,16 @@ async function removeFiles(keys: string[]): Promise<void> {
   } catch {
     // Orphaned files are harmless.
   }
+}
+
+/** Why a test can't be published, or null: learners must be able to answer every section. */
+function publishProblem(kind: TestKind, sections: Section[]): string | null {
+  if (!sections.some((s) => countOf(s) > 0)) return "Add questions before publishing.";
+  if (kind === "listening") {
+    const silent = sections.findIndex((s) => !s.audioKey && !s.script?.trim());
+    if (silent !== -1) return `Section ${silent + 1} has no audio file and no script. Upload audio or add a script before publishing.`;
+  }
+  return null;
 }
 
 export async function deleteTest(kind: TestKind, id: string): Promise<ActionResult> {
@@ -140,7 +161,10 @@ export async function setTestStatus(kind: TestKind, id: string, status: PublishS
   await connectDb();
   const doc = await model(kind).findById(id).lean<TestRow>();
   if (!doc) return fail(NOT_FOUND);
-  if (status === "published" && !doc.sections.some((s) => countOf(s) > 0)) return fail("Add questions before publishing.");
+  if (status === "published") {
+    const problem = publishProblem(kind, doc.sections);
+    if (problem) return fail(problem);
+  }
   await model(kind).updateOne({ _id: id }, { $set: { status } });
   return ok();
 }
@@ -159,11 +183,6 @@ export async function getTestAdmin(kind: TestKind, id: string): Promise<AdminTes
 }
 
 // ---- Listening audio ----
-
-const AUDIO_EXT: Record<string, string> = {
-  "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/mp4": "m4a", "audio/x-m4a": "m4a",
-  "audio/aac": "aac", "audio/wav": "wav", "audio/x-wav": "wav", "audio/webm": "webm", "audio/ogg": "ogg",
-};
 
 export async function startSectionAudioUpload(id: string, index: number, mime: string, size: number): Promise<ActionResult<{ uploadUrl: string; key: string }>> {
   if (!isId(id) || !Number.isInteger(index) || index < 0) return fail(NOT_FOUND);
@@ -238,12 +257,15 @@ export async function savePrompt(id: string | null, input: unknown, extra: { gen
   await connectDb();
   if (id) {
     if (!isId(id)) return fail(NOT_FOUND);
-    const existing = await IeltsWritingPrompt.findById(id).select("task").lean<{ task: string }>();
+    const existing = await IeltsWritingPrompt.findById(id).select("task imageKey").lean<{ task: string; imageKey?: string }>();
     if (!existing) return fail(NOT_FOUND);
     if (existing.task !== data.task) return fail("A prompt's task can't be changed. Create a new prompt instead.");
+    if (data.status === "published" && data.task === "task1" && !existing.imageKey) return fail({ status: NEEDS_IMAGE });
     await IeltsWritingPrompt.updateOne({ _id: id }, { $set: { title: data.title, brief: data.brief, imageAlt: data.imageAlt, status: data.status, tags: data.tags } });
     return ok({ id });
   }
+  // A new Task 1 prompt has no image yet (it is uploaded after the first save).
+  if (data.status === "published" && data.task === "task1") return fail({ status: NEEDS_IMAGE });
   const doc = await IeltsWritingPrompt.create({ ...data, generated: extra.generated ?? false });
   return ok({ id: String(doc._id) });
 }
@@ -261,8 +283,11 @@ export async function setPromptStatus(id: string, status: PublishStatus): Promis
   if (!isId(id)) return fail(NOT_FOUND);
   if (status !== "draft" && status !== "published") return fail("Choose draft or published.");
   await connectDb();
-  const res = await IeltsWritingPrompt.updateOne({ _id: id }, { $set: { status } });
-  return res.matchedCount ? ok() : fail(NOT_FOUND);
+  const p = await IeltsWritingPrompt.findById(id).select("task imageKey").lean<{ task: string; imageKey?: string }>();
+  if (!p) return fail(NOT_FOUND);
+  if (status === "published" && p.task === "task1" && !p.imageKey) return fail(NEEDS_IMAGE);
+  await IeltsWritingPrompt.updateOne({ _id: id }, { $set: { status } });
+  return ok();
 }
 
 export async function listPromptsAdmin(): Promise<AdminPrompt[]> {

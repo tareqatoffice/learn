@@ -8,11 +8,14 @@ import { presignGet, storageConfigured } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
 
-export const metadata = buildMetadata({
-  title: "IELTS Writing attempt",
-  description: "Write your answer, or review and rate a submitted one.",
-  path: "/ielts/writing",
-});
+export async function generateMetadata({ params }: { params: Promise<{ attemptId: string }> }) {
+  const { attemptId } = await params;
+  return buildMetadata({
+    title: "IELTS Writing attempt",
+    description: "Write your answer, or review and rate a submitted one.",
+    path: `/ielts/writing/${attemptId}`,
+  });
+}
 
 export default async function IeltsWritingAttemptPage({ params }: { params: Promise<{ attemptId: string }> }) {
   const { attemptId } = await params;

@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectDb } from "@/lib/db";
-import { IeltsListeningTest } from "@/models";
+import { IeltsListeningTest, IeltsWritingPrompt } from "@/models";
 import {
   deleteTest,
   getTestAdmin,
@@ -52,13 +52,53 @@ describe("admin IELTS tests", () => {
     const res = await saveTest("listening", null, input());
     if (!res.ok) throw new Error("save");
     await IeltsListeningTest.updateOne({ _id: res.id }, { $set: { "sections.0.audioKey": "ielts/tests/listening/x/a.mp3", "sections.0.durationSec": 90 } });
-    const again = await saveTest("listening", res.id, input({ title: "Renamed", status: "published" }));
+    const again = await saveTest(
+      "listening",
+      res.id,
+      input({ title: "Renamed", status: "published", sections: [{ title: "S", script: "A script", questions: QUESTIONS, audioKey: "ielts/tests/listening/x/a.mp3" }] }),
+    );
     expect(again.ok).toBe(true);
     const got = await getTestAdmin("listening", res.id);
     expect(got).toMatchObject({ title: "Renamed", status: "published", sections: [{ audioKey: "ielts/tests/listening/x/a.mp3", durationSec: 90 }] });
     expect((await setTestStatus("listening", res.id, "draft")).ok).toBe(true);
     expect((await deleteTest("listening", res.id)).ok).toBe(true);
     expect(await getTestAdmin("listening", res.id)).toBeNull();
+  });
+
+  it("keeps each recording with its own section when sections are removed or reordered", async () => {
+    const section = (title: string, audioKey = "") => ({ title, script: `${title} script`, questions: QUESTIONS, audioKey });
+    const res = await saveTest("listening", null, input({ sections: [section("One"), section("Two"), section("Three")] }));
+    if (!res.ok) throw new Error("save");
+    await IeltsListeningTest.updateOne(
+      { _id: res.id },
+      { $set: { "sections.0.audioKey": "k/0.mp3", "sections.1.audioKey": "k/1.mp3", "sections.2.audioKey": "k/2.mp3", "sections.1.durationSec": 61 } },
+    );
+    // Remove section One: Two and Three keep their own files and the file of the removed section is dropped.
+    const removed = await saveTest("listening", res.id, input({ sections: [section("Two", "k/1.mp3"), section("Three", "k/2.mp3")] }));
+    expect(removed.ok).toBe(true);
+    const got = await getTestAdmin("listening", res.id);
+    expect(got?.sections.map((s) => [s.title, s.audioKey, s.durationSec])).toEqual([["Two", "k/1.mp3", 61], ["Three", "k/2.mp3", 0]]);
+    // An unknown key (for example from another test) is ignored rather than trusted.
+    const forged = await saveTest("listening", res.id, input({ sections: [section("Two", "k/other.mp3"), section("Three", "k/2.mp3")] }));
+    expect(forged.ok).toBe(true);
+    expect((await getTestAdmin("listening", res.id))?.sections.map((s) => s.audioKey)).toEqual(["", "k/2.mp3"]);
+  });
+
+  it("won't publish a silent listening section or a Task 1 prompt without its image", async () => {
+    const silent = { title: "S", script: "", questions: QUESTIONS };
+    expect((await saveTest("listening", null, input({ status: "published", sections: [silent] }))).ok).toBe(false);
+    const draft = await saveTest("listening", null, input({ sections: [silent] }));
+    if (!draft.ok) throw new Error("draft");
+    expect((await setTestStatus("listening", draft.id, "published")).ok).toBe(false);
+
+    const brief = "Summarise the chart below in at least 150 words.";
+    expect((await savePrompt(null, { task: "task1", title: "Chart", brief, status: "published" })).ok).toBe(false);
+    const p = await savePrompt(null, { task: "task1", title: "Chart", brief, status: "draft" });
+    if (!p.ok) throw new Error("prompt");
+    expect((await setPromptStatus(p.id, "published")).ok).toBe(false);
+    expect((await savePrompt(p.id, { task: "task1", title: "Chart", brief, status: "published" })).ok).toBe(false);
+    await IeltsWritingPrompt.updateOne({ _id: p.id }, { $set: { imageKey: "ielts/tests/writing/x/a.png" } });
+    expect((await setPromptStatus(p.id, "published")).ok).toBe(true);
   });
 
   it("saves, publishes and lists writing prompts", async () => {

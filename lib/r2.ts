@@ -65,10 +65,9 @@ export function presignPut(key: string, contentType: string, contentLength?: num
   );
 }
 
-export function presignGet(key: string): Promise<string> {
-  return getSignedUrl(client(), new GetObjectCommand({ Bucket: bucket(), Key: key }), {
-    expiresIn: EXPIRES_IN,
-  });
+/** A presigned GET for `key`, valid for `expiresIn` seconds (default 10 minutes). */
+export function presignGet(key: string, expiresIn: number = EXPIRES_IN): Promise<string> {
+  return getSignedUrl(client(), new GetObjectCommand({ Bucket: bucket(), Key: key }), { expiresIn });
 }
 
 export async function headObject(

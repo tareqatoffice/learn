@@ -16,6 +16,7 @@ import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import { FileDropzone } from "@/components/ui/FileDropzone";
+import { audioDuration } from "@/lib/audioDuration";
 import { putFile } from "@/lib/uploadFile";
 import { UploadError } from "@/lib/uploadTake";
 
@@ -34,22 +35,6 @@ const EMPTY: AdminLesson = {
 };
 
 const MAX_AUDIO_MB = 50;
-
-/** Reads an audio file's length in seconds in the browser; 0 when it can't be decoded. */
-function audioDuration(file: File): Promise<number> {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    const el = new Audio();
-    const done = (n: number) => {
-      URL.revokeObjectURL(url);
-      resolve(Number.isFinite(n) ? Math.round(n) : 0);
-    };
-    el.preload = "metadata";
-    el.onloadedmetadata = () => done(el.duration);
-    el.onerror = () => done(0);
-    el.src = url;
-  });
-}
 
 function AudioUpload({
   lessonId,

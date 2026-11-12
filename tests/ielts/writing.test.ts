@@ -103,7 +103,7 @@ describe("writing attempts", () => {
     await saveWritingSelf(u, id, 0, SELF);
     expect(await IeltsBandEntry.countDocuments({})).toBe(0); // task 2 not rated yet
     await saveWritingSelf(u, id, 1, SELF);
-    expect((await IeltsBandEntry.findOne({ source: "mockSelf" }).lean<{ bands: { writing: number } }>())?.bands.writing).toBe(6);
+    expect((await IeltsBandEntry.findOne({ source: "writingSelf" }).lean<{ bands: { writing: number } }>())?.bands.writing).toBe(6);
 
     const hidden = await getWritingAttempt(u, id);
     expect(hidden?.tasks[0].ai).toBeUndefined();
@@ -113,7 +113,7 @@ describe("writing attempts", () => {
     await writingAiEstimate(u, id, 1, { fetch });
     expect(fetch).toHaveBeenCalledTimes(2);
     expect((await AiUsage.findOne({ userId: u }).lean<{ count: number }>())?.count).toBe(2);
-    const ai = await IeltsBandEntry.findOne({ source: "mockAi" }).lean<{ bands: { writing: number } }>();
+    const ai = await IeltsBandEntry.findOne({ source: "writingAi" }).lean<{ bands: { writing: number } }>();
     expect(ai?.bands.writing).toBe(6.5);
     const view = await getWritingAttempt(u, id);
     expect(view?.aiBand).toBe(6.5);

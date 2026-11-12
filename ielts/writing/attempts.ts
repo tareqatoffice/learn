@@ -82,10 +82,10 @@ function attemptBand(a: AttemptDoc, pick: (t: TaskDoc) => number | null): number
 async function syncEntries(userId: string, a: AttemptDoc): Promise<void> {
   const self = attemptBand(a, (t) => (selfComplete(t) ? taskBand(t.self) : null));
   const ai = attemptBand(a, (t) => (aiComplete(t) ? t.ai.overall : null));
-  const write = (source: "mockSelf" | "mockAi", writing: number) =>
+  const write = (source: "writingSelf" | "writingAi", writing: number) =>
     IeltsBandEntry.updateOne({ userId, attemptId: a._id, source }, { $set: { date: a.date, bands: { writing } } }, { upsert: true });
-  if (self !== null && a.status === "submitted") await write("mockSelf", self);
-  if (ai !== null && a.status === "submitted") await write("mockAi", ai);
+  if (self !== null && a.status === "submitted") await write("writingSelf", self);
+  if (ai !== null && a.status === "submitted") await write("writingAi", ai);
 }
 
 // ---- start / write / submit ----
@@ -331,7 +331,12 @@ export type WritingListItem = { id: string; date: string; kind: WritingKind; sta
 export async function listWritingAttempts(userId: string, limit = 50): Promise<WritingListItem[]> {
   if (!isId(userId)) return [];
   await connectDb();
-  const rows = await IeltsWritingAttempt.find({ userId }).sort({ createdAt: -1 }).limit(limit).lean<AttemptDoc[]>();
+  // Only what the list shows: the essays and AI payloads stay in the database.
+  const rows = await IeltsWritingAttempt.find({ userId })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .select("date kind status tasks.task tasks.wordCount tasks.self")
+    .lean<AttemptDoc[]>();
   return rows.map((r) => ({
     id: String(r._id),
     date: r.date,

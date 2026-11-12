@@ -15,6 +15,8 @@ const ieltsTestAttemptSchema = new Schema(
     sections: { type: [sectionSchema], default: [] },
     /** Question number to the learner's answer. */
     answers: { type: Map, of: String, default: {} },
+    /** Sections whose script was already read aloud by the browser voice (one play in a full test). */
+    played: { type: [Number], default: [] },
     startedAt: { type: Date, required: true },
     submittedAt: Date,
     limitSec: { type: Number, required: true },

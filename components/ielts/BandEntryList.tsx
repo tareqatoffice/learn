@@ -16,6 +16,8 @@ const SOURCE_LABEL: Record<BandSource, string> = {
   other: "Other",
   mockSelf: "Speaking mock (your rating)",
   mockAi: "Speaking mock (AI estimate)",
+  writingSelf: "Writing test (your rating)",
+  writingAi: "Writing test (AI estimate)",
 };
 
 /** Saved calculator results, newest first, each removable. Mock rows are removed with their attempt. */

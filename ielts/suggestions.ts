@@ -320,7 +320,7 @@ export async function runChecks(userId: string, today: string, timeZone: string)
   for (const [kind, check] of checks) {
     if (quiet.has(kind)) continue;
     const found = await check();
-    if (found) await IeltsPlanSuggestion.create({ userId, ...found, forDate: today });
+    if (found) await ignoreDuplicate(() => IeltsPlanSuggestion.create({ userId, ...found, forDate: today }));
   }
 }
 
@@ -413,7 +413,7 @@ export async function suggestCurrentBand(userId: string, source: "official" | "m
     const keys = Object.keys(given) as (keyof Bands)[];
     if (!keys.length || keys.every((k) => profile.current[k] === given[k])) return;
     const list = keys.map((k) => `${k} ${band(given[k]!)}`).join(", ");
-    await IeltsPlanSuggestion.updateOne(
+    await ignoreDuplicate(() => IeltsPlanSuggestion.updateOne(
       { userId, kind: "currentBand", status: "pending" },
       {
         $set: {
@@ -423,7 +423,7 @@ export async function suggestCurrentBand(userId: string, source: "official" | "m
         },
       },
       { upsert: true },
-    );
+    ));
     return;
   }
 
@@ -433,11 +433,27 @@ export async function suggestCurrentBand(userId: string, source: "official" | "m
   if (now !== undefined && Math.abs(speaking - now) < settings.thresholds.currentBandGap) return;
   if ((await quietKinds(userId, today, settings.thresholds.dismissDays)).has("currentBand")) return;
   const from = now === undefined ? "" : `, against ${band(now)} on your profile`;
-  await IeltsPlanSuggestion.create({
-    userId,
-    kind: "currentBand",
-    reason: `Your last 2 mocks put your Speaking at about ${band(speaking)}${from}. This updates your current Speaking band and rebuilds the plan.`,
-    proposal: { inputs: { current: { speaking } } },
-    forDate: today,
-  });
+  // An upsert (backed by the unique pending index), so two saves at once can't raise it twice.
+  await ignoreDuplicate(() =>
+    IeltsPlanSuggestion.updateOne(
+      { userId, kind: "currentBand", status: "pending" },
+      {
+        $setOnInsert: {
+          reason: `Your last 2 mocks put your Speaking at about ${band(speaking)}${from}. This updates your current Speaking band and rebuilds the plan.`,
+          proposal: { inputs: { current: { speaking } } },
+          forDate: today,
+        },
+      },
+      { upsert: true },
+    ),
+  );
+}
+
+/** Runs a write that may lose a race on the unique pending index; the other writer's row stands. */
+async function ignoreDuplicate(write: () => Promise<unknown>): Promise<void> {
+  try {
+    await write();
+  } catch (error) {
+    if ((error as { code?: number })?.code !== 11000) throw error;
+  }
 }

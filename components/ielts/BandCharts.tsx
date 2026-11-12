@@ -27,6 +27,8 @@ const BAND_SERIES: LineSeries<BandRow>[] = [
   { key: "speaking", label: "Speaking (practice)", color: "var(--chart-5)", pick: own(SELF_SOURCES, (p) => p.speaking) },
   { key: "mockSelf", label: "Speaking (mock, you)", color: "var(--chart-5)", pick: own(["mockSelf"], (p) => p.speaking) },
   { key: "mockAi", label: "Speaking (mock, AI estimate)", color: "var(--chart-5)", dash: "4 3", pick: own(["mockAi"], (p) => p.speaking) },
+  { key: "writingSelf", label: "Writing (full test, you)", color: "var(--chart-4)", pick: own(["writingSelf"], (p) => p.writing) },
+  { key: "writingAi", label: "Writing (full test, AI estimate)", color: "var(--chart-4)", dash: "4 3", pick: own(["writingAi"], (p) => p.writing) },
 ];
 
 const CRITERION_COLOR: Record<Criterion, string> = {

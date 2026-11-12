@@ -15,6 +15,7 @@ import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Chip } from "@/components/Chip";
 import { Button } from "@/components/ui/button";
 import { FileDropzone } from "@/components/ui/FileDropzone";
+import { audioDuration } from "@/lib/audioDuration";
 import { putFile } from "@/lib/uploadFile";
 import { UploadError } from "@/lib/uploadTake";
 
@@ -37,21 +38,6 @@ Anna => B
 
 ## completion | Write NO MORE THAN TWO WORDS.
 The ___ is large. => big | huge`;
-
-function audioDuration(file: File): Promise<number> {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    const el = new Audio();
-    const done = (n: number) => {
-      URL.revokeObjectURL(url);
-      resolve(Number.isFinite(n) ? Math.round(n) : 0);
-    };
-    el.preload = "metadata";
-    el.onloadedmetadata = () => done(el.duration);
-    el.onerror = () => done(0);
-    el.src = url;
-  });
-}
 
 function SectionAudio({ testId, index, audioKey, onDone }: { testId: string; index: number; audioKey: string; onDone: (key: string) => void }) {
   const { run, pending, errors, setErrors, saved } = useAdminAction();
@@ -105,6 +91,8 @@ export function IeltsTestForm({ kind, test }: { kind: TestKind; test?: AdminTest
       { title: kind === "reading" ? "Passage 1" : "Section 1", passage: "", script: "", questions: "", audioKey: "" },
     ],
   );
+  // Uploads go to a saved section by position, so once a section has been removed here, save before uploading.
+  const [removed, setRemoved] = useState(false);
   const { run, pending, errors, saved, touch } = useAdminAction();
   const del = useAdminAction();
 
@@ -115,7 +103,11 @@ export function IeltsTestForm({ kind, test }: { kind: TestKind; test?: AdminTest
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const input = { title, status, sections: sections.map((s) => ({ title: s.title, passage: s.passage, script: s.script, questions: s.questions })) };
+    const input = {
+      title,
+      status,
+      sections: sections.map((s) => ({ title: s.title, passage: s.passage, script: s.script, questions: s.questions, audioKey: s.audioKey })),
+    };
     if (id) run(() => saveTestAction(kind, id, input));
     else run(() => saveTestAction(kind, null, input), { refresh: false, onSuccess: (r) => router.push(`${BACK}/${kind}/${r.id}`) });
   };
@@ -144,7 +136,7 @@ export function IeltsTestForm({ kind, test }: { kind: TestKind; test?: AdminTest
               <Field label="Script (shown after the test, and read aloud when there is no audio file)">
                 <textarea className={inputClass} rows={8} value={s.script} onChange={(e) => patch(i, { script: e.target.value })} />
               </Field>
-              {id && test?.sections[i] ? (
+              {id && test?.sections[i] && !removed ? (
                 <SectionAudio testId={id} index={i} audioKey={s.audioKey} onDone={(key) => patch(i, { audioKey: key })} />
               ) : (
                 <p className="text-sm text-muted-foreground">Save the test first, then upload this section&apos;s audio.</p>
@@ -156,7 +148,7 @@ export function IeltsTestForm({ kind, test }: { kind: TestKind; test?: AdminTest
           </Field>
           {sections.length > 1 && (
             <div>
-              <Button type="button" variant="outline" size="sm" onClick={() => { touch(); setSections((all) => all.filter((_, j) => j !== i)); }}>
+              <Button type="button" variant="outline" size="sm" onClick={() => { touch(); setRemoved(true); setSections((all) => all.filter((_, j) => j !== i)); }}>
                 Remove this section
               </Button>
             </div>

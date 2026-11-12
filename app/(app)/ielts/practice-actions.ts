@@ -2,10 +2,12 @@
 
 import { type ActionResult } from "@/admin/result";
 import {
+  claimSection,
   deleteTestAttempt,
   saveAnswers,
   startTestAttempt,
   submitAttempt,
+  type SectionPlay,
   type SubmitResult,
   type TestSkill,
 } from "@/ielts/practice/attempts";
@@ -41,6 +43,10 @@ const today = async () => localDate(new Date(), await readTimeZone());
 export async function startTestAction(skill: TestSkill, testId: string, scope: "full" | number): Promise<ActionResult<{ attemptId: string }>> {
   const userId = await session();
   return startTestAttempt(userId, { skill, testId, scope, date: await today() });
+}
+
+export async function claimSectionAction(attemptId: string, index: number): Promise<ActionResult<{ play: SectionPlay }>> {
+  return claimSection(await session(), attemptId, index);
 }
 
 export async function saveAnswersAction(attemptId: string, answers: Record<string, string>): Promise<ActionResult> {

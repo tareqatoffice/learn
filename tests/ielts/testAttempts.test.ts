@@ -1,8 +1,8 @@
 import mongoose, { Types } from "mongoose";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectDb } from "@/lib/db";
-import { IeltsBandEntry, IeltsReadingTest } from "@/models";
-import { deleteTestAttempt, getAttempt, listTestAttempts, listTests, saveAnswers, startTestAttempt, submitAttempt } from "@/ielts/practice/attempts";
+import { IeltsBandEntry, IeltsListeningTest, IeltsReadingTest } from "@/models";
+import { AUDIO_LINK_SEC, claimSection, deleteTestAttempt, getAttempt, listTestAttempts, listTests, saveAnswers, startTestAttempt, submitAttempt } from "@/ielts/practice/attempts";
 import { parseQuestions } from "@/ielts/practice/format";
 import { resetDb } from "../setup/mongo";
 
@@ -114,6 +114,42 @@ describe("listening and reading attempts", () => {
     await startTestAttempt(u, { skill: "reading", testId, scope: "full", date: "2026-11-12" });
     await startTestAttempt(user(), { skill: "reading", testId, scope: "full", date: "2026-11-12" });
     expect(await listTestAttempts(u)).toHaveLength(1);
+  });
+
+  it("keeps scripts and audio links out of the run view and hands them out at Play", async () => {
+    const u = user();
+    const deps = { sign: vi.fn(async (key: string, ttl: number) => `https://r2.test/${key}?ttl=${ttl}`), storage: () => true };
+    const doc = await IeltsListeningTest.create({
+      title: "L",
+      status: "published",
+      sections: [
+        { title: "S1", script: "The secret is cat.", groups: groups("## completion | w\nThe secret => cat") },
+        { title: "S2", script: "Other.", audioKey: "k/a.mp3", groups: groups("## completion | w\nQ => x") },
+        { title: "S3", groups: groups("## completion | w\nQ3 => y") },
+      ],
+    });
+    const full = await startTestAttempt(u, { skill: "listening", testId: String(doc._id), scope: "full", date: "2026-11-12" });
+    if (!full.ok) throw new Error("start");
+    const got = await getAttempt(u, full.attemptId);
+    if (got?.state !== "run") throw new Error("run");
+    expect(got.view.audio).toEqual(["voice", "file", "none"]);
+    expect(JSON.stringify(got.view)).not.toContain("secret is cat");
+    expect(JSON.stringify(got.view)).not.toContain("k/a.mp3");
+
+    expect(await claimSection(u, full.attemptId, 0, deps)).toEqual({ ok: true, play: { kind: "voice", script: "The secret is cat." } });
+    expect((await claimSection(u, full.attemptId, 0, deps)).ok).toBe(false); // one play in a full test
+    // A recording is signed only now, for long enough to play through a section.
+    expect(await claimSection(u, full.attemptId, 1, deps)).toEqual({ ok: true, play: { kind: "file", url: `https://r2.test/k/a.mp3?ttl=${AUDIO_LINK_SEC}` } });
+    expect((await claimSection(u, full.attemptId, 1, deps)).ok).toBe(false);
+    expect((await claimSection(u, full.attemptId, 2, deps)).ok).toBe(false); // nothing to play
+    expect((await claimSection(user(), full.attemptId, 0, deps)).ok).toBe(false); // someone else's attempt
+
+    const drill = await startTestAttempt(u, { skill: "listening", testId: String(doc._id), scope: 1, date: "2026-11-12" });
+    if (!drill.ok) throw new Error("start");
+    expect((await claimSection(u, drill.attemptId, 0, deps)).ok).toBe(true);
+    expect((await claimSection(u, drill.attemptId, 0, deps)).ok).toBe(true); // drills can be replayed
+    await submitAttempt(u, drill.attemptId, {});
+    expect((await claimSection(u, drill.attemptId, 0, deps)).ok).toBe(false); // closed after submit
   });
 
   it("rejects an unknown section", async () => {

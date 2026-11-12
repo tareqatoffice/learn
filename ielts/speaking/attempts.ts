@@ -277,28 +277,58 @@ export async function transcribePart(
   userId: string,
   attemptId: string,
   part: Part,
-  deps: { transcribe?: typeof transcribe } = {},
+  deps: { transcribe?: typeof transcribe; now?: Date } = {},
 ): Promise<ActionResult<{ transcript: string }>> {
   const attempt = await ownAttempt(userId, attemptId);
   const row = attempt?.parts.find((p) => p.part === part);
   if (!attempt || !row || !row.media.stored) return fail(NOT_FOUND);
-  if (row.transcriptStatus !== "pending" && row.transcriptStatus !== "failed") return fail("This recording can't be transcribed.");
+  if (!["pending", "failed", "running"].includes(row.transcriptStatus ?? "")) return fail("This recording can't be transcribed.");
 
-  const filter = { _id: attemptId, userId, parts: { $elemMatch: { part, transcriptStatus: { $in: ["pending", "failed"] } } } };
-  return transcribeMedia(userId, row.media, {
+  // Claim the part first, so two requests (a retry, a second tab) can't both spend the daily cap and
+  // both pay for speech-to-text. A claim left by a crashed request can be taken over after a while.
+  const now = deps.now ?? new Date();
+  const claim = await IeltsSpeakingAttempt.updateOne(
+    {
+      _id: attemptId,
+      userId,
+      parts: {
+        $elemMatch: {
+          part,
+          "media.stored": true,
+          $or: [
+            { transcriptStatus: { $in: ["pending", "failed"] } },
+            { transcriptStatus: "running", transcribeStartedAt: { $lt: new Date(now.getTime() - STALE_CLAIM_MS) } },
+          ],
+        },
+      },
+    },
+    { $set: { "parts.$.transcriptStatus": "running", "parts.$.transcribeStartedAt": now } },
+  );
+  if (!claim.matchedCount) return fail("This recording is already being transcribed. Reload the page in a minute.");
+
+  // Only this claim may write the outcome.
+  const ours = { _id: attemptId, userId, parts: { $elemMatch: { part, transcriptStatus: "running", transcribeStartedAt: now } } };
+  const before = row.transcriptStatus === "failed" ? "failed" : "pending";
+  const res = await transcribeMedia(userId, row.media, {
     transcribe: deps.transcribe,
     label: `IELTS attempt ${attemptId} ${part}`,
     save: async (transcript) => {
-      const res = await IeltsSpeakingAttempt.updateOne(filter, {
+      const saved = await IeltsSpeakingAttempt.updateOne(ours, {
         $set: { "parts.$.transcript": transcript, "parts.$.transcriptStatus": "done" },
       });
-      return res.matchedCount > 0;
+      return saved.matchedCount > 0;
     },
     onError: async () => {
-      await IeltsSpeakingAttempt.updateOne(filter, { $set: { "parts.$.transcriptStatus": "failed" } });
+      await IeltsSpeakingAttempt.updateOne(ours, { $set: { "parts.$.transcriptStatus": "failed" } });
     },
   });
+  // Refused before the call (daily cap, missing object): release the claim as it was.
+  if (!res.ok) await IeltsSpeakingAttempt.updateOne(ours, { $set: { "parts.$.transcriptStatus": before } });
+  return res;
 }
+
+/** A transcription claimed longer ago than this is treated as abandoned. */
+const STALE_CLAIM_MS = 5 * 60_000;
 
 /** Ends the attempt: complete when every part its kind needs is stored, otherwise incomplete. */
 export async function finishAttempt(
