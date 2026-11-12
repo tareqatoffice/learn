@@ -199,6 +199,13 @@ export function TopBar({ user }: { user: TopBarUser }) {
               <p className="truncate px-2 py-1.5 text-sm font-medium">
                 {user.name}
               </p>
+              <Link
+                href="/profile"
+                onClick={() => setAccountOpen(false)}
+                className="block w-full rounded-md px-2 py-1.5 pointer-coarse:py-2.5 text-left text-sm text-muted-foreground hover:bg-muted hover:pl-3 hover:text-foreground"
+              >
+                Profile
+              </Link>
               <form action={signOutAction}>
                 <button
                   type="submit"

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ProgressBar } from "@/components/ProgressBar";
+import { Card, ProgressRows } from "@/components/TrackCard";
 import { StartReviewButton } from "@/components/StartReviewButton";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
@@ -11,7 +11,6 @@ import { TASKS, TASK_LABEL, TASK_SLUG } from "@/speaking/tasks";
 import { readTimeZone } from "@/speaking/timezone";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
-import { cn } from "@/lib/utils";
 
 export const metadata = buildMetadata({
   title: "Dashboard",
@@ -49,74 +48,6 @@ function NextUp({
       </h3>
       {children}
     </section>
-  );
-}
-
-/** A tracking card: a quiet title and a list of numbers. Never carries an action. */
-function Card({
-  title,
-  children,
-  className,
-}: {
-  title: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  const id = `card-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
-  return (
-    <section
-      aria-labelledby={id}
-      className={cn(
-        "card-interactive grid content-start gap-2 rounded-xl border border-border bg-card p-4",
-        className,
-      )}
-    >
-      <h3
-        id={id}
-        className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-      >
-        {title}
-      </h3>
-      {children}
-    </section>
-  );
-}
-
-function ProgressRows({
-  rows,
-  empty,
-}: {
-  rows: {
-    key: string;
-    href: string;
-    label: string;
-    value: number;
-    max: number;
-  }[];
-  empty: string;
-}) {
-  if (!rows.length)
-    return <p className="text-sm text-muted-foreground">{empty}</p>;
-  return (
-    <ul className="grid gap-2">
-      {rows.map((r) => (
-        <li
-          key={r.key}
-          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3"
-        >
-          <Link
-            href={r.href}
-            className={`truncate text-sm pointer-coarse:py-2 ${linkClass}`}
-          >
-            {r.label}
-          </Link>
-          <span className="text-xs tabular-nums text-muted-foreground">
-            {r.value}/{r.max}
-          </span>
-          <ProgressBar value={r.value} max={r.max} className="col-span-2" />
-        </li>
-      ))}
-    </ul>
   );
 }
 
