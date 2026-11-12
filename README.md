@@ -96,6 +96,12 @@ Learner pages:
 - `/ielts/speaking` is the Speaking hub.
 - `/ielts/speaking/[id]` runs an attempt.
 - `/ielts/speaking/[id]/review` reviews it.
+- `/ielts/reading` and `/ielts/listening` list published tests (a full 40-question test or one section);
+  `/ielts/test/[id]` runs the timed answer sheet, then shows the marked review. Marking is server-side; only a
+  full 40-question test gets an approximate band and a band-history entry. Listening plays the section's audio
+  once in a full test, or your browser's voice reading the script when no recording is attached.
+- `/ielts/writing` starts a Task 1, Task 2 or full Writing test; `/ielts/writing/[id]` is the editor, then the
+  review: rate yourself first, then ask for an AI estimate. Only a full test writes Writing bands to history.
 
 Admin sections: **Content → IELTS Speaking** (`/admin/ielts/speaking`: Part 1 topics,
 Part 2 cue cards, Part 3 discussions) and **Settings → IELTS settings**

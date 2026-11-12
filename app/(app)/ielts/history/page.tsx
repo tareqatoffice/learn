@@ -3,7 +3,9 @@ import { BandCharts } from "@/components/ielts/BandCharts";
 import { dateLabel } from "@/components/ielts/format";
 import { bandSeries, criteriaSeries, weeklyMinutes } from "@/ielts/history";
 import { getProfile } from "@/ielts/profile";
+import { listTestAttempts } from "@/ielts/practice/attempts";
 import { type AttemptSummary, listAttempts } from "@/ielts/speaking/attempts";
+import { listWritingAttempts } from "@/ielts/writing/attempts";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
@@ -47,12 +49,14 @@ export default async function IeltsHistoryPage({ searchParams }: PageProps<"/iel
   const timeZone = await readTimeZone();
   const filter: Filter = FILTERS.find((f) => f.key === show)?.key ?? "all";
 
-  const [profile, bands, criteria, weeks, attempts] = await Promise.all([
+  const [profile, bands, criteria, weeks, attempts, tests, writings] = await Promise.all([
     getProfile(user.userId),
     bandSeries(user.userId),
     criteriaSeries(user.userId),
     weeklyMinutes(user.userId, timeZone),
     listAttempts(user.userId, { limit: LIMIT }),
+    listTestAttempts(user.userId, { limit: LIMIT }),
+    listWritingAttempts(user.userId, LIMIT),
   ]);
   const rows = attempts.filter((a) => matches(filter, a));
 
@@ -101,6 +105,45 @@ export default async function IeltsHistoryPage({ searchParams }: PageProps<"/iel
                     {dateLabel(a.date)} · {minutes(a.durationSec)}
                     {a.status === "incomplete" ? " · incomplete" : ""}
                     {a.aiOverall !== undefined ? ` · AI estimate ${a.aiOverall.toFixed(1)}` : ""}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="practice-title" className="grid gap-3">
+        <h2 id="practice-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Listening, Reading and Writing attempts
+        </h2>
+        {tests.length === 0 && writings.length === 0 ? (
+          <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">No practice attempts yet.</p>
+        ) : (
+          <ul className="grid gap-2">
+            {tests.map((t) => (
+              <li key={t.id}>
+                <Link
+                  href={`/ielts/test/${t.id}`}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  <span className="font-medium">{t.title}</span>
+                  <span className="text-muted-foreground">
+                    {dateLabel(t.date)} ·{" "}
+                    {t.status === "submitted" && t.raw !== undefined ? `${t.raw}/${t.total}${t.band !== undefined ? ` · about band ${t.band}` : ""}` : "in progress"}
+                  </span>
+                </Link>
+              </li>
+            ))}
+            {writings.map((w) => (
+              <li key={w.id}>
+                <Link
+                  href={`/ielts/writing/${w.id}`}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  <span className="font-medium">Writing {w.kind === "full" ? "full test" : w.kind === "task1" ? "Task 1" : "Task 2"}</span>
+                  <span className="text-muted-foreground">
+                    {dateLabel(w.date)} · {w.status === "submitted" ? `${w.words} words${w.selfBand !== null ? ` · you rated ${w.selfBand}` : ""}` : "in progress"}
                   </span>
                 </Link>
               </li>
