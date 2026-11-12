@@ -146,7 +146,8 @@ export async function startLessonAudioUpload(
   if (!(await SpeakingLesson.exists({ _id: id }))) return fail(NOT_FOUND);
   const ext = EXT[type] ?? "audio";
   const key = `lessons/${id}/${randomBytes(12).toString("hex")}.${ext}`;
-  return ok({ uploadUrl: await presignPut(key, type), key });
+  // The length is signed, so R2 refuses an upload of any other size (the 50 MB cap can't be dodged).
+  return ok({ uploadUrl: await presignPut(key, type, size), key });
 }
 
 export async function confirmLessonAudio(id: string, key: string, durationSec: number): Promise<ActionResult> {
@@ -161,7 +162,14 @@ export async function confirmLessonAudio(id: string, key: string, durationSec: n
   if (!lesson) return fail(NOT_FOUND);
   const head = await headObject(key);
   if (!head) return fail("The audio didn't finish uploading. Try again.");
-  if (head.size > AUDIO_MAX_BYTES) return fail("Audio can be 50 MB at most.");
+  if (head.size > AUDIO_MAX_BYTES) {
+    try {
+      await deleteObjects([key]);
+    } catch {
+      // Orphaned file only.
+    }
+    return fail("Audio can be 50 MB at most.");
+  }
   await SpeakingLesson.updateOne({ _id: id }, { $set: { "shadow.audioKey": key, "shadow.durationSec": duration } });
   const previous = lesson.shadow?.audioKey;
   if (previous && previous !== key) {

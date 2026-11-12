@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ProgressBar } from "@/components/ProgressBar";
+import { Card, ProgressRows } from "@/components/TrackCard";
 import { StartReviewButton } from "@/components/StartReviewButton";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
@@ -11,7 +11,6 @@ import { TASKS, TASK_LABEL, TASK_SLUG } from "@/speaking/tasks";
 import { readTimeZone } from "@/speaking/timezone";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
-import { cn } from "@/lib/utils";
 
 export const metadata = buildMetadata({
   title: "Dashboard",
@@ -52,74 +51,6 @@ function NextUp({
   );
 }
 
-/** A tracking card: a quiet title and a list of numbers. Never carries an action. */
-function Card({
-  title,
-  children,
-  className,
-}: {
-  title: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  const id = `card-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
-  return (
-    <section
-      aria-labelledby={id}
-      className={cn(
-        "card-interactive grid content-start gap-2 rounded-xl border border-border bg-card p-4",
-        className,
-      )}
-    >
-      <h3
-        id={id}
-        className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-      >
-        {title}
-      </h3>
-      {children}
-    </section>
-  );
-}
-
-function ProgressRows({
-  rows,
-  empty,
-}: {
-  rows: {
-    key: string;
-    href: string;
-    label: string;
-    value: number;
-    max: number;
-  }[];
-  empty: string;
-}) {
-  if (!rows.length)
-    return <p className="text-sm text-muted-foreground">{empty}</p>;
-  return (
-    <ul className="grid gap-2">
-      {rows.map((r) => (
-        <li
-          key={r.key}
-          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3"
-        >
-          <Link
-            href={r.href}
-            className={`truncate text-sm pointer-coarse:py-2 ${linkClass}`}
-          >
-            {r.label}
-          </Link>
-          <span className="text-xs tabular-nums text-muted-foreground">
-            {r.value}/{r.max}
-          </span>
-          <ProgressBar value={r.value} max={r.max} className="col-span-2" />
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 /** Topic links joined by a middot, used for both "learning now" and "ready next". */
 function TopicLinks({
   topics,
@@ -148,7 +79,7 @@ export default async function DashboardPage() {
   await connectDb();
   const timeZone = await readTimeZone();
   const [dash, speaking] = await Promise.all([
-    getDashboard(user.userId),
+    getDashboard(user.userId, timeZone),
     getToday(user.userId, timeZone),
   ]);
   const speakingTasks = TASKS.filter((t) => speaking.settings.enabled[t]);
@@ -311,6 +242,27 @@ export default async function DashboardPage() {
               empty="Every speaking task is turned off."
             />
           </Card>
+
+          {dash.ielts && (
+            <Card title="IELTS">
+              <p className="text-sm">
+                <Link href="/ielts" className={`font-medium ${linkClass}`}>
+                  {dash.ielts.testDay === "passed"
+                    ? "Enter your result"
+                    : dash.ielts.testDay === "today"
+                      ? "Your test is today"
+                      : `${dash.ielts.daysLeft} ${dash.ielts.daysLeft === 1 ? "day" : "days"} to your test`}
+                </Link>
+              </p>
+              {dash.ielts.testDay === "upcoming" && (
+                <p className="text-sm text-muted-foreground">
+                  {dash.ielts.total === 0
+                    ? "Nothing planned for today."
+                    : `${dash.ielts.done} of ${dash.ielts.total} done today`}
+                </p>
+              )}
+            </Card>
+          )}
 
           <Card title="Notes">
             <ProgressRows

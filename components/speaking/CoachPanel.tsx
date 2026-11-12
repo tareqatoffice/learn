@@ -4,34 +4,12 @@ import { useState } from "react";
 import { bodyFeedbackAction, setBodyConsentAction, speechFeedbackAction } from "@/app/(app)/speaking/actions";
 import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
-import { grabFrames } from "@/lib/media";
+import { framesOf } from "@/lib/media";
 import type { BodyFeedback, SpeechFeedback } from "@/speaking/coach";
 import { BodyConsentDialog } from "./BodyConsentDialog";
 import type { SelfRating } from "./SelfRatingForm";
 
-const FRAME_COUNT = 5;
-
 export type CoachAi = { speech?: Partial<SpeechFeedback>; body?: Partial<BodyFeedback> };
-
-/** Five evenly spaced stills of the take, read from a same-origin blob copy so the canvas isn't tainted. */
-async function framesOf(mediaUrl: string): Promise<string[]> {
-  const res = await fetch(mediaUrl);
-  if (!res.ok) throw new Error(`fetch ${res.status}`);
-  const url = URL.createObjectURL(await res.blob());
-  const video = document.createElement("video");
-  video.muted = true;
-  video.playsInline = true;
-  video.preload = "auto";
-  video.src = url;
-  try {
-    video.load();
-    return await grabFrames(video, FRAME_COUNT);
-  } finally {
-    video.removeAttribute("src");
-    video.load();
-    URL.revokeObjectURL(url);
-  }
-}
 
 function List({ title, items }: { title: string; items?: string[] }) {
   if (!items?.length) return null;
