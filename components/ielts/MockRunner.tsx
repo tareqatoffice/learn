@@ -48,6 +48,8 @@ type Stage = "ready" | "prep" | "live" | "between" | "finishing";
 const REUSE_MS = 8 * 60 * 1000;
 const MB = 1024 * 1024;
 const NAME: Record<Part, string> = { p1: "Part 1", p2: "Part 2", p3: "Part 3" };
+const LEAVE_PROMPT = "You have recordings that haven't saved. Leave anyway?";
+const GUARD_KEY = "ieltsLeaveGuard";
 
 const PREP_INTRO =
   "Now I'm going to give you a topic, and I'd like you to talk about it for one to two minutes. You have one minute to think about what you're going to say. You can make some notes if you wish. Here is your topic.";
@@ -391,6 +393,35 @@ export function MockRunner({
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
+  }, [unsent]);
+
+  // In-app navigation never fires beforeunload, so same-origin link clicks and Back ask too (R26).
+  useEffect(() => {
+    if (!unsent) return;
+    const leave = () => window.confirm(LEAVE_PROMPT);
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = e.target instanceof Element ? e.target.closest("a[href]") : null;
+      if (!(a instanceof HTMLAnchorElement) || a.hasAttribute("download") || (a.target && a.target !== "_self")) return;
+      if (new URL(a.href, window.location.href).origin !== window.location.origin) return;
+      if (!leave()) e.preventDefault();
+    };
+    // A guard entry on top of this page, so Back lands on it first and can be undone when declined.
+    if (!window.history.state?.[GUARD_KEY]) window.history.pushState({ [GUARD_KEY]: true }, "");
+    const onPopState = () => {
+      if (leave()) {
+        window.removeEventListener("popstate", onPopState);
+        window.history.back();
+      } else {
+        window.history.pushState({ [GUARD_KEY]: true }, "");
+      }
+    };
+    document.addEventListener("click", onClick, true);
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      window.removeEventListener("popstate", onPopState);
+    };
   }, [unsent]);
 
   // ---- view ----

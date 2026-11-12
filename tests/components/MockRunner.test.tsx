@@ -281,6 +281,87 @@ describe("MockRunner", () => {
     expect(leave()).toBe(false);
   });
 
+  it("asks before an in-app link or Back leaves unsent parts, and stops asking once they save", async () => {
+    let release = () => {};
+    upload.uploadTake.mockImplementation(() => new Promise<void>((resolve) => (release = resolve)));
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirm);
+    const link = document.body.appendChild(document.createElement("a"));
+    link.href = "/ielts";
+    // Runs after the runner's capture listener; records the outcome and keeps jsdom from navigating.
+    const blocked: boolean[] = [];
+    const record = (e: MouseEvent) => {
+      if (e.target !== link) return;
+      blocked.push(e.defaultPrevented);
+      e.preventDefault();
+    };
+    document.addEventListener("click", record);
+    // jsdom's history outlives each test; start from an entry without a guard.
+    window.history.replaceState(null, "");
+    const pushState = vi.spyOn(window.history, "pushState");
+    try {
+      renderRunner("mock");
+      fireEvent.click(link);
+      expect(confirm).not.toHaveBeenCalled();
+      expect(blocked).toEqual([false]);
+
+      await click(/^start/i);
+      await click(/end part 1/i);
+      // Part 1 is uploading while Part 2 prep runs.
+      expect(pushState).toHaveBeenCalledTimes(1);
+      fireEvent.click(link);
+      expect(confirm).toHaveBeenLastCalledWith("You have recordings that haven't saved. Leave anyway?");
+      expect(blocked).toEqual([false, true]);
+      confirm.mockReturnValueOnce(true);
+      fireEvent.click(link);
+      expect(blocked).toEqual([false, true, false]);
+
+      // Back, declined: the guard entry is pushed again.
+      confirm.mockClear();
+      act(() => void window.dispatchEvent(new PopStateEvent("popstate", { state: null })));
+      expect(confirm).toHaveBeenCalledTimes(1);
+      expect(pushState).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        release();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(actions.confirmPart).toHaveBeenCalledWith(ID, "p1", expect.anything());
+      // Nothing unsent while Part 2 prep runs: no guard left.
+      confirm.mockClear();
+      fireEvent.click(link);
+      act(() => void window.dispatchEvent(new PopStateEvent("popstate", { state: null })));
+      expect(confirm).not.toHaveBeenCalled();
+      expect(blocked.at(-1)).toBe(false);
+    } finally {
+      document.removeEventListener("click", record);
+      link.remove();
+      pushState.mockRestore();
+    }
+  });
+
+  it("removes the leave guards on unmount", async () => {
+    upload.uploadTake.mockImplementation(() => new Promise<void>(() => {}));
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirm);
+    const link = document.body.appendChild(document.createElement("a"));
+    link.href = "/ielts";
+    const swallow = (e: MouseEvent) => e.preventDefault();
+    document.addEventListener("click", swallow);
+    try {
+      const { unmount } = renderRunner("mock");
+      await click(/^start/i);
+      await click(/end part 1/i);
+      unmount();
+      fireEvent.click(link);
+      window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      expect(confirm).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener("click", swallow);
+      link.remove();
+    }
+  });
+
   it("pause stops the part, keeps it, and finishes with paused set", async () => {
     renderRunner("part3");
     await click(/^start/i);
