@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectDb } from "@/lib/db";
 import { IeltsPlan } from "@/models";
 import { addDays } from "@/speaking/schedule";
-import { currentPlan, endPlan, getProfile, previewProfile, saveProfile, writePlanVersion } from "@/ielts/profile";
+import { currentPlan, endPlan, getProfile, previewProfile, saveProfile, testDayStatus, writePlanVersion } from "@/ielts/profile";
 import { getIeltsSettings, saveIeltsSettings } from "@/ielts/settings";
 import { resetDb } from "../setup/mongo";
 
@@ -126,5 +126,13 @@ describe("ielts settings", () => {
     expect(s.hoursPerBand).toBe(150);
     expect(s.split.mocks).toBe(30);
     expect(s.thresholds.missedShare).toBe(0.6);
+  });
+});
+
+describe("testDayStatus", () => {
+  it("is upcoming before the test, today on the day and passed only after it", () => {
+    expect(testDayStatus("2026-11-11", "2026-11-12")).toBe("upcoming");
+    expect(testDayStatus("2026-11-12", "2026-11-12")).toBe("today");
+    expect(testDayStatus("2026-11-13", "2026-11-12")).toBe("passed");
   });
 });

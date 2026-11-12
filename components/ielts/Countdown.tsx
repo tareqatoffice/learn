@@ -16,6 +16,14 @@ export function Countdown({
   week: { index: number; count: number } | null;
 }) {
   const days = daysBetween(today, testDate);
+  if (days <= 0) {
+    return (
+      <section aria-label="Countdown" className="grid gap-1 rounded-xl border border-border bg-card p-5">
+        <p className="text-3xl font-semibold tracking-tight">Your test is today</p>
+        <p className="text-sm text-muted-foreground">Good luck. Rest, eat well and trust the work you have put in.</p>
+      </section>
+    );
+  }
   return (
     <section aria-label="Countdown" className="grid gap-1 rounded-xl border border-border bg-card p-5">
       <p className="text-3xl font-semibold tracking-tight tabular-nums">

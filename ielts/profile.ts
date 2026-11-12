@@ -148,6 +148,14 @@ function validate(input: ProfileInput, today: string): { data: z.output<typeof p
   return { data: parsed.data };
 }
 
+export type TestDayStatus = "upcoming" | "today" | "passed";
+
+/** Where local `today` sits against the test date: the test day itself is not yet passed. */
+export function testDayStatus(today: string, testDate: string): TestDayStatus {
+  if (today < testDate) return "upcoming";
+  return today === testDate ? "today" : "passed";
+}
+
 export async function getProfile(userId: string): Promise<ProfileView | null> {
   await connectDb();
   const doc = await IeltsProfile.findOne({ userId }).lean<

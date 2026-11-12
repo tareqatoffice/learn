@@ -3,7 +3,7 @@ import { listBooksWithProgress, listSeriesWithProgress } from "@/content/queries
 import { filterUnder, visibleNodeFilter, visibleNoteFilter, visibleQuestionFilter } from "@/content/visibility";
 import { readyNext as readyIn } from "@/graph/layout";
 import { Graph, GraphNode, Note, NodeProgress, NoteProgress, NoteSeries, Question, QuestionBook, QuestionProgress, QuizSession } from "@/models";
-import { getProfile } from "@/ielts/profile";
+import { getProfile, testDayStatus, type TestDayStatus } from "@/ielts/profile";
 import { todayList } from "@/ielts/progress";
 import { localDate } from "@/speaking/schedule";
 import { labelSessions, sessionCounts } from "./quiz";
@@ -21,7 +21,7 @@ export type Dashboard = {
   series: { slug: string; title: string; read: number; total: number }[];
   recentQuizzes: { id: string; label: string; got: number; review: number; finishedAt: Date }[];
   /** Only with an active IELTS profile. */
-  ielts?: { daysLeft: number; done: number; total: number };
+  ielts?: { daysLeft: number; testDay: TestDayStatus; done: number; total: number };
 };
 
 const READY_NEXT_MAX = 3;
@@ -131,8 +131,9 @@ async function ieltsCard(userId: string, timeZone: string, now: Date): Promise<D
   if (!profile || profile.status !== "active") return undefined;
   const today = localDate(now, timeZone);
   const days = Math.round((Date.parse(`${profile.testDate}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+  const testDay = testDayStatus(today, profile.testDate);
   const items = await todayList(userId, today, timeZone);
-  return { daysLeft: Math.max(0, days), done: items.filter((i) => i.done).length, total: items.length };
+  return { daysLeft: Math.max(0, days), testDay, done: items.filter((i) => i.done).length, total: items.length };
 }
 
 export async function getDashboard(userId: string, timeZone = "UTC", now = new Date()): Promise<Dashboard> {

@@ -10,7 +10,7 @@ import { TodayList } from "@/components/ielts/TodayList";
 import { TimeZoneCookie } from "@/components/speaking/TimeZoneCookie";
 import { listBandEntries } from "@/ielts/bandHistory";
 import { phaseOn, weekOn } from "@/ielts/plan";
-import { currentPlan, getProfile } from "@/ielts/profile";
+import { currentPlan, getProfile, testDayStatus } from "@/ielts/profile";
 import { todayList } from "@/ielts/progress";
 import { listPending, runChecks } from "@/ielts/suggestions";
 import { requireUser } from "@/lib/authz";
@@ -99,7 +99,7 @@ export default async function IeltsPage() {
     );
   }
 
-  if (profile.testDate <= today) {
+  if (testDayStatus(today, profile.testDate) === "passed") {
     return (
       <div className="mx-auto grid w-full max-w-3xl gap-4">
         {header}

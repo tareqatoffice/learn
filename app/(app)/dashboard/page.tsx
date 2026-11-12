@@ -316,14 +316,20 @@ export default async function DashboardPage() {
             <Card title="IELTS">
               <p className="text-sm">
                 <Link href="/ielts" className={`font-medium ${linkClass}`}>
-                  {dash.ielts.daysLeft} {dash.ielts.daysLeft === 1 ? "day" : "days"} to your test
+                  {dash.ielts.testDay === "passed"
+                    ? "Enter your result"
+                    : dash.ielts.testDay === "today"
+                      ? "Your test is today"
+                      : `${dash.ielts.daysLeft} ${dash.ielts.daysLeft === 1 ? "day" : "days"} to your test`}
                 </Link>
               </p>
-              <p className="text-sm text-muted-foreground">
-                {dash.ielts.total === 0
-                  ? "Nothing planned for today."
-                  : `${dash.ielts.done} of ${dash.ielts.total} done today`}
-              </p>
+              {dash.ielts.testDay === "upcoming" && (
+                <p className="text-sm text-muted-foreground">
+                  {dash.ielts.total === 0
+                    ? "Nothing planned for today."
+                    : `${dash.ielts.done} of ${dash.ielts.total} done today`}
+                </p>
+              )}
             </Card>
           )}
 

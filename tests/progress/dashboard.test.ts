@@ -145,4 +145,17 @@ describe("getDashboard", () => {
     await endPlan(user);
     expect((await getDashboard(user, "UTC", now)).ielts).toBeUndefined();
   });
+
+  it("marks the ielts card on test day and once the test has passed", async () => {
+    const user = newUserId();
+    const res = await saveProfile(
+      user,
+      { testDate: "2026-12-11", target: { overall: 7 }, current: { overall: 6 }, minutesPerDay: 60, studyDays: [0, 1, 2, 3, 4, 5, 6] },
+      "2026-11-11",
+    );
+    expect(res.ok).toBe(true);
+    expect((await getDashboard(user, "UTC", new Date("2026-11-11T12:00:00Z"))).ielts).toMatchObject({ testDay: "upcoming" });
+    expect((await getDashboard(user, "UTC", new Date("2026-12-11T12:00:00Z"))).ielts).toMatchObject({ daysLeft: 0, testDay: "today" });
+    expect((await getDashboard(user, "UTC", new Date("2026-12-14T12:00:00Z"))).ielts).toMatchObject({ testDay: "passed" });
+  });
 });

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { DeleteIeltsDataButton, EndPlanButton } from "@/components/ielts/PlanActions";
 import { ProfileForm } from "@/components/ielts/ProfileForm";
 import { TimeZoneCookie } from "@/components/speaking/TimeZoneCookie";
-import { getProfile } from "@/ielts/profile";
+import { getProfile, testDayStatus } from "@/ielts/profile";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
@@ -38,7 +38,7 @@ export default async function IeltsProfilePage() {
       {profile?.status === "ended" && (
         <p className="text-sm text-muted-foreground">Your last plan has ended. Saving this starts a new one.</p>
       )}
-      {profile && profile.testDate <= today && profile.status === "active" && (
+      {profile && testDayStatus(today, profile.testDate) === "passed" && profile.status === "active" && (
         <p className="text-sm text-muted-foreground">Your test date has passed. Pick a new test date to rebuild your plan.</p>
       )}
       <div className="rounded-xl border border-border bg-card p-5">
