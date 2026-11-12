@@ -5,6 +5,7 @@ import { connectDb } from "@/lib/db";
 import { AiError, type ChatOptions, chatCompletion, extractJson } from "@/lib/openrouter";
 import { IeltsSpeakingAttempt, IeltsSpeakingItem, type IeltsSpeakingQuestions } from "@/models";
 import { type AiResult, metered } from "@/progress/quizAi";
+import { KIND_PARTS } from "./timing";
 
 export type Kind = "mock" | "part1" | "part2" | "part3";
 type Id = Types.ObjectId;
@@ -111,6 +112,12 @@ export async function pickQuestions(
   }
   const incomplete = kind === "mock" && !((questions.part1?.frames?.length ?? 0) >= 3 && questions.part2 && questions.part3);
   return { questions, exhausted: incomplete || !pickable.every(fresh) };
+}
+
+/** True when `questions` lacks a part `kind` needs, so it can't start without AI-written questions. */
+export function missingParts(kind: Kind, questions: QuestionSet): boolean {
+  const filled = { p1: !!questions.part1?.frames.length, p2: !!questions.part2, p3: !!questions.part3?.questions.length };
+  return !KIND_PARTS[kind].every((p) => filled[p]);
 }
 
 // ---- learner AI fill ----

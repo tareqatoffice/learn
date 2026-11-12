@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { type HubOption, SpeakingHub } from "@/components/ielts/SpeakingHub";
 import { listAttempts } from "@/ielts/speaking/attempts";
-import { type Kind, pickQuestions } from "@/ielts/speaking/questions";
+import { type Kind, missingParts, pickQuestions } from "@/ielts/speaking/questions";
 import { getAiConfig } from "@/lib/aiSettings";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
@@ -32,7 +32,11 @@ export default async function IeltsSpeakingPage({ searchParams }: PageProps<"/ie
     listAttempts(user.userId, { limit: 10 }),
     Promise.all(OPTIONS.map((o) => pickQuestions(user.userId, o.kind))),
   ]);
-  const options: HubOption[] = OPTIONS.map((o, i) => ({ ...o, exhausted: picks[i].exhausted }));
+  const options: HubOption[] = OPTIONS.map((o, i) => ({
+    ...o,
+    exhausted: picks[i].exhausted,
+    missing: missingParts(o.kind, picks[i].questions),
+  }));
 
   return (
     <div className="mx-auto grid w-full max-w-3xl gap-4">

@@ -1,6 +1,6 @@
 import mongoose, { Types } from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { generateQuestions, pickQuestions } from "@/ielts/speaking/questions";
+import { generateQuestions, missingParts, pickQuestions } from "@/ielts/speaking/questions";
 import { connectDb } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
 import { AiUsage, IeltsSpeakingAttempt, IeltsSpeakingItem } from "@/models";
@@ -38,6 +38,19 @@ beforeEach(async () => {
 afterAll(() => mongoose.disconnect());
 
 describe("pickQuestions", () => {
+  it("missingParts is true when the bank can't fill a part the kind needs", async () => {
+    const missing = async (kind: "mock" | "part1") => missingParts(kind, (await pickQuestions(userId, kind)).questions);
+    expect(await missing("part1")).toBe(true);
+    await p1("About me", { aboutYou: true });
+    expect(await missing("part1")).toBe(false);
+    // A card whose only Part 3 set belongs to another card: no Part 3 for the mock.
+    await p2("Card");
+    await p3("Other card", { cardId: new Types.ObjectId() });
+    expect(await missing("mock")).toBe(true);
+    await p3("Unlinked");
+    expect(await missing("mock")).toBe(false);
+  });
+
   it("unused items first, then least recently used", async () => {
     const a = await p1("Alpha");
     const b = await p1("Beta");

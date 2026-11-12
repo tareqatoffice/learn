@@ -12,7 +12,8 @@ import type { AttemptSummary } from "@/ielts/speaking/attempts";
 import type { Kind } from "@/ielts/speaking/questions";
 import { cn } from "@/lib/utils";
 
-export type HubOption = { kind: Kind; title: string; blurb: string; exhausted: boolean };
+/** `missing`: the bank can't fill a part this needs, so only AI-written questions can start it. */
+export type HubOption = { kind: Kind; title: string; blurb: string; exhausted: boolean; missing: boolean };
 
 const DATE = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" });
 const NAME: Record<Kind, string> = { mock: "Full mock", part1: "Part 1 drill", part2: "Part 2 drill", part3: "Part 3 drill" };
@@ -21,7 +22,7 @@ function Option({ option, aiOn, storage, highlight }: { option: HubOption; aiOn:
   const router = useRouter();
   const [busy, setBusy] = useState<"start" | "generate" | null>(null);
   const [error, setError] = useState("");
-  const { kind, exhausted } = option;
+  const { kind, exhausted, missing } = option;
 
   async function begin(generate: boolean) {
     setBusy(generate ? "generate" : "start");
@@ -56,23 +57,35 @@ function Option({ option, aiOn, storage, highlight }: { option: HubOption; aiOn:
         </h3>
         <p className="text-sm text-muted-foreground">{option.blurb}</p>
       </div>
-      {exhausted && (
+      {missing ? (
         <p className="text-sm text-muted-foreground">
           {aiOn
-            ? "You've used every question we have for this. Generate new ones, or repeat earlier ones."
-            : "There are no new questions for this. You can repeat earlier ones."}
+            ? "There aren't enough questions in the bank for this yet. Generate new ones."
+            : "Not enough questions in the bank yet — ask your admin to add some"}
         </p>
+      ) : (
+        exhausted && (
+          <p className="text-sm text-muted-foreground">
+            {aiOn
+              ? "You've used every question we have for this. Generate new ones, or repeat earlier ones."
+              : "There are no new questions for this. You can repeat earlier ones."}
+          </p>
+        )
       )}
-      <div className="flex flex-wrap gap-2">
-        {exhausted && aiOn && (
-          <Button onClick={() => begin(true)} disabled={busy !== null || !storage}>
-            {busy === "generate" ? "Writing questions…" : "Generate new questions"}
-          </Button>
-        )}
-        <Button variant={exhausted && aiOn ? "outline" : "default"} onClick={() => begin(false)} disabled={busy !== null || !storage}>
-          {busy === "start" ? "Starting…" : exhausted ? "Repeat earlier questions" : "Start"}
-        </Button>
-      </div>
+      {(aiOn || !missing) && (
+        <div className="flex flex-wrap gap-2">
+          {(exhausted || missing) && aiOn && (
+            <Button onClick={() => begin(true)} disabled={busy !== null || !storage}>
+              {busy === "generate" ? "Writing questions…" : "Generate new questions"}
+            </Button>
+          )}
+          {!missing && (
+            <Button variant={exhausted && aiOn ? "outline" : "default"} onClick={() => begin(false)} disabled={busy !== null || !storage}>
+              {busy === "start" ? "Starting…" : exhausted ? "Repeat earlier questions" : "Start"}
+            </Button>
+          )}
+        </div>
+      )}
       {error && <Notice>{error}</Notice>}
     </li>
   );

@@ -198,7 +198,7 @@ describe("ielts speaking attempts", () => {
       const winnerKeys = [doc!.parts[0].media.key, doc!.parts[0].media.audioKey].filter(Boolean);
       const loserKeys = results[0].ok ? [`ielts/${u}/${id}/p1.mp4`, `ielts/${u}/${id}/p1.audio.m4a`] : [`ielts/${u}/${id}/p1.webm`];
       expect(r2.deleteObjects).toHaveBeenCalledWith(loserKeys);
-      for (const call of vi.mocked(r2.deleteObjects).mock.calls.slice(replacing ? 2 : 0)) {
+      for (const call of vi.mocked(r2.deleteObjects).mock.calls) {
         for (const k of winnerKeys) expect(call[0]).not.toContain(k);
       }
     });

@@ -37,7 +37,11 @@ const CRITERION_COLOR: Record<Criterion, string> = {
 };
 const CRITERION_SERIES: LineSeries<CriteriaPoint>[] = (Object.keys(CRITERION_LABEL) as Criterion[]).flatMap((c) => [
   { key: `self-${c}`, label: `${CRITERION_LABEL[c]} (you)`, color: CRITERION_COLOR[c], pick: (p: CriteriaPoint) => p.self[c] },
-  { key: `ai-${c}`, label: `${CRITERION_LABEL[c]} (AI estimate)`, color: CRITERION_COLOR[c], dash: "4 3", pick: (p: CriteriaPoint) => p.ai?.[c] },
+  {
+    key: `ai-${c}`,
+    // The AI hears no audio, so its pronunciation band comes from the transcript alone.
+    label: c === "pronunciation" ? `${CRITERION_LABEL[c]} (AI estimate, transcript only)` : `${CRITERION_LABEL[c]} (AI estimate)`,
+    color: CRITERION_COLOR[c], dash: "4 3", pick: (p: CriteriaPoint) => p.ai?.[c] },
 ]);
 
 const sum = (r: Record<string, number>) => Object.values(r).reduce((a, b) => a + b, 0);

@@ -108,6 +108,11 @@ Storage: IELTS recordings go to R2 under `ielts/<userId>/<attemptId>/<part>.<ext
 (and `<part>.audio.<ext>` for the audio track of a video take). The bucket CORS must
 allow the app origins, exactly as Speaking Practice already needs.
 
+Deleting: **Delete my IELTS data** on `/ielts/profile` removes the learner's IELTS
+profile, plans, band entries, study logs and attempts, and deletes the attempts' R2
+objects under `ielts/<userId>/`. Speaking Practice takes are not touched. If R2 can't
+delete the objects, nothing is removed and the page asks the learner to try again.
+
 Notes:
 
 - The examiner voice uses the browser `speechSynthesis`. Without it the app falls back
