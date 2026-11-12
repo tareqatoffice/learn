@@ -1,4 +1,4 @@
-# Learn
+# Learn 
 
 Next.js + MongoDB learning app (App Router, Tailwind, shadcn/ui, Auth.js, Vitest).
 
