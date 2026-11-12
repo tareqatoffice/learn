@@ -199,13 +199,16 @@ async function lostRace(userId: string, attemptId: string, part: Part, media: Me
   return current?.media.stored ? fail("This part is already saved.") : fail("This part was started again elsewhere. Try again.");
 }
 
-/** Sets `complete` once every part the kind needs is stored; a no-op otherwise. Atomic against concurrent confirms. */
+/**
+ * Sets `complete` once every part the kind needs is stored; a no-op otherwise. Atomic against concurrent confirms.
+ * Also matches `inProgress`, so a run left by a reload or navigation still completes when its last part is confirmed.
+ */
 async function promoteIfComplete(userId: string, attemptId: string, kind: Kind): Promise<boolean> {
   const res = await IeltsSpeakingAttempt.updateOne(
     {
       _id: attemptId,
       userId,
-      status: "incomplete",
+      status: { $in: ["inProgress", "incomplete"] },
       parts: { $all: KIND_PARTS[kind].map((part) => ({ $elemMatch: { part, "media.stored": true } })) },
     },
     { $set: { status: "complete" } },
@@ -317,6 +320,21 @@ export async function finishAttempt(
   // A part confirmed between our read and write would otherwise leave a full attempt marked incomplete.
   if (status === "incomplete" && (await promoteIfComplete(userId, attemptId, attempt.kind))) return ok({ status: "complete" as Status });
   return ok({ status });
+}
+
+/**
+ * Ends a run that was left in progress (a reload or navigation mid-run): complete when every part its kind
+ * needs is stored, otherwise incomplete. Returns the status now held, or null when the attempt isn't the user's.
+ * A finished attempt is left as it is.
+ */
+export async function settleAttempt(userId: string, attemptId: string): Promise<Status | null> {
+  const attempt = await ownAttempt(userId, attemptId);
+  if (!attempt) return null;
+  if (attempt.status !== "inProgress") return attempt.status;
+  if (await promoteIfComplete(userId, attemptId, attempt.kind)) return "complete";
+  const res = await IeltsSpeakingAttempt.updateOne({ _id: attemptId, userId, status: "inProgress" }, { $set: { status: "incomplete" } });
+  if (res.modifiedCount > 0) return "incomplete";
+  return (await ownAttempt(userId, attemptId))?.status ?? null;
 }
 
 type Plain<T> = T extends Types.ObjectId ? string : T extends (infer U)[] ? Plain<U>[] : T extends object ? { [K in keyof T]: Plain<T[K]> } : T;

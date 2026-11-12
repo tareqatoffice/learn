@@ -33,11 +33,14 @@ import {
   finishAttempt,
   getAttempt,
   listAttempts,
+  settleAttempt,
   startAttempt,
   startPart,
   transcribePart,
 } from "@/ielts/speaking/attempts";
 import { writeMockEntries } from "@/ielts/bandHistory";
+import { weekProgress } from "@/ielts/progress";
+import { saveSelfBands } from "@/ielts/speaking/score";
 import { TRANSCRIBE_LIMIT_MESSAGE } from "@/recording/transcribe";
 import { resetDb } from "../setup/mongo";
 
@@ -248,6 +251,41 @@ describe("ielts speaking attempts", () => {
     expect((await getAttempt(u, id))!.status).toBe("complete");
   });
 
+  it("a part confirmed on an attempt left in progress completes it", async () => {
+    const u = user();
+    const id = await start(u, "part2");
+    await store(u, id, "p2");
+    // confirmPart's own promote already ran; reset to the stuck state left by a reload mid-run.
+    await IeltsSpeakingAttempt.updateOne({ _id: id }, { $set: { status: "inProgress", "parts.0.media.stored": false } });
+    expect((await confirmPart(u, id, "p2", { durationSec: 20, markers: [] })).ok).toBe(true);
+    expect((await getAttempt(u, id))!.status).toBe("complete");
+  });
+
+  it("settleAttempt completes a fully stored attempt and counts it as a mock", async () => {
+    const u = user();
+    const id = await start(u);
+    await store(u, id, "p1");
+    await store(u, id, "p2");
+    await store(u, id, "p3");
+    await IeltsSpeakingAttempt.updateOne({ _id: id }, { $set: { status: "inProgress" } });
+    expect(await settleAttempt(u, id)).toBe("complete");
+    expect((await getAttempt(u, id))!.status).toBe("complete");
+
+    const week = { start: today, end: today, minutes: { listening: 0, reading: 0, writing: 0, speaking: 60 }, mocks: 1 };
+    expect((await weekProgress(u, { weeks: [week] }, 0, "UTC")).mocksDone).toBe(1);
+    expect((await saveSelfBands(u, id, { fluency: 6, lexical: 6, grammar: 6, pronunciation: 6 }, today)).ok).toBe(true);
+    expect(await IeltsBandEntry.countDocuments({ userId: u, source: "mockSelf" })).toBe(1);
+  });
+
+  it("settleAttempt marks an attempt with missing parts incomplete and leaves others alone", async () => {
+    const u = user();
+    const id = await start(u);
+    await store(u, id, "p1");
+    expect(await settleAttempt(u, id)).toBe("incomplete");
+    expect((await getAttempt(u, id))!.status).toBe("incomplete");
+    expect(await settleAttempt(user(), id)).toBeNull();
+  });
+
   it("confirmPart rejects missing object", async () => {
     const u = user();
     const id = await start(u);
@@ -370,7 +408,8 @@ describe("ielts speaking attempts", () => {
     expect((await listAttempts(u, { kind: "mock" })).map((a) => a.id)).toEqual([mock]);
     expect(await listAttempts(u, { limit: 1 })).toHaveLength(1);
     const [row] = await listAttempts(u, { kind: "part2" });
-    expect(row).toMatchObject({ id: drill, kind: "part2", status: "inProgress", parts: ["p2"], durationSec: 30 });
+    // Its only part is stored, so the confirm completed it.
+    expect(row).toMatchObject({ id: drill, kind: "part2", status: "complete", parts: ["p2"], durationSec: 30 });
   });
 
   it("deleteAttempt removes R2 objects and band entries", async () => {
