@@ -14,6 +14,7 @@ export const ADMIN_NAV: AdminSectionGroup[] = [
       { href: "/admin/graphs", label: "Graphs", description: "Topic graphs with prerequisites." },
       { href: "/admin/notes", label: "Note series", description: "Chaptered notes." },
       { href: "/admin/speaking", label: "Speaking lessons", description: "Shadowing audio, read-aloud passages and speaking prompts." },
+      { href: "/admin/ielts/speaking", label: "IELTS Speaking", description: "Part 1 topics, Part 2 cue cards and Part 3 discussions." },
       { href: "/admin/subjects", label: "Subjects", description: "Tags that link books, graphs and notes." },
     ],
   },
@@ -34,6 +35,9 @@ export const ADMIN_NAV: AdminSectionGroup[] = [
   },
   {
     label: "Settings",
-    links: [{ href: "/admin/ai", label: "AI coach", description: "OpenRouter key, models and limits for the quiz coach." }],
+    links: [
+      { href: "/admin/ai", label: "AI coach", description: "OpenRouter key, models and limits for the quiz coach." },
+      { href: "/admin/ielts/settings", label: "IELTS settings", description: "Hours-per-band guide, plan phases and suggestion thresholds." },
+    ],
   },
 ];

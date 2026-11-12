@@ -95,3 +95,25 @@ export async function grabFrames(
   }
   return frames;
 }
+
+const FRAME_COUNT = 5;
+
+/** Five evenly spaced stills of a recording, read from a same-origin blob copy so the canvas isn't tainted. */
+export async function framesOf(mediaUrl: string): Promise<string[]> {
+  const res = await fetch(mediaUrl);
+  if (!res.ok) throw new Error(`fetch ${res.status}`);
+  const url = URL.createObjectURL(await res.blob());
+  const video = document.createElement("video");
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "auto";
+  video.src = url;
+  try {
+    video.load();
+    return await grabFrames(video, FRAME_COUNT);
+  } finally {
+    video.removeAttribute("src");
+    video.load();
+    URL.revokeObjectURL(url);
+  }
+}

@@ -8,6 +8,14 @@ import {
   ApiToken,
   Graph,
   GraphNode,
+  IeltsBandEntry,
+  IeltsPlan,
+  IeltsPlanSuggestion,
+  IeltsProfile,
+  IeltsSettings,
+  IeltsSpeakingAttempt,
+  IeltsSpeakingItem,
+  IeltsStudyLog,
   NodeProgress,
   Note,
   NoteProgress,
@@ -39,6 +47,8 @@ export const CONTENT_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["notes", Note],
   ["speakinglessons", SpeakingLesson],
   ["speakingsettings", SpeakingSettings],
+  ["ieltsspeakingitems", IeltsSpeakingItem],
+  ["ieltssettings", IeltsSettings],
 ];
 
 const ejson = (value: unknown) => EJSON.stringify(value, { relaxed: false });
@@ -75,6 +85,12 @@ export const ALL_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["speakingtakes", SpeakingTake],
   ["speakingprofiles", SpeakingProfile],
   ["speakingdays", SpeakingDay],
+  ["ieltsprofiles", IeltsProfile],
+  ["ieltsplans", IeltsPlan],
+  ["ieltsplansuggestions", IeltsPlanSuggestion],
+  ["ieltsstudylogs", IeltsStudyLog],
+  ["ieltsbandentries", IeltsBandEntry],
+  ["ieltsspeakingattempts", IeltsSpeakingAttempt],
 ];
 
 const countsOf = async (collections: typeof ALL_COLLECTIONS) =>
