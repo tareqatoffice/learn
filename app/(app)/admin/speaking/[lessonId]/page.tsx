@@ -3,7 +3,7 @@ import { getLessonAdmin } from "@/admin/speaking";
 import { AdminCard, AdminPage } from "@/components/admin/layout";
 import { SpeakingLessonForm } from "@/components/admin/SpeakingLessonForm";
 import { connectDb } from "@/lib/db";
-import { storageConfigured } from "@/lib/r2";
+import { presignGet, storageConfigured } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";
 import { Subject } from "@/models";
 
@@ -29,10 +29,13 @@ export default async function AdminSpeakingLessonPage({ params }: { params: Prom
     name: s.name,
   }));
 
+  const storage = storageConfigured();
+  const audioPreviewUrl = lesson?.shadowAudioKey && storage ? await presignGet(lesson.shadowAudioKey) : lesson?.shadowAudioUrl || undefined;
+
   return (
     <AdminPage title={lesson?.title ?? "New lesson"} back={{ href: "/admin/speaking", label: "Speaking lessons" }} width="narrow">
       <AdminCard>
-        <SpeakingLessonForm lesson={lesson ?? undefined} subjects={subjects} storageReady={storageConfigured()} />
+        <SpeakingLessonForm lesson={lesson ?? undefined} subjects={subjects} storageReady={storage} audioPreviewUrl={audioPreviewUrl} />
       </AdminCard>
     </AdminPage>
   );

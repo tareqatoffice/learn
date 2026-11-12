@@ -17,6 +17,7 @@ const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/interview", label: "Interview" },
   { href: "/speaking", label: "Speaking" },
+  { href: "/ielts", label: "IELTS" },
   { href: "/graphs", label: "Graphs" },
   { href: "/notes", label: "Notes" },
 ];

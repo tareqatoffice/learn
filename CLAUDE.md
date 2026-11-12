@@ -35,6 +35,8 @@ Layering (logic lives outside `app/`):
 - `content/` — domain logic for content: `queries/` (read), `parse/` + `import/` (canonical markdown with `<!-- learn:… id=… -->` markers, zod schemas in `import/schema.ts`), `pull.ts`, `revisions.ts` (edit history), `visibility.ts` (draft/published), `cycles.ts` (prereq cycle check), `backup.ts`.
 - `admin/` — admin service/queries/token logic; `progress/` — per-user progress (questions, quiz, graph, notes, dashboard; `quizAi.ts` is the OpenRouter quiz coach: client + model catalogue in `lib/openrouter.ts`, admin-chosen key (encrypted via `lib/secrets.ts` with `AUTH_SECRET`; use `getAiConfig()` and never pass `apiKey` to a page), primary/backup models and daily limit in `lib/aiSettings.ts` (Admin → AI coach, env as defaults); off when no key is set); `graph/layout.ts` — pure tiered layout for the prereq graph view.
 - `speaking/` — speaking practice logic; media in R2 via `lib/r2.ts`, transcription via `lib/stt.ts`.
+- `recording/` — shared media, upload and transcription helpers (client code imports `@/recording/mediaCore`, which is mongoose-free).
+- `ielts/` — IELTS Prep: profile, plan, suggestions, bands, progress, history, and `speaking/` (attempts, questions, score, timing).
 - `app/(app)/**` — signed-in pages and Server Actions (`actions.ts` beside pages); `app/(app)/admin/**` admin-only UI; `app/api/content/*` token-authenticated content API (used by `scripts/content.ts`); `app/api/admin/export`.
 - `components/` — UI; `components/admin/` forms.
 

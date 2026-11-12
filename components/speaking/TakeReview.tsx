@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { deleteTakeAction, transcribeTakeAction } from "@/app/(app)/speaking/actions";
 import { firstError } from "@/admin/result";
+import { MediaPlayer } from "@/components/MediaPlayer";
 import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import type { TakeView } from "@/speaking/takes";
@@ -146,28 +147,14 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
     <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <div className="grid content-start gap-4">
         <section aria-label="Playback" className="grid gap-3 rounded-xl border border-border bg-card p-5">
-          {video ? (
-            <video
-              ref={(el) => {
-                player.current = el;
-              }}
-              src={urls.media}
-              controls
-              playsInline
-              preload="metadata"
-              className="aspect-video w-full rounded-lg bg-black"
-            />
-          ) : (
-            <audio
-              ref={(el) => {
-                player.current = el;
-              }}
-              src={urls.media}
-              controls
-              preload="metadata"
-              className="w-full"
-            />
-          )}
+          <MediaPlayer
+            src={urls.media}
+            video={video}
+            label="your take"
+            playerRef={(el) => {
+              player.current = el;
+            }}
+          />
           {take.task === "shadowing" && urls.source && (
             <ShadowPlayer sourceUrl={urls.source} takeUrl={urls.audio ?? urls.media} />
           )}

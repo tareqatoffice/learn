@@ -5,10 +5,11 @@ import { commitImportAction, previewImportAction, type ImportInput } from "@/app
 import { inputClass } from "@/components/admin/SaveBar";
 import { SubjectPicker } from "@/components/SubjectPicker";
 import { Button } from "@/components/ui/button";
+import { FileDropzone } from "@/components/ui/FileDropzone";
 import type { ImportReport } from "@/content/types";
 
 type Kind = "book" | "series" | "graph";
-type Files = { name: string; content: string }[];
+type Files = { name: string; size: number; content: string }[];
 
 /** Paste or upload content, preview the import, then commit exactly what was previewed. */
 export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string; name: string }[] }) {
@@ -93,19 +94,24 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
         <SubjectPicker options={subjectOptions} value={subjects} onChange={edit(setSubjects)} />
       </div>
 
-      <label className="grid gap-1 text-sm">
+      <div className="grid gap-1 text-sm">
         <span className="font-medium">Files</span>
-        <input
-          type="file"
-          className="w-full min-w-0 text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-muted file:px-3 file:py-1.5 file:text-sm file:text-foreground hover:file:bg-secondary pointer-coarse:file:py-2.5"
+        <FileDropzone
+          label="Files"
           multiple={kind === "series"}
           accept={kind === "graph" ? ".json,application/json" : ".md,text/markdown"}
-          onChange={async (e) =>
-            edit(setFiles)(await Promise.all([...(e.target.files ?? [])].map(async (f) => ({ name: f.name, content: await f.text() }))))
-          }
+          hint={kind === "graph" ? "A .json graph file" : kind === "series" ? "One .md file per chapter" : "A .md file"}
+          files={files.map((f) => ({ name: f.name, size: f.size }))}
+          onClear={() => edit(setFiles)([])}
+          onFiles={async (picked) => {
+            try {
+              edit(setFiles)(await Promise.all(picked.map(async (f) => ({ name: f.name, size: f.size, content: await f.text() }))));
+            } catch {
+              setError("Couldn't read that file. Choose it again.");
+            }
+          }}
         />
-        {files.length > 0 && <span className="text-muted-foreground">{files.map((f) => f.name).join(", ")}</span>}
-      </label>
+      </div>
       <label className="grid gap-1 text-sm">
         <span className="font-medium">…or paste</span>
         <textarea className={`${inputClass} font-mono`} rows={12} value={text} onChange={(e) => edit(setText)(e.target.value)} />
