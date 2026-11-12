@@ -18,7 +18,8 @@ vi.mock("@/lib/r2", () => ({
 
 import * as actions from "@/app/(app)/ielts/actions";
 import { connectDb } from "@/lib/db";
-import { IeltsBandEntry, IeltsPlanSuggestion, IeltsProfile, IeltsStudyLog } from "@/models";
+import * as r2 from "@/lib/r2";
+import { IeltsBandEntry, IeltsPlanSuggestion, IeltsProfile, IeltsSpeakingAttempt, IeltsStudyLog } from "@/models";
 import { getProfile, planHistory } from "@/ielts/profile";
 import { addDays, localDate } from "@/speaking/schedule";
 import { resetDb } from "../setup/mongo";
@@ -99,6 +100,27 @@ describe("ielts actions", () => {
     expect((await actions.deleteAllIeltsDataAction()).ok).toBe(true);
     expect(await getProfile(me)).toBeNull();
     expect(await IeltsProfile.countDocuments({ userId: other })).toBe(1);
+  });
+
+  it("says the delete failed and keeps the data when R2 can't remove the recordings", async () => {
+    const me = id();
+    session.userId = me;
+    await actions.saveProfileAction(profile());
+    await IeltsSpeakingAttempt.create({
+      userId: me,
+      date: today,
+      kind: "part2",
+      status: "complete",
+      parts: [{ part: "p2", media: { kind: "audio", key: `ielts/${me}/a/p2.webm`, mime: "audio/webm", durationSec: 10, capSec: 150, stored: true } }],
+    });
+    vi.mocked(r2.deleteObjects).mockRejectedValueOnce(new Error("R2 down"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(await actions.deleteAllIeltsDataAction()).toEqual({ ok: false, errors: { _: "Couldn't delete your recordings. Try again." } });
+    } finally {
+      error.mockRestore();
+    }
+    expect(await getProfile(me)).not.toBeNull();
   });
 
   it("lists plan versions newest first", async () => {

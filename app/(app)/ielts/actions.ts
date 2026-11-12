@@ -1,6 +1,6 @@
 "use server";
 
-import { type ActionResult, ok } from "@/admin/result";
+import { type ActionResult, fail, ok } from "@/admin/result";
 import { deleteAllIeltsData } from "@/ielts/data";
 import { deleteBandEntry, saveCalculatorResult, type CalculatorInput } from "@/ielts/bandHistory";
 import type { Skill } from "@/ielts/bands";
@@ -67,6 +67,12 @@ export async function deleteBandEntryAction(id: string): Promise<ActionResult> {
 
 /** The client asks for confirmation before calling this. */
 export async function deleteAllIeltsDataAction(): Promise<ActionResult> {
-  await deleteAllIeltsData(await session());
+  const userId = await session();
+  try {
+    await deleteAllIeltsData(userId);
+  } catch (error) {
+    console.error(`Couldn't delete the IELTS data of ${userId}`, error);
+    return fail("Couldn't delete your recordings. Try again.");
+  }
   return ok();
 }
