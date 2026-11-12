@@ -1,9 +1,16 @@
 import mongoose from "mongoose";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+const session = vi.hoisted(() => ({ userId: null as string | null }));
+vi.mock("@/auth", () => ({
+  auth: () =>
+    Promise.resolve(session.userId ? { user: { id: session.userId, email: "learner@example.test", name: "Learner" } } : null),
+}));
+
+import { setNodeStatusAction } from "@/app/(app)/graphs/actions";
 import { ForbiddenError } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 import { GraphNode, NodeProgress } from "@/models";
-import { getGraphProgress, setNodeStatus } from "@/progress/graph";
+import { getGraphProgress, PrereqNotDoneError, setNodeStatus } from "@/progress/graph";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedGraph, seedNode } from "./seed";
 
@@ -84,6 +91,67 @@ describe("graph progress", () => {
     );
     await expect(setNodeStatus(user, "not-an-id", "learning")).rejects.toBeInstanceOf(ForbiddenError);
     expect(await NodeProgress.countDocuments()).toBe(0);
+  });
+
+  it("blocks learning/done until every visible prerequisite is done", async () => {
+    const user = newUserId();
+    const graphId = await seedGraph("g");
+    const a = await seedNode(graphId, "a");
+    const hidden = await seedNode(graphId, "hidden", { status: "draft" });
+    const b = await seedNode(graphId, "b", { prereqIds: [a, hidden] });
+
+    await expect(setNodeStatus(user, b, "done")).rejects.toBeInstanceOf(PrereqNotDoneError);
+    await expect(setNodeStatus(user, b, "learning")).rejects.toBeInstanceOf(PrereqNotDoneError);
+    await setNodeStatus(user, a, "learning");
+    await expect(setNodeStatus(user, b, "done")).rejects.toBeInstanceOf(PrereqNotDoneError);
+    expect(await NodeProgress.countDocuments({ userId: user, nodeId: b })).toBe(0);
+
+    await setNodeStatus(user, a, "done");
+    await setNodeStatus(user, b, "done");
+    expect(await NodeProgress.countDocuments({ userId: user, nodeId: b, status: "done" })).toBe(1);
+    // Clearing is always allowed.
+    await setNodeStatus(user, a, "none");
+    await setNodeStatus(user, b, "none");
+  });
+
+  it("taking a done topic back clears the progress of its dependents only", async () => {
+    const user = newUserId();
+    const graphId = await seedGraph("g");
+    const a = await seedNode(graphId, "a");
+    const b = await seedNode(graphId, "b", { prereqIds: [a] });
+    const c = await seedNode(graphId, "c", { prereqIds: [b] });
+    const other = await seedNode(graphId, "other");
+    for (const id of [a, b, other]) await setNodeStatus(user, id, "done");
+    await setNodeStatus(user, c, "learning");
+
+    await setNodeStatus(user, a, "learning");
+    expect(await getGraphProgress(user, graphId)).toEqual({ [a]: "learning", [other]: "done" });
+
+    // Not touching a done topic's own state leaves dependents alone.
+    await setNodeStatus(user, a, "done");
+    await setNodeStatus(user, b, "done");
+    await setNodeStatus(user, a, "done");
+    expect(await getGraphProgress(user, graphId)).toEqual({ [a]: "done", [b]: "done", [other]: "done" });
+  });
+
+  it("ignores a prerequisite that belongs to another graph", async () => {
+    const user = newUserId();
+    const elsewhere = await seedNode(await seedGraph("g2"), "x");
+    const b = await seedNode(await seedGraph("g"), "b", { prereqIds: [elsewhere] });
+    await setNodeStatus(user, b, "done");
+    expect(await NodeProgress.countDocuments({ userId: user, nodeId: b })).toBe(1);
+  });
+
+  it("the action returns the refusal instead of throwing", async () => {
+    const user = newUserId();
+    session.userId = user;
+    const graphId = await seedGraph("g");
+    const a = await seedNode(graphId, "a");
+    const b = await seedNode(graphId, "b", { prereqIds: [a] });
+
+    expect(await setNodeStatusAction(b, "done")).toEqual({ error: "Finish first: a title" });
+    expect(await setNodeStatusAction(a, "done")).toEqual({});
+    expect(await setNodeStatusAction(b, "done")).toEqual({});
   });
 
   it("getGraphProgress maps visible nodes of the graph to their status, per user", async () => {
