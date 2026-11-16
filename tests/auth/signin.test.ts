@@ -108,6 +108,22 @@ describe("sign-in", () => {
       resetEnvCache();
       expect(ids()).toEqual(["google"]);
     });
+
+    it("has no dev login when MONGODB_URI points at a remote database (S6)", () => {
+      const saved = process.env.MONGODB_URI;
+      try {
+        vi.stubEnv("NODE_ENV", "development");
+        process.env.AUTH_DEV_LOGIN = "true";
+        for (const uri of ["mongodb+srv://u:p@cluster0.example.net/learn", "mongodb://db.example.net:27017/learn"]) {
+          process.env.MONGODB_URI = uri;
+          resetEnvCache();
+          expect(ids()).toEqual(["google"]);
+        }
+      } finally {
+        process.env.MONGODB_URI = saved;
+        resetEnvCache();
+      }
+    });
   });
 
   describe("isSignInAllowed", () => {

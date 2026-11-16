@@ -5,6 +5,7 @@ import { z } from "zod";
 import { connectDb, retryOnDuplicateKey } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { isAdminEmail } from "@/lib/authz";
+import { isLocalMongoUri } from "@/lib/mongoUri";
 import { User } from "@/models";
 
 type Provider = NonNullable<NextAuthConfig["providers"]>[number];
@@ -66,8 +67,9 @@ export function getProviders(): Provider[] {
   const providers: Provider[] = [
     Google({ clientId: env.AUTH_GOOGLE_ID, clientSecret: env.AUTH_GOOGLE_SECRET }),
   ];
-  // Local testing only: never available in production builds.
-  if (process.env.NODE_ENV === "development" && env.AUTH_DEV_LOGIN) {
+  // Local testing only: never in production builds, and never against a remote database, where a
+  // dev login with a real email would overwrite that user's googleId and name.
+  if (process.env.NODE_ENV === "development" && env.AUTH_DEV_LOGIN && isLocalMongoUri(env.MONGODB_URI)) {
     providers.push(
       Credentials({
         id: "credentials",
