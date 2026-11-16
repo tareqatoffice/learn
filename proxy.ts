@@ -2,6 +2,22 @@ import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server
 import { auth } from "@/auth";
 import { ACCESS_MESSAGES, accessStatusFor } from "@/lib/access";
 import { ACCESS_PATH, isPublicPath, routeAccess } from "@/lib/authz";
+import { buildCsp, newNonce } from "@/lib/csp";
+
+/**
+ * Lets the request through with a per-request CSP nonce: Next reads it from the request's CSP header
+ * and puts it on its own scripts; the root layout reads `x-nonce` for the inline theme script.
+ */
+function nextWithCsp(req: NextRequest): NextResponse {
+  const nonce = newNonce();
+  const csp = buildCsp({ nonce, dev: process.env.NODE_ENV === "development" });
+  const headers = new Headers(req.headers);
+  headers.set("x-nonce", nonce);
+  headers.set("Content-Security-Policy", csp);
+  const res = NextResponse.next({ request: { headers } });
+  res.headers.set("Content-Security-Policy", csp);
+  return res;
+}
 
 // NextAuth is configured lazily (see auth.ts), so `auth(callback)` resolves to the
 // request handler asynchronously and cannot be used directly as the export.
@@ -14,7 +30,7 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
     const status =
       email && !isPublicPath(pathname) ? await accessStatusFor({ userId: user?.id, email }) : null;
     const access = routeAccess(pathname, email ? { email, status } : null);
-    if (access === "allow") return NextResponse.next();
+    if (access === "allow") return nextWithCsp(req);
 
     const isApi = pathname.startsWith("/api/");
     if (access === "pending" || access === "blocked") {

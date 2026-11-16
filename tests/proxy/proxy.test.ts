@@ -43,6 +43,18 @@ describe("proxy", () => {
     resetEnvCache();
   });
 
+  it("puts a per-request nonce CSP on allowed responses and on the request Next renders (S2)", async () => {
+    signIn();
+    statusMock.mockResolvedValue("approved");
+    const a = await run("/dashboard");
+    const b = await run("/dashboard");
+    const csp = a.headers.get("content-security-policy") ?? "";
+    expect(csp).toMatch(/script-src 'self' 'nonce-[^']+'/);
+    expect(csp).not.toBe(b.headers.get("content-security-policy"));
+    expect(a.headers.get("x-middleware-request-content-security-policy")).toBe(csp);
+    expect(a.headers.get("x-middleware-request-x-nonce")).toBeTruthy();
+  });
+
   it.each(["pending", "blocked"] as const)("answers a %s user's API call with 403 and the reason", async (status) => {
     signIn();
     statusMock.mockResolvedValue(status);

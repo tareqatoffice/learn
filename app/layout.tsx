@@ -7,6 +7,7 @@ import {
 import NextTopLoader from "nextjs-toploader";
 import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 import "./globals.css";
+import { headers } from "next/headers";
 
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex",
@@ -42,7 +43,9 @@ export const metadata: Metadata = {
 // Runs before first paint so a saved choice never flashes the wrong theme. Reads the key ThemeToggle writes.
 const themeScript = `try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Set by proxy.ts with the page's CSP; absent on paths the proxy skips, which render no page.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html
       lang="en"
@@ -50,7 +53,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${plexSans.variable} ${notoBengali.variable} ${plexMono.variable} h-full antialiased`}
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* Browsers hide a nonce from the DOM after load, so the client never sees the server's value. */}
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-full flex flex-col">
         <NextTopLoader
