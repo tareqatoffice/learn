@@ -16,6 +16,11 @@ const MAX_LABEL = 60;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 const isId = (id: string) => typeof id === "string" && Types.ObjectId.isValid(id);
+/** Takes started but not yet confirmed. Older ones count as abandoned and are swept, so they never block. */
+export const MAX_OPEN_TAKES = 3;
+export const OPEN_TAKE_MS = 60 * 60 * 1000;
+/** Takes started in any rolling 24 hours, stored or not: bounds what one account can upload. */
+export const MAX_TAKES_PER_DAY = 40;
 
 export type StartTakeInput = {
   task: TaskKey;
@@ -25,7 +30,6 @@ export type StartTakeInput = {
   kind: "audio" | "video";
   mime: string;
   audioMime?: string;
-  clipSec?: number;
   /** Byte size of the recorded blob; it is signed into the upload URL, so only that size uploads. */
   size: number;
   /** Byte size of the audio-only blob (video takes). */
@@ -51,8 +55,23 @@ export async function startTake(
     }
   }
 
-  const clipSec = typeof input.clipSec === "number" && Number.isFinite(input.clipSec) ? input.clipSec : undefined;
-  const capSec = takeCapSec(input.task, clipSec);
+  await connectDb();
+  const [open, recent] = await Promise.all([
+    SpeakingTake.countDocuments({ userId, "media.stored": false, createdAt: { $gte: new Date(Date.now() - OPEN_TAKE_MS) } }),
+    SpeakingTake.countDocuments({ userId, createdAt: { $gte: new Date(Date.now() - 86_400_000) } }),
+  ]);
+  if (open >= MAX_OPEN_TAKES) return fail("You have recordings that haven't finished uploading. Wait a moment, or reload the page, then try again.");
+  if (recent >= MAX_TAKES_PER_DAY) return fail(`You've made ${MAX_TAKES_PER_DAY} recordings in the last day, the most allowed. Try again tomorrow.`);
+
+  // The take keeps a copy of its material, so a lesson unpublished or deleted mid-session (or a bad
+  // id) only drops the link; the recording still saves. The shadowing clip length, which sets the
+  // cap, comes from the lesson rather than the browser.
+  const lesson =
+    input.lessonId && isId(input.lessonId)
+      ? await SpeakingLesson.findOne({ _id: input.lessonId, status: "published" }).select("shadow.durationSec").lean<{ _id: Types.ObjectId; shadow?: { durationSec?: number } }>()
+      : null;
+  const lessonId = lesson ? lesson._id : null;
+  const capSec = takeCapSec(input.task, input.task === "shadowing" ? lesson?.shadow?.durationSec : undefined);
 
   // The take id is minted before its document so the upload keys can include it; the document is
   // only written once the recording itself passes validation.
@@ -69,14 +88,6 @@ export async function startTake(
   });
   if (!upload.ok) return upload;
   const { media, uploadUrl, audioUploadUrl, maxBytes } = upload;
-
-  await connectDb();
-  // The take keeps a copy of its material, so a lesson unpublished or deleted mid-session (or a bad
-  // id) only drops the link; the recording still saves.
-  let lessonId: Types.ObjectId | null = null;
-  if (input.lessonId && isId(input.lessonId) && (await SpeakingLesson.exists({ _id: input.lessonId, status: "published" }))) {
-    lessonId = new Types.ObjectId(input.lessonId);
-  }
 
   await SpeakingTake.create({
     _id,

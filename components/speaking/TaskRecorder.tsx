@@ -172,7 +172,6 @@ export function TaskRecorder({
             kind: result.mime.startsWith("video/") ? "video" : "audio",
             mime: result.mime,
             audioMime: result.audioMime,
-            clipSec,
             // Signed into the upload URLs; the server refuses a take over its byte limit here.
             size: result.blob.size,
             audioSize: result.audioBlob?.size,
@@ -226,7 +225,7 @@ export function TaskRecorder({
         fail(e instanceof UploadError ? e.message : "Couldn't save the recording. Check your connection and try again.");
       }
     },
-    [task, lessonId, material, clipSec, router],
+    [task, lessonId, material, router],
   );
 
   useEffect(() => {

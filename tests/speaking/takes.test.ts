@@ -12,7 +12,7 @@ vi.mock("@/lib/stt", () => ({ sttConfigured: vi.fn(() => true) }));
 
 import { connectDb } from "@/lib/db";
 import { SpeakingLesson, SpeakingTake } from "@/models";
-import { deleteAllTakes, deleteTake, confirmTake, getTake, listTakes, saveSelfRating, startTake } from "@/speaking/takes";
+import { MAX_OPEN_TAKES, MAX_TAKES_PER_DAY, OPEN_TAKE_MS, deleteAllTakes, deleteTake, confirmTake, getTake, listTakes, saveSelfRating, startTake } from "@/speaking/takes";
 import * as r2 from "@/lib/r2";
 import * as stt from "@/lib/stt";
 import { resetDb } from "../setup/mongo";
@@ -112,10 +112,38 @@ describe("speaking takes", () => {
     expect((await startTake("bad", base)).ok).toBe(false);
   });
 
-  it("startTake caps shadowing at twice the clip length", async () => {
-    const res = await start(user(), { task: "shadowing", clipSec: 90 });
+  it("startTake caps shadowing at twice the lesson's clip length, ignoring a client clipSec (S3)", async () => {
+    const lesson = await SpeakingLesson.create({ title: "L", order: 1, status: "published", shadow: { durationSec: 90 } });
+    const res = await start(user(), { task: "shadowing", lessonId: String(lesson._id), clipSec: 900 });
     expect(res.capSec).toBe(180);
     expect(res.maxBytes).toBe(1_440_000);
+    const noLesson = await start(user(), { task: "shadowing", clipSec: 900 });
+    expect(noLesson.capSec).toBe(600);
+  });
+
+  it("startTake refuses a fourth unconfirmed take, but not once older ones count as abandoned (S3)", async () => {
+    const u = user();
+    for (let i = 0; i < MAX_OPEN_TAKES; i++) await start(u);
+    const refused = await startTake(u, base);
+    expect(refused.ok).toBe(false);
+    await SpeakingTake.collection.updateMany({}, { $set: { createdAt: new Date(Date.now() - OPEN_TAKE_MS - 1000) } });
+    expect((await startTake(u, base)).ok).toBe(true);
+    expect((await startTake(user(), base)).ok).toBe(true); // another user is unaffected
+  });
+
+  it("startTake refuses past the daily limit (S3)", async () => {
+    const u = user();
+    const day = Array.from({ length: MAX_TAKES_PER_DAY }, () => ({
+      userId: new Types.ObjectId(u),
+      date: base.date,
+      task: "readAloud",
+      media: { kind: "audio", key: "k", mime: "audio/webm", stored: true, capSec: 600 },
+      createdAt: new Date(Date.now() - 60_000),
+    }));
+    await SpeakingTake.collection.insertMany(day);
+    const refused = await startTake(u, base);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.errors._).toMatch(/last day/);
   });
 
   it("confirmTake rejects missing object", async () => {
