@@ -376,6 +376,7 @@ export function GraphView({ data }: { data: GraphData }) {
             </div>
           </div>
           <div ref={canvasRef} className="overflow-auto">
+            {nodes.length === 0 && <p className="p-5 text-sm text-muted-foreground">This graph has no published topics yet.</p>}
             <svg
               width={Math.round(layout.width * zoom)}
               height={Math.round(layout.height * zoom)}

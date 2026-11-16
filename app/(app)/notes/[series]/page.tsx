@@ -55,7 +55,10 @@ export default async function SeriesPage({
         <h2 id="chapters" className="text-lg font-semibold">
           Chapters
         </h2>
-        <ol className="mt-3 divide-y divide-border">
+        {view.chapters.length === 0 && (
+          <p className="mt-3 text-sm text-muted-foreground">No chapters are published in this series yet.</p>
+        )}
+        <ol className="mt-3 divide-y divide-border empty:hidden">
           {view.chapters.map((c) => (
             <li
               key={c.slug}
