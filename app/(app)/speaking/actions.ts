@@ -10,6 +10,9 @@ import { localDate } from "@/speaking/schedule";
 import { saveProfile, setBodyConsent } from "@/speaking/settings";
 import { type StartTakeInput, confirmTake, deleteAllTakes, deleteTake, getTake, saveSelfRating, startTake } from "@/speaking/takes";
 import { readTimeZone } from "@/speaking/timezone";
+import { framesInput, objectIdInput, selfRatingInput, shape, takeInput } from "@/lib/actionInput";
+
+const BAD_REQUEST = "That request isn't valid. Reload the page and try again.";
 import { transcribeTake } from "@/speaking/transcribe";
 
 // Every action signs in first and acts as the session user; ids in the input never pick the user.
@@ -22,14 +25,18 @@ async function session(): Promise<string> {
 
 export async function startTakeAction(input: StartTakeInput) {
   const userId = await session();
-  const { task, lessonId, material, kind, mime, audioMime, size, audioSize } = input ?? ({} as StartTakeInput);
+  const valid = shape(takeInput, input);
+  if (!valid) return fail(BAD_REQUEST);
+  const { task, lessonId, material, kind, mime, audioMime, size, audioSize } = valid as unknown as StartTakeInput;
   // The take's day is the learner's local today, worked out here rather than taken from the browser.
   const date = localDate(new Date(), await readTimeZone());
   return startTake(userId, { task, date, lessonId: lessonId ?? null, material, kind, mime, audioMime, size, audioSize });
 }
 
 export async function confirmTakeAction(takeId: string, durationSec: number): Promise<ActionResult> {
-  return confirmTake(await session(), takeId, durationSec);
+  const userId = await session();
+  if (!shape(objectIdInput, takeId) || typeof durationSec !== "number") return fail(BAD_REQUEST);
+  return confirmTake(userId, takeId, durationSec);
 }
 
 export async function transcribeTakeAction(takeId: string): Promise<ActionResult<{ transcript: string }>> {
@@ -40,7 +47,10 @@ export async function saveSelfRatingAction(
   takeId: string,
   input: Parameters<typeof saveSelfRating>[2],
 ): Promise<ActionResult> {
-  return saveSelfRating(await session(), takeId, input);
+  const userId = await session();
+  const valid = shape(selfRatingInput, input);
+  if (!valid || !shape(objectIdInput, takeId)) return fail(BAD_REQUEST);
+  return saveSelfRating(userId, takeId, valid as Parameters<typeof saveSelfRating>[2]);
 }
 
 export async function speechFeedbackAction(takeId: string): Promise<AiResult<SpeechFeedback>> {
@@ -48,7 +58,9 @@ export async function speechFeedbackAction(takeId: string): Promise<AiResult<Spe
 }
 
 export async function bodyFeedbackAction(takeId: string, frames: string[]): Promise<AiResult<BodyFeedback>> {
-  return bodyFeedback(await session(), takeId, frames);
+  const userId = await session();
+  if (!shape(framesInput, frames)) return { ok: false, error: BAD_REQUEST };
+  return bodyFeedback(userId, takeId, frames);
 }
 
 export async function generateMaterialAction(

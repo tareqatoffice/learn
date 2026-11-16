@@ -110,6 +110,14 @@ describe("speaking actions", () => {
     expect(take?.transcriptStatus).toBe("unavailable");
   });
 
+  it("refuses inputs of the wrong shape before they reach the take logic (S13)", async () => {
+    session.userId = id();
+    expect((await actions.startTakeAction({ ...input, size: "huge" } as never)).ok).toBe(false);
+    expect((await actions.saveSelfRatingAction(id(), { fluency: "3", confidence: 3 } as never)).ok).toBe(false);
+    expect((await actions.bodyFeedbackAction(id(), Array.from({ length: 20 }, () => "x"))).ok).toBe(false);
+    expect(await SpeakingTake.countDocuments()).toBe(0);
+  });
+
   it("surfaces startTake's messages", async () => {
     session.userId = id();
     const res = await actions.startTakeAction({ ...input, task: "nope" as never });

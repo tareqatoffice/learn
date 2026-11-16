@@ -58,6 +58,8 @@ type AttemptDoc = {
 
 const isId = (id: unknown): id is string => typeof id === "string" && Types.ObjectId.isValid(id);
 const NOT_FOUND = "That attempt doesn't exist.";
+/** A real task position, not any key an action caller sends (e.g. "constructor"). */
+const isIndex = (index: unknown, a: AttemptDoc): index is number => Number.isInteger(index) && (index as number) >= 0 && (index as number) < a.tasks.length;
 const RECENT = 30;
 const TASKS_OF: Record<WritingKind, WritingTask[]> = { task1: ["task1"], task2: ["task2"], full: ["task1", "task2"] };
 
@@ -96,7 +98,7 @@ export async function startWritingAttempt(
   now: Date = new Date(),
 ): Promise<ActionResult<{ attemptId: string }>> {
   const kind = input?.kind;
-  if (!isId(userId) || !TASKS_OF[kind]) return failForm("Choose Task 1, Task 2 or a full test.");
+  if (!isId(userId) || typeof kind !== "string" || !Object.hasOwn(TASKS_OF, kind)) return failForm("Choose Task 1, Task 2 or a full test.");
   await connectDb();
   const recent = await IeltsWritingAttempt.find({ userId }).sort({ createdAt: -1 }).limit(RECENT).select("tasks.promptId").lean<{ tasks: { promptId?: Types.ObjectId }[] }[]>();
   const seen = new Set(recent.flatMap((r) => r.tasks.map((t) => String(t.promptId))));
@@ -125,7 +127,7 @@ export async function saveWritingText(
   now: Date = new Date(),
 ): Promise<ActionResult> {
   const a = await own(userId, attemptId);
-  if (!a || a.status !== "in_progress" || !a.tasks[index]) return failForm("This attempt was already submitted or doesn't exist.");
+  if (!a || a.status !== "in_progress" || !isIndex(index, a) ) return failForm("This attempt was already submitted or doesn't exist.");
   if (typeof text !== "string" || text.length > MAX_TEXT_CHARS) return failForm(`The text is limited to ${MAX_TEXT_CHARS} characters.`);
   // A task can't have taken longer than the attempt has been open.
   const open = Math.max(0, Math.round((now.getTime() - new Date(a.startedAt).getTime()) / 1000));
@@ -152,7 +154,7 @@ export async function submitWriting(userId: string, attemptId: string, now: Date
 
 export async function saveWritingSelf(userId: string, attemptId: string, index: number, input: SelfInput): Promise<ActionResult<{ band: number }>> {
   const a = await own(userId, attemptId);
-  if (!a || !a.tasks[index]) return failForm(NOT_FOUND);
+  if (!a || !isIndex(index, a)) return failForm(NOT_FOUND);
   if (a.status !== "submitted") return failForm("Submit your writing before rating it.");
   const errors: FieldErrors = {};
   const self: Record<string, unknown> = {};
@@ -253,7 +255,7 @@ export function parseWritingEstimate(reply: string): WritingAi | null {
 
 export async function writingAiEstimate(userId: string, attemptId: string, index: number, deps: Deps = {}): Promise<AiResult<WritingAi>> {
   const a = await own(userId, attemptId);
-  if (!a || !a.tasks[index]) return fail(NOT_FOUND);
+  if (!a || !isIndex(index, a)) return fail(NOT_FOUND);
   if (a.status !== "submitted") return fail("Submit your writing before asking for an estimate.");
   const t = a.tasks[index];
   if (!selfComplete(t)) return fail(NEED_SELF_RATING);

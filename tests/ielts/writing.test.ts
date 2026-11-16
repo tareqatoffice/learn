@@ -75,6 +75,16 @@ describe("writing attempts", () => {
   });
   afterAll(() => mongoose.disconnect());
 
+  it("refuses a kind or task index that is only an object key (S13)", async () => {
+    await prompts();
+    const u = user();
+    expect((await startWritingAttempt(u, { kind: "constructor" as never, date: TODAY })).ok).toBe(false);
+    const started = await startWritingAttempt(u, { kind: "task2", date: TODAY });
+    if (!started.ok) throw new Error("start");
+    expect((await saveWritingText(u, started.attemptId, "constructor" as never, "text", 1)).ok).toBe(false);
+    expect((await saveWritingText(u, started.attemptId, 1, "text", 1)).ok).toBe(false);
+  });
+
   it("fails to start when no prompt is published", async () => {
     const res = await startWritingAttempt(user(), { kind: "task2", date: TODAY });
     expect(res.ok).toBe(false);
