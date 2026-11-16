@@ -49,14 +49,15 @@ export type TokenRow = {
   createdAt: Date;
   scope: TokenScope;
   expiresAt?: Date;
+  expired: boolean;
   lastUsedAt?: Date;
   revokedAt?: Date;
 };
 
-export async function listTokens(): Promise<TokenRow[]> {
+export async function listTokens(now: Date = new Date()): Promise<TokenRow[]> {
   const rows = await ApiToken.find({}, { tokenHash: 0 })
     .sort({ createdAt: -1 })
-    .lean<(Omit<TokenRow, "id" | "createdBy" | "scope"> & { _id: Types.ObjectId; createdBy: Types.ObjectId; scope?: TokenScope })[]>();
+    .lean<(Omit<TokenRow, "id" | "createdBy" | "scope" | "expired"> & { _id: Types.ObjectId; createdBy: Types.ObjectId; scope?: TokenScope })[]>();
   return rows.map((r) => ({
     id: String(r._id),
     name: r.name,
@@ -64,6 +65,7 @@ export async function listTokens(): Promise<TokenRow[]> {
     createdAt: r.createdAt,
     scope: r.scope ?? "write",
     expiresAt: r.expiresAt,
+    expired: Boolean(r.expiresAt && r.expiresAt.getTime() <= now.getTime()),
     lastUsedAt: r.lastUsedAt,
     revokedAt: r.revokedAt,
   }));

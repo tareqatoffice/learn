@@ -32,7 +32,7 @@ export default async function TokensPage() {
           createdAt: formatDateTime(t.createdAt),
           scope: t.scope,
           expiresAt: t.expiresAt ? formatDateTime(t.expiresAt) : undefined,
-          expired: Boolean(t.expiresAt && t.expiresAt.getTime() <= Date.now()),
+          expired: t.expired,
           lastUsedAt: t.lastUsedAt ? formatDateTime(t.lastUsedAt) : undefined,
           revokedAt: t.revokedAt ? formatDateTime(t.revokedAt) : undefined,
         }))}
