@@ -177,7 +177,7 @@ export function IeltsTestForm({ kind, test }: { kind: TestKind; test?: AdminTest
         <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded bg-muted p-3 text-xs">{SYNTAX}</pre>
       </details>
 
-      <SaveBar label={id ? "Save test" : "Create test"} pending={pending} saved={saved} errors={{}}>
+      <SaveBar label={id ? "Save test" : "Create test"} pending={pending} saved={saved} errors={errors}>
         {id && (
           <Button
             type="button"
@@ -195,7 +195,6 @@ export function IeltsTestForm({ kind, test }: { kind: TestKind; test?: AdminTest
           </Button>
         )}
       </SaveBar>
-      <ActionStatus saved={false} errors={errors._ ? { _: errors._ } : {}} />
       <ActionStatus saved={false} errors={del.errors} />
     </form>
   );

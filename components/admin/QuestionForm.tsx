@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { ActionStatus } from "@/components/admin/SaveBar";
+import { useAdminAction } from "@/components/admin/useAdminAction";
 import { saveQuestionAction, searchTopicsAction, setQuestionTopicLinkAction } from "@/app/(app)/admin/books/actions";
 import type { AdminQuestion } from "@/admin/queries";
 import { Field, StatusField, SubjectsField, TextField } from "@/components/admin/fields";
@@ -22,7 +24,7 @@ export function QuestionForm({
   subjects: { slug: string; name: string }[];
   topics?: Topic[];
 }) {
-  const { draft, set, errors, setErrors, saved, pending, submit } = useSaveForm(
+  const { draft, set, errors, saved, pending, submit } = useSaveForm(
     question,
     (d) => saveQuestionAction(withoutEmptyId(d)),
     (id) => `/admin/books/${question.bookId}/questions/${id}`,
@@ -34,11 +36,12 @@ export function QuestionForm({
 
   const searchTopics = () => startTransition(async () => setResults(await searchTopicsAction(search, draft.subjects)));
 
+  // Links save on their own (not with the form), through the shared admin action flow.
+  const linking = useAdminAction();
   function link(topic: Topic, linked: boolean) {
-    startTransition(async () => {
-      const result = await setQuestionTopicLinkAction(draft.id, topic.id, linked);
-      if (!result.ok) return setErrors(result.errors);
-      setTopics((t) => (linked ? [...t.filter((x) => x.id !== topic.id), topic] : t.filter((x) => x.id !== topic.id)));
+    linking.run(() => setQuestionTopicLinkAction(draft.id, topic.id, linked), {
+      refresh: false,
+      onSuccess: () => setTopics((t) => (linked ? [...t.filter((x) => x.id !== topic.id), topic] : t.filter((x) => x.id !== topic.id))),
     });
   }
 
@@ -101,6 +104,7 @@ export function QuestionForm({
               Search
             </Button>
           </div>
+          <ActionStatus saved={false} errors={linking.errors} />
           {results && (
             <ul className="grid gap-1 text-sm">
               {results.length === 0 && <li className="text-muted-foreground">No topics found in these subjects.</li>}

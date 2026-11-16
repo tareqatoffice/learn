@@ -28,7 +28,12 @@ export function RowActions({ kind, id, status, label }: { kind: OrderedKind; id:
           aria-label={`Status of ${label}`}
           value={status}
           disabled={pending}
-          onChange={(e) => run(() => setStatusAction(kind as StatusKind, id, e.target.value as Status))}
+          onChange={(e) => {
+            const next = e.target.value as Status;
+            // Unpublishing takes the item away from learners at once, so it asks first.
+            const confirm = status === "published" && next !== "published" ? `Unpublish "${label}"? Learners stop seeing it.` : undefined;
+            run(() => setStatusAction(kind as StatusKind, id, next), { confirm });
+          }}
           className="rounded border border-border bg-background px-1 py-0.5 text-xs pointer-coarse:min-h-9"
         >
           <option value="draft">Draft</option>

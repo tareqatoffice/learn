@@ -6,7 +6,7 @@ import { inputClass } from "@/components/admin/SaveBar";
 import { Button } from "@/components/ui/button";
 import { connectDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
-import { AdminList, AdminPage } from "@/components/admin/layout";
+import { AdminList, AdminListItem, AdminPage } from "@/components/admin/layout";
 import { buildMetadata } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 
@@ -133,7 +133,16 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
 function UserRow({ user: u }: { user: AdminUserRow }) {
   const badge = BADGE[u.status];
   return (
-    <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+    <AdminListItem
+      className="items-start py-3"
+      actions={
+        u.isAdmin ? (
+          <p className="text-xs text-muted-foreground sm:pt-1">Can&apos;t be blocked</p>
+        ) : (
+          <UserAccessActions id={u.id} email={u.email} status={u.status} />
+        )
+      }
+    >
       <div className="flex min-w-0 gap-3">
         <span
           aria-hidden
@@ -179,11 +188,6 @@ function UserRow({ user: u }: { user: AdminUserRow }) {
           )}
         </div>
       </div>
-      {u.isAdmin ? (
-        <p className="text-xs text-muted-foreground sm:pt-1">Can&apos;t be blocked</p>
-      ) : (
-        <UserAccessActions id={u.id} email={u.email} status={u.status} />
-      )}
-    </li>
+    </AdminListItem>
   );
 }
