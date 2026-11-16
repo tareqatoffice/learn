@@ -106,6 +106,12 @@ describe("proxy", () => {
     signIn();
     statusMock.mockResolvedValue(null);
     const res = await run("/dashboard");
-    expect(res.headers.get("location")).toBe("http://localhost/");
+    expect(res.headers.get("location")).toBe("http://localhost/?next=%2Fdashboard");
+  });
+
+  it("keeps the requested page and query in next when sending a signed-out visitor to sign in (F6)", async () => {
+    const res = await run("/notes/a/b?x=1");
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe("http://localhost/?next=%2Fnotes%2Fa%2Fb%3Fx%3D1");
   });
 });

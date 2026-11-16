@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { ACCESS_MESSAGES, accessStatusFor } from "@/lib/access";
 import { ACCESS_PATH, isPublicPath, routeAccess } from "@/lib/authz";
 import { buildCsp, newNonce } from "@/lib/csp";
+import { signInPath } from "@/lib/nextPath";
 
 /**
  * Lets the request through with a per-request CSP nonce: Next reads it from the request's CSP header
@@ -43,9 +44,10 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
         ? NextResponse.json({ error: "Forbidden" }, { status: 403 })
         : new NextResponse("Forbidden", { status: 403 });
     }
+    // Signed out: the sign-in page keeps where they were going and sends them there afterwards.
     return isApi
       ? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-      : NextResponse.redirect(new URL("/", req.nextUrl));
+      : NextResponse.redirect(new URL(signInPath(`${pathname}${req.nextUrl.search}`), req.nextUrl));
   });
   return handler(request, event as never);
 }

@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { accessStatusFor } from "@/lib/access";
 import { ACCESS_PATH } from "@/lib/authz";
+import { safeNextPath } from "@/lib/nextPath";
 import { cn } from "@/lib/utils";
 import { buildMetadata } from "@/lib/seo";
 
@@ -37,15 +38,16 @@ export const metadata = buildMetadata({
 });
 
 export default async function Home({ searchParams }: PageProps<"/">) {
+  const { error, next: rawNext } = await searchParams;
+  const next = safeNextPath(rawNext);
   const session = await auth();
   const user = session?.user;
   if (user?.id && user.email) {
     // A stale session (user record gone) stays here to sign in again instead of bouncing back.
     const status = await accessStatusFor({ userId: user.id, email: user.email });
-    if (status === "approved") redirect("/dashboard");
+    if (status === "approved") redirect(next ?? "/dashboard");
     if (status) redirect(ACCESS_PATH);
   }
-  const { error } = await searchParams;
 
   return (
     <>
@@ -100,6 +102,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               </p>
 
               <form action={signInWithGoogle} className="mt-6">
+                {next && <input type="hidden" name="next" value={next} />}
                 <Button type="submit" size="lg" className="w-full">
                   Sign in with Google
                 </Button>
@@ -110,6 +113,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                   action={signInDev}
                   className="mt-6 grid gap-2 rounded-lg border border-dashed border-border p-4"
                 >
+                  {next && <input type="hidden" name="next" value={next} />}
                   <label htmlFor="dev-email" className="text-sm font-medium">
                     Dev login (local only)
                   </label>
