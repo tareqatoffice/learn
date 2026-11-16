@@ -155,7 +155,7 @@ export function TopBar({ user }: { user: TopBarUser }) {
     >
       <nav
         aria-label="Main"
-        className="hidden min-w-0 flex-1 gap-1 self-stretch overflow-x-auto md:flex"
+        className="hidden min-w-0 flex-1 gap-1 self-stretch overflow-x-auto overflow-y-hidden md:flex"
       >
         {links.map(({ href, label }) => (
           <div key={href} className="relative flex shrink-0 items-center">
