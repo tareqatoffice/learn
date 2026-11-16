@@ -2,7 +2,7 @@
 
 import { adminContext } from "@/admin/action";
 import type { Result } from "@/admin/service";
-import { setUserAccess } from "@/admin/users";
+import { deleteUser, setUserAccess } from "@/admin/users";
 
 export async function setUserAccessAction(
   id: string,
@@ -11,4 +11,9 @@ export async function setUserAccessAction(
 ): Promise<Result> {
   const admin = await adminContext();
   return setUserAccess({ id, status, reason }, admin.email);
+}
+
+export async function deleteUserAction(id: string): Promise<Result> {
+  await adminContext();
+  return deleteUser(String(id));
 }

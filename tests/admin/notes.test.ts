@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { restoreRevisionChecked, saveNote, saveSeries, saveSubject, setNodeNoteLink } from "@/admin/service";
+import { deleteSubject, restoreRevisionChecked, saveNote, saveSeries, saveSubject, setNodeNoteLink } from "@/admin/service";
 import { connectDb } from "@/lib/db";
 import { GraphNode, Note, NoteSeries, Revision, Subject } from "@/models";
 import { resetDb } from "../setup/mongo";
@@ -63,6 +63,17 @@ describe("setNodeNoteLink", () => {
 });
 
 describe("saveSubject", () => {
+  it("deletes a subject only when nothing lists it (F23)", async () => {
+    const r = await saveSubject({ slug: "rust", name: "Rust" }, ADMIN);
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    const series = await saveSeries({ slug: "rs", title: "RS", description: "", subjects: ["rust"], status: "draft" }, ADMIN);
+    if (!series.ok) throw new Error(JSON.stringify(series.errors));
+    expect(await deleteSubject(r.id)).toMatchObject({ ok: false, errors: { _: expect.stringContaining("1 item") } });
+    await saveSeries({ id: series.id, slug: "rs", title: "RS", description: "", subjects: [], status: "draft" }, ADMIN);
+    expect((await deleteSubject(r.id)).ok).toBe(true);
+    expect(await Subject.exists({ _id: r.id })).toBeNull();
+  });
+
   it("creates and renames a subject", async () => {
     const r = await saveSubject({ slug: "react", name: "React" }, ADMIN);
     if (!r.ok) throw new Error(JSON.stringify(r.errors));

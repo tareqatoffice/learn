@@ -472,6 +472,18 @@ export async function saveSubject(input: SubjectInput, editedBy: string): Promis
   return done((await saveWithRevision(Subject, null, { ...data, order: await nextOrder(Subject) }, editedBy))._id);
 }
 
+/** Deletes a subject nothing lists any more; one still in use is refused with where it is used. */
+export async function deleteSubject(id: string): Promise<Result> {
+  if (!isValidObjectId(id)) return fail({ _: "Invalid subject" });
+  const subject = await Subject.findById(id, { slug: 1, name: 1 }).lean<{ slug: string; name: string }>();
+  if (!subject) return fail({ _: "That subject no longer exists." });
+  const counts = await Promise.all(SUBJECT_HOLDERS.map((m) => m.countDocuments({ subjects: subject.slug })));
+  const used = counts.reduce((a, b) => a + b, 0);
+  if (used) return fail({ _: `"${subject.name}" is still listed on ${used} item${used === 1 ? "" : "s"}. Remove it from them first.` });
+  await Subject.deleteOne({ _id: id });
+  return done(id);
+}
+
 // ---------- revisions ----------
 
 type Snapshot = Record<string, unknown>;

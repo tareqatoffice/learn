@@ -350,6 +350,10 @@ async function planItem(
     await queue(ctx, model, null, stamped(opts, data), { ...base, action: "create" });
     return;
   }
+  // Slugs name the page a link points at; an import keeps the stored one, so say so when they differ.
+  if (typeof createData.slug === "string" && m.doc.slug !== undefined && m.doc.slug !== createData.slug) {
+    report.warnings.push(`${type} "${m.item.title}": slug change to "${createData.slug}" ignored (kept "${String(m.doc.slug)}"); rename it in Admin`);
+  }
   const fields = diff(m.doc, next);
   if (!fields.length) {
     report.unchanged++;
