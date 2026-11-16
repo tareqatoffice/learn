@@ -227,6 +227,24 @@ export function GraphView({ data }: { data: GraphData }) {
     window.history.back();
   }
 
+  // A link straight to a topic (search, profile, a shared URL) on a narrow screen: the panel is far
+  // below the graph, so bring it into view instead of leaving the learner at the top of the canvas.
+  useEffect(() => {
+    if (!current || reading || typeof window.matchMedia !== "function" || wide()) return;
+    panelRef.current?.scrollIntoView({ block: "start" });
+    // Only for the address the page opened with.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Escape in the panel returns focus to the selected topic in the graph, where it came from.
+  function onPanelKey(e: React.KeyboardEvent) {
+    if (e.key !== "Escape" || !current) return;
+    const node = canvasRef.current?.querySelector<SVGGElement>(`[data-slug="${CSS.escape(current.slug)}"]`);
+    if (!node) return;
+    e.preventDefault();
+    node.focus();
+  }
+
   // The side panel sits beside the graph on wide screens; on narrow ones it is far below, so open the reader.
   function pick(slug: string) {
     if (wide()) select(slug);
@@ -450,6 +468,7 @@ export function GraphView({ data }: { data: GraphData }) {
                     <g
                       role="button"
                       tabIndex={0}
+                      data-slug={n.slug}
                       aria-label={label}
                       aria-pressed={isSel}
                       onClick={() => pick(n.slug)}
@@ -521,6 +540,7 @@ export function GraphView({ data }: { data: GraphData }) {
         <div
           ref={panelRef}
           tabIndex={-1}
+          onKeyDown={onPanelKey}
           aria-label="Topic details"
           className="rounded-xl border border-border bg-card p-5 outline-none lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-auto"
         >
