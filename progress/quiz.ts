@@ -90,6 +90,11 @@ async function deckQuery(userId: string, filter: QuizFilter) {
   return { $and: and };
 }
 
+/** How many questions a deck with this filter would have, before the size limit. */
+export async function countDeck(userId: string, filter: QuizFilter): Promise<number> {
+  return Question.countDocuments(await deckQuery(userId, filter));
+}
+
 /**
  * Samples a shuffled deck. A review deck is spaced: the questions seen longest ago come first (ties
  * shuffled), so a size limit takes the most overdue ones. An empty deck creates nothing.

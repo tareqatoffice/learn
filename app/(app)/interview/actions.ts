@@ -11,6 +11,7 @@ import { ANSWER_MODES, type QuizAttempt } from "@/lib/quiz-answer";
 import { clearQuestionProgress, type MarkResult } from "@/progress/questions";
 import { type AiGrade, type AiReply, type AiResult, askFollowUp, gradeAnswer } from "@/progress/quizAi";
 import {
+  countDeck,
   createSession,
   finishSession,
   recordResult,
@@ -38,6 +39,15 @@ export async function startQuizAction(
   const result = await createSession(user.userId, parsed);
   if ("empty" in result) return { empty: true };
   redirect(`/interview/quiz/${result.sessionId}`);
+}
+
+/** How many questions the setup's current choices would put in a deck (the size limit applied). */
+export async function countDeckAction(filter: QuizFilter): Promise<number> {
+  const parsed = filterSchema.parse(filter);
+  const user = await requireUser();
+  await connectDb();
+  const n = await countDeck(user.userId, parsed);
+  return parsed.size ? Math.min(parsed.size, n) : n;
 }
 
 export async function recordResultAction(

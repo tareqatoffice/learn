@@ -5,6 +5,7 @@ import { connectDb } from "@/lib/db";
 import { Question, QuestionProgress, QuizSession } from "@/models";
 import { markQuestion } from "@/progress/questions";
 import {
+  countDeck,
   createSession,
   finishSession,
   getSessionView,
@@ -56,6 +57,17 @@ describe("quiz sessions", () => {
       expect(sessionLabel(["CSS", "HTML"])).toBe("CSS · HTML");
       expect(sessionLabel(["CSS", "HTML", "JS"])).toBe("Mixed");
       expect(sessionLabel(["CSS"], "Selectors")).toBe("CSS · Selectors");
+    });
+  });
+
+  describe("countDeck (F10)", () => {
+    it("counts what a deck with the filter would hold", async () => {
+      const user = newUserId();
+      const ids = await seedQuestions(await seedBook("b"), 4);
+      await markQuestion(user, ids[0], "got");
+      expect(await countDeck(user, all())).toBe(4);
+      expect(await countDeck(user, all({ mode: "unseen" }))).toBe(3);
+      expect(await countDeck(user, all({ mode: "review" }))).toBe(0);
     });
   });
 

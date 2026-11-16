@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { startQuizAction } from "@/app/(app)/interview/actions";
+import { useEffect, useState, useTransition } from "react";
+import { countDeckAction, startQuizAction } from "@/app/(app)/interview/actions";
 import { Chip } from "@/components/Chip";
 import { Button } from "@/components/ui/button";
 import { toggleItem } from "@/lib/utils";
@@ -41,6 +41,22 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
   const [pending, startTransition] = useTransition();
 
   const single = bookIds.length === 1 ? books.find((b) => b.id === bookIds[0]) : undefined;
+  // The deck the current choices would start, so the button never promises more than it has.
+  const [count, setCount] = useState<{ key: string; n: number } | null>(null);
+  const key = JSON.stringify([bookIds, single ? partKeys : [], mode, size]);
+  useEffect(() => {
+    let live = true;
+    countDeckAction({ bookIds, partKeys: single ? partKeys : [], mode, size })
+      .then((n) => live && setCount({ key, n }))
+      .catch(() => live && setCount(null));
+    return () => {
+      live = false;
+    };
+    // `key` covers every input of the count.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  const known = count?.key === key ? count.n : null;
+  const label = known !== null ? `${known} question${known === 1 ? "" : "s"}` : size ? `up to ${size} questions` : "all questions";
 
   function changeBooks(next: string[]) {
     setBookIds(next);
@@ -104,11 +120,11 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
       </Group>
 
       <div className="mt-6">
-        <Button type="button" size="lg" disabled={pending} onClick={start}>
-          {pending ? "Starting…" : `Start · ${size ? `${size} questions` : "all questions"}`}
+        <Button type="button" size="lg" disabled={pending || known === 0} onClick={start}>
+          {pending ? "Starting…" : `Start · ${label}`}
         </Button>
         <p role="status" className="mt-3 text-sm text-muted-foreground empty:hidden">
-          {empty && "No questions match. Try another mode or book."}
+          {(empty || known === 0) && "No questions match. Try another mode or book."}
         </p>
       </div>
     </section>
