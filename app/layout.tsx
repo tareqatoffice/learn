@@ -57,6 +57,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-full flex flex-col">
+        {/* First tab stop on every page; each page's <main> carries id="main". */}
+        <a
+          href="#main"
+          className="sr-only z-50 rounded-md bg-background px-3 py-2 text-sm font-medium focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-2 focus:outline-ring"
+        >
+          Skip to content
+        </a>
         <NextTopLoader
           color="#2563c9"
           height={2}

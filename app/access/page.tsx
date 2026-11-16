@@ -46,7 +46,7 @@ export default async function AccessPage({ searchParams }: PageProps<"/access">)
         </div>
       </AppHeader>
 
-      <main className={cn(containerClass, "flex flex-1 items-start justify-center py-10 sm:items-center")}>
+      <main id="main" tabIndex={-1} className={cn(containerClass, "flex flex-1 items-start justify-center py-10 focus:outline-none sm:items-center")}>
         <section
           aria-labelledby="access-title"
           className="page-enter w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8"

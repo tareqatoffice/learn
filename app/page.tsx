@@ -56,7 +56,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         <ThemeToggle className="ml-auto" />
       </AppHeader>
 
-      <main className={cn(containerClass, "flex flex-1 items-center py-6")}>
+      <main id="main" tabIndex={-1} className={cn(containerClass, "flex flex-1 items-center py-6 focus:outline-none")}>
         <div className="page-enter w-full">
           <div className="grid items-center gap-8 py-6 lg:grid-cols-[minmax(0,1fr)_26.25rem] lg:gap-16 lg:py-16">
             <section aria-labelledby="welcome" className="grid gap-6">

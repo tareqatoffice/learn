@@ -20,7 +20,7 @@ export default async function AppLayout({
       <TopBar
         user={{ name: user.name, image: user.image, isAdmin: user.isAdmin }}
       />
-      <main className={cn(containerClass, "flex-1 py-6")}>{children}</main>
+      <main id="main" tabIndex={-1} className={cn(containerClass, "flex-1 py-6 focus:outline-none")}>{children}</main>
       {/* One of each for the whole signed-in app: the palette opens on ⌘K or the header's button. */}
       <CommandPalette />
       <Toaster />
