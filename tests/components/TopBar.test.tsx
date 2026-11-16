@@ -59,6 +59,31 @@ describe("TopBar", () => {
     expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
   });
 
+  it("lists Profile in the mobile menu, focuses it and makes the page inert while open (U3, U12)", async () => {
+    const main = document.createElement("main");
+    main.id = "main";
+    document.body.appendChild(main);
+    render(<TopBar user={user} />);
+    await userEvent.click(screen.getByRole("button", { name: "Menu" }));
+    const nav = screen.getByRole("navigation", { name: "Mobile" });
+    expect(nav.querySelector('a[href="/profile"]')).not.toBeNull();
+    expect(document.activeElement?.getAttribute("href")).toBe("/dashboard");
+    expect(main.inert).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "Menu" }));
+    expect(main.inert).toBe(false);
+    main.remove();
+  });
+
+  it("closes the account menu when focus leaves it (U12)", async () => {
+    render(<TopBar user={user} />);
+    await userEvent.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
+    await userEvent.tab(); // Profile link
+    await userEvent.tab(); // Sign out
+    await userEvent.tab(); // out of the menu
+    expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
+  });
+
   it("collapses the links into a menu button on small screens", async () => {
     render(<TopBar user={user} />);
     const toggle = screen.getByRole("button", { name: "Menu" });

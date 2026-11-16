@@ -22,6 +22,8 @@ const LINKS = [
   { href: "/notes", label: "Notes" },
 ];
 const ADMIN_LINK = { href: "/admin", label: "Admin" };
+/** In the mobile menu, which has no account menu beside it the way the desktop header does. */
+const PROFILE_LINK = { href: "/profile", label: "Profile" };
 
 const linkClass = (active: boolean) =>
   cn(
@@ -49,6 +51,8 @@ export function TopBar({ user }: { user: TopBarUser }) {
   const accountRef = useRef<HTMLDivElement>(null);
   const accountButtonRef = useRef<HTMLButtonElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileNavRef = useRef<HTMLElement>(null);
+  const mobileLinks = [...links, PROFILE_LINK];
 
   // A new page closes both menus (the account menu has no links, but a back/forward navigation can happen with it open).
   const [shownPath, setShownPath] = useState(pathname);
@@ -62,6 +66,18 @@ export function TopBar({ user }: { user: TopBarUser }) {
   useEffect(() => {
     if (!menuOpen) return;
     return lockPageScroll();
+  }, [menuOpen]);
+
+  // While the mobile menu is open the page behind it is inert (no focus, no screen-reader browsing),
+  // and focus starts on its first link, so keyboard users stay in the menu.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const main = document.getElementById("main");
+    if (main) main.inert = true;
+    mobileNavRef.current?.querySelector<HTMLElement>("a")?.focus();
+    return () => {
+      if (main) main.inert = false;
+    };
   }, [menuOpen]);
 
   // The menu, its backdrop and the hamburger are all md:hidden, so widening past md would leave the
@@ -113,12 +129,13 @@ export function TopBar({ user }: { user: TopBarUser }) {
               className="fixed inset-x-0 bottom-0 top-14 bg-black/40 animate-in fade-in-0 duration-200 md:hidden"
             />
             <nav
+              ref={mobileNavRef}
               id="mobile-nav"
               aria-label="Mobile"
               className="absolute inset-x-0 top-full border-y border-border bg-card px-4 py-2 shadow-lg sm:px-6 animate-in fade-in-0 slide-in-from-top-2 duration-200 md:hidden"
             >
               <ul className="grid gap-1">
-                {links.map(({ href, label }) => (
+                {mobileLinks.map(({ href, label }) => (
                   <li key={href}>
                     <Link
                       href={href}
@@ -171,7 +188,14 @@ export function TopBar({ user }: { user: TopBarUser }) {
           </kbd>
         </button>
         <ThemeToggle />
-        <div ref={accountRef} className="relative">
+        <div
+          ref={accountRef}
+          className="relative"
+          // Tabbing out of the account menu closes it, like a click outside does.
+          onBlur={(e) => {
+            if (accountOpen && !e.currentTarget.contains(e.relatedTarget as Node | null)) setAccountOpen(false);
+          }}
+        >
           <button
             ref={accountButtonRef}
             type="button"
