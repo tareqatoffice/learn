@@ -19,7 +19,7 @@ export default async function SpeakingSettingsPage() {
   const settings = await getEffectiveSettings(user.userId);
 
   return (
-    <div className="mx-auto grid w-full max-w-2xl gap-4">
+    <div className="grid w-full gap-4">
       <div>
         <Link href="/speaking" className="text-sm text-muted-foreground hover:underline">
           ← Speaking practice

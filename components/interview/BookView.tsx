@@ -14,7 +14,7 @@ export function BookView({ view }: { view: BookViewData }) {
   const mastered = questions.filter((q) => q.status === "got").length;
 
   return (
-    <article className="mx-auto w-full max-w-3xl">
+    <article className="w-full">
       <BackLink href="/interview">← Interview prep</BackLink>
       <h1 className={cn("mt-1", pageTitleClass)}>{book.title}</h1>
       <p className="mt-2 text-sm tabular-nums text-muted-foreground">

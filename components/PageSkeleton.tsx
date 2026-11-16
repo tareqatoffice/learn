@@ -102,7 +102,7 @@ export function CardGridSkeleton({ titleWidth = "w-48" }: { titleWidth?: string 
             className="rounded-xl border border-border bg-card p-4"
           >
             <div className="flex items-baseline justify-between gap-3">
-              <Skeleton className="h-5 w-2/3 max-w-[12rem]" />
+              <Skeleton className="h-5 w-2/3 max-w-48" />
               <Skeleton className="h-4 w-14" />
             </div>
             <Skeleton className="mt-2 h-2 w-full" />
@@ -162,7 +162,7 @@ export function InterviewIndexSkeleton() {
 /** Book detail: back + title + progress + part question lists. */
 export function BookDetailSkeleton() {
   return (
-    <Status label="Loading page" className="mx-auto grid w-full max-w-3xl gap-2">
+    <Status label="Loading page" className="grid w-full gap-2">
       <Skeleton className="h-4 w-28" />
       <Skeleton className="mt-1 h-8 w-64 max-w-full" />
       <Skeleton className="mt-2 h-4 w-36" />
@@ -235,7 +235,7 @@ export function QuestionDetailSkeleton() {
 /** Note series: header + chapters card. */
 export function SeriesDetailSkeleton() {
   return (
-    <Status label="Loading page" className="grid max-w-3xl gap-6">
+    <Status label="Loading page" className="grid gap-6">
       <header className="grid gap-1">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-8 w-56 max-w-full" />
@@ -314,7 +314,7 @@ export function ChapterDetailSkeleton() {
 /** Quiz session: centered quiz card. */
 export function QuizPageSkeleton() {
   return (
-    <Status label="Loading page" className="mx-auto w-full max-w-3xl">
+    <Status label="Loading page" className="w-full">
       <section className="grid gap-4 rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex items-center justify-between gap-3">
           <Skeleton className="h-4 w-24" />
@@ -405,7 +405,7 @@ export function AdminPageSkeleton() {
   );
 }
 
-/** Speaking / IELTS-style max-w-3xl stack (also catch-all for signed-in routes). */
+/** Speaking / IELTS-style stack (also catch-all for signed-in routes). */
 export function NarrowStackSkeleton({
   label = "Loading page",
   /** IELTS: nav chips share the title row. Speaking: two action buttons. */
@@ -415,7 +415,7 @@ export function NarrowStackSkeleton({
   header?: "actions" | "chips";
 }) {
   return (
-    <Status label={label} className="mx-auto grid w-full max-w-3xl gap-4">
+    <Status label={label} className="grid w-full gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Skeleton className="h-8 w-48 max-w-full" />
         {header === "chips" ? (

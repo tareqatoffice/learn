@@ -32,7 +32,7 @@ export function SpeakingHistory({
   timeZone: string;
 }) {
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-4">
+    <div className="grid w-full gap-4">
       <TimeZoneCookie current={timeZone} />
       <div>
         <Link href="/speaking" className="text-sm text-muted-foreground hover:underline">

@@ -31,7 +31,7 @@ export default async function TakePage({ params }: PageProps<"/speaking/takes/[t
 
   if (!storageConfigured()) {
     return (
-      <div className="mx-auto grid w-full max-w-3xl gap-4">
+      <div className="grid w-full gap-4">
         <Link href="/speaking/history" className="text-sm text-muted-foreground hover:underline">
           ← All takes
         </Link>
@@ -48,7 +48,7 @@ export default async function TakePage({ params }: PageProps<"/speaking/takes/[t
   const [ai, settings] = await Promise.all([getAiConfig(), getEffectiveSettings(user.userId)]);
 
   return (
-    <div className="mx-auto grid w-full max-w-5xl gap-4">
+    <div className="grid w-full gap-4">
       <div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/speaking/history" className="text-sm text-muted-foreground hover:underline">

@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 const WIDTH = {
   /** Lists, tables and editors that use the full column. */
   full: "",
-  /** Settings and single-purpose pages, so lines stay readable. */
-  narrow: "max-w-3xl",
+  /** Same width as full; kept so callers can still pass width="narrow". */
+  narrow: "",
 } as const;
 
 /**

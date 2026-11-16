@@ -9,7 +9,7 @@ export function SeriesView({ view }: { view: SeriesViewData }) {
   const read = view.chapters.filter((c) => c.read).length;
 
   return (
-    <div className="grid max-w-3xl gap-6">
+    <div className="grid gap-6">
       <header className="grid gap-1">
         <BackLink href="/notes">← All notes</BackLink>
         <h1 className={pageTitleClass}>{view.series.title}</h1>

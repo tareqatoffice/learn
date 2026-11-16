@@ -87,7 +87,7 @@ export function TopicReader({
       className="topic-reader m-0 h-dvh max-h-none w-full max-w-none overflow-y-auto overscroll-contain border-0 bg-background p-0 text-foreground backdrop:bg-black/60"
     >
       <div className="sticky top-0 z-10 border-b border-border bg-card">
-        <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2.5 sm:px-6">
+        <div className="mx-auto flex max-w-[75rem] items-center gap-2 px-4 py-2.5 sm:px-6">
           <Button variant="ghost" size="icon" aria-label="Close" onClick={onClose} className="-ml-2">
             <X aria-hidden />
           </Button>
@@ -102,7 +102,7 @@ export function TopicReader({
           </Button>
         </div>
       </div>
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:py-12">{children}</div>
+      <div className="mx-auto max-w-[75rem] px-4 py-8 sm:px-6 lg:py-12">{children}</div>
     </dialog>
   );
 }

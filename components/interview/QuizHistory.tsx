@@ -16,7 +16,7 @@ export function QuizHistory({
   const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short", timeZone });
 
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-4">
+    <div className="grid w-full gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link href="/interview" className="text-sm text-muted-foreground hover:underline">

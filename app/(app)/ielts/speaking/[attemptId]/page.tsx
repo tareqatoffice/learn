@@ -38,7 +38,7 @@ export default async function IeltsRunPage({ params }: PageProps<"/ielts/speakin
 
   if (!storageConfigured()) {
     return (
-      <div className="mx-auto grid w-full max-w-3xl gap-4">
+      <div className="grid w-full gap-4">
         <Link href="/ielts/speaking" className="text-sm text-muted-foreground hover:underline">
           ← Speaking practice
         </Link>
@@ -62,7 +62,7 @@ export default async function IeltsRunPage({ params }: PageProps<"/ielts/speakin
   const video = attempt.kind === "mock" ? (profile?.mockVideo ?? true) : (profile?.drillVideo ?? false);
 
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-4">
+    <div className="grid w-full gap-4">
       <MockRunner
         attemptId={attempt.id}
         kind={attempt.kind}

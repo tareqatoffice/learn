@@ -61,7 +61,7 @@ export async function IeltsHome() {
 
   if (!profile) {
     return (
-      <div className="mx-auto grid w-full max-w-3xl gap-4">
+      <div className="grid w-full gap-4">
         <TimeZoneCookie current={timeZone} />
         <h1 className={pageTitleClass}>Set up your IELTS plan</h1>
         <IeltsNav withPlan={false} />
@@ -88,7 +88,7 @@ export async function IeltsHome() {
 
   if (profile.status === "ended") {
     return (
-      <div className="mx-auto grid w-full max-w-3xl gap-4">
+      <div className="grid w-full gap-4">
         {header}
         <section className="grid gap-3 rounded-xl border border-border bg-card p-5">
           <h2 className="text-lg font-semibold">Your IELTS plan has ended</h2>
@@ -105,7 +105,7 @@ export async function IeltsHome() {
 
   if (testDayStatus(today, profile.testDate) === "passed") {
     return (
-      <div className="mx-auto grid w-full max-w-3xl gap-4">
+      <div className="grid w-full gap-4">
         {header}
         <section className="grid gap-4 rounded-xl border border-border bg-card p-5">
           <div className="grid gap-1">
@@ -137,7 +137,7 @@ export async function IeltsHome() {
   const week = plan ? weekOn(plan, today) : null;
 
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-4">
+    <div className="grid w-full gap-4">
       {header}
       <Countdown
         today={today}

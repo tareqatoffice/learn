@@ -2,9 +2,8 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /**
- * Page width and gutters shared by the header row and every page's <main>, so they line up. 1200px
- * keeps a list page's cards and a prose page's column within sight of each other; the app used to
- * run to 1400px, which left list pages sprawling beside the 48rem reading column.
+ * Page width and gutters shared by the header row and every page's <main>, so they line up.
+ * All signed-in pages use this same column (75rem); do not nest a narrower max-w on page shells.
  */
 export const containerClass = "mx-auto w-full min-w-0 max-w-[75rem] px-4 sm:px-6 lg:px-8";
 

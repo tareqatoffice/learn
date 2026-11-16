@@ -28,7 +28,7 @@ export default async function QuizPage({
   if (!view) notFound();
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className="w-full">
       <QuizRunner initial={view} aiEnabled={ai.active} />
     </div>
   );

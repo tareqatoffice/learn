@@ -9,7 +9,7 @@ type Log = NonNullable<Awaited<ReturnType<typeof import("@/progress/attempts").g
 
 export function QuizSession({ log }: { log: Log }) {
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-4">
+    <div className="grid w-full gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link href="/interview/history" className="text-sm text-muted-foreground hover:underline">
