@@ -101,6 +101,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                 New accounts are reviewed by an admin before they get access.
               </p>
 
+              {error === "email-in-use" && (
+                <p role="alert" className="mt-6 text-sm text-destructive">
+                  This Google account&apos;s email address already belongs to another Learn account. Sign in with that account, or
+                  ask the admin to merge them.
+                </p>
+              )}
               {error === "rate" && (
                 <p role="alert" className="mt-6 text-sm text-destructive">
                   Too many sign-in attempts. Wait a few minutes and try again.

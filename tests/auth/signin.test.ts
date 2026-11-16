@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetDb } from "../setup/mongo";
 import { resetEnvCache } from "@/lib/env";
-import { getProviders, isSignInAllowed, upsertUserOnSignIn } from "@/auth";
+import { emailTakenByAnother, getProviders, isSignInAllowed, upsertUserOnSignIn } from "@/auth";
 import { User } from "@/models";
 
 const KEYS = [
@@ -123,6 +123,17 @@ describe("sign-in", () => {
         process.env.MONGODB_URI = saved;
         resetEnvCache();
       }
+    });
+  });
+
+  describe("emailTakenByAnother (S15)", () => {
+    it("is true only when a linked Google account's new email belongs to someone else", async () => {
+      await upsertUserOnSignIn({ sub: "g-1", email: "one@x.com", name: "One" });
+      await upsertUserOnSignIn({ sub: "g-2", email: "two@x.com", name: "Two" });
+      expect(await emailTakenByAnother({ sub: "g-1", email: "Two@X.com" })).toBe(true);
+      expect(await emailTakenByAnother({ sub: "g-1", email: "one@x.com" })).toBe(false);
+      expect(await emailTakenByAnother({ sub: "g-1", email: "new@x.com" })).toBe(false);
+      expect(await emailTakenByAnother({ sub: "g-new", email: "two@x.com" })).toBe(false); // first Google login links by email
     });
   });
 

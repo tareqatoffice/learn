@@ -49,6 +49,25 @@ export async function upsertUserOnSignIn(
   return { userId: String(doc._id), role };
 }
 
+/** Shown on the sign-in page when a Google account's email already belongs to another Learn account. */
+export const EMAIL_IN_USE_ERROR = "email-in-use";
+
+/**
+ * True when this Google account is already linked to a Learn user but its (changed) email belongs to
+ * a different Learn user: saving it would break the unique email, so the sign-in is stopped with a
+ * clear message instead of a crash.
+ */
+export async function emailTakenByAnother(profile: { sub?: string; email?: string }): Promise<boolean> {
+  if (!profile.sub || !profile.email) return false;
+  await connectDb();
+  const email = profile.email.trim().toLowerCase();
+  const [linked, owner] = await Promise.all([
+    User.findOne({ googleId: profile.sub }, { _id: 1 }).lean<{ _id: unknown }>(),
+    User.findOne({ email }, { _id: 1 }).lean<{ _id: unknown }>(),
+  ]);
+  return Boolean(linked && owner && String(linked._id) !== String(owner._id));
+}
+
 /** Email drives admin rights and account linking, so Google must vouch for it. */
 export function isSignInAllowed({
   account,
@@ -92,7 +111,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
   providers: getProviders(),
   session: { strategy: "jwt" as const },
   callbacks: {
-    signIn: ({ account, profile }) => isSignInAllowed({ account, profile }),
+    async signIn({ account, profile }) {
+      if (!isSignInAllowed({ account, profile })) return false;
+      if (account?.provider === "google" && (await emailTakenByAnother({ sub: profile?.sub ?? undefined, email: profile?.email ?? undefined }))) {
+        return `/?error=${EMAIL_IN_USE_ERROR}`;
+      }
+      return true;
+    },
     async jwt({ token, account, profile, user }) {
       if (account) {
         const email = (profile?.email ?? user?.email ?? token.email) as string | undefined;
