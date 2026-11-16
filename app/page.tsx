@@ -101,6 +101,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                 New accounts are reviewed by an admin before they get access.
               </p>
 
+              {error === "rate" && (
+                <p role="alert" className="mt-6 text-sm text-destructive">
+                  Too many sign-in attempts. Wait a few minutes and try again.
+                </p>
+              )}
               <form action={signInWithGoogle} className="mt-6">
                 {next && <input type="hidden" name="next" value={next} />}
                 <Button type="submit" size="lg" className="w-full">
