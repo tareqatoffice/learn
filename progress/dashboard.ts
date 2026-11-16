@@ -28,26 +28,44 @@ export type Dashboard = {
 const READY_NEXT_MAX = 3;
 const RECENT_QUIZZES = 5;
 
-/** The most recently opened chapter that is still visible, with its series' read count. */
+/**
+ * Where to pick up reading: the most recently opened chapter that is still visible or, when that one
+ * is already read, the next unread chapter of its series (wrapping to an earlier one), with the
+ * series' read count. A fully read series keeps the last opened chapter.
+ */
 async function continueReading(userId: string, series: Dashboard["series"]): Promise<Dashboard["continueReading"]> {
   // Walks the user's opened chapters newest first and stops at the first visible one.
-  const [note] = await NoteProgress.aggregate<{ slug: string; title: string; seriesId: Id }>([
+  const [note] = await NoteProgress.aggregate<{ slug: string; title: string; seriesId: Id; noteId: Id; read?: boolean }>([
     { $match: { userId: new Types.ObjectId(userId), lastOpenedAt: { $ne: null } } },
     { $sort: { lastOpenedAt: -1 } },
     { $lookup: { from: Note.collection.name, localField: "noteId", foreignField: "_id", as: "note" } },
     { $unwind: "$note" },
     { $match: filterUnder("note", await visibleNoteFilter()) },
     { $limit: 1 },
-    { $project: { _id: 0, slug: "$note.slug", title: "$note.title", seriesId: "$note.seriesId" } },
+    { $project: { _id: 0, slug: "$note.slug", title: "$note.title", seriesId: "$note.seriesId", noteId: "$note._id", read: 1 } },
   ]);
   const parent = note && (await NoteSeries.findById(note.seriesId, { slug: 1, title: 1 }).lean<{ slug: string; title: string }>());
   if (!note || !parent) return null;
+  let chapter = { slug: note.slug, title: note.title };
+  if (note.read) {
+    const chapters = await Note.find(await visibleNoteFilter(String(note.seriesId)), { slug: 1, title: 1 })
+      .sort({ order: 1, _id: 1 })
+      .lean<{ _id: Id; slug: string; title: string }[]>();
+    const read = new Set(
+      (await NoteProgress.find({ userId, read: true, noteId: { $in: chapters.map((c) => c._id) } }, { noteId: 1 }).lean<{ noteId: Id }[]>()).map((r) =>
+        String(r.noteId),
+      ),
+    );
+    const at = chapters.findIndex((c) => String(c._id) === String(note.noteId));
+    const next = [...chapters.slice(at + 1), ...chapters.slice(0, Math.max(at, 0))].find((c) => !read.has(String(c._id)));
+    if (next) chapter = { slug: next.slug, title: next.title };
+  }
   const counts = series.find((s) => s.slug === parent.slug);
   return {
     seriesSlug: parent.slug,
     seriesTitle: parent.title,
-    chapterSlug: note.slug,
-    chapterTitle: note.title,
+    chapterSlug: chapter.slug,
+    chapterTitle: chapter.title,
     read: counts?.read ?? 0,
     total: counts?.total ?? 0,
   };

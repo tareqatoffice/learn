@@ -107,6 +107,16 @@ describe("getDashboard", () => {
     expect(dash.continueReading).toMatchObject({ chapterSlug: "intro", read: 1, total: 1 });
   });
 
+  it("points Continue reading at the next unread chapter when the last opened one is read (F18)", async () => {
+    const { user, n2, s } = await fixtures();
+    const n3 = await seedNote(s, "vol");
+    await Note.updateOne({ _id: n3 }, { order: 2 });
+    await setNoteRead(user, n2, true); // last opened ("net") is now read
+    expect((await getDashboard(user)).continueReading).toMatchObject({ chapterSlug: "vol", read: 2, total: 3 });
+    await setNoteRead(user, n3, true); // whole series read: stay on the last opened chapter
+    expect((await getDashboard(user)).continueReading).toMatchObject({ chapterSlug: "net" });
+  });
+
   it("falls back to null when no opened chapter is visible", async () => {
     const { user, s } = await fixtures();
     await Note.updateMany({ seriesId: s }, { status: "archived" });
