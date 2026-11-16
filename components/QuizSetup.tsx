@@ -82,7 +82,7 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
   }
 
   return (
-    <section aria-labelledby="new-quiz" className="rounded-xl border border-border bg-card p-5">
+    <section aria-labelledby="new-quiz" className="min-w-0 rounded-xl border border-border bg-card p-5">
       <h2 id="new-quiz" className="text-lg font-semibold">
         New quiz
       </h2>

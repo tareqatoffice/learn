@@ -226,12 +226,21 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* body is flex column; default min-width:auto on flex children lets long content widen the page. */
+  body > * {
+    min-width: 0;
+  }
   html {
     @apply font-sans;
     /* In-page anchors (chapter TOC, heading links) land below the 56px sticky header, not under it. */
     scroll-padding-top: 5rem;
     -webkit-text-size-adjust: 100%;
   }
+}
+
+/* Unlayered so it wins over preflight: clip sideways overflow without breaking sticky (clip ≠ hidden). */
+html {
+  overflow-x: clip;
 }
 
 /*

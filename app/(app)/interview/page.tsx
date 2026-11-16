@@ -40,11 +40,11 @@ export default async function InterviewPage() {
           books={books.map(({ id, title, parts }) => ({ id, title, parts }))}
         />
 
-        <div className="grid content-start gap-6">
+        <div className="grid min-w-0 content-start gap-6">
           {unfinished.length > 0 && (
             <section
               aria-labelledby="unfinished"
-              className="rounded-xl border border-border bg-card p-5"
+              className="min-w-0 rounded-xl border border-border bg-card p-5"
             >
               <h2 id="unfinished" className="text-lg font-semibold">
                 Unfinished quizzes
@@ -55,7 +55,7 @@ export default async function InterviewPage() {
                     key={quiz.id}
                     className="flex items-center justify-between gap-3 py-2"
                   >
-                    <span className="min-w-0">
+                    <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">
                         {quiz.label || "Quiz"}
                       </span>
@@ -80,7 +80,7 @@ export default async function InterviewPage() {
 
           <section
             aria-labelledby="books"
-            className="rounded-xl border border-border bg-card p-5"
+            className="min-w-0 rounded-xl border border-border bg-card p-5"
           >
             <h2 id="books" className="text-lg font-semibold">
               Question books
@@ -96,7 +96,7 @@ export default async function InterviewPage() {
                     <div className="flex items-baseline justify-between gap-3">
                       <Link
                         href={`/interview/${book.slug}`}
-                        className="inline-block font-medium hover:underline pointer-coarse:py-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        className="min-w-0 truncate font-medium hover:underline pointer-coarse:py-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                       >
                         {book.title}
                       </Link>

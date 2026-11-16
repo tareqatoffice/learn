@@ -44,7 +44,7 @@ function NextUp({
   return (
     <section
       aria-labelledby={id}
-      className="grid content-start gap-2 p-4 sm:p-5"
+      className="grid min-w-0 content-start gap-2 p-4 sm:p-5"
     >
       <h3 id={id} className="text-sm font-semibold">
         {title}
@@ -150,7 +150,7 @@ export default async function DashboardPage() {
               <p className="text-3xl font-semibold tabular-nums leading-none">
                 {reviewCount}
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="min-w-0 break-words text-sm text-muted-foreground">
                 {reviewCount === 1 ? "question waiting" : "questions waiting"}
                 {dash.reviewPile.byBook.length > 0 &&
                   ` · ${dash.reviewPile.byBook.map((b) => `${b.title} ${b.count}`).join(" · ")}`}
@@ -341,9 +341,9 @@ export default async function DashboardPage() {
                   {dash.recentQuizzes.map((q) => (
                     <li
                       key={q.id}
-                      className="flex items-baseline justify-between gap-3"
+                      className="flex min-w-0 items-baseline justify-between gap-3"
                     >
-                      <Link href={`/interview/history/${q.id}`} className={`truncate ${linkClass}`}>
+                      <Link href={`/interview/history/${q.id}`} className={`min-w-0 truncate ${linkClass}`}>
                         {q.label}
                         {!q.finished && <span className="text-muted-foreground"> · in progress</span>}
                       </Link>

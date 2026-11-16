@@ -68,7 +68,7 @@ export default async function SeriesPage({
                 href={`/notes/${view.series.slug}/${c.slug}`}
                 className="relative flex min-w-0 items-baseline gap-2 hover:underline pointer-coarse:py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
-                <span className="min-w-0">{c.title}</span>
+                <span className="min-w-0 truncate">{c.title}</span>
                 {c.read && (
                   <>
                     <span aria-hidden className="shrink-0 text-ok">

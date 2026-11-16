@@ -56,7 +56,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         {/* Browsers hide a nonce from the DOM after load, so the client never sees the server's value. */}
         <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-full min-w-0 flex-col">
         {/* First tab stop on every page; each page's <main> carries id="main". */}
         <a
           href="#main"

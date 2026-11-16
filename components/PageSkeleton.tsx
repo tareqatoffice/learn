@@ -62,7 +62,7 @@ export function DashboardSkeleton() {
         <Skeleton className="h-4 w-16" />
         <div className="grid divide-y divide-border rounded-xl border border-border bg-card shadow-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           {Array.from({ length: 3 }, (_, i) => (
-            <div key={i} className="grid content-start gap-2 p-4 sm:p-5">
+            <div key={i} className="grid min-w-0 content-start gap-2 p-4 sm:p-5">
               <Skeleton className="h-4 w-24" />
               <Skeleton className="h-8 w-16" />
               <Skeleton className="h-4 w-36 max-w-full" />

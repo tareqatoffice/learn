@@ -23,7 +23,7 @@ export function Card({
     <section
       aria-labelledby={id}
       className={cn(
-        "card-interactive grid content-start gap-2 rounded-xl border border-border bg-card p-4",
+        "card-interactive grid min-w-0 content-start gap-2 rounded-xl border border-border bg-card p-4",
         className,
       )}
     >

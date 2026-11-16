@@ -24,7 +24,7 @@ export function WeekStrip({ week, today }: { week: { date: string; fraction: num
               data-bar
               className={cn(
                 "relative flex h-16 w-full max-w-10 items-end overflow-hidden rounded-md bg-muted",
-                isToday && "outline-2 outline-offset-2 outline-ring",
+                isToday && "ring-2 ring-ring",
               )}
             >
               <div data-fill className="progress-fill w-full rounded-md bg-ok" style={{ height: `${share}%` }} />

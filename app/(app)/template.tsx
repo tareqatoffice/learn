@@ -23,7 +23,7 @@ export default function Template({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   return (
-    <div ref={ref} className="page-enter">
+    <div ref={ref} className="page-enter min-w-0">
       {children}
     </div>
   );

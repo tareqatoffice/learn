@@ -27,7 +27,7 @@ const PROFILE_LINK = { href: "/profile", label: "Profile" };
 
 const linkClass = (active: boolean) =>
   cn(
-    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+    "rounded-md px-2 py-1.5 text-sm font-medium transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring lg:px-3",
     active ? "bg-muted text-foreground" : "text-muted-foreground",
   );
 
@@ -37,7 +37,7 @@ const linkClass = (active: boolean) =>
 // pull the bar up under the text for the length of the click.
 const barClass = (active: boolean) =>
   cn(
-    "pointer-events-none absolute inset-x-3 -bottom-px h-0.5 origin-left rounded-full bg-ring transition-transform duration-300 ease-out peer-hover:scale-x-100",
+    "pointer-events-none absolute inset-x-2 -bottom-px h-0.5 origin-left rounded-full bg-ring transition-transform duration-300 ease-out peer-hover:scale-x-100 lg:inset-x-3",
     active ? "scale-x-100" : "scale-x-0",
   );
 
@@ -153,9 +153,12 @@ export function TopBar({ user }: { user: TopBarUser }) {
         )
       }
     >
-      <nav aria-label="Main" className="hidden gap-1 self-stretch md:flex">
+      <nav
+        aria-label="Main"
+        className="hidden min-w-0 flex-1 gap-1 self-stretch overflow-x-auto md:flex"
+      >
         {links.map(({ href, label }) => (
-          <div key={href} className="relative flex items-center">
+          <div key={href} className="relative flex shrink-0 items-center">
             <Link
               href={href}
               aria-current={isActive(href) ? "page" : undefined}
@@ -168,21 +171,21 @@ export function TopBar({ user }: { user: TopBarUser }) {
         ))}
       </nav>
 
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex shrink-0 items-center gap-1">
         <button
           type="button"
           onClick={openSearch}
           aria-label="Search"
           aria-keyshortcuts="Control+K Meta+K"
-          className="inline-flex h-9 items-center gap-2 rounded-md px-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:border sm:border-border sm:bg-background sm:pr-1.5 sm:pl-2.5 pointer-coarse:h-10"
+          className="inline-flex h-9 items-center gap-2 rounded-md px-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring lg:border lg:border-border lg:bg-background lg:pr-1.5 lg:pl-2.5 pointer-coarse:h-10"
         >
           <Search className="size-4 shrink-0" aria-hidden />
-          <span aria-hidden className="hidden text-sm sm:inline">
+          <span aria-hidden className="hidden text-sm lg:inline">
             Search
           </span>
           <kbd
             aria-hidden
-            className="ml-6 hidden rounded border border-border px-1.5 py-0.5 text-[0.6875rem] font-sans tabular-nums lg:inline"
+            className="ml-3 hidden rounded border border-border px-1.5 py-0.5 text-[0.6875rem] font-sans tabular-nums xl:inline"
           >
             ⌘K
           </kbd>
