@@ -10,17 +10,13 @@ const cueSchema = new Schema(
   { _id: false },
 );
 
-/** Content: a Part 1 frame, a Part 2 cue card or a Part 3 question set. */
 const ieltsSpeakingItemSchema = new Schema(
   {
     type: { type: String, enum: ["part1", "part2", "part3"], required: true },
     title: { type: String, required: true },
     aboutYou: { type: Boolean, default: false },
-    /** Parts 1 and 3. */
     questions: { type: [String], default: [] },
-    /** Part 2. */
     cue: { type: cueSchema, default: undefined },
-    /** Part 3: the Part 2 card it follows. */
     cardId: { type: Schema.Types.ObjectId, ref: "IeltsSpeakingItem" },
     status: { type: String, enum: ["draft", "published"], default: "draft" },
     tags: { type: [String], default: [] },

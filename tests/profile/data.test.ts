@@ -1,12 +1,13 @@
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectDb } from "@/lib/db";
-import { IeltsBandEntry, IeltsSpeakingAttempt, Note, NoteProgress, QuizSession, SpeakingTake } from "@/models";
+import { IeltsBandEntry, IeltsSpeakingAttempt, IeltsStudyLog, IeltsTestAttempt, IeltsWritingAttempt, Note, NoteProgress, QuizSession, SpeakingTake } from "@/models";
+import { setNodeStatus } from "@/progress/graph";
 import { openNote, setNoteRead } from "@/progress/notes";
 import { createSession, finishSession, recordResult, type QuizFilter } from "@/progress/quiz";
-import { fillActivity, getProfileData, parseTab, streakOf } from "@/profile/data";
+import { activityStreak, fillActivity, getProfileData, parseTab, streakOf } from "@/profile/data";
 import { resetDb } from "../setup/mongo";
-import { newUserId, seedBook, seedNote, seedQuestions, seedSeries } from "../progress/seed";
+import { newUserId, seedBook, seedGraph, seedNode, seedNote, seedQuestions, seedSeries } from "../progress/seed";
 
 beforeAll(connectDb);
 beforeEach(resetDb);
@@ -14,7 +15,8 @@ afterAll(() => mongoose.disconnect());
 
 const now = new Date("2026-11-12T10:00:00Z");
 const who = { name: "Sam" };
-const media = { kind: "audio", key: "k", mime: "audio/webm", durationSec: 5, capSec: 60 };
+const media = { kind: "audio", key: "k", mime: "audio/webm", durationSec: 5, capSec: 60, stored: true };
+const part = (stored = true) => [{ part: "p1", media: { ...media, stored } }];
 const all: QuizFilter = { bookIds: [], partKeys: [], mode: "all", size: null };
 
 describe("parseTab", () => {
@@ -49,6 +51,17 @@ describe("fillActivity and streakOf", () => {
     const days = fillActivity(new Map([["2026-11-10", 1]]), "2026-11-12", 5);
     expect(streakOf(days)).toBe(0);
   });
+
+  it("activityStreak counts past the heatmap window (D4)", () => {
+    const counts = new Map<string, number>();
+    let day = "2026-11-11";
+    for (let i = 0; i < 100; i++) {
+      counts.set(day, 1);
+      day = new Date(Date.parse(`${day}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+    }
+    expect(activityStreak(counts, "2026-11-12")).toBe(100);
+    expect(activityStreak(counts, "2026-11-14")).toBe(0);
+  });
 });
 
 describe("getProfileData", () => {
@@ -59,7 +72,7 @@ describe("getProfileData", () => {
     expect(d.notes.history).toEqual([]);
     expect(d.interview.history).toEqual([]);
     expect(d.speaking.takes).toBe(0);
-    expect(d.ielts.attempts).toBe(0);
+    expect(d.ielts.speaking.attempts).toBe(0);
   });
 
   it("returns empty areas for an id that is not an ObjectId", async () => {
@@ -103,7 +116,6 @@ describe("getProfileData", () => {
       const n = await seedNote(s, "intro");
       await openNote(user, n);
       await setNoteRead(user, n, true);
-      // 23:00 UTC on the 12th is 03:00 on the 13th in Dubai (UTC+4).
       await NoteProgress.updateOne({ userId: user, noteId: n }, { readAt: new Date("2026-11-12T23:00:00Z") });
 
       const d = await getProfileData(user, who, "Asia/Dubai", new Date("2026-11-13T05:00:00Z"));
@@ -133,7 +145,6 @@ describe("getProfileData", () => {
       await seedQuestions(book, 2);
       const created = await createSession(user, all);
       if (!("sessionId" in created)) throw new Error("expected a session");
-      // The deck is shuffled and cards are answered in deck order.
       const session = await QuizSession.findById(created.sessionId).lean<{ questionIds: unknown[] }>();
       for (const q of session!.questionIds) await recordResult(user, created.sessionId, String(q), "got");
       await finishSession(user, created.sessionId);
@@ -156,6 +167,34 @@ describe("getProfileData", () => {
       expect(d.interview.quizzes).toBe(0);
       expect(d.interview.history).toEqual([]);
     });
+
+    it("counts answered cards on their day even before the quiz is finished (D4b)", async () => {
+      const user = newUserId();
+      const book = await seedBook("js");
+      await seedQuestions(book, 2);
+      const created = await createSession(user, all);
+      if (!("sessionId" in created)) throw new Error("expected a session");
+      const session = await QuizSession.findById(created.sessionId).lean<{ questionIds: unknown[] }>();
+      await recordResult(user, created.sessionId, String(session!.questionIds[0]), "got");
+
+      const d = await getProfileData(user, who);
+      expect(d.activity.at(-1)?.count).toBe(1);
+    });
+  });
+
+  describe("graphs", () => {
+    it("counts topics done and lists them with a heatmap day (D4b)", async () => {
+      const user = newUserId();
+      const graphId = await seedGraph("g");
+      const a = await seedNode(graphId, "a");
+      await seedNode(graphId, "b");
+      await setNodeStatus(user, a, "done");
+
+      const d = await getProfileData(user, who);
+      expect(d.graphs).toMatchObject({ done: 1, total: 2 });
+      expect(d.graphs.history).toEqual([expect.objectContaining({ topicSlug: "a", graphSlug: "g" })]);
+      expect(d.activity.at(-1)?.count).toBe(1);
+    });
   });
 
   describe("speaking", () => {
@@ -172,6 +211,15 @@ describe("getProfileData", () => {
       expect(d.activity.at(-1)?.count).toBe(2);
     });
 
+    it("leaves out takes whose upload never finished (D3)", async () => {
+      const user = newUserId();
+      await SpeakingTake.create({ userId: user, date: "2026-11-12", task: "readAloud", media: { ...media, stored: false } });
+      const d = await getProfileData(user, who, "UTC", now);
+      expect(d.speaking.takes).toBe(0);
+      expect(d.speaking.history).toEqual([]);
+      expect(d.activity.at(-1)?.count).toBe(0);
+    });
+
     it("keeps old takes in the totals but out of the heatmap window", async () => {
       const user = newUserId();
       await SpeakingTake.create({ userId: user, date: "2026-01-01", task: "shadowing", media });
@@ -185,14 +233,14 @@ describe("getProfileData", () => {
   describe("ielts", () => {
     it("counts attempts and completed ones, with the AI overall on the history rows", async () => {
       const user = newUserId();
-      await IeltsSpeakingAttempt.create({ userId: user, date: "2026-11-11", kind: "part1", status: "inProgress" });
-      await IeltsSpeakingAttempt.create({ userId: user, date: "2026-11-12", kind: "mock", status: "complete", ai: { overall: 6.5 } });
+      await IeltsSpeakingAttempt.create({ userId: user, date: "2026-11-11", kind: "part1", status: "inProgress", parts: part() });
+      await IeltsSpeakingAttempt.create({ userId: user, date: "2026-11-12", kind: "mock", status: "complete", ai: { overall: 6.5 }, parts: part() });
+      await IeltsSpeakingAttempt.create({ userId: user, date: "2026-11-12", kind: "part2", status: "inProgress", parts: part(false) });
 
       const d = await getProfileData(user, who, "UTC", now);
-      expect(d.ielts.attempts).toBe(2);
-      expect(d.ielts.completed).toBe(1);
-      expect(d.ielts.history[0]).toMatchObject({ date: "2026-11-12", kind: "mock", overall: 6.5 });
-      expect(d.ielts.history[1].overall).toBeUndefined();
+      expect(d.ielts.speaking).toEqual({ attempts: 2, completed: 1 });
+      expect(d.ielts.history[0]).toMatchObject({ date: "2026-11-12", area: "speaking", kind: "mock", band: 6.5, done: true });
+      expect(d.ielts.history[1].band).toBeUndefined();
       expect(d.activity.at(-1)?.count).toBe(1);
     });
 
@@ -203,6 +251,23 @@ describe("getProfileData", () => {
 
       const d = await getProfileData(user, who, "UTC", now);
       expect(d.ielts.bands.map((b) => b.overall)).toEqual([7, 6]);
+      expect(d.ielts.bands[0].bands).toEqual({ speaking: 7 });
+    });
+
+    it("counts Listening, Reading and Writing attempts and study logs (D4b)", async () => {
+      const user = newUserId();
+      const base = { userId: user, date: "2026-11-12", startedAt: now, limitSec: 60 };
+      await IeltsTestAttempt.collection.insertOne({ ...base, userId: new mongoose.Types.ObjectId(user), skill: "reading", testId: new mongoose.Types.ObjectId(), title: "R", scope: "full", status: "submitted", score: { band: 7 } });
+      await IeltsTestAttempt.collection.insertOne({ ...base, userId: new mongoose.Types.ObjectId(user), skill: "listening", testId: new mongoose.Types.ObjectId(), title: "L", scope: "0", status: "in_progress" });
+      await IeltsWritingAttempt.collection.insertOne({ userId: new mongoose.Types.ObjectId(user), date: "2026-11-11", kind: "task2", status: "submitted", tasks: [] });
+      await IeltsStudyLog.create({ userId: user, date: "2026-11-10", skill: "reading", minutes: 30 });
+
+      const d = await getProfileData(user, who, "UTC", now);
+      expect(d.ielts).toMatchObject({ tests: 1, writing: 1, studyMinutes: 30 });
+      expect(d.ielts.history.map((h) => h.area).sort()).toEqual(["listening", "reading", "writing"]);
+      expect(d.ielts.history.find((h) => h.area === "reading")).toMatchObject({ band: 7, done: true, href: expect.stringMatching(/^\/ielts\/test\//) });
+      expect(d.activity.slice(-3).map((a) => a.count)).toEqual([1, 1, 1]);
+      expect(d.streak).toBe(3);
     });
   });
 });

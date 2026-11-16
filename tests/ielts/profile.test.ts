@@ -38,6 +38,18 @@ describe("ielts profile", () => {
     expect((await getProfile(u))?.testDate).toBe(addDays(TODAY, 120));
   });
 
+  it("keeps the plan when only preferences change, and writes a version when plan inputs do (D8)", async () => {
+    const u = user();
+    await saveProfile(u, input(), TODAY);
+    expect(await saveProfile(u, input({ examinerVoice: false, studyDays: [6, 5, 4, 3, 2, 1, 0] }), TODAY)).toEqual({ ok: true, version: 1 });
+    expect(await saveProfile(u, input(), addDays(TODAY, 3))).toEqual({ ok: true, version: 1 });
+    expect(await IeltsPlan.countDocuments({ userId: u })).toBe(1);
+    expect(await saveProfile(u, input({ minutesPerDay: 90 }), TODAY)).toEqual({ ok: true, version: 2 });
+    expect(await saveProfile(u, input({ minutesPerDay: 90, target: { overall: 7.5 } }), TODAY)).toEqual({ ok: true, version: 3 });
+    await endPlan(u);
+    expect(await saveProfile(u, input({ minutesPerDay: 90, target: { overall: 7.5 } }), TODAY)).toEqual({ ok: true, version: 4 });
+  });
+
   it("previewProfile writes nothing", async () => {
     const u = user();
     await saveProfile(u, input(), TODAY);

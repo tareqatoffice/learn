@@ -18,6 +18,7 @@ const graphSchema = new Schema(
     footer: { type: String, default: "" },
     subjects: { type: [String], default: [] },
     tracks: { type: [trackSchema], default: [] },
+    prereqVersion: { type: Number, default: 0 },
     order: { type: Number, default: 0 },
     status: { type: String, enum: STATUSES, default: "draft" },
     importedAt: Date,

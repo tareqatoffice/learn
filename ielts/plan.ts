@@ -1,5 +1,3 @@
-// Pure three-phase study plan generator. No DB, no clock: `today` comes in through the inputs.
-// All dates are YYYY-MM-DD strings, compared lexically and read as UTC.
 
 import { SKILLS, type Criterion, type Skill } from "@/ielts/bands";
 import { addDays } from "@/speaking/schedule";
@@ -10,17 +8,14 @@ export type PlanInputs = {
   today: string;
   testDate: string;
   minutesPerDay: number;
-  /** Weekdays, 0 = Sunday. */
   studyDays: number[];
   target: BandSet;
   current: Partial<BandSet>;
   currentUnknown: boolean;
 };
 
-/** Split values are percentages of the days left. */
 export type PlanSettings = { hoursPerBand: number; split: { foundation: number; skills: number; mocks: number } };
 
-/** As stored in `IeltsPlan.adjustments`. */
 export type Adjustment = {
   id: string;
   kind: "shiftCriterion" | "spreadShortfall";
@@ -32,7 +27,6 @@ export type Adjustment = {
 };
 
 export type PhaseName = "foundation" | "skills" | "mocks";
-/** `start` and `end` are inclusive. */
 export type Phase = { name: PhaseName; start: string; end: string };
 export type Week = { start: string; end: string; minutes: Record<Skill, number>; mocks: number; focus?: Criterion };
 export type Hours = { needed: number; available: number; short: boolean };
@@ -48,12 +42,10 @@ function weekday(date: string): number {
   return new Date(`${date}T00:00:00Z`).getUTCDay();
 }
 
-/** Days from `from` to `to` (exclusive of `to`). */
 function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
 
-/** Study days from `from` to `to`, both inclusive; 0 when `to` is before `from`. */
 export function studyDaysBetween(from: string, to: string, studyDays: number[]): number {
   const days = new Set(studyDays);
   let count = 0;
@@ -72,11 +64,6 @@ export function hoursCheck(inputs: PlanInputs, settings: PlanSettings): Hours {
   return { needed, available, short: needed > available };
 }
 
-/**
- * Whole-day phases over `days`. Foundation and mocks each get round(days × share); mocks is then
- * raised to at least 7 days (never past the whole plan), and skills takes what is left. Under 21
- * days there is no foundation and the split is 60/40. Empty phases are left out.
- */
 function phaseLengths(days: number, split: PlanSettings["split"]): [PhaseName, number][] {
   const short = days < SHORT_PLAN_DAYS;
   const mocksPct = short ? SHORT_SPLIT.mocks : split.mocks;
@@ -90,11 +77,6 @@ function phaseLengths(days: number, split: PlanSettings["split"]): [PhaseName, n
   return lengths.filter(([, n]) => n > 0);
 }
 
-/**
- * Share of weekly minutes per skill: w = 1 + max(target − current, 0), with a missing per-skill
- * figure taken from overall. Normalised, then any share under 15 % is raised to 15 % and the rest
- * rescaled to fill what remains (repeated until none is under).
- */
 function skillWeights(inputs: PlanInputs): Record<Skill, number> {
   const cur = currentOverall(inputs);
   const raw = SKILLS.map((s) => 1 + Math.max((inputs.target[s] ?? inputs.target.overall) - (inputs.current[s] ?? cur), 0));
@@ -111,7 +93,6 @@ function skillWeights(inputs: PlanInputs): Record<Skill, number> {
   return Object.fromEntries(SKILLS.map((s, i) => [s, shares[i]])) as Record<Skill, number>;
 }
 
-/** Rounds `amounts` (summing to the integer `whole`) to integers with the same sum, largest remainder first. */
 function largestRemainder(amounts: number[], whole: number): number[] {
   const out = amounts.map((a) => Math.floor(a));
   let left = whole - out.reduce((a, b) => a + b, 0);
@@ -120,14 +101,6 @@ function largestRemainder(amounts: number[], whole: number): number[] {
   return out;
 }
 
-/**
- * Whole minutes per skill summing exactly to round(total). Every skill first gets
- * ceil(whole × 15 %); the rest is shared by each skill's weight above 15 % (which keeps the
- * weights' proportions, since the weights already include the floor), with largest-remainder
- * rounding. Ruling R7: when the week is too small for the floor (whole < 4 × ceil(whole × 15 %),
- * e.g. a week with no study days and only spread minutes), the floor is skipped and the minutes
- * are split by weight with largest remainder.
- */
 function splitMinutes(total: number, weights: Record<Skill, number>): Record<Skill, number> {
   const whole = Math.round(total);
   const w = SKILLS.map((s) => weights[s]);
@@ -145,25 +118,10 @@ function splitMinutes(total: number, weights: Record<Skill, number>): Record<Ski
   return Object.fromEntries(SKILLS.map((s, i) => [s, minutes[i]])) as Record<Skill, number>;
 }
 
-/** The UTC calendar date an adjustment was created on. */
 function createdDate(a: Adjustment): string {
   return new Date(a.createdAt).toISOString().slice(0, 10);
 }
 
-/**
- * Builds the plan over today..testDate−1.
- *
- * - Weeks are 7-day blocks from `today`; the last one is cut short at testDate−1 and its minutes
- *   come from its own (fewer) study days.
- * - A week's mocks come from the phase its first day falls in, capped at its study days. Week 0
- *   gets 1 diagnostic mock when it is a foundation week and the current band is unknown.
- * - `spreadShortfall` adds minutes / (weeks − fromWeek) to each week from `fromWeek` on, split by
- *   the skill weights. It is one-shot (ruling R12): kept only on the rebuild dated its creation
- *   day (UTC date of `createdAt` = `today`), and dropped on later rebuilds or when `fromWeek` is
- *   past the last week.
- * - `shiftCriterion` sets `focus` on the week containing its creation date (UTC) and every later
- *   week, in `createdAt` order so the newest shift wins; dropped when its criterion is in `metCriteria`.
- */
 export function generatePlan(
   inputs: PlanInputs,
   adjustments: Adjustment[],

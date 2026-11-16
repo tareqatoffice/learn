@@ -1,5 +1,6 @@
 "use server";
 
+import { refresh } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
@@ -10,7 +11,6 @@ const input = z.object({
   status: z.enum(["none", "learning", "done"]),
 });
 
-/** `error` is set when a prerequisite is not done yet; other failures throw. */
 export async function setNodeStatusAction(
   nodeId: string,
   status: NodeStatus,
@@ -24,5 +24,6 @@ export async function setNodeStatusAction(
     if (e instanceof PrereqNotDoneError) return { error: e.message };
     throw e;
   }
+  refresh();
   return {};
 }

@@ -1,5 +1,6 @@
 "use server";
 
+import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { AI_ANSWER_MAX, AI_MESSAGE_MAX } from "@/lib/ai-limits";
@@ -10,7 +11,9 @@ import { ANSWER_MODES, type QuizAttempt } from "@/lib/quiz-answer";
 import { clearQuestionProgress, type MarkResult } from "@/progress/questions";
 import { type AiGrade, type AiReply, type AiResult, askFollowUp, gradeAnswer } from "@/progress/quizAi";
 import {
+  countDeck,
   createSession,
+  discardSession,
   finishSession,
   recordResult,
   type QuizFilter,
@@ -27,7 +30,6 @@ const filterSchema = z.object({
   questionIds: z.array(objectId).max(5000).optional(),
 });
 
-/** Starts a quiz and redirects into it; an empty deck creates nothing and comes back as `{ empty: true }`. */
 export async function startQuizAction(
   filter: QuizFilter,
 ): Promise<{ empty: true }> {
@@ -37,6 +39,14 @@ export async function startQuizAction(
   const result = await createSession(user.userId, parsed);
   if ("empty" in result) return { empty: true };
   redirect(`/interview/quiz/${result.sessionId}`);
+}
+
+export async function countDeckAction(filter: QuizFilter): Promise<number> {
+  const parsed = filterSchema.parse(filter);
+  const user = await requireUser();
+  await connectDb();
+  const n = await countDeck(user.userId, parsed);
+  return parsed.size ? Math.min(parsed.size, n) : n;
 }
 
 export async function recordResultAction(
@@ -62,7 +72,7 @@ export async function recordResultAction(
     });
   const user = await requireUser();
   await connectDb();
-  return recordResult(
+  const view = await recordResult(
     user.userId,
     input.sessionId,
     input.questionId,
@@ -70,9 +80,10 @@ export async function recordResultAction(
     Math.random,
     input.attempt,
   );
+  refresh();
+  return view;
 }
 
-/** Clears the user's question progress for the given books (empty list = every book). */
 export async function clearProgressAction(bookIds: string[]): Promise<{ cleared: number }> {
   const ids = z.array(objectId).max(100).parse(bookIds);
   const user = await requireUser();
@@ -80,14 +91,22 @@ export async function clearProgressAction(bookIds: string[]): Promise<{ cleared:
   return { cleared: await clearQuestionProgress(user.userId, ids) };
 }
 
+export async function discardQuizAction(sessionId: string): Promise<void> {
+  const id = objectId.parse(sessionId);
+  const user = await requireUser();
+  await connectDb();
+  await discardSession(user.userId, id);
+  refresh();
+}
+
 export async function finishQuizAction(sessionId: string): Promise<void> {
   const id = objectId.parse(sessionId);
   const user = await requireUser();
   await connectDb();
   await finishSession(user.userId, id);
+  refresh();
 }
 
-/** Runs an AI call, turning failures into a message (thrown errors are masked in production). */
 async function aiCall<T>(work: (userId: string) => Promise<T>): Promise<AiResult<T>> {
   const user = await requireUser();
   try {
@@ -100,7 +119,6 @@ async function aiCall<T>(work: (userId: string) => Promise<T>): Promise<AiResult
   }
 }
 
-/** The message for the first invalid field, so the learner fixes the right thing. */
 function inputError(error: z.ZodError, messages: Record<string, string>): string {
   const field = String(error.issues[0]?.path[0] ?? "");
   return messages[field] ?? "This quiz is out of date. Reload the page and try again.";

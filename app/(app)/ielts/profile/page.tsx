@@ -24,7 +24,7 @@ export default async function IeltsProfilePage() {
   const profile = await getProfile(user.userId);
 
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-4">
+    <div className="grid w-full gap-4">
       <TimeZoneCookie current={timeZone} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>{profile ? "IELTS profile" : "Set up your IELTS plan"}</h1>
@@ -60,7 +60,8 @@ export default async function IeltsProfilePage() {
           )}
           <div className="grid gap-2">
             <p className="text-sm text-muted-foreground">
-              Deleting removes your IELTS profile, plans, band entries, study logs and Speaking recordings. Speaking Practice is not affected.
+              Deleting removes your IELTS profile, plans, band entries, study logs, and every Speaking, Listening, Reading and
+              Writing attempt, recordings included. Speaking Practice is not affected.
             </p>
             <div>
               <DeleteIeltsDataButton />

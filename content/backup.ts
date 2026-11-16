@@ -4,18 +4,25 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import mongoose, { type Model } from "mongoose";
 import {
+  AiConversation,
   AiSettings,
+  AiUsage,
   ApiToken,
   Graph,
   GraphNode,
   IeltsBandEntry,
+  IeltsListeningTest,
   IeltsPlan,
   IeltsPlanSuggestion,
   IeltsProfile,
+  IeltsReadingTest,
   IeltsSettings,
   IeltsSpeakingAttempt,
   IeltsSpeakingItem,
   IeltsStudyLog,
+  IeltsTestAttempt,
+  IeltsWritingAttempt,
+  IeltsWritingPrompt,
   NodeProgress,
   Note,
   NoteProgress,
@@ -30,13 +37,13 @@ import {
   SpeakingProfile,
   SpeakingSettings,
   SpeakingTake,
+  SpeakingUsage,
   Subject,
   User,
 } from "@/models";
 
 const { EJSON } = mongoose.mongo.BSON;
 
-/** Content collections in export order (users, progress, revisions and tokens are never part of a content export). */
 export const CONTENT_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["subjects", Subject],
   ["questionbooks", QuestionBook],
@@ -49,14 +56,13 @@ export const CONTENT_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["speakingsettings", SpeakingSettings],
   ["ieltsspeakingitems", IeltsSpeakingItem],
   ["ieltssettings", IeltsSettings],
+  ["ieltsreadingtests", IeltsReadingTest],
+  ["ieltslisteningtests", IeltsListeningTest],
+  ["ieltswritingprompts", IeltsWritingPrompt],
 ];
 
 const ejson = (value: unknown) => EJSON.stringify(value, { relaxed: false });
 
-/**
- * Canonical-EJSON document `{ version, exportedAt, collections: { name: [docs] } }`,
- * yielded piece by piece so the whole export never sits in memory at once.
- */
 export async function* exportContent(collections = CONTENT_COLLECTIONS): AsyncIterable<string> {
   yield `{"version":1,"exportedAt":${ejson(new Date())},"collections":{`;
   for (const [i, [name, model]] of collections.entries()) {
@@ -71,7 +77,6 @@ export async function* exportContent(collections = CONTENT_COLLECTIONS): AsyncIt
   yield "}}";
 }
 
-/** Everything: content plus users, progress, quiz sessions, revisions and API token hashes. */
 export const ALL_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ...CONTENT_COLLECTIONS,
   ["users", User],
@@ -91,24 +96,22 @@ export const ALL_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["ieltsstudylogs", IeltsStudyLog],
   ["ieltsbandentries", IeltsBandEntry],
   ["ieltsspeakingattempts", IeltsSpeakingAttempt],
+  ["ieltstestattempts", IeltsTestAttempt],
+  ["ieltswritingattempts", IeltsWritingAttempt],
+  ["aiusages", AiUsage],
+  ["aiconversations", AiConversation],
+  ["speakingusages", SpeakingUsage],
 ];
 
 const countsOf = async (collections: typeof ALL_COLLECTIONS) =>
   Object.fromEntries(await Promise.all(collections.map(async ([name, model]) => [name, await model.countDocuments()] as const)));
 
-/** Full backup of every collection to `filePath`, in the same format as the content export. */
 export async function backupAll(filePath: string): Promise<{ counts: Record<string, number> }> {
   const counts = await countsOf(ALL_COLLECTIONS);
-  // pipeline handles backpressure and rejects (closing both ends) on a read or write error.
   await pipeline(Readable.from(exportContent(ALL_COLLECTIONS)), createWriteStream(filePath, { encoding: "utf8" }));
   return { counts };
 }
 
-/**
- * Loads a backup or a content export into an empty database, keeping every original
- * `_id` so progress still points at its content. Refuses unless every Learn collection is
- * empty; if an insert fails, empties them again so the restore can simply be rerun.
- */
 export async function restoreAll(filePath: string): Promise<{ counts: Record<string, number> }> {
   for (const [name, model] of ALL_COLLECTIONS) {
     if (await model.exists({})) throw new Error(`target database is not empty (${name} has documents)`);
@@ -129,7 +132,6 @@ export async function restoreAll(filePath: string): Promise<{ counts: Record<str
       counts[name] = docs.length;
     }
   } catch (error) {
-    // Every collection was empty before the restore, so emptying them undoes it.
     await Promise.all(ALL_COLLECTIONS.map(([, model]) => model.collection.deleteMany({})));
     const why = error instanceof Error ? error.message : String(error);
     throw new Error(`restore failed and was rolled back, the database is empty again: ${why}`);

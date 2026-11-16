@@ -17,7 +17,6 @@ const split = (text: string) =>
     .map((s) => s.trim())
     .filter(Boolean);
 
-/** The line-per-entry text areas hold their text as typed; they are split into lists on save. */
 type Draft = {
   id: string;
   title: string;
@@ -49,7 +48,6 @@ const toDraft = (item?: AdminIeltsItem): Draft => ({
 const PART_NAME: Record<ItemType, string> = { part1: "Part 1 topic", part2: "Part 2 cue card", part3: "Part 3 discussion" };
 const BACK = { href: "/admin/ielts/speaking", label: "IELTS Speaking" };
 
-/** Create or edit one Part 1 frame, Part 2 cue card or Part 3 question set. */
 export function IeltsSpeakingItemForm({ type, item, cards }: { type: ItemType; item?: AdminIeltsItem; cards: { id: string; title: string }[] }) {
   const router = useRouter();
   const [draft, setDraft] = useState(() => toDraft(item));

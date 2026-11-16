@@ -5,30 +5,31 @@ import { moveItemAction, setStatusAction } from "@/app/(app)/admin/actions";
 import { firstError } from "@/admin/result";
 import type { OrderedKind, StatusKind } from "@/admin/service";
 import { useAdminAction } from "@/components/admin/useAdminAction";
+import { Button } from "@/components/ui/button";
 import type { Status } from "@/models/status";
 
-const buttonClass =
-  "rounded border border-border px-2 py-0.5 text-xs pointer-coarse:min-h-9 pointer-coarse:min-w-9 hover:bg-muted disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-ring";
-
-/** Up/down and a status select for one row of an admin list. */
 export function RowActions({ kind, id, status, label }: { kind: OrderedKind; id: string; status?: Status; label: string }) {
   const { run, pending, errors } = useAdminAction();
   const error = firstError(errors);
 
   return (
     <span className="flex items-center gap-1">
-      <button type="button" className={buttonClass} disabled={pending} aria-label={`Move ${label} up`} onClick={() => run(() => moveItemAction(kind, id, "up"))}>
+      <Button type="button" variant="outline" size="xs" disabled={pending} aria-label={`Move ${label} up`} onClick={() => run(() => moveItemAction(kind, id, "up"))}>
         ↑
-      </button>
-      <button type="button" className={buttonClass} disabled={pending} aria-label={`Move ${label} down`} onClick={() => run(() => moveItemAction(kind, id, "down"))}>
+      </Button>
+      <Button type="button" variant="outline" size="xs" disabled={pending} aria-label={`Move ${label} down`} onClick={() => run(() => moveItemAction(kind, id, "down"))}>
         ↓
-      </button>
+      </Button>
       {status && kind !== "subject" && (
         <select
           aria-label={`Status of ${label}`}
           value={status}
           disabled={pending}
-          onChange={(e) => run(() => setStatusAction(kind as StatusKind, id, e.target.value as Status))}
+          onChange={(e) => {
+            const next = e.target.value as Status;
+            const confirm = status === "published" && next !== "published" ? `Unpublish "${label}"? Learners stop seeing it.` : undefined;
+            run(() => setStatusAction(kind as StatusKind, id, next), { confirm });
+          }}
           className="rounded border border-border bg-background px-1 py-0.5 text-xs pointer-coarse:min-h-9"
         >
           <option value="draft">Draft</option>
@@ -48,7 +49,6 @@ export function RowActions({ kind, id, status, label }: { kind: OrderedKind; id:
   );
 }
 
-/** Revision.entityType is the Mongoose model name. */
 const MODEL_OF: Record<OrderedKind, string> = {
   book: "QuestionBook",
   question: "Question",

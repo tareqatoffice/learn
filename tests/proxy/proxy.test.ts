@@ -6,7 +6,6 @@ import type { AccessStatus } from "@/models";
 type Session = { user: { id: string; email: string } } | null;
 let session: Session = null;
 
-// auth(callback) resolves to a handler; the request carries the session as `req.auth`.
 vi.mock("@/auth", () => ({
   auth: (callback: (req: NextRequest & { auth: Session }) => unknown) =>
     Promise.resolve((req: NextRequest) => callback(Object.assign(req, { auth: session }))),
@@ -41,6 +40,18 @@ describe("proxy", () => {
     if (saved === undefined) delete process.env.ADMIN_EMAILS;
     else process.env.ADMIN_EMAILS = saved;
     resetEnvCache();
+  });
+
+  it("puts a per-request nonce CSP on allowed responses and on the request Next renders (S2)", async () => {
+    signIn();
+    statusMock.mockResolvedValue("approved");
+    const a = await run("/dashboard");
+    const b = await run("/dashboard");
+    const csp = a.headers.get("content-security-policy") ?? "";
+    expect(csp).toMatch(/script-src 'self' 'nonce-[^']+'/);
+    expect(csp).not.toBe(b.headers.get("content-security-policy"));
+    expect(a.headers.get("x-middleware-request-content-security-policy")).toBe(csp);
+    expect(a.headers.get("x-middleware-request-x-nonce")).toBeTruthy();
   });
 
   it.each(["pending", "blocked"] as const)("answers a %s user's API call with 403 and the reason", async (status) => {
@@ -94,6 +105,12 @@ describe("proxy", () => {
     signIn();
     statusMock.mockResolvedValue(null);
     const res = await run("/dashboard");
-    expect(res.headers.get("location")).toBe("http://localhost/");
+    expect(res.headers.get("location")).toBe("http://localhost/?next=%2Fdashboard");
+  });
+
+  it("keeps the requested page and query in next when sending a signed-out visitor to sign in (F6)", async () => {
+    const res = await run("/notes/a/b?x=1");
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe("http://localhost/?next=%2Fnotes%2Fa%2Fb%3Fx%3D1");
   });
 });

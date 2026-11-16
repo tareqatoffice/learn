@@ -28,25 +28,25 @@ describe("markQuestion", () => {
     expect(docs[0].lastSeenAt).toBeInstanceOf(Date);
   });
 
-  it("a skip on a new question stores status null and seenCount 1", async () => {
+  it("a skip on a new question stores nothing, so it stays unseen (F2)", async () => {
     const user = newUserId();
     const [q] = await seedQuestions(await seedBook("b"), 1);
 
     await markQuestion(user, q, "skip");
 
-    const doc = await QuestionProgress.findOne({ userId: user, questionId: q }).lean<{ status: unknown; seenCount: number }>();
-    expect(doc).toMatchObject({ status: null, seenCount: 1 });
+    expect(await QuestionProgress.countDocuments({ userId: user, questionId: q })).toBe(0);
   });
 
-  it("a skip keeps an earlier status", async () => {
+  it("a skip leaves an earlier mark, its count and its date alone (F2)", async () => {
     const user = newUserId();
     const [q] = await seedQuestions(await seedBook("b"), 1);
 
     await markQuestion(user, q, "got");
+    const before = await QuestionProgress.findOne({ userId: user, questionId: q }).lean<{ lastSeenAt: Date }>();
     await markQuestion(user, q, "skip");
 
-    const doc = await QuestionProgress.findOne({ userId: user, questionId: q }).lean<{ status: unknown; seenCount: number }>();
-    expect(doc).toMatchObject({ status: "got", seenCount: 2 });
+    const doc = await QuestionProgress.findOne({ userId: user, questionId: q }).lean<{ status: unknown; seenCount: number; lastSeenAt: Date }>();
+    expect(doc).toMatchObject({ status: "got", seenCount: 1, lastSeenAt: before!.lastSeenAt });
   });
 
   it("concurrent first marks for the same question keep one doc", async () => {

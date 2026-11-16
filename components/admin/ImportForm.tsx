@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { commitImportAction, previewImportAction, type ImportInput } from "@/app/(app)/admin/import/actions";
+import type { ImportInput } from "@/admin/import";
 import { inputClass } from "@/components/admin/SaveBar";
 import { SubjectPicker } from "@/components/SubjectPicker";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ import type { ImportReport } from "@/content/types";
 type Kind = "book" | "series" | "graph";
 type Files = { name: string; size: number; content: string }[];
 
-/** Paste or upload content, preview the import, then commit exactly what was previewed. */
 export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string; name: string }[] }) {
   const [kind, setKind] = useState<Kind>("book");
   const [slug, setSlug] = useState("");
@@ -21,12 +20,10 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
   const [text, setText] = useState("");
   const [files, setFiles] = useState<Files>([]);
   const [report, setReport] = useState<ImportReport | null>(null);
-  // True only while the inputs are exactly what the last clean preview saw; any edit clears it.
   const [previewClean, setPreviewClean] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  /** Wraps a setter so every input change invalidates the last preview. */
   const edit =
     <T,>(setter: (value: T) => void) =>
     (value: T) => {
@@ -34,7 +31,6 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
       setter(value);
     };
 
-  // Built only when Preview or Commit is pressed, never per keystroke.
   function build(): ImportInput | string {
     const target = { kind, slug: slug.trim() };
     const base = { target, title: title.trim() || undefined, subjects, publish };
@@ -54,7 +50,6 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
     return { ...base, source: { kind, markdown: body } };
   }
 
-  // A commit that reports errors wrote nothing (the plan stopped it, or the transaction rolled back).
   const committed = report !== null && !report.dryRun && report.errors.length === 0;
 
   const go = (commit: boolean) =>
@@ -62,7 +57,17 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
       setError(null);
       const input = build();
       if (typeof input === "string") return setError(input);
-      const r = await (commit ? commitImportAction(input) : previewImportAction(input));
+      let r: ImportReport | { error: string };
+      try {
+        const res = await fetch("/api/admin/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ input, dryRun: !commit }),
+        });
+        r = (await res.json().catch(() => ({ error: `The import failed (${res.status}). Try again.` }))) as typeof r;
+      } catch {
+        return setError("The import didn't reach the server. Check your connection and try again.");
+      }
       if ("error" in r) return setError(r.error);
       setReport(r);
       setPreviewClean(!commit && !r.errors.length);

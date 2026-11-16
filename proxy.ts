@@ -2,19 +2,29 @@ import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server
 import { auth } from "@/auth";
 import { ACCESS_MESSAGES, accessStatusFor } from "@/lib/access";
 import { ACCESS_PATH, isPublicPath, routeAccess } from "@/lib/authz";
+import { buildCsp, newNonce } from "@/lib/csp";
+import { signInPath } from "@/lib/nextPath";
 
-// NextAuth is configured lazily (see auth.ts), so `auth(callback)` resolves to the
-// request handler asynchronously and cannot be used directly as the export.
+function nextWithCsp(req: NextRequest): NextResponse {
+  const nonce = newNonce();
+  const csp = buildCsp({ nonce, dev: process.env.NODE_ENV === "development" });
+  const headers = new Headers(req.headers);
+  headers.set("x-nonce", nonce);
+  headers.set("Content-Security-Policy", csp);
+  const res = NextResponse.next({ request: { headers } });
+  res.headers.set("Content-Security-Policy", csp);
+  return res;
+}
+
 export async function proxy(request: NextRequest, event: NextFetchEvent) {
   const handler = await auth(async (req) => {
     const { pathname } = req.nextUrl;
     const user = req.auth?.user;
     const email = user?.email;
-    // Every non-public request re-reads the status, so approving or blocking someone applies at once.
     const status =
       email && !isPublicPath(pathname) ? await accessStatusFor({ userId: user?.id, email }) : null;
     const access = routeAccess(pathname, email ? { email, status } : null);
-    if (access === "allow") return NextResponse.next();
+    if (access === "allow") return nextWithCsp(req);
 
     const isApi = pathname.startsWith("/api/");
     if (access === "pending" || access === "blocked") {
@@ -29,15 +39,11 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
     }
     return isApi
       ? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-      : NextResponse.redirect(new URL("/", req.nextUrl));
+      : NextResponse.redirect(new URL(signInPath(`${pathname}${req.nextUrl.search}`), req.nextUrl));
   });
   return handler(request, event as never);
 }
 
-// Static asset paths skip the proxy, but never under api/ or admin/.
-// Next requires this config to be a literal, so tests read `config.matcher[0]`.
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|(?!api/|admin/).*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
-  ],
+  matcher: ["/((?!_next/static/|_next/image|favicon\\.ico$|[^/]+\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };

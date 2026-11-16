@@ -5,7 +5,6 @@ const FULL = new Intl.DateTimeFormat("en", { weekday: "long", month: "short", da
 
 const pct = (fraction: number) => Math.round(Math.min(1, Math.max(0, fraction)) * 100);
 
-/** Seven bars, Sunday first: each fills with the share of that day's target minutes, today outlined. */
 export function WeekStrip({ week, today }: { week: { date: string; fraction: number }[]; today: string }) {
   return (
     <ol aria-label="This week" className="grid grid-cols-7 gap-2">
@@ -24,7 +23,7 @@ export function WeekStrip({ week, today }: { week: { date: string; fraction: num
               data-bar
               className={cn(
                 "relative flex h-16 w-full max-w-10 items-end overflow-hidden rounded-md bg-muted",
-                isToday && "outline-2 outline-offset-2 outline-ring",
+                isToday && "ring-2 ring-ring",
               )}
             >
               <div data-fill className="progress-fill w-full rounded-md bg-ok" style={{ height: `${share}%` }} />

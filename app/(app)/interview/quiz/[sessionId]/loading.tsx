@@ -1,5 +1,5 @@
-import { DetailPageSkeleton } from "@/components/PageSkeleton";
+import { QuizPageSkeleton } from "@/components/PageSkeleton";
 
 export default function Loading() {
-  return <DetailPageSkeleton />;
+  return <QuizPageSkeleton />;
 }

@@ -4,7 +4,6 @@ export const SITE_NAME = "Learn";
 export const SITE_DESCRIPTION =
   "A personal learning platform: interview question books with spaced review, prerequisite topic graphs, and chaptered study notes.";
 
-/** Absolute origin for canonical and Open Graph URLs. Set NEXT_PUBLIC_SITE_URL in production. */
 export function getSiteUrl(): URL {
   const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
@@ -15,7 +14,6 @@ export function getSiteUrl(): URL {
 
 const MAX_DESCRIPTION = 160;
 
-/** Collapses markdown/whitespace to one plain line and trims it to a search-snippet length. */
 export function toDescription(
   source: string | undefined | null,
   fallback = SITE_DESCRIPTION,
@@ -33,16 +31,12 @@ export function toDescription(
 }
 
 type PageSeo = {
-  /** Page title only; the root layout's template appends " · Learn". */
   title: string;
   description?: string | null;
-  /** Site-relative path, e.g. "/notes/react". Becomes the canonical URL and og:url. */
   path: string;
-  /** Keep the page out of search results. Use for signed-in and admin pages. */
   noindex?: boolean;
 };
 
-/** One place that sets title, description, canonical, Open Graph, Twitter and robots for a page. */
 export function buildMetadata({
   title,
   description,

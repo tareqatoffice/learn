@@ -22,9 +22,8 @@ export default async function IeltsTestPage({ params }: { params: Promise<{ atte
   const got = await getAttempt(user.userId, attemptId);
   if (!got) notFound();
 
-  // Neither the answer key nor any audio link is in the run view: audio is signed when Play is pressed.
   return (
-    <div className="mx-auto grid w-full max-w-5xl gap-4">
+    <div className="grid w-full gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>{got.view.title}</h1>
         <Link

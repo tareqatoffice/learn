@@ -2,21 +2,12 @@ import { BackLink } from "@/components/BackLink";
 import { pageTitleClass } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
-// The admin page layout standard. Every admin page is one <AdminPage>; inside it, groups of
-// content are <AdminSection>s, forms and settings sit in <AdminCard>s, and rows of items are an
-// <AdminList> of <AdminListItem>s (with <EmptyState> when there are none).
 
 const WIDTH = {
-  /** Lists, tables and editors that use the full column. */
   full: "",
-  /** Settings and single-purpose pages, so lines stay readable. */
-  narrow: "max-w-3xl",
+  narrow: "",
 } as const;
 
-/**
- * Page shell: optional back link, the title with its primary actions (e.g. "New book") on the right,
- * an optional description, then the content.
- */
 export function AdminPage({
   title,
   description,
@@ -47,7 +38,6 @@ export function AdminPage({
   );
 }
 
-/** A titled group on a page, with its own actions on the right (e.g. "New question"). */
 export function AdminSection({
   title,
   description,
@@ -75,7 +65,6 @@ export function AdminSection({
   );
 }
 
-/** The surface for a form or a block of settings; `title` makes it a labelled region. */
 export function AdminCard({
   title,
   description,
@@ -87,7 +76,6 @@ export function AdminCard({
   children: React.ReactNode;
   className?: string;
 }) {
-  // content-start: when a grid of cards stretches one to match a taller neighbour, keep its rows at the top.
   const body = <div className="grid content-start gap-5">{children}</div>;
   if (!title) return <div className={cn("rounded-xl border border-border bg-card p-4 sm:p-5", className)}>{body}</div>;
   return (
@@ -101,7 +89,6 @@ export function AdminCard({
   );
 }
 
-/** Rows of items in one bordered card; renders `empty` instead when there are no children. */
 export function AdminList({
   children,
   empty,
@@ -122,7 +109,6 @@ export function AdminList({
   );
 }
 
-/** One row: the main content on the left, its actions on the right (wrapping on narrow screens). */
 export function AdminListItem({ children, actions, className }: { children: React.ReactNode; actions?: React.ReactNode; className?: string }) {
   return (
     <li className={cn("flex flex-wrap items-center justify-between gap-3 px-4 py-2", className)}>

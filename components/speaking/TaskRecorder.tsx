@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { confirmTakeAction, deleteTakeAction, generateMaterialAction, startTakeAction } from "@/app/(app)/speaking/actions";
 import { firstError } from "@/admin/result";
+import { confirm } from "@/components/ConfirmDialog";
 import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { UploadError, uploadTake } from "@/lib/uploadTake";
 import { type RecorderResult, useRecorder } from "@/lib/useRecorder";
+import { useLeaveGuard } from "@/lib/useLeaveGuard";
 import { localDate, takeCapSec } from "@/speaking/schedule";
 import type { TaskKey } from "@/speaking/tasks";
 import { clock } from "./format";
@@ -27,16 +29,16 @@ type Started = {
 };
 type Save =
   | { phase: "idle" }
-  | { phase: "saving"; step: string }
+  | { phase: "saving"; step: string; progress?: number }
   | { phase: "failed"; error: string }
   | { phase: "saved" };
 
-// Presigned upload URLs live 10 minutes; past this a retry starts a fresh take for new URLs.
+const SHORT_TAKE_SEC = 3;
+
 const REUSE_MS = 8 * 60 * 1000;
 const CLIP_FAILED = "The clip didn't start. Tap Start again.";
 const MB = 1024 * 1024;
 
-/** The learner's local calendar date now (YYYY-MM-DD), so a take started before midnight keeps its day. */
 function todayHere(fallback: string): string {
   try {
     return localDate(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -45,7 +47,6 @@ function todayHere(fallback: string): string {
   }
 }
 
-// Shadowing: one pass of the clip is one take, so recording stops shortly after the clip ends.
 const AFTER_CLIP_MS = 1500;
 
 function MaterialView({ task, material }: { task: TaskKey; material: Material }) {
@@ -59,10 +60,6 @@ function MaterialView({ task, material }: { task: TaskKey; material: Material })
   );
 }
 
-/**
- * The recorder for one task: the material on screen, a video toggle, the headphones check for
- * shadowing, then record → upload (retryable) → confirm → transcribe in the background → review.
- */
 export function TaskRecorder({
   task,
   date,
@@ -72,6 +69,8 @@ export function TaskRecorder({
   clipSec,
   videoDefault,
   storage,
+  aiOn = true,
+  hasLesson = true,
 }: {
   task: TaskKey;
   date: string;
@@ -81,6 +80,8 @@ export function TaskRecorder({
   clipSec?: number;
   videoDefault: boolean;
   storage: boolean;
+  aiOn?: boolean;
+  hasLesson?: boolean;
 }) {
   const router = useRouter();
   const [material, setMaterial] = useState(initialMaterial);
@@ -101,17 +102,16 @@ export function TaskRecorder({
   const audioRef = useRef<HTMLAudioElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
   const started = useRef<Started | null>(null);
+  const uploadAbort = useRef<AbortController | null>(null);
   const savedFor = useRef<RecorderResult | null>(null);
   const clipTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const clipPlaying = useRef(false);
   const takeDate = useRef(date);
 
-  // Live camera preview while recording video.
   useEffect(() => {
     if (previewRef.current) previewRef.current.srcObject = rec.stream;
   }, [rec.stream]);
 
-  // The clip was primed inside the Start tap (iOS needs the gesture); it plays once recording runs.
   useEffect(() => {
     const audio = audioRef.current;
     if (!shadowing || !audio) return;
@@ -121,14 +121,11 @@ export function TaskRecorder({
       audio.muted = false;
       audio.currentTime = 0;
       void audio.play()?.catch(() => {
-        // Without the clip there is nothing to shadow: drop this take rather than save silence.
         clipPlaying.current = false;
         setClipError(CLIP_FAILED);
         resetRecorder();
       });
     } else if (rec.state !== "asking") {
-      // Leave the primed clip alone while the permission prompt is open (pausing it aborts the
-      // iOS unlock); reset it once recording has finished or failed.
       clipPlaying.current = false;
       audio.pause();
       audio.muted = false;
@@ -147,6 +144,7 @@ export function TaskRecorder({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [unsaved]);
+  useLeaveGuard(unsaved, "Your recording hasn't been saved. Leave anyway?", "speakingLeaveGuard");
 
   const persist = useCallback(
     async (result: RecorderResult) => {
@@ -158,7 +156,6 @@ export function TaskRecorder({
       try {
         let s = started.current;
         if (s && Date.now() - s.at > REUSE_MS) {
-          // Its upload URLs have expired: remove the unconfirmed take before starting a new one.
           const old = s.takeId;
           started.current = s = null;
           await deleteTakeAction(old).catch(() => undefined);
@@ -172,8 +169,6 @@ export function TaskRecorder({
             kind: result.mime.startsWith("video/") ? "video" : "audio",
             mime: result.mime,
             audioMime: result.audioMime,
-            clipSec,
-            // Signed into the upload URLs; the server refuses a take over its byte limit here.
             size: result.blob.size,
             audioSize: result.audioBlob?.size,
           });
@@ -195,16 +190,24 @@ export function TaskRecorder({
           );
         }
         const two = Boolean(s.audioUploadUrl && result.audioBlob);
+        const cancel = new AbortController();
+        uploadAbort.current = cancel;
+        const upload = async (url: string, blob: Blob, mime: string, step: string) => {
+          setSave({ phase: "saving", step, progress: 0 });
+          await uploadTake(url, blob, mime, {
+            signal: cancel.signal,
+            onProgress: (progress) => setSave({ phase: "saving", step, progress }),
+          });
+        };
         if (!s.main) {
-          setSave({ phase: "saving", step: two ? "Uploading the video (1 of 2)…" : "Uploading the recording…" });
-          await uploadTake(s.uploadUrl, result.blob, result.mime);
+          await upload(s.uploadUrl, result.blob, result.mime, two ? "Uploading the video (1 of 2)…" : "Uploading the recording…");
           s.main = true;
         }
         if (two && !s.audio) {
-          setSave({ phase: "saving", step: "Uploading the audio (2 of 2)…" });
-          await uploadTake(s.audioUploadUrl!, result.audioBlob!, result.audioMime!);
+          await upload(s.audioUploadUrl!, result.audioBlob!, result.audioMime!, "Uploading the audio (2 of 2)…");
           s.audio = true;
         }
+        uploadAbort.current = null;
         setSave({
           phase: "saving",
           step:
@@ -214,33 +217,30 @@ export function TaskRecorder({
         });
         const confirmed = await confirmTakeAction(s.takeId, result.durationSec);
         if (!confirmed.ok) {
-          // The stored objects didn't check out: upload again on retry.
           s.main = false;
           s.audio = false;
           return fail(firstError(confirmed.errors) ?? "Couldn't save the recording. Try again.");
         }
         setSave({ phase: "saved" });
-        // Navigate first: the review page starts transcription, so nothing here waits on it.
         router.push(`/speaking/takes/${s.takeId}`);
       } catch (e) {
         fail(e instanceof UploadError ? e.message : "Couldn't save the recording. Check your connection and try again.");
       }
     },
-    [task, lessonId, material, clipSec, router],
+    [task, lessonId, material, router],
   );
 
   useEffect(() => {
     if (!rec.result || savedFor.current === rec.result) return;
     savedFor.current = rec.result;
     started.current = null;
-    void persist(rec.result);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (rec.result.durationSec >= SHORT_TAKE_SEC) void persist(rec.result);
   }, [rec.result, persist]);
 
   function begin() {
     const audio = audioRef.current;
     if (shadowing && audio) {
-      // Unlock playback inside this tap with a muted play; the effect above unmutes it and plays
-      // from the top once recording starts.
       clipPlaying.current = false;
       audio.muted = true;
       audio.currentTime = 0;
@@ -254,9 +254,8 @@ export function TaskRecorder({
     void rec.start();
   }
 
-  function discard() {
-    if (!window.confirm("Discard this recording? It hasn't been saved.")) return;
-    // Remove the started (unconfirmed) take and anything it uploaded; best effort.
+  async function discard() {
+    if (!(await confirm({ description: "Discard this recording? It hasn't been saved.", destructive: true }))) return;
     const takeId = started.current?.takeId;
     if (takeId) void deleteTakeAction(takeId).catch(() => undefined);
     started.current = null;
@@ -296,7 +295,7 @@ export function TaskRecorder({
   }
 
   const idle = rec.state === "idle" || rec.state === "error";
-  const canStart = idle && material !== null && (!shadowing || headphones) && save.phase === "idle";
+  const canStart = idle && (material !== null || !shadowing) && (!shadowing || headphones) && save.phase === "idle";
 
   return (
     <div className="grid gap-4">
@@ -305,17 +304,21 @@ export function TaskRecorder({
       ) : (
         <section className="grid gap-3 rounded-xl border border-border bg-card p-5">
           <p className="text-sm text-muted-foreground">
-            Today&apos;s lesson has nothing for this task. The AI coach can write some practice material for you.
+            {hasLesson ? "Today's lesson has nothing for this task." : "No speaking lessons are published yet."}{" "}
+            {aiOn ? "The AI coach can write some practice material for you, or you" : "You"} can record a free practice
+            take: speak about anything for as long as you like.
           </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={generate} disabled={generating}>
-              {generating ? "Writing…" : "Generate with AI"}
-            </Button>
-            {generateError && <Notice>{generateError}</Notice>}
-          </div>
+          {aiOn && (
+            <div className="flex flex-wrap items-center gap-3">
+              <Button onClick={generate} disabled={generating}>
+                {generating ? "Writing…" : "Generate with AI"}
+              </Button>
+              {generateError && <Notice>{generateError}</Notice>}
+            </div>
+          )}
         </section>
       )}
-      {material?.generated && idle && save.phase === "idle" && (
+      {material?.generated && aiOn && idle && save.phase === "idle" && (
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="outline" size="sm" onClick={generate} disabled={generating}>
             {generating ? "Writing…" : "Write something else"}
@@ -331,7 +334,6 @@ export function TaskRecorder({
           preload="auto"
           playsInline
           onEnded={() => {
-            // A primed clip can end during the permission prompt; only a playing pass ends the take.
             if (!clipPlaying.current) return;
             clearTimeout(clipTimer.current);
             clipTimer.current = setTimeout(() => rec.stop(), AFTER_CLIP_MS);
@@ -399,11 +401,36 @@ export function TaskRecorder({
         {rec.state === "error" && <Notice>{rec.error}</Notice>}
         {clipError && <Notice>{clipError}</Notice>}
 
+        {rec.result && rec.result.durationSec < SHORT_TAKE_SEC && save.phase === "idle" && (
+          <div className="grid gap-3">
+            <p className="text-sm">That take is only {clock(rec.result?.durationSec ?? 0)} long. Keep it?</p>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => rec.result && void persist(rec.result)}>Save it</Button>
+              <Button variant="outline" onClick={discard}>
+                Discard
+              </Button>
+            </div>
+          </div>
+        )}
         {save.phase === "saving" && (
           <div className="grid gap-1.5" role="status">
-            <span className="text-sm">{save.step}</span>
+            <span className="flex items-center justify-between gap-3 text-sm">
+              <span>
+                {save.step}
+                {save.progress !== undefined && ` ${Math.round(save.progress * 100)}%`}
+              </span>
+              {save.progress !== undefined && (
+                <Button variant="ghost" size="sm" onClick={() => uploadAbort.current?.abort()}>
+                  Cancel upload
+                </Button>
+              )}
+            </span>
             <div aria-hidden className="h-1.5 overflow-hidden rounded-full bg-muted">
-              <div className="h-full w-1/3 animate-pulse rounded-full bg-ring" />
+              {save.progress !== undefined ? (
+                <div className="h-full rounded-full bg-ring transition-[width]" style={{ width: `${Math.round(save.progress * 100)}%` }} />
+              ) : (
+                <div className="h-full w-1/3 animate-pulse rounded-full bg-ring" />
+              )}
             </div>
           </div>
         )}

@@ -1,6 +1,5 @@
 import mongoose, { Schema, model } from "mongoose";
 
-/** Speech-to-text calls per user per day, for the daily limit. Rows expire after a few days. */
 const speakingUsageSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },

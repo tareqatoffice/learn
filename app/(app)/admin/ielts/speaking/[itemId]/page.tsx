@@ -17,7 +17,6 @@ export async function generateMetadata({ params }: { params: Promise<{ itemId: s
   });
 }
 
-/** `/admin/ielts/speaking/new?type=part1|part2|part3` creates an item; any other segment is an item id. */
 export default async function AdminIeltsSpeakingItemPage({
   params,
   searchParams,

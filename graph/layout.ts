@@ -1,13 +1,9 @@
-// Prerequisite-graph layout, ported from learning-graph/_src/template.html.
-// Topics sit in tiers (steps) by prerequisite depth; a tier with more than MAXC
-// topics wraps onto balanced visual rows; rows are centred against the widest one.
 
 export const NW = 184;
 export const NH = 48;
 const GX = 14;
 const GY = 52;
 const TG = 14;
-// Half the row gap, so each step's band reaches halfway to its neighbours and the bands tile the canvas.
 const PAD = GY / 2;
 export const LBL = 72;
 const MAXC = 4;
@@ -16,14 +12,13 @@ type Prereqs = { id: string; prereqIds: string[] };
 type LayoutNode = Prereqs & { trackKey: string };
 export type Progress = Record<string, "learning" | "done">;
 
-/** Tier 0 for topics without (known) prerequisites, else 1 + the deepest prerequisite's tier. */
 export function computeTiers(nodes: Prereqs[]): Record<string, number> {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const tiers: Record<string, number> = {};
   const visiting = new Set<string>();
   const tierOf = (n: Prereqs): number => {
     if (n.id in tiers) return tiers[n.id];
-    if (visiting.has(n.id)) return 0; // a cycle never reaches the DB, but never recurse forever
+    if (visiting.has(n.id)) return 0;
     visiting.add(n.id);
     const pre = n.prereqIds.map((p) => byId.get(p)).filter((p): p is Prereqs => !!p);
     tiers[n.id] = pre.length ? 1 + Math.max(...pre.map(tierOf)) : 0;
@@ -34,15 +29,12 @@ export function computeTiers(nodes: Prereqs[]): Record<string, number> {
   return tiers;
 }
 
-/** The (known) prerequisites of a topic that are not done yet. `known` is the set of topic ids in the graph. */
 export function unmetPrereqs(node: Prereqs, known: ReadonlySet<string>, progress: Progress): string[] {
   return node.prereqIds.filter((p) => known.has(p) && progress[p] !== "done");
 }
 
-/** What a topic with unfinished prerequisites tells the user; shared by the server's refusal and the panel. */
 export const prereqMessage = (titles: string[]) => `Finish first: ${titles.join(", ")}`;
 
-/** Every topic that depends on `id`, directly or through other topics. */
 export function dependentsOf(nodes: Prereqs[], id: string): string[] {
   const children = new Map<string, string[]>();
   for (const n of nodes) for (const p of n.prereqIds) children.set(p, [...(children.get(p) ?? []), n.id]);
@@ -58,7 +50,6 @@ export function dependentsOf(nodes: Prereqs[], id: string): string[] {
   return [...found];
 }
 
-/** Topics not started yet whose (known) prerequisites are all done. */
 export function readyNext(nodes: Prereqs[], progress: Progress): string[] {
   const known = new Set(nodes.map((n) => n.id));
   return nodes.filter((n) => !progress[n.id] && unmetPrereqs(n, known, progress).length === 0).map((n) => n.id);
@@ -72,7 +63,6 @@ export function layoutGraph(
   height: number;
   positions: Record<string, { x: number; y: number; tier: number }>;
   rows: { tier: number; y: number; first: boolean }[];
-  /** One horizontal band per tier, covering all of its wrapped rows. */
   bands: { tier: number; y: number; height: number }[];
 } {
   const tiers = computeTiers(nodes);

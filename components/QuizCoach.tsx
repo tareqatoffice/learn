@@ -2,6 +2,7 @@
 
 import { Mic, MicOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AI_ANSWER_MAX, AI_MESSAGE_MAX } from "@/lib/ai-limits";
 import { useSpeechInput } from "@/lib/useSpeechInput";
@@ -15,16 +16,11 @@ const fieldClass =
 
 const isSubmitChord = (e: React.KeyboardEvent) => e.key === "Enter" && (e.ctrlKey || e.metaKey);
 
-/** Appends a dictated phrase to the answer, with a space between it and what is already there. */
 export function appendSpoken(current: string, phrase: string): string {
   const joined = current && !/\s$/.test(current) ? `${current} ${phrase}` : current + phrase;
   return joined.slice(0, AI_ANSWER_MAX);
 }
 
-/**
- * Where the learner writes or dictates an answer before revealing. With a coach, Ctrl/Cmd+Enter
- * (or the button) checks it; `onChange` says whether the new text was typed or spoken.
- */
 export function AnswerBox({
   value,
   onChange,
@@ -36,10 +32,8 @@ export function AnswerBox({
   onChange: (value: string, source: "typed" | "voice") => void;
   onCheck?: () => void;
   pending?: boolean;
-  /** Told when dictation starts and stops, so the card can hold marks until the last phrase is in. */
   onRecordingChange?: (recording: boolean) => void;
 }) {
-  // The latest value, so a phrase that finishes after a keystroke appends to the current text.
   const valueRef = useRef(value);
   useEffect(() => {
     valueRef.current = value;
@@ -52,7 +46,6 @@ export function AnswerBox({
   useEffect(() => {
     onRecordingChange?.(speech.listening);
   }, [speech.listening, onRecordingChange]);
-  // Checking mid-dictation would grade the answer without the phrase still being spoken.
   const canCheck = Boolean(value.trim()) && !pending && !speech.listening;
   const check = () => {
     if (canCheck) onCheck?.();
@@ -68,7 +61,6 @@ export function AnswerBox({
         rows={4}
         maxLength={AI_ANSWER_MAX}
         value={value}
-        // Read-only rather than disabled: a disabled box drops focus to <body>, where Space and G/R/S are shortcuts.
         readOnly={pending}
         aria-busy={pending}
         placeholder={
@@ -122,10 +114,10 @@ export function AnswerBox({
   );
 }
 
-const VERDICT: Record<AiVerdict, { label: string; className: string }> = {
-  correct: { label: "Correct", className: "border-ok/40 bg-ok/10 text-ok" },
-  partial: { label: "Partly right", className: "border-track-1/40 bg-track-1/10 text-track-1" },
-  incorrect: { label: "Not quite", className: "border-destructive/40 bg-destructive/10 text-destructive" },
+const VERDICT: Record<AiVerdict, { label: string; variant: "ok" | "track" | "destructive" }> = {
+  correct: { label: "Correct", variant: "ok" },
+  partial: { label: "Partly right", variant: "track" },
+  incorrect: { label: "Not quite", variant: "destructive" },
 };
 
 export function FeedbackPanel({ feedback, model }: { feedback: AiFeedback; model?: string }) {
@@ -133,9 +125,9 @@ export function FeedbackPanel({ feedback, model }: { feedback: AiFeedback; model
   return (
     <section aria-label="AI feedback" className="rounded-lg border border-border bg-background p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className={cn("rounded-full border px-2.5 py-0.5 text-sm font-medium", verdict.className)}>
+        <Badge variant={verdict.variant} size="md">
           {verdict.label}
-        </span>
+        </Badge>
         <span className="text-sm tabular-nums text-muted-foreground">{feedback.score} / 100</span>
       </div>
       <p className="mt-3 text-sm">{feedback.summary}</p>
@@ -160,11 +152,6 @@ function FeedbackList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-/**
- * A short conversation with the coach about the card. The server keeps the history; the chat only
- * sends the new message and the conversation id. When grading produced a follow-up question, the
- * chat opens with it (it is already the conversation's first message on the server).
- */
 export function FollowUpChat({
   opener,
   conversationId: initialId,

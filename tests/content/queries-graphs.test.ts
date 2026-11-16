@@ -76,7 +76,7 @@ describe("getGraphView", () => {
       { id: q1, title: "p1 question 0", href: `/interview/js-book/${q1}` },
     ]);
     expect(nodeB.related.notes).toEqual([
-      { title: "Internals § Closures", href: "/notes/js-notes/internals#closures" },
+      { title: "Internals § Closures", href: "/notes/js-notes/internals#h-closures" },
       { title: "Internals", href: "/notes/js-notes/internals" },
     ]);
     expect(view?.progress).toEqual({ [a]: "done" });

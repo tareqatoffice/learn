@@ -7,7 +7,6 @@ import { GraphNode, NodeProgress } from "@/models";
 
 export type NodeStatus = "none" | "learning" | "done";
 
-/** The topic has prerequisites the user has not finished yet. */
 export class PrereqNotDoneError extends Error {
   constructor(titles: string[]) {
     super(prereqMessage(titles));
@@ -17,11 +16,6 @@ export class PrereqNotDoneError extends Error {
 
 type GraphTopic = { _id: Types.ObjectId; title: string; prereqIds?: Types.ObjectId[] };
 
-/**
- * Throws PrereqNotDoneError unless every visible prerequisite of the topic is done. The done rows are
- * touched as well as counted: a concurrent change that un-completes one of them then conflicts with this
- * transaction instead of slipping past a check that has already passed.
- */
 async function requirePrereqsDone(
   userId: string,
   topic: { id: string; prereqIds: string[] },
@@ -29,7 +23,7 @@ async function requirePrereqsDone(
   titles: Map<string, string>,
   session: ClientSession,
 ): Promise<void> {
-  const needed = topic.prereqIds.filter((p) => known.has(p));
+  const needed = [...new Set(topic.prereqIds.filter((p) => known.has(p)))];
   if (!needed.length) return;
   const touched = await NodeProgress.updateMany(
     { userId, nodeId: { $in: needed }, status: "done" },
@@ -45,12 +39,6 @@ async function requirePrereqsDone(
   throw new PrereqNotDoneError(unmet.map((id) => titles.get(id) ?? id));
 }
 
-/**
- * Sets a topic's status for the user; `none` removes the progress doc. The node must be visible.
- * Starting or finishing a topic needs every visible prerequisite done (hidden ones don't count, matching
- * the graph view). Taking a done topic back below done also clears the progress of everything that
- * depends on it, so a topic is never ahead of its prerequisites.
- */
 export async function setNodeStatus(userId: string, nodeId: string, status: NodeStatus): Promise<void> {
   const node = isValidObjectId(nodeId)
     ? await GraphNode.findOne({ ...(await visibleNodeFilter()), _id: nodeId }, { graphId: 1 }).lean<{
@@ -72,8 +60,6 @@ export async function setNodeStatus(userId: string, nodeId: string, status: Node
       ? { $set: { status }, $unset: { doneAt: 1 } }
       : { $set: { status, doneAt: now } };
 
-  // One transaction: the prerequisite check, the write and the dependents' clean-up stand or fall together.
-  // The upsert's duplicate-key retry sits outside it because that error aborts the transaction.
   await retryOnDuplicateKey(() =>
     inTransaction(async (session) => {
       if (status !== "none") await requirePrereqsDone(userId, topic, known, titles, session);
@@ -93,10 +79,6 @@ export async function setNodeStatus(userId: string, nodeId: string, status: Node
   );
 }
 
-/**
- * Status per visible node of the graph that the user has started (nodeId -> status). A caller that
- * already holds the graph's visible node ids passes them as `visibleIds` to skip reading them again.
- */
 export async function getGraphProgress(
   userId: string,
   graphId: string,
@@ -107,7 +89,7 @@ export async function getGraphProgress(
     visibleIds ??
     (await GraphNode.find(await visibleNodeFilter(graphId), { _id: 1 }).lean<{ _id: Types.ObjectId }[]>()).map((n) => n._id);
   const rows = await NodeProgress.find(
-    { userId, nodeId: { $in: ids } },
+    { userId, graphId, nodeId: { $in: ids } },
     { nodeId: 1, status: 1 },
   ).lean<{ nodeId: Types.ObjectId; status: "learning" | "done" }[]>();
   return Object.fromEntries(rows.map((row) => [String(row.nodeId), row.status]));

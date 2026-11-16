@@ -31,7 +31,7 @@ export default async function IeltsReviewPage({ params }: PageProps<"/ielts/spea
   );
   if (!storageConfigured()) {
     return (
-      <div className="mx-auto grid w-full max-w-3xl gap-4">
+      <div className="grid w-full gap-4">
         {back}
         <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
           Recording storage isn&apos;t set up yet, so recordings can&apos;t be played.
@@ -42,11 +42,10 @@ export default async function IeltsReviewPage({ params }: PageProps<"/ielts/spea
 
   const attempt = await getAttempt(user.userId, attemptId);
   if (!attempt) notFound();
-  // Only whether the coach is on reaches the page; the key never does.
   const [ai, settings] = await Promise.all([getAiConfig(), getEffectiveSettings(user.userId)]);
 
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-4">
+    <div className="grid w-full gap-4">
       {back}
       <AttemptReview attempt={attempt} aiOn={ai.settings.active} bodyConsent={settings.bodyConsent} />
     </div>

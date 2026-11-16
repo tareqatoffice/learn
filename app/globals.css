@@ -4,7 +4,7 @@
 
 @import "./hljs.css";
 
-/* `dark:` follows the same rules as the variables below: data-theme wins, else the OS preference. */
+
 @custom-variant dark {
   &:where([data-theme="dark"], [data-theme="dark"] *) {
     @slot;
@@ -69,11 +69,7 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/*
- * Palette from learning-graph/_src/template.html, mapped onto the shadcn tokens. Dark applies when the
- * OS prefers it, unless <html data-theme="light"> says otherwise, or when <html data-theme="dark"> is
- * set (ThemeToggle). The two dark blocks must stay identical.
- */
+
 :root {
   --radius: 0.625rem;
   --background: #f2f4f7;
@@ -226,18 +222,24 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  body > * {
+    min-width: 0;
+  }
   html {
     @apply font-sans;
-    /* In-page anchors (chapter TOC, heading links) land below the 56px sticky header, not under it. */
+
     scroll-padding-top: 5rem;
     -webkit-text-size-adjust: 100%;
   }
 }
 
-/*
- * iOS zooms the page when a focused field's text is under 16px; touch devices get 16px fields.
- * Unlayered on purpose: inside a layer the fields' own text-sm / text-xs utilities would win.
- */
+
+html {
+  overflow-x: clip;
+}
+
+
 @media (pointer: coarse) {
   input:not([type="checkbox"], [type="radio"], [type="range"]),
   select,
@@ -246,13 +248,7 @@
   }
 }
 
-/*
- * Reading typography for rendered markdown (chapters, answers, topic summaries). Preflight strips
- * every browser default, so the whole prose rhythm lives here. Flow spacing (`> * + *`) keeps the
- * first and last blocks flush with their container; headings take more space above than below so
- * each one binds to the text it introduces. 1.7 leading suits the ~65ch column and gives
- * Bengali conjuncts and vowel signs room.
- */
+
 @layer components {
   .md {
     line-height: 1.7;
@@ -269,7 +265,7 @@
     text-wrap: balance;
     scroll-margin-top: 1.5rem;
   }
-  /* Below the 1.5rem page title (lib/ui.ts pageTitleClass) so a body heading never matches it. */
+
   .md h1 {
     font-size: 1.375rem;
   }
@@ -314,7 +310,7 @@
   .md li::marker {
     color: var(--muted-foreground);
   }
-  /* Loose lists wrap items in <p>; keep their rhythm close to a tight list's. */
+
   .md li > p + p {
     margin-top: 0.5rem;
   }
@@ -334,7 +330,7 @@
     text-decoration-color: currentColor;
   }
 
-  /* --font-mono is an inline theme token (no runtime variable), so name the face directly. */
+
   .md :is(pre, code, kbd),
   .md-inline code {
     font-family: var(--font-plex-mono), ui-monospace, monospace;
@@ -363,7 +359,7 @@
     margin-block: 2rem;
   }
 
-  /* A wide table scrolls inside the column instead of widening the page. */
+
   .md table {
     display: block;
     max-width: 100%;
@@ -410,14 +406,7 @@
     margin-bottom: 0.5rem;
   }
 }
-/*
- * Motion and interaction. Every control eases between states, presses in on click and shows a
- * pointer; inline text links draw an underline in from the left; card tiles lift on hover. Pages fade
- * up section by section on each navigation (app/(app)/template.tsx replays `.page-enter`, and the
- * sign-in page uses it too), and list rows reveal as they scroll in. Everything that moves is gated on
- * prefers-reduced-motion: no-preference, so reduced motion keeps the colour feedback and drops the
- * movement.
- */
+
 @layer base {
   :where(a, button, summary, select, label, [role="button"], input, textarea) {
     transition-property:
@@ -433,25 +422,19 @@
   }
 }
 
-/* ThemeToggle sets this for one frame so the whole page swaps colours at once instead of fading piecemeal. */
+
 .theme-switching,
 .theme-switching * {
   transition: none !important;
 }
 
-/*
- * Unlayered on purpose: these must beat the Tailwind utilities already on each element
- * (border-border, text-muted-foreground, hover:underline) for the hover states to show.
- */
+
 input:not([type="checkbox"], [type="radio"], [data-chrome="bare"]):hover:not(:focus-visible, :disabled),
 textarea:not([data-chrome="bare"]):hover:not(:focus-visible, :disabled),
 select:hover:not(:focus-visible, :disabled) {
   border-color: color-mix(in oklch, var(--border), var(--foreground) 25%);
 }
-/*
- * Single-line selects draw their own chevron, inset from the right edge with room reserved for it;
- * the native arrow sits flush against the border. Gradients take currentColor, so it follows the theme.
- */
+
 select:not([multiple], [size]) {
   appearance: none;
   padding-inline-end: 2rem;
@@ -464,12 +447,7 @@ select:not([multiple], [size]) {
   background-size: 0.3125rem 0.3125rem;
   background-repeat: no-repeat;
 }
-/*
- * The transparent outline is what forced-colors mode paints, since it drops box-shadow.
- * `data-chrome="bare"` opts a field out: a field that fills its own container and is focused the
- * moment that container appears (the command palette's input) would otherwise draw a ring around
- * itself inside the panel's border, which reads as a misaligned box rather than as focus.
- */
+
 input:not([type="checkbox"], [type="radio"], [data-chrome="bare"]):focus-visible,
 textarea:not([data-chrome="bare"]):focus-visible,
 select:focus-visible {
@@ -479,10 +457,7 @@ select:focus-visible {
   outline-offset: 0.125rem;
 }
 
-/*
- * Inline text links: an underline grows in from the left and the text picks up the accent. Anchors
- * styled as controls (rounded, bordered, button slots) or laid out as boxes are left alone.
- */
+
 main
   a:not(
     [class*="rounded"],
@@ -523,7 +498,7 @@ main a.underline:hover,
   color: var(--ring);
 }
 
-/* Card tiles (list items and opted-in `.card-interactive` panels) answer the pointer; forms and panels don't. */
+
 main :is(li.rounded-xl.bg-card, .card-interactive) {
   transition:
     border-color 220ms ease,
@@ -545,7 +520,7 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
   transform-origin: left;
 }
 
-/* Prerequisite-graph nodes (components/GraphView.tsx): press scales about the node, not the SVG origin. */
+
 .graph-node {
   transform-box: fill-box;
   transform-origin: center;
@@ -557,7 +532,7 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
     stroke 180ms ease,
     filter 220ms ease;
 }
-/* Touch screens keep :hover on the last tapped node, so only a real pointer gets the hover lift. */
+
 @media (hover: hover) {
   .graph-node:hover .node-body {
     filter: drop-shadow(0 0.375rem 0.625rem color-mix(in oklch, var(--foreground) 22%, transparent));
@@ -571,7 +546,7 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Stagger index: position among siblings, capped at 5. */
+
   :where(.page-enter *) {
     --i: 0;
   }
@@ -591,10 +566,7 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
     --i: 5;
   }
 
-  /*
-   * The entry rules are wrapped in :where() so they carry no specificity: the scroll reveal below
-   * must win on list rows, and the grid-children rule wins over the section rule by source order.
-   */
+
   .page-enter {
     animation: page-fade 260ms ease-out both;
   }
@@ -602,14 +574,14 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
     animation: rise-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
     animation-delay: calc(var(--i) * 60ms);
   }
-  /* Grid children of a section (dashboard cards, list tiles) cascade in after their section. */
-  /* Not inside a disclosure or the mobile overlay: that list remounts each time it opens. */
+
+
   :where(.page-enter :is(.grid, ul):not(.md *, .md-inline *, details *, [data-overlay] *) > :is(section, li)) {
     animation: rise-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
     animation-delay: calc(120ms + var(--i) * 50ms);
   }
 
-  /* Rows reveal as they scroll into view, where the browser supports scroll timelines. */
+
   @supports (animation-timeline: view()) {
     .page-enter :is(.divide-y > li, .divide-y > div, tbody > tr) {
       animation: rise-in linear both;
@@ -637,7 +609,7 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
       translate: 0 -0.125rem;
     }
   }
-  /* The full-screen topic reader (components/TopicReader.tsx) rises over a fading backdrop. */
+
   .topic-reader[open] {
     animation: rise-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
@@ -645,7 +617,7 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
     animation: page-fade 240ms ease-out both;
   }
 
-  /* A topic's prerequisite chain draws in, prerequisite to topic, each time a topic is highlighted. */
+
   .edge-draw {
     animation: edge-draw 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }

@@ -12,7 +12,6 @@ import { TASKS, TASK_LABEL, type TaskKey } from "@/speaking/tasks";
 const fieldClass =
   "w-20 rounded-lg border border-border bg-background px-2 py-1.5 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-invalid:border-destructive";
 
-/** Per-task targets, on/off and video default; and withdrawing body-language consent. */
 export function SpeakingSettingsForm({ settings }: { settings: EffectiveSettings }) {
   const router = useRouter();
   const [targets, setTargets] = useState<Record<TaskKey, string>>(

@@ -17,13 +17,11 @@ export type TodayTask = {
   minutes: number;
   target: number;
   done: boolean;
-  /** Why today's lesson can't serve this task; null when it can. */
   missing: "shadowing" | "generate" | null;
 };
 
 const linkClass = "hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-/** Today's enabled tasks with their minutes against target, and today's lesson with "Change lesson". */
 export function TodayTasks({
   tasks,
   lesson,

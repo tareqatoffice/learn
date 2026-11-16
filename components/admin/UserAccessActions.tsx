@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useId, useState } from "react";
-import { setUserAccessAction } from "@/app/(app)/admin/users/actions";
+import { deleteUserAction, setUserAccessAction } from "@/app/(app)/admin/users/actions";
 import { firstError } from "@/admin/result";
 import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,6 @@ import { cn } from "@/lib/utils";
 type Flash = { tone: "ok" | "error"; text: string } | null;
 const FlashContext = createContext<(flash: Flash) => void>(() => {});
 
-/**
- * Wraps the user list with one live region, so the result of approving or blocking stays visible
- * even when the row itself leaves the current tab after the refresh.
- */
 export function UserAccessFlash({ children }: { children: React.ReactNode }) {
   const [flash, setFlash] = useState<Flash>(null);
   return (
@@ -44,7 +40,6 @@ export function UserAccessFlash({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Approve / block / unblock for one non-admin user. Blocking asks for confirmation and an optional reason. */
 export function UserAccessActions({
   id,
   email,
@@ -59,6 +54,20 @@ export function UserAccessActions({
   const [blocking, setBlocking] = useState(false);
   const [reason, setReason] = useState("");
   const reasonId = useId();
+  const del = useAdminAction();
+  const remove = () =>
+    del.run(
+      async () => {
+        const result = await deleteUserAction(id);
+        setFlash(
+          result.ok
+            ? { tone: "ok", text: `${email} and all their data were deleted.` }
+            : { tone: "error", text: `${email}: ${firstError(result.errors) ?? "Something went wrong. Try again."}` },
+        );
+        return result;
+      },
+      { confirm: `Delete ${email} for good? Their recordings, progress, attempts and account are removed. This can't be undone.` },
+    );
   const tooLong = reason.trim().length > REASON_MAX;
 
   const error = firstError(errors) ?? null;
@@ -145,6 +154,9 @@ export function UserAccessActions({
           Block
         </Button>
       )}
+      <Button size="sm" variant="ghost" disabled={pending || del.pending} onClick={remove} aria-label={`Delete ${email}`}>
+        {del.pending ? "Deleting…" : "Delete"}
+      </Button>
       {error && (
         <span role="alert" className="text-xs text-destructive">
           {error}

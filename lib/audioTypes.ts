@@ -1,4 +1,3 @@
-// Audio MIME types accepted for uploads, and the file extension used in the storage key.
 export const AUDIO_EXT: Record<string, string> = {
   "audio/mpeg": "mp3",
   "audio/mp3": "mp3",

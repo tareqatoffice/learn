@@ -2,12 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { saveWritingTextAction, submitWritingAction } from "@/app/(app)/ielts/practice-actions";
+import { deleteWritingAction, saveWritingTextAction, submitWritingAction } from "@/app/(app)/ielts/practice-actions";
+import { DiscardAttempt } from "@/components/ielts/DiscardAttempt";
 import { ActionStatus } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
+import { Tab } from "@/components/Chip";
 import { Button } from "@/components/ui/button";
 import type { WritingView } from "@/ielts/writing/attempts";
 import { MAX_TEXT_CHARS, MIN_WORDS, TASK_LIMIT_SEC, wordCount } from "@/ielts/writing/bands";
+import { rovingIndex, timeWarning } from "@/lib/a11y";
 import { cn } from "@/lib/utils";
 
 const SAVE_DELAY_MS = 1500;
@@ -15,7 +18,6 @@ const RETRY_MS = 5000;
 const TIME_SAVE_MS = 30_000;
 const clock = (s: number) => `${Math.floor(Math.abs(s) / 60)}:${String(Math.abs(s) % 60).padStart(2, "0")}`;
 
-/** Writes the task(s): live word count, timers that never cut you off, autosave, then submit. */
 export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrls: string[] }) {
   const router = useRouter();
   const [texts, setTexts] = useState(() => view.tasks.map((t) => t.text));
@@ -23,6 +25,7 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
   const [active, setActive] = useState(0);
   const { run, pending, errors } = useAdminAction();
   const dirty = useRef(new Set<number>());
+  const [saveError, setSaveError] = useState("");
   const latest = useRef({ texts, secs });
   useEffect(() => {
     latest.current = { texts, secs };
@@ -34,14 +37,18 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
   }, [active]);
 
   const [retry, setRetry] = useState(0);
-  // Sends every task with unsaved text or time. A failed save keeps the task and tries again shortly.
   const flush = useCallback(() => {
     for (const i of [...dirty.current]) {
       dirty.current.delete(i);
-      saveWritingTextAction(view.id, i, latest.current.texts[i], latest.current.secs[i]).catch(() => {
-        dirty.current.add(i);
-        setTimeout(() => setRetry((n) => n + 1), RETRY_MS);
-      });
+      saveWritingTextAction(view.id, i, latest.current.texts[i], latest.current.secs[i])
+        .then((res) => {
+          if (!res.ok) setSaveError(res.errors._ ?? "Your text isn't being saved. Reload the page.");
+          else setSaveError("");
+        })
+        .catch(() => {
+          dirty.current.add(i);
+          setTimeout(() => setRetry((n) => n + 1), RETRY_MS);
+        });
     }
   }, [view.id]);
 
@@ -51,7 +58,6 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
     return () => clearTimeout(t);
   }, [texts, retry, flush]);
 
-  // Time spent counts towards the plan, so it is saved now and then even while the learner is thinking.
   useEffect(() => {
     const t = setInterval(() => {
       dirty.current.add(active);
@@ -60,7 +66,6 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
     return () => clearInterval(t);
   }, [active]);
 
-  // Best effort when the tab is hidden or closed.
   useEffect(() => {
     const hide = () => {
       if (document.visibilityState === "hidden") flush();
@@ -106,26 +111,51 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
           {left < 0 ? "-" : ""}
           {clock(left)}
         </span>
+        <span aria-live="polite" className="sr-only">
+          {timeWarning(left)}
+        </span>
         <span className="text-xs text-muted-foreground">The timer never cuts you off. Your text saves automatically.</span>
-        <Button type="button" disabled={pending || texts.some((t) => !t.trim())} onClick={submit}>
-          Submit
-        </Button>
+        <span className="flex items-center gap-2">
+          <DiscardAttempt discard={() => deleteWritingAction(view.id)} back="/ielts/writing" />
+          <Button
+            type="button"
+            disabled={pending || texts.some((t) => !t.trim())}
+            aria-describedby={texts.some((t) => !t.trim()) ? "submit-why" : undefined}
+            onClick={submit}
+          >
+            Submit
+          </Button>
+        </span>
+        {texts.some((t) => !t.trim()) && (
+          <span id="submit-why" className="w-full text-xs text-muted-foreground">
+            Write something for {view.tasks.length > 1 ? "both tasks" : "the task"} to submit.
+          </span>
+        )}
       </div>
       <ActionStatus saved={false} errors={errors} />
+      {saveError && (
+        <p role="alert" className="text-sm text-destructive">
+          {saveError}
+        </p>
+      )}
 
       {view.tasks.length > 1 && (
         <div role="tablist" aria-label="Tasks" className="flex gap-2">
           {view.tasks.map((t, i) => (
-            <button
+            <Tab
               key={i}
-              type="button"
-              role="tab"
-              aria-selected={i === active}
+              selected={i === active}
+              onKeyDown={(e) => {
+                const next = rovingIndex(e.key, i, view.tasks.length);
+                if (next === null) return;
+                e.preventDefault();
+                setActive(next);
+                (e.currentTarget.parentElement?.children[next] as HTMLElement | undefined)?.focus();
+              }}
               onClick={() => setActive(i)}
-              className={cn("rounded-md border px-3 py-1 text-sm", i === active ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")}
             >
               {t.task === "task1" ? "Task 1" : "Task 2"}
-            </button>
+            </Tab>
           ))}
         </div>
       )}

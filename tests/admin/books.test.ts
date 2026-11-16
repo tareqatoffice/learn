@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { moveItem, saveBook, saveQuestion, setQuestionTopicLink, setStatus } from "@/admin/service";
+import { moveItem, saveBook, saveQuestion, setQuestionTopicLink, setStatus, STALE_EDIT_MESSAGE } from "@/admin/service";
 import { connectDb } from "@/lib/db";
 import { importKey } from "@/lib/ids";
 import { GraphNode, Question, QuestionBook, Revision } from "@/models";
@@ -49,7 +49,7 @@ describe("saveBook", () => {
       { id: created.id, slug: "react", title: "React!", intro: "Intro", subjects: [], parts: [], extras: [], status: "published" },
       ADMIN,
     );
-    expect(updated).toEqual({ ok: true, id: created.id });
+    expect(updated).toMatchObject({ ok: true, id: created.id });
     expect(await Revision.countDocuments({ entityId: created.id })).toBe(1);
   });
 
@@ -62,7 +62,7 @@ describe("saveBook", () => {
       { key: "p2", title: "Part Two" },
     ];
     const r = await saveBook({ id: book, slug: "javascript", title: "JS", intro: "", subjects: [], parts, extras: [], status: "published" }, ADMIN);
-    expect(r).toEqual({ ok: true, id: book });
+    expect(r).toMatchObject({ ok: true, id: book });
     const saved = await Question.findById(q.id).lean<{ importKey: string }>();
     expect(saved!.importKey).toBe(importKey("javascript", "What is a closure?", ""));
   });
@@ -92,11 +92,24 @@ describe("saveQuestion", () => {
     const book = await seedBook("js");
     const [q] = await seedQuestions(book, 1);
     const result = await saveQuestion({ id: q, ...questionInput(book, { answer: "Edited" }) }, ADMIN);
-    expect(result).toEqual({ ok: true, id: q });
+    expect(result).toMatchObject({ ok: true, id: q });
     expect((await Question.findById(q).lean<{ answer: string }>())?.answer).toBe("Edited");
     const revisions = await Revision.find({ entityId: q }).lean<{ editedBy: string; snapshot: { answer: string } }[]>();
     expect(revisions).toHaveLength(1);
     expect(revisions[0]).toMatchObject({ editedBy: ADMIN, snapshot: { answer: "answer 0" } });
+  });
+
+  it("refuses a save from an editor opened before someone else's save (D6)", async () => {
+    const book = await seedBook("js");
+    const [q] = await seedQuestions(book, 1);
+    const opened = (await Question.findById(q).lean<{ updatedAt: Date }>())!.updatedAt.toISOString();
+    const first = await saveQuestion({ id: q, ...questionInput(book, { answer: "Mine" }), updatedAt: opened }, ADMIN);
+    if (!first.ok) throw new Error(JSON.stringify(first.errors));
+    expect(first.updatedAt).not.toBe(opened);
+    const stale = await saveQuestion({ id: q, ...questionInput(book, { answer: "Theirs" }), updatedAt: opened }, ADMIN);
+    expect(stale).toEqual({ ok: false, errors: { _: STALE_EDIT_MESSAGE } });
+    expect((await Question.findById(q).lean<{ answer: string }>())?.answer).toBe("Mine");
+    expect((await saveQuestion({ id: q, ...questionInput(book, { answer: "Again" }), updatedAt: first.updatedAt }, ADMIN)).ok).toBe(true);
   });
 
   it("gives a new question the next order and an import key", async () => {
@@ -125,10 +138,10 @@ describe("moveItem", () => {
     const other = await seedBook("css");
     await seedQuestions(other, 2);
 
-    expect(await moveItem("question", q2, "up", ADMIN)).toEqual({ ok: true, id: q2 });
+    expect(await moveItem("question", q2, "up")).toMatchObject({ ok: true, id: q2 });
     const order = async (id: string) => (await Question.findById(id).lean<{ order: number }>())?.order;
     expect([await order(q1), await order(q2), await order(q3)]).toEqual([1, 0, 2]);
-    expect(await moveItem("question", q2, "up", ADMIN)).toMatchObject({ ok: false });
+    expect(await moveItem("question", q2, "up")).toMatchObject({ ok: false });
   });
 
   it("swaps only the two items when orders are distinct but not 0-based (as imported)", async () => {
@@ -136,10 +149,10 @@ describe("moveItem", () => {
     const ids = await seedQuestions(book, 5);
     await Promise.all(ids.map((id, i) => Question.updateOne({ _id: id }, { $set: { order: i + 1 } })));
 
-    expect(await moveItem("question", ids[3], "up", ADMIN)).toEqual({ ok: true, id: ids[3] });
+    expect(await moveItem("question", ids[3], "up")).toMatchObject({ ok: true, id: ids[3] });
     const orders = await Promise.all(ids.map(async (id) => (await Question.findById(id).lean<{ order: number }>())?.order));
     expect(orders).toEqual([1, 2, 4, 3, 5]);
-    expect(await Revision.countDocuments({ entityType: "Question" })).toBe(2);
+    expect(await Revision.countDocuments({ entityType: "Question" })).toBe(0);
   });
 });
 
@@ -147,7 +160,7 @@ describe("setStatus", () => {
   it("archives without deleting", async () => {
     const book = await seedBook("js");
     const [q] = await seedQuestions(book, 1);
-    expect(await setStatus("question", q, "archived", ADMIN)).toEqual({ ok: true, id: q });
+    expect(await setStatus("question", q, "archived", ADMIN)).toMatchObject({ ok: true, id: q });
     expect((await Question.findById(q).lean<{ status: string }>())?.status).toBe("archived");
     expect(await Revision.countDocuments({ entityId: q })).toBe(1);
   });

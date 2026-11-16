@@ -5,6 +5,8 @@ const authMock = vi.fn();
 vi.mock("@/auth", () => ({ auth: () => authMock() }));
 
 import { ForbiddenError, isAdminEmail, isPublicPath, requireAdmin, requireUser, routeAccess } from "@/lib/authz";
+import { User } from "@/models";
+import { resetDb } from "../setup/mongo";
 
 const approved = (email: string) => ({ email, status: "approved" as const });
 
@@ -126,6 +128,28 @@ describe("authz", () => {
         name: "Owner",
         image: "i.png",
         isAdmin: true,
+      });
+    });
+
+    it("sends pending and blocked users to /access, whatever path the action came through (S1)", async () => {
+      await resetDb();
+      for (const status of ["pending", "blocked"] as const) {
+        const doc = await User.create({ email: `${status}@x.com`, name: status, status, lastLoginAt: new Date() });
+        authMock.mockResolvedValue({ user: { id: String(doc._id), email: `${status}@x.com`, name: status } });
+        await expect(requireUser()).rejects.toMatchObject({
+          digest: expect.stringContaining("NEXT_REDIRECT;replace;/access;"),
+        });
+      }
+    });
+
+    it("lets an approved user through and treats a deleted user as signed out", async () => {
+      await resetDb();
+      const doc = await User.create({ email: "a@x.com", name: "A", status: "approved", lastLoginAt: new Date() });
+      authMock.mockResolvedValue({ user: { id: String(doc._id), email: "a@x.com", name: "A" } });
+      await expect(requireUser()).resolves.toMatchObject({ userId: String(doc._id) });
+      await User.deleteOne({ _id: doc._id });
+      await expect(requireUser()).rejects.toMatchObject({
+        digest: expect.stringContaining("NEXT_REDIRECT;replace;/;"),
       });
     });
 

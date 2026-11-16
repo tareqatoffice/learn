@@ -1,5 +1,5 @@
-import { ListPageSkeleton } from "@/components/PageSkeleton";
+import { InterviewIndexSkeleton } from "@/components/PageSkeleton";
 
 export default function Loading() {
-  return <ListPageSkeleton split />;
+  return <InterviewIndexSkeleton />;
 }

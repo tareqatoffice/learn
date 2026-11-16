@@ -1,4 +1,3 @@
-/** What a topic shows: its saved status, with "not started" split by whether its prerequisites are done. */
 export type NodeState = "locked" | "ready" | "learning" | "done";
 
 export const STATE_LABEL: Record<NodeState, string> = {
@@ -8,7 +7,6 @@ export const STATE_LABEL: Record<NodeState, string> = {
   done: "Done",
 };
 
-/** A 16px status glyph centred on the origin, for use inside an SVG; `color` is the topic's track colour. */
 export function StatusIcon({ state, color }: { state: NodeState; color: string }) {
   if (state === "done")
     return (
@@ -39,7 +37,6 @@ export function StatusIcon({ state, color }: { state: NodeState; color: string }
   );
 }
 
-/** StatusIcon as a standalone inline icon, for HTML text. */
 export function StatusGlyph({ state, color = "var(--muted-foreground)", size = 14 }: { state: NodeState; color?: string; size?: number }) {
   return (
     <svg width={size} height={size} viewBox="-8 -8 16 16" aria-hidden className="shrink-0">

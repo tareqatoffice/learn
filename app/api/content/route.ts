@@ -17,7 +17,6 @@ const rows = (model: typeof Graph) =>
       })),
     );
 
-/** Every book, series and graph (any status) so the CLI can pick a target. */
 export function GET(req: Request): Promise<Response> {
   return withToken(req, async () => {
     const [books, series, graphs] = await Promise.all([rows(QuestionBook), rows(NoteSeries), rows(Graph)]);

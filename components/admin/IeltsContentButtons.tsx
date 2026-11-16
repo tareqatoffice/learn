@@ -12,7 +12,6 @@ import { ActionStatus } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
 
-/** Creates an AI draft test or prompt and opens it for editing. */
 export function GenerateDraftButton({ what, label }: { what: TestKind | "task1" | "task2"; label: string }) {
   const router = useRouter();
   const { run, pending, errors } = useAdminAction();
@@ -38,7 +37,6 @@ export function GenerateDraftButton({ what, label }: { what: TestKind | "task1" 
   );
 }
 
-/** Publishes or unpublishes a test or a prompt from the list. */
 export function StatusButton({ what, id, status, label }: { what: TestKind | "writing"; id: string; status: PublishStatus; label: string }) {
   const { run, pending, errors } = useAdminAction();
   const next: PublishStatus = status === "published" ? "draft" : "published";

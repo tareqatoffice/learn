@@ -1,13 +1,3 @@
-/**
- * Content CLI over the token API, for adding content in bulk (e.g. from Claude Code).
- *
- *   npm run content -- list
- *   npm run content -- pull <book|series|graph> <slug> [--out <dir>]
- *   npm run content -- push <file...> (--book|--series|--graph) <slug> [--title <t>] [--commit] [--publish]
- *
- * Reads LEARN_API_URL and LEARN_API_TOKEN (from the environment or web/.env.local).
- * A push without --commit only previews.
- */
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -107,7 +97,6 @@ async function api(pathname: string, init?: RequestInit): Promise<{ status: numb
   try {
     body = JSON.parse(text);
   } catch {
-    // keep the raw text for the error message
   }
   return { status: res.status, body };
 }
@@ -145,7 +134,6 @@ async function run(command: CliCommand): Promise<number> {
   }
 
   const { kind, slug } = command.target;
-  // Node keeps a UTF-8 byte-order mark, which JSON.parse rejects; drop it from every file.
   const texts = await Promise.all(command.files.map(async (f) => (await readFile(f, "utf8")).replace(/^﻿/, "")));
   const source =
     kind === "series"

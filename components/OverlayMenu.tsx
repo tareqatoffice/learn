@@ -13,18 +13,12 @@ function focusable(root: HTMLElement): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>("a[href], button:not(:disabled)")];
 }
 
-/**
- * A collapsed list for narrow screens. Opening it lays the list over the page, under the trigger,
- * with a backdrop that closes it — the same idea as the header's mobile menu — instead of pushing
- * the page down. Choosing a link closes it too. Opening one closes any other.
- */
 export function OverlayMenu({
   label,
   navLabel,
   children,
 }: {
   label: React.ReactNode;
-  /** Accessible name for the list that opens. */
   navLabel: string;
   children: React.ReactNode;
 }) {
@@ -44,7 +38,6 @@ export function OverlayMenu({
 
   useEffect(() => {
     if (!open) return;
-    // The header is 3.5rem. Keep the sheet under it when the trigger has scrolled up behind it.
     const place = () => {
       const box = buttonRef.current?.getBoundingClientRect();
       if (!box) return;
@@ -107,7 +100,6 @@ export function OverlayMenu({
           }
           const box = buttonRef.current?.getBoundingClientRect();
           if (box) setTop(Math.max(box.bottom, 56));
-          // Close any overlay already open, then open this one. The listener is only attached while open.
           window.dispatchEvent(new Event(OVERLAY_EVENT));
           setOpen(true);
         }}
@@ -121,9 +113,6 @@ export function OverlayMenu({
       </button>
       {open &&
         createPortal(
-          // Portaled out of the page: its enter animation uses translate, which would trap a
-          // fixed layer inside this one-row trigger instead of the viewport. The page fade also
-          // paints above anything left inside the page, so the list has to travel with the backdrop.
           <div ref={portalRef}>
             <div
               aria-hidden

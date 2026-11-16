@@ -39,6 +39,13 @@ describe("speaking lessons", () => {
   beforeEach(resetDb);
   afterAll(() => mongoose.disconnect());
 
+  it("shows a lesson without fixing it to the day while the time zone is unknown (F24)", async () => {
+    const u = user();
+    const l1 = await lesson(1);
+    expect((await todaysLesson(u, "2026-11-10", ALL, { assign: false }))?.id).toBe(l1);
+    expect(await SpeakingDay.countDocuments({ userId: u })).toBe(0);
+  });
+
   it("assigns the first unfinished published lesson and keeps it all day", async () => {
     const u = user();
     const l1 = await lesson(1);

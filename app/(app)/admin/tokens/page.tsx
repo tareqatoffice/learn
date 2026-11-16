@@ -20,8 +20,8 @@ export default async function TokensPage() {
       width="narrow"
       description={
         <>
-          Tokens let the <code>npm run content</code> command line list, pull and import content. They cannot read
-          users or progress.
+          Tokens let the <code>npm run content</code> command line list and pull content, and import it when the
+          token has write access. They cannot read users or progress.
         </>
       }
     >
@@ -30,6 +30,9 @@ export default async function TokensPage() {
           id: t.id,
           name: t.name,
           createdAt: formatDateTime(t.createdAt),
+          scope: t.scope,
+          expiresAt: t.expiresAt ? formatDateTime(t.expiresAt) : undefined,
+          expired: t.expired,
           lastUsedAt: t.lastUsedAt ? formatDateTime(t.lastUsedAt) : undefined,
           revokedAt: t.revokedAt ? formatDateTime(t.revokedAt) : undefined,
         }))}

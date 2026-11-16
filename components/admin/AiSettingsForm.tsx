@@ -16,10 +16,6 @@ const CUSTOM = "__custom__";
 const optionLabel = (m: CatalogModel) =>
   `${m.name}${m.contextLength ? ` · ${Math.round(m.contextLength / 1000)}k context` : ""}${m.json === false ? " · no JSON mode" : ""}`;
 
-/**
- * A model from OpenRouter's catalogue (free ones, plus paid ones when `showPaid`), or any model id
- * typed by hand. The current value is always listed, even when the filter would hide it.
- */
 export function ModelPicker({
   label,
   value,
@@ -34,7 +30,6 @@ export function ModelPicker({
   onChange: (value: string) => void;
   catalog: CatalogModel[];
   showPaid: boolean;
-  /** Offers an empty choice with this label. */
   noneLabel?: string;
   error?: string;
 }) {

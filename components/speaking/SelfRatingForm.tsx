@@ -43,7 +43,7 @@ function ScoreGroup({
           <label
             key={n}
             className={cn(
-              "grid size-9 cursor-pointer place-items-center rounded-lg border text-sm tabular-nums transition-colors has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring pointer-coarse:size-11",
+              "grid size-9 cursor-pointer place-items-center rounded-full border text-sm tabular-nums transition-colors has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring pointer-coarse:size-11",
               value === n ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:bg-muted",
             )}
           >
@@ -64,10 +64,6 @@ function ScoreGroup({
   );
 }
 
-/**
- * The learner's own 1–5 rating of a take, before any AI feedback: fluency and confidence always,
- * eye contact and gestures for video, a note, and moments marked at the player's current time.
- */
 export function SelfRatingForm({
   takeId,
   kind,

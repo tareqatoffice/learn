@@ -3,7 +3,6 @@ import type { PhaseName } from "@/ielts/plan";
 
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 
-/** "N days to your test (date)", the current phase and the week of the plan. */
 export function Countdown({
   today,
   testDate,

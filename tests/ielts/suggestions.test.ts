@@ -39,7 +39,6 @@ async function setup(over: Partial<ProfileInput> = {}) {
 
 const total = (m: Record<string, number>) => Object.values(m).reduce((a, b) => a + b, 0);
 
-/** Week 0 at 40 % of its target, checked at the start of week 1. */
 async function missedWeek() {
   const u = await setup();
   const plan = (await currentPlan(u))!;
@@ -69,7 +68,6 @@ describe("ielts suggestions", () => {
     const [s] = await pending(u);
     expect(s.proposal).toMatchObject({ adjustment: { kind: "spreadShortfall", minutes: target - done, fromWeek: 1 } });
     expect(list[0].reason).toContain("40 %");
-    // The preview carries the spread minutes; the plan itself is unchanged.
     const { before, after, dropped } = list[0].preview;
     expect(before.version).toBe(1);
     expect(after.adjustments.map((a) => a.kind)).toEqual(["spreadShortfall"]);
@@ -81,8 +79,6 @@ describe("ielts suggestions", () => {
 
   it("missed raises minutes per day when spreading would overload a day", async () => {
     const u = await setup({ testDate: addDays(TODAY, 21) });
-    // Nothing done in week 0 (420 min). Spread over the one week after this it would put 120 min
-    // on each day (> 90), so instead: (14 days × 60 + 420) / 14 study days left = 90 a day.
     await runChecks(u, WEEK1, TZ);
     const [s] = await pending(u);
     expect(s.kind).toBe("missed");
@@ -122,7 +118,6 @@ describe("ielts suggestions", () => {
     expect((await removeAdjustment(u, shift.id, next)).ok).toBe(true);
     const after = (await currentPlan(u))!;
     expect(after.adjustments).toEqual([]);
-    // 52 study days left at 60 min, with nothing extra.
     expect(after.weeks.reduce((n, w) => n + total(w.minutes), 0)).toBe(52 * 60);
   });
 
@@ -141,7 +136,6 @@ describe("ielts suggestions", () => {
     await runChecks(u, WEEK1, TZ);
     await runChecks(u, WEEK1, TZ);
     expect(await pending(u)).toHaveLength(1);
-    // A later day still adds none while one of the kind is pending.
     await runChecks(u, addDays(WEEK1, 1), TZ);
     expect(await pending(u)).toHaveLength(1);
   });
@@ -202,8 +196,6 @@ describe("ielts suggestions", () => {
 
   it("weak uses min(self, AI) and ignores pronunciation unless self flags it", async () => {
     const u = await setup();
-    // Target 7, so weak means 6 or lower in both mocks. Fluency: self 7, AI 6 → 6 (weak).
-    // Pronunciation: AI 5 but self 7 → ignored. Lexical weak in one mock only.
     await mock(u, TODAY, { fluency: 7, lexical: 6, grammar: 7, pronunciation: 7 }, { fluency: 6, lexical: 7, grammar: 7, pronunciation: 5 });
     await mock(u, TODAY, { fluency: 6, lexical: 7, grammar: 7, pronunciation: 7 }, { fluency: 7, lexical: 7, grammar: 7, pronunciation: 5 });
     await runChecks(u, TODAY, TZ);
@@ -220,7 +212,7 @@ describe("ielts suggestions", () => {
     const w = await setup();
     await mock(w, TODAY, { fluency: 7, lexical: 7, grammar: 7, pronunciation: 7 }, { fluency: 6, lexical: 7, grammar: 7, pronunciation: 7 });
     await runChecks(w, TODAY, TZ);
-    expect(await pending(w)).toEqual([]); // only one mock
+    expect(await pending(w)).toEqual([]);
   });
 
   it("drops stale spreadShortfall on rebuild", async () => {
@@ -238,7 +230,6 @@ describe("ielts suggestions", () => {
   });
 
   it("hoursShort only on the transition from OK to short", async () => {
-    // 201 study days at 1 h for a 200 h gap: OK until two days have passed.
     const u = await setup({ testDate: addDays(TODAY, 201) });
     await logStudy(u, { date: TODAY, skill: "reading", minutes: 60 });
     await runChecks(u, addDays(TODAY, 1), TZ);
@@ -260,7 +251,6 @@ describe("ielts suggestions", () => {
     const phase = (await listPending(u, skills.start)).find((s) => s.kind === "phase")!;
     expect(phase.reason).toContain(plan.phases.find((p) => p.name === "mocks")!.start);
     expect(await approveSuggestion(u, phase.id, skills.start)).toEqual({ ok: true, version: 1 });
-    // The same mock doesn't raise it again.
     await runChecks(u, addDays(skills.start, 1), TZ);
     expect((await pending(u)).some((s) => s.kind === "phase")).toBe(false);
   });

@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { chipClass } from "@/components/Chip";
+import { confirm } from "@/components/ConfirmDialog";
 import { AnswerBox, FeedbackPanel, FollowUpChat } from "@/components/QuizCoach";
 import { Notice } from "@/components/Notice";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -16,10 +18,8 @@ type Card = NonNullable<SessionView["current"]>;
 
 export type QuizCardProps = {
   view: SessionView;
-  /** Records the mark (with the learner's answer, if any) and resolves with the session as it now stands. */
   onResult: (result: MarkResult, attempt?: QuizAttempt) => Promise<SessionView>;
-  onFinish: () => void;
-  /** The AI coach (OpenRouter); without it the card is a plain flashcard. */
+  onFinish: () => Promise<void>;
   coach?: QuizCoach;
 };
 
@@ -33,7 +33,6 @@ export type QuizCoach = {
 
 const KEYS: Record<string, MarkResult> = { g: "got", r: "review", s: "skip" };
 
-/** Typing, modifier chords and key repeat must never trigger a shortcut. */
 function ignoresShortcut(e: KeyboardEvent): boolean {
   if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || e.repeat) return true;
   const target = e.target as HTMLElement | null;
@@ -41,17 +40,11 @@ function ignoresShortcut(e: KeyboardEvent): boolean {
   return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
-/** Space already activates a focused button, link or summary, so it must not also reveal. */
 const activatesOnSpace = (target: EventTarget | null) =>
   target instanceof HTMLElement && Boolean(target.closest("button, a[href], summary, [role='button']"));
 
 const suggestedRing = "ring-2 ring-ring ring-offset-2 ring-offset-card";
 
-/**
- * The shortcut for a control, printed on the control itself. `aria-hidden` on purpose: the key is a
- * hint for pointer users, and leaving it out of the accessible name keeps that name the plain label.
- * `border-current` takes the button's own text colour, so one chip suits every variant.
- */
 function KeyHint({ children }: { children: React.ReactNode }) {
   return (
     <kbd aria-hidden className="ml-1.5 rounded border border-current px-1 text-[0.6875rem] font-sans leading-4 opacity-60">
@@ -62,23 +55,53 @@ function KeyHint({ children }: { children: React.ReactNode }) {
 
 export function QuizCard({ view, onResult, onFinish, coach }: QuizCardProps) {
   if (view.done || !view.current) return <Done view={view} />;
-  // A new card (or the same question coming back later) starts hidden and enabled.
   return <Live key={`${view.position}:${view.current.id}`} view={view} card={view.current} onResult={onResult} onFinish={onFinish} coach={coach} />;
 }
 
 function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card: Card }) {
   const [revealed, setRevealed] = useState(false);
+  const revealedRef = useRef(false);
+  useEffect(() => {
+    revealedRef.current = revealed;
+  }, [revealed]);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const [answer, setAnswer] = useState("");
-  // How the answer was given, saved with the mark: refs, since only `mark` reads them.
   const typed = useRef(false);
   const spoken = useRef(false);
   const answerRef = useRef("");
   const [grade, setGrade] = useState<AiGrade | null>(null);
+  const [ending, setEnding] = useState(false);
+  const [endFailed, setEndFailed] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (view.position > 0) heading.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function end() {
+    const left = view.total - view.position;
+    if (
+      !(await confirm({
+        description: `End the quiz now? ${left} card${left === 1 ? "" : "s"} won't be shown; your marks so far are kept.`,
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
+    setEnding(true);
+    setEndFailed(false);
+    try {
+      await onFinish();
+    } catch {
+      setEndFailed(true);
+    } finally {
+      setEnding(false);
+    }
+  }
 
   function changeAnswer(value: string, source: "typed" | "voice") {
-    // Clearing the box starts the answer over, so its mode counts only what is there now.
     if (!value.trim()) typed.current = spoken.current = false;
     else if (source === "voice") spoken.current = true;
     else typed.current = true;
@@ -86,8 +109,6 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
     setAnswer(value);
   }
 
-  // While dictating, the phrase being spoken is not in the answer yet: marking, revealing or checking
-  // then would drop it, so they wait until the recording stops.
   const [recording, setRecording] = useState(false);
   const recordingRef = useRef(false);
   const onRecordingChange = useCallback((on: boolean) => {
@@ -96,7 +117,6 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
   }, []);
   const [checking, setChecking] = useState(false);
   const [coachError, setCoachError] = useState("");
-  // Like `busy`: blocks a second check, and every shortcut, while a check is in flight.
   const checkingRef = useRef(false);
   const feedback = grade?.feedback ?? null;
 
@@ -118,7 +138,6 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
       setChecking(false);
     }
   }
-  // State updates are asynchronous; the ref is what stops a second key press in the same tick.
   const busy = useRef(false);
 
   const mark = useCallback(
@@ -151,6 +170,7 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
       }
       const result = KEYS[e.key.toLowerCase()];
       if (!result) return;
+      if (result !== "skip" && !revealedRef.current) return;
       e.preventDefault();
       void mark(result);
     }
@@ -172,7 +192,7 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
         <div className="h-full bg-ok" style={{ width: `${(view.position / Math.max(view.total, 1)) * 100}%` }} />
       </div>
 
-      <h1 className="mt-5 text-xl font-semibold leading-snug">
+      <h1 ref={heading} tabIndex={-1} className="mt-5 text-xl font-semibold leading-snug focus-visible:outline-none">
         <Markdown source={card.question} inline />
       </h1>
       {card.prompt && (
@@ -181,7 +201,7 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
         </div>
       )}
 
-      {!revealed && (
+      {(!revealed || (coach && !grade)) && (
         <div className="mt-4">
           <AnswerBox
             value={answer}
@@ -195,7 +215,7 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
       )}
 
       <div aria-live="polite" className="mt-4 grid gap-4">
-        {revealed && answer.trim() && !feedback && (
+        {revealed && !coach && answer.trim() && !feedback && (
           <div className="rounded-lg border border-dashed border-border p-3 text-sm">
             <p className="text-muted-foreground">Your answer</p>
             <p className="mt-1 whitespace-pre-wrap">{answer}</p>
@@ -217,7 +237,6 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
         )}
         {revealed && coach && (
           <FollowUpChat
-            // A new conversation (a grade) starts a fresh chat; the opener is only read on mount.
             key={grade?.conversationId ?? "ungraded"}
             opener={feedback?.followUp || undefined}
             conversationId={grade?.conversationId}
@@ -261,7 +280,7 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
         {card.topic && (
           <Link
             href={`/graphs/${encodeURIComponent(card.topic.graphSlug)}?topic=${encodeURIComponent(card.topic.nodeSlug)}`}
-            className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className={chipClass(false, "text-xs text-muted-foreground")}
           >
             Graph topic: {card.topic.title}
           </Link>
@@ -270,10 +289,12 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
 
       {failed && <Notice className="mt-3">Could not save that answer. Try again.</Notice>}
 
+      {endFailed && <Notice className="mt-3">Could not end the quiz. Try again.</Notice>}
+
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
-        <span>{coach ? "Ctrl+Enter checks your answer." : ""}</span>
-        <Button type="button" variant="ghost" size="sm" onClick={onFinish}>
-          End quiz
+        <span>{coach ? "Ctrl+Enter checks your answer. G and R work once the answer is shown." : "G and R work once the answer is shown."}</span>
+        <Button type="button" variant="ghost" size="sm" disabled={ending || pending} onClick={() => void end()}>
+          {ending ? "Ending…" : "End quiz"}
         </Button>
       </div>
     </section>

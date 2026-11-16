@@ -43,6 +43,30 @@ async function saved(input: ReturnType<typeof node>) {
   return r.id;
 }
 
+describe("saveNode prerequisites (F3)", () => {
+  it("stores a prerequisite picked twice once", async () => {
+    const g = await graph();
+    const a = await saved(node(g, "a"));
+    const b = await saved(node(g, "b", { prereqIds: [a, a] }));
+    expect((await GraphNode.findById(b).lean<{ prereqIds: unknown[] }>())?.prereqIds.map(String)).toEqual([a]);
+  });
+});
+
+describe("saveNode concurrency (D14)", () => {
+  it("never lets two saves at once close a prerequisite loop", async () => {
+    const g = await graph();
+    const a = await saved(node(g, "a"));
+    const b = await saved(node(g, "b"));
+    const [ra, rb] = await Promise.all([
+      saveNode({ id: a, ...node(g, "a", { prereqIds: [b] }) }, ADMIN),
+      saveNode({ id: b, ...node(g, "b", { prereqIds: [a] }) }, ADMIN),
+    ]);
+    expect([ra.ok, rb.ok].filter(Boolean)).toHaveLength(1);
+    const rows = await GraphNode.find({ graphId: g }, { prereqIds: 1 }).lean<{ prereqIds: unknown[] }[]>();
+    expect(rows.filter((r) => r.prereqIds.length)).toHaveLength(1);
+  });
+});
+
 describe("saveGraph", () => {
   it("requires 2 to 6 tracks", async () => {
     const r = await saveGraph({ slug: "x", title: "X", subtitle: "", footer: "", subjects: [], tracks: [TRACKS[0]], status: "draft" }, ADMIN);
@@ -68,7 +92,7 @@ describe("saveGraph", () => {
   it("updates with a revision", async () => {
     const id = await graph();
     const r = await saveGraph({ id, slug: "js", title: "JS!", subtitle: "", footer: "", subjects: [], tracks: TRACKS, status: "published" }, ADMIN);
-    expect(r).toEqual({ ok: true, id });
+    expect(r).toMatchObject({ ok: true, id });
     expect((await Graph.findById(id).lean<{ title: string }>())?.title).toBe("JS!");
     expect(await Revision.countDocuments({ entityId: id })).toBe(1);
   });
@@ -137,7 +161,7 @@ describe("restoreRevisionChecked", () => {
     const a = await saved(node(g, "a"));
     const b = await saved(node(g, "b"));
     await saved(node(g, "a", { id: a, prereqIds: [b] }));
-    await saved(node(g, "a", { id: a, prereqIds: [] })); // stores the a -> b version
+    await saved(node(g, "a", { id: a, prereqIds: [] }));
     await saved(node(g, "b", { id: b, prereqIds: [a] }));
 
     const aNeedsB = await revisionWith(a, (s) => (s.prereqIds as unknown[]).length === 1);
@@ -160,7 +184,7 @@ describe("restoreRevisionChecked", () => {
     const a = await saved(node(g, "a"));
     await saved(node(g, "a", { id: a, title: "renamed" }));
     const original = await revisionWith(a, (s) => s.title === "a topic");
-    expect(await restoreRevisionChecked(original, ADMIN)).toEqual({ ok: true, id: a });
+    expect(await restoreRevisionChecked(original, ADMIN)).toMatchObject({ ok: true, id: a });
     expect((await GraphNode.findById(a).lean<{ title: string }>())?.title).toBe("a topic");
   });
 });

@@ -15,7 +15,6 @@ import { Notice } from "@/components/Notice";
 
 type NoteHit = { id: string; title: string; toc: { anchor: string; text: string }[] };
 
-/** Links a topic to interview questions (searched within the graph's subjects) and to note chapters or headings. */
 export function RelatedPicker({ nodeId, subjects, initial }: { nodeId: string; subjects: string[]; initial: AdminRelated }) {
   const [related, setRelated] = useState(initial);
   const [pending, startTransition] = useTransition();

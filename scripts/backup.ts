@@ -1,8 +1,3 @@
-/**
- * Full backup of every collection (content, users, progress, history, token hashes).
- *
- *   npm run backup -- backups/learn-2026-10-19.json
- */
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";

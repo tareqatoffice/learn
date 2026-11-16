@@ -68,7 +68,6 @@ describe("speaking progress", () => {
 
   it("week fractions and streak use local dates", async () => {
     const u = user();
-    // 2026-11-10 20:00 UTC is already 11-11 in Dhaka (UTC+6).
     const late = new Date("2026-11-10T20:00:00Z");
     await take(u, "2026-11-11", "shadowing", 15);
     await take(u, "2026-11-10", "readAloud", 5);

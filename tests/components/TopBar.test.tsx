@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,7 +5,6 @@ import { TopBar } from "@/components/TopBar";
 
 const pathname = vi.hoisted(() => ({ value: "/dashboard" }));
 vi.mock("next/navigation", () => ({ usePathname: () => pathname.value }));
-// The real action pulls in Auth.js and the database, which a component test must not load.
 vi.mock("@/app/actions", () => ({ signOutAction: vi.fn() }));
 
 const user = { name: "Tareq Ahmed", isAdmin: false };
@@ -57,6 +55,31 @@ describe("TopBar", () => {
     expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Account menu" }));
     expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
+  });
+
+  it("lists Profile in the mobile menu, focuses it and makes the page inert while open (U3, U12)", async () => {
+    const main = document.createElement("main");
+    main.id = "main";
+    document.body.appendChild(main);
+    render(<TopBar user={user} />);
+    await userEvent.click(screen.getByRole("button", { name: "Menu" }));
+    const nav = screen.getByRole("navigation", { name: "Mobile" });
+    expect(nav.querySelector('a[href="/profile"]')).not.toBeNull();
+    expect(document.activeElement?.getAttribute("href")).toBe("/dashboard");
+    expect(main.inert).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "Menu" }));
+    expect(main.inert).toBe(false);
+    main.remove();
+  });
+
+  it("closes the account menu when focus leaves it (U12)", async () => {
+    render(<TopBar user={user} />);
+    await userEvent.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
+    await userEvent.tab();
+    await userEvent.tab();
+    await userEvent.tab();
+    expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
   });
 
   it("collapses the links into a menu button on small screens", async () => {

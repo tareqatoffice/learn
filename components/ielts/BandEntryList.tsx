@@ -12,7 +12,8 @@ import { SKILL_LABEL, bandLabel, dateLabel } from "./format";
 
 const SOURCE_LABEL: Record<BandSource, string> = {
   official: "Official result",
-  practice: "Practice test",
+  practice: "Practice test (entered)",
+  practiceTest: "Practice test in Learn",
   other: "Other",
   mockSelf: "Speaking mock (your rating)",
   mockAi: "Speaking mock (AI estimate)",
@@ -20,7 +21,6 @@ const SOURCE_LABEL: Record<BandSource, string> = {
   writingAi: "Writing test (AI estimate)",
 };
 
-/** Saved calculator results, newest first, each removable. Mock rows are removed with their attempt. */
 export function BandEntryList({ entries }: { entries: BandEntryView[] }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);

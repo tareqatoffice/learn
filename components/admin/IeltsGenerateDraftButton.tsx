@@ -8,7 +8,6 @@ import { ActionStatus, inputClass } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
 
-/** Asks the AI coach for a draft item and opens it for editing. Part 3 can follow one of the cue cards. */
 export function IeltsGenerateDraftButton({ type, cards = [] }: { type: ItemType; cards?: { id: string; title: string }[] }) {
   const router = useRouter();
   const { run, pending, errors } = useAdminAction();

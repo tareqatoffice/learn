@@ -7,11 +7,10 @@ import { GET as pullContent } from "@/app/api/content/pull/route";
 import { GET as exportContent } from "@/app/api/admin/export/route";
 import { connectDb } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
-import { Question, Revision, User } from "@/models";
+import { ApiToken, Question, Revision, User } from "@/models";
 import { resetDb } from "../setup/mongo";
 import { seedBook, seedQuestions } from "../progress/seed";
 
-// No browser session at all: only the bearer token may authenticate.
 vi.mock("@/auth", () => ({ auth: () => Promise.resolve(null) }));
 
 beforeAll(connectDb);
@@ -28,9 +27,9 @@ afterAll(() => mongoose.disconnect());
 
 const URL_BASE = "http://localhost:3000";
 
-async function token() {
-  const owner = await User.create({ email: "owner@example.test", name: "Owner", role: "admin" });
-  return createToken("cli", String(owner._id));
+async function token(options: Parameters<typeof createToken>[2] = {}, now?: Date) {
+  const owner = (await User.findOne({ email: "owner@example.test" })) ?? (await User.create({ email: "owner@example.test", name: "Owner", role: "admin" }));
+  return createToken("cli", String(owner._id), options, now);
 }
 
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
@@ -47,8 +46,30 @@ describe("content API tokens", () => {
   it("rejects an unknown or revoked token", async () => {
     const { id, token: t } = await token();
     expect((await listContent(new Request(`${URL_BASE}/api/content`, { headers: auth("learn_nope") }))).status).toBe(401);
-    await revokeToken(id);
+    expect(await revokeToken(id)).toBe(true);
+    expect(await revokeToken(id)).toBe(false);
     expect((await listContent(new Request(`${URL_BASE}/api/content`, { headers: auth(t) }))).status).toBe(401);
+  });
+
+  it("refuses an import from a read-only token but lets it list (S5)", async () => {
+    const { token: t } = await token({ scope: "read" });
+    expect((await listContent(new Request(`${URL_BASE}/api/content`, { headers: auth(t) }))).status).toBe(200);
+    const res = await importContent(new Request(`${URL_BASE}/api/content/import`, { method: "POST", headers: auth(t), body: importBody() }));
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects an expired token (S5)", async () => {
+    const { token: t } = await token({ lifetimeDays: 30 }, new Date(Date.now() - 31 * 86_400_000));
+    expect((await listContent(new Request(`${URL_BASE}/api/content`, { headers: auth(t) }))).status).toBe(401);
+    const { token: fresh } = await token({ lifetimeDays: 30 });
+    expect((await listContent(new Request(`${URL_BASE}/api/content`, { headers: auth(fresh) }))).status).toBe(200);
+  });
+
+  it("treats a token made before scopes existed as able to import (S5)", async () => {
+    const { id, token: t } = await token();
+    await ApiToken.collection.updateOne({ _id: new mongoose.Types.ObjectId(id) }, { $unset: { scope: "" } });
+    const res = await importContent(new Request(`${URL_BASE}/api/content/import`, { method: "POST", headers: auth(t), body: importBody() }));
+    expect(res.status).toBe(200);
   });
 
   it("rejects a token once its creator is no longer an admin", async () => {
@@ -113,6 +134,14 @@ describe("content API tokens", () => {
     );
     expect(res.status).toBe(400);
     expect((await res.json()).errors).toEqual(["target not found"]);
+  });
+
+  it("refuses an import body over the size limit before reading it (S9)", async () => {
+    const { token: t } = await token();
+    const res = await importContent(
+      new Request(`${URL_BASE}/api/content/import`, { method: "POST", headers: { ...auth(t), "Content-Length": "20000000" }, body: importBody() }),
+    );
+    expect(res.status).toBe(413);
   });
 
   it("rejects a malformed body", async () => {

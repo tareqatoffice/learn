@@ -1,5 +1,8 @@
 import mongoose, { Schema, model } from "mongoose";
 
+export const TOKEN_SCOPES = ["read", "write"] as const;
+export type TokenScope = (typeof TOKEN_SCOPES)[number];
+
 const apiTokenSchema = new Schema(
   {
     name: { type: String, required: true },
@@ -7,6 +10,8 @@ const apiTokenSchema = new Schema(
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     lastUsedAt: Date,
     revokedAt: Date,
+    scope: { type: String, enum: TOKEN_SCOPES, default: "write" },
+    expiresAt: Date,
   },
   { timestamps: true },
 );

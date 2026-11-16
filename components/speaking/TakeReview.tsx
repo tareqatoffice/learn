@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { deleteTakeAction, transcribeTakeAction } from "@/app/(app)/speaking/actions";
+import { deleteTakeAction, takeMediaUrlsAction, transcribeTakeAction } from "@/app/(app)/speaking/actions";
 import { firstError } from "@/admin/result";
+import { confirm } from "@/components/ConfirmDialog";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
@@ -12,10 +13,6 @@ import { CoachPanel, type CoachAi } from "./CoachPanel";
 import { SelfRatingForm, type SelfRating } from "./SelfRatingForm";
 import { ShadowPlayer } from "./ShadowPlayer";
 
-/**
- * The take's transcript and its status. A freshly saved take arrives "pending": this starts the
- * transcription once, here rather than in the recorder, so navigating to this page never waits on it.
- */
 export function TakeTranscript({ takeId, status, transcript }: { takeId: string; status: string; transcript?: string }) {
   const router = useRouter();
   const [text, setText] = useState(transcript);
@@ -24,7 +21,6 @@ export function TakeTranscript({ takeId, status, transcript }: { takeId: string;
   const [error, setError] = useState("");
   const startedFor = useRef<string | null>(null);
 
-  // A refresh brings the server's latest status down as props.
   const [shown, setShown] = useState({ status, transcript });
   if (shown.status !== status || shown.transcript !== transcript) {
     setShown({ status, transcript });
@@ -49,7 +45,6 @@ export function TakeTranscript({ takeId, status, transcript }: { takeId: string;
       setState("failed");
     } finally {
       setBusy(false);
-      // Bring down the stored status (and let the coach see the transcript).
       router.refresh();
     }
   }, [takeId, router]);
@@ -75,6 +70,17 @@ export function TakeTranscript({ takeId, status, transcript }: { takeId: string;
         <p className="text-sm text-muted-foreground">This recording hasn&apos;t been transcribed yet.</p>
         <Button variant="outline" size="sm" className="justify-self-start" onClick={run}>
           Transcribe now
+        </Button>
+      </div>
+    );
+  } else if (state === "running" && !busy) {
+    body = (
+      <div className="grid gap-2">
+        <p role="status" className="text-sm text-muted-foreground">
+          This recording is being transcribed (perhaps in another tab). Reload in a minute to see it.
+        </p>
+        <Button variant="outline" size="sm" className="justify-self-start" onClick={() => router.refresh()}>
+          Check again
         </Button>
       </div>
     );
@@ -109,20 +115,25 @@ export function TakeTranscript({ takeId, status, transcript }: { takeId: string;
   );
 }
 
-/** One take: playback, transcript, self-rating, then AI feedback, and delete. */
 export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: boolean; bodyConsent: boolean }) {
   const router = useRouter();
   const player = useRef<HTMLMediaElement | null>(null);
   const [self, setSelf] = useState<SelfRating | undefined>(take.self);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  // Refreshes (after transcription) bring new presigned URLs; keep the first so playback isn't reset.
   const [urls] = useState({ media: take.mediaUrl, audio: take.audioUrl, source: take.sourceAudioUrl });
   const video = take.kind === "video";
   const reference = take.task === "recordReview" ? take.material.prompt : take.material.text;
 
   async function remove() {
-    if (!window.confirm("Delete this recording? The video or audio and its ratings are removed for good.")) return;
+    if (
+      !(await confirm({
+        description: "Delete this recording? The video or audio and its ratings are removed for good.",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     setDeleting(true);
     setDeleteError("");
     try {
@@ -150,6 +161,8 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
           <MediaPlayer
             src={urls.media}
             video={video}
+            fallbackDuration={take.durationSec}
+            refreshSrc={async () => (await takeMediaUrlsAction(take.id))?.media ?? null}
             label="your take"
             playerRef={(el) => {
               player.current = el;

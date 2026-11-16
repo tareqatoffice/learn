@@ -16,7 +16,6 @@ export async function generateMetadata({ params }: { params: Promise<{ kind: str
   });
 }
 
-/** `/admin/ielts/tests/<kind>/new` creates a test; any other segment is a test id. */
 export default async function AdminIeltsTestPage({ params }: { params: Promise<{ kind: string; testId: string }> }) {
   const { kind, testId } = await params;
   if (!isKind(kind)) notFound();

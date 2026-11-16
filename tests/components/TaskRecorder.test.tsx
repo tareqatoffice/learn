@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -44,6 +43,12 @@ vi.mock("@/app/(app)/speaking/actions", () => actions);
 const push = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh: vi.fn() }) }));
 
+const confirmMock = vi.hoisted(() => vi.fn(async () => true));
+vi.mock("@/components/ConfirmDialog", () => ({
+  confirm: (...args: unknown[]) => confirmMock(...args),
+  ConfirmHost: () => null,
+}));
+
 const base = {
   date: "2026-11-10",
   lessonId: "64b000000000000000000003",
@@ -60,6 +65,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  confirmMock.mockResolvedValue(true);
 });
 
 describe("TaskRecorder", () => {
@@ -88,6 +94,73 @@ describe("TaskRecorder", () => {
     expect((screen.getByRole("button", { name: /start/i }) as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("allows a free practice take with no material, and hides Generate with AI when the coach is off (F8)", () => {
+    render(<TaskRecorder {...base} lessonId={null} task="recordReview" material={null} aiOn={false} hasLesson={false} />);
+    expect(screen.getByText(/No speaking lessons are published yet/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Generate with AI" })).toBeNull();
+    expect((screen.getByRole("button", { name: /start/i }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("offers Generate with AI when the coach is on (F8)", () => {
+    render(<TaskRecorder {...base} task="readAloud" material={null} />);
+    expect(screen.getByText(/Today's lesson has nothing for this task/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Generate with AI" })).toBeTruthy();
+  });
+
+  it("asks before an in-app link leaves an unsaved recording (U6)", async () => {
+    recorder.value = { ...recorder.value, state: "recording" };
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<TaskRecorder {...base} task="readAloud" material={{ title: "P", text: "Read me.", generated: false }} />);
+    const link = document.createElement("a");
+    link.href = "/dashboard";
+    link.textContent = "Dashboard";
+    document.body.appendChild(link);
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+    link.dispatchEvent(event);
+    expect(confirm).toHaveBeenCalledWith("Your recording hasn't been saved. Leave anyway?");
+    expect(event.defaultPrevented).toBe(true);
+    link.remove();
+    confirm.mockRestore();
+  });
+
+  it("asks before saving a very short take, and saves it only when kept (U16)", async () => {
+    const user = userEvent.setup();
+    recorder.value = {
+      ...recorder.value,
+      state: "stopped",
+      elapsedSec: 1,
+      result: { blob: new Blob(["x"], { type: "audio/webm" }), mime: "audio/webm", durationSec: 1 },
+    };
+    render(<TaskRecorder {...base} task="readAloud" material={{ title: "P", text: "Read me.", generated: false }} />);
+    expect(await screen.findByText(/only 0:01 long/)).toBeTruthy();
+    expect(actions.startTakeAction).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Save it" }));
+    await waitFor(() => expect(actions.startTakeAction).toHaveBeenCalled());
+  });
+
+  it("can cancel an upload in progress and keeps the recording for a retry (U16)", async () => {
+    const user = userEvent.setup();
+    upload.uploadTake.mockImplementationOnce(
+      (_url: unknown, _blob: unknown, _mime: unknown, opts: unknown) =>
+        new Promise<void>((_resolve, reject) => {
+          const o = opts as { signal: AbortSignal; onProgress: (f: number) => void };
+          o.onProgress(0.4);
+          o.signal.addEventListener("abort", () => reject(new upload.UploadError("The upload was cancelled.")));
+        }),
+    );
+    recorder.value = {
+      ...recorder.value,
+      state: "stopped",
+      elapsedSec: 42,
+      result: { blob: new Blob(["x"], { type: "audio/webm" }), mime: "audio/webm", durationSec: 42 },
+    };
+    render(<TaskRecorder {...base} task="readAloud" material={{ title: "P", text: "Read me.", generated: false }} />);
+    expect(await screen.findByText(/40%/)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Cancel upload" }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/cancelled/);
+    expect(screen.getByRole("button", { name: /try again/i })).toBeTruthy();
+  });
+
   it("TaskRecorder shows retry after a failed upload", async () => {
     const user = userEvent.setup();
     upload.uploadTake.mockRejectedValueOnce(new upload.UploadError("The upload failed (500). Try again."));
@@ -105,14 +178,12 @@ describe("TaskRecorder", () => {
     expect(actions.startTakeAction).toHaveBeenCalledWith(
       expect.objectContaining({ task: "readAloud", kind: "audio", mime: "audio/webm", date: base.date, size: 1 }),
     );
-    expect(upload.uploadTake).toHaveBeenCalledWith("https://r2.test/put", expect.any(Blob), "audio/webm");
+    expect(upload.uploadTake).toHaveBeenCalledWith("https://r2.test/put", expect.any(Blob), "audio/webm", expect.objectContaining({ signal: expect.any(AbortSignal) }));
 
     await user.click(retry);
     await waitFor(() => expect(actions.confirmTakeAction).toHaveBeenCalledWith("64b000000000000000000009", 42));
-    // The retry reuses the take it already started.
     expect(actions.startTakeAction).toHaveBeenCalledTimes(1);
     expect(push).toHaveBeenCalledWith("/speaking/takes/64b000000000000000000009");
-    // The review page starts transcription; the recorder only navigates.
     expect(actions.transcribeTakeAction).not.toHaveBeenCalled();
   });
 
@@ -166,7 +237,7 @@ describe("TaskRecorder", () => {
 
   it("Discard deletes the take it started", async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmMock.mockResolvedValue(true);
     upload.uploadTake.mockRejectedValueOnce(new upload.UploadError("The upload failed (500). Try again."));
     recorder.value = {
       ...recorder.value,
@@ -181,7 +252,7 @@ describe("TaskRecorder", () => {
 
   it("Discard with no started take deletes nothing", async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmMock.mockResolvedValue(true);
     actions.startTakeAction.mockResolvedValueOnce({ ok: false, errors: { _: "Invalid recording size." } } as never);
     recorder.value = {
       ...recorder.value,

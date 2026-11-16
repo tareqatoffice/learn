@@ -10,7 +10,7 @@ export { GraphNode } from "./graphNode";
 export { NoteSeries } from "./noteSeries";
 export { Note } from "./note";
 export { Revision } from "./revision";
-export { ApiToken } from "./apiToken";
+export { ApiToken, TOKEN_SCOPES, type TokenScope } from "./apiToken";
 export { QuestionProgress } from "./questionProgress";
 export { QuizSession } from "./quizSession";
 export { NodeProgress } from "./nodeProgress";

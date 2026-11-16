@@ -75,6 +75,20 @@ describe("openrouter", () => {
     ).rejects.toBeInstanceOf(AiError);
   });
 
+  it("logs status and sizes, never the error body or the reply text (S11)", async () => {
+    const secret = "learner wrote: my private answer";
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: secret } }), { status: 500 }))
+      .mockResolvedValueOnce(reply(secret));
+    await expect(
+      chatCompletion(msg, { apiKey: "sk-test", models: ["a/1", "a/2"], fetch, accept: () => false }),
+    ).rejects.toBeInstanceOf(AiError);
+    const logged = vi.mocked(console.error).mock.calls.flat().map(String).join(" ");
+    expect(logged).toContain("status 500");
+    expect(logged).not.toContain("private answer");
+  });
+
   it("does not fall back when the key is rejected", async () => {
     const fetch = vi.fn(async () => new Response("", { status: 401 }));
     await expect(chatCompletion(msg, { apiKey: "sk-test", models: ["a/1", "a/2"], fetch })).rejects.toThrow(/key was rejected/);

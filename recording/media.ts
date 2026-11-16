@@ -1,9 +1,5 @@
 import { Schema } from "mongoose";
 
-/**
- * A recording's stored media. The shape (and so every stored `media.*` path) is the one Speaking
- * Practice takes have always used; IELTS attempts embed the same sub-schema.
- */
 export const mediaSchema = new Schema(
   {
     kind: { type: String, enum: ["audio", "video"], required: true },
@@ -19,7 +15,6 @@ export const mediaSchema = new Schema(
   { _id: false },
 );
 
-/** AI body-language feedback on a video recording (stored under `ai.body`). */
 export const bodySchema = new Schema(
   {
     confidence: Number,

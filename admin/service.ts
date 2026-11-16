@@ -1,8 +1,9 @@
+import { publicMessage } from "@/lib/errors";
 import mongoose, { isValidObjectId, Types, type ClientSession, type Model } from "mongoose";
 import { z } from "zod";
 import { findCycle } from "@/content/cycles";
 import { validateNode } from "@/content/parse/graph";
-import { restoreRevision, saveWithRevision } from "@/content/revisions";
+import { restoreRevision, saveWithRevision, StaleEditError } from "@/content/revisions";
 import type { ActionResult } from "@/admin/result";
 import { inTransaction } from "@/lib/db";
 import { importKey, SLUG_PATTERN } from "@/lib/ids";
@@ -10,15 +11,25 @@ import { extractToc, readMinutes } from "@/lib/markdown/toc";
 import { escapeRegex } from "@/lib/utils";
 import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook, Revision, STATUSES, Subject, type Status } from "@/models";
 
-// Admin write operations. Every function validates its input, writes through
-// saveWithRevision (so edits keep history) and never deletes content.
 
-/** What content saves return: the saved item's id, or field errors. */
-export type Result = ActionResult<{ id: string }>;
+export type Result = ActionResult<{ id: string; updatedAt?: string }>;
 
 type Id = Types.ObjectId;
 const fail = (errors: Record<string, string>): Result => ({ ok: false, errors });
 const done = (id: unknown): Result => ({ ok: true, id: String(id) });
+
+export const STALE_EDIT_MESSAGE = "Someone saved this since you opened it. Reload the page to see their changes, then make yours again.";
+const version = z.string().max(40).optional();
+
+async function saved(work: () => Promise<{ _id: unknown; updatedAt?: Date }>): Promise<Result> {
+  try {
+    const doc = await work();
+    return { ok: true, id: String(doc._id), ...(doc.updatedAt ? { updatedAt: doc.updatedAt.toISOString() } : {}) };
+  } catch (error) {
+    if (error instanceof StaleEditError) return fail({ _: STALE_EDIT_MESSAGE });
+    throw error;
+  }
+}
 
 const slug = z.string().trim().regex(SLUG_PATTERN, "Use lowercase letters, digits and dashes");
 const text = (label: string) => z.string().trim().min(1, `${label} is required`);
@@ -26,7 +37,6 @@ const objectId = z.string().refine((v) => isValidObjectId(v), "Invalid id");
 const status = z.enum(STATUSES);
 const subjects = z.array(slug).max(50);
 
-/** zod issues → { field: message } using the first path segment. */
 function fieldErrors(error: z.ZodError): Record<string, string> {
   const out: Record<string, string> = {};
   for (const issue of error.issues) {
@@ -45,10 +55,6 @@ async function slugTaken(model: Model<unknown>, value: string, id?: string, scop
   return !!(await model.exists({ ...scope, slug: value, ...(id ? { _id: { $ne: id } } : {}) }));
 }
 
-/**
- * Labels of the parent's current parts/tracks that the edit drops while children (any status)
- * still point at them, e.g. "Part Two (2)"; empty when nothing would be orphaned.
- */
 async function removedKeysInUse(
   parentModel: Model<unknown>,
   parentId: string,
@@ -70,13 +76,8 @@ async function removedKeysInUse(
   return used.join(", ");
 }
 
-/** Content that lists subjects by slug. */
 const SUBJECT_HOLDERS: Model<unknown>[] = [QuestionBook, Question, Graph, GraphNode, NoteSeries, Note];
 
-/**
- * Keeps slug-keyed references in step with a subject or book whose slug changed: content lists its
- * subjects by slug, and question importKeys (what a legacy re-import matches on) start with the book slug.
- */
 async function followSlugChange(entityType: string, id: string, from: string, to: string, session: ClientSession): Promise<void> {
   if (from === to) return;
   if (entityType === "Subject") {
@@ -99,17 +100,21 @@ async function followSlugChange(entityType: string, id: string, from: string, to
   }
 }
 
-/** Updates an existing subject or book and, in the same transaction, follows its slug change. */
-async function updateFollowingSlug(model: Model<unknown>, id: string, data: { slug: string }, editedBy: string): Promise<unknown> {
+async function updateFollowingSlug(
+  model: Model<unknown>,
+  id: string,
+  data: { slug: string },
+  editedBy: string,
+  expectedUpdatedAt?: string,
+): Promise<{ _id: unknown; updatedAt?: Date }> {
   return inTransaction(async (session) => {
     const before = await model.findById(id, { slug: 1 }, { session }).lean<{ slug: string }>();
-    const saved = await saveWithRevision(model, id, data, editedBy, { session });
+    const doc = await saveWithRevision(model, id, data, editedBy, { session, expectedUpdatedAt });
     if (before) await followSlugChange(model.modelName, id, before.slug, data.slug, session);
-    return saved._id;
+    return doc as { _id: unknown; updatedAt?: Date };
   });
 }
 
-// ---------- books ----------
 
 const bookSchema = z.object({
   id: objectId.optional(),
@@ -120,13 +125,14 @@ const bookSchema = z.object({
   parts: z.array(z.object({ key: slug, title: text("Part title"), intro: z.string().optional() })).max(100),
   extras: z.array(z.object({ key: slug, title: text("Extra title"), body: z.string() })).max(100),
   status,
+  updatedAt: version,
 });
 export type BookInput = z.input<typeof bookSchema>;
 
 export async function saveBook(input: BookInput, editedBy: string): Promise<Result> {
   const parsed = bookSchema.safeParse(input);
   if (!parsed.success) return fail(fieldErrors(parsed.error));
-  const { id, parts, extras, ...rest } = parsed.data;
+  const { id, parts, extras, updatedAt, ...rest } = parsed.data;
   if (new Set(parts.map((p) => p.key)).size !== parts.length) return fail({ parts: "Part keys must be unique" });
   if (new Set(extras.map((e) => e.key)).size !== extras.length) return fail({ extras: "Extra keys must be unique" });
   if (await slugTaken(QuestionBook, rest.slug, id)) return fail({ slug: "Another book already uses this slug" });
@@ -142,12 +148,11 @@ export async function saveBook(input: BookInput, editedBy: string): Promise<Resu
   };
   if (id) {
     if (!(await QuestionBook.exists({ _id: id }))) return fail({ id: "Book not found" });
-    return done(await updateFollowingSlug(QuestionBook, id, data, editedBy));
+    return saved(() => updateFollowingSlug(QuestionBook, id, data, editedBy, updatedAt));
   }
   return done((await saveWithRevision(QuestionBook, null, { ...data, order: await nextOrder(QuestionBook) }, editedBy))._id);
 }
 
-// ---------- questions ----------
 
 const questionSchema = z.object({
   id: objectId.optional(),
@@ -158,10 +163,10 @@ const questionSchema = z.object({
   answer: text("Answer"),
   subjects,
   status,
+  updatedAt: version,
 });
 export type QuestionInput = z.input<typeof questionSchema>;
 
-/** importKey for a new question, suffixed like collect.js when the text already exists. */
 async function freshImportKey(bookSlug: string, question: string, prompt: string): Promise<string> {
   const base = importKey(bookSlug, question, prompt);
   let key = base;
@@ -172,14 +177,14 @@ async function freshImportKey(bookSlug: string, question: string, prompt: string
 export async function saveQuestion(input: QuestionInput, editedBy: string): Promise<Result> {
   const parsed = questionSchema.safeParse(input);
   if (!parsed.success) return fail(fieldErrors(parsed.error));
-  const { id, ...data } = parsed.data;
+  const { id, updatedAt, ...data } = parsed.data;
   const book = await QuestionBook.findById(data.bookId, { slug: 1, parts: 1 }).lean<{ slug: string; parts: { key: string }[] }>();
   if (!book) return fail({ bookId: "Book not found" });
   if (!book.parts.some((p) => p.key === data.partKey)) return fail({ partKey: "Pick one of the book's parts" });
 
   if (id) {
     if (!(await Question.exists({ _id: id }))) return fail({ id: "Question not found" });
-    return done((await saveWithRevision(Question, id, data, editedBy))._id);
+    return saved(() => saveWithRevision(Question, id, data, editedBy, { expectedUpdatedAt: updatedAt }));
   }
   const created = await saveWithRevision(
     Question,
@@ -194,7 +199,6 @@ export async function saveQuestion(input: QuestionInput, editedBy: string): Prom
   return done(created._id);
 }
 
-// ---------- shared: ordering and status ----------
 
 export type OrderedKind = "book" | "question" | "graph" | "node" | "series" | "note" | "subject";
 export type StatusKind = Exclude<OrderedKind, "subject">;
@@ -209,11 +213,7 @@ const KINDS: Record<OrderedKind, { model: Model<unknown>; parent: string | null 
   subject: { model: Subject, parent: null },
 };
 
-/**
- * Swaps the item with its neighbour among siblings (same parent). When sibling orders are already
- * distinct only the two `order` values swap; ties or missing orders renumber siblings 0..n-1.
- */
-export async function moveItem(kind: OrderedKind, id: string, dir: "up" | "down", editedBy: string): Promise<Result> {
+export async function moveItem(kind: OrderedKind, id: string, dir: "up" | "down"): Promise<Result> {
   const spec = Object.hasOwn(KINDS, kind) ? KINDS[kind] : undefined;
   if (!spec || !isValidObjectId(id) || (dir !== "up" && dir !== "down")) return fail({ _: "Invalid move" });
   const item = await spec.model.findById(id).lean<Record<string, unknown> & { _id: Id }>();
@@ -231,12 +231,11 @@ export async function moveItem(kind: OrderedKind, id: string, dir: "up" | "down"
   const distinct = orders.every((o, i) => typeof o === "number" && (i === 0 || o > orders[i - 1]!));
   const next = siblings.slice();
   [next[at], next[to]] = [next[to], next[at]];
-  // Positions keep their order values; only the items in them move.
   const writes = next
     .map((s, i) => ({ id: String(s._id), order: distinct ? orders[i]! : i, current: s.order }))
     .filter((w) => w.order !== w.current);
   await inTransaction(async (session) => {
-    for (const w of writes) await saveWithRevision(spec.model, w.id, { order: w.order }, editedBy, { session });
+    for (const w of writes) await spec.model.updateOne({ _id: w.id }, { $set: { order: w.order } }, { session });
   });
   return done(id);
 }
@@ -249,9 +248,7 @@ export async function setStatus(kind: StatusKind, id: string, value: Status, edi
   return done((await saveWithRevision(spec.model, id, { status: parsed.data }, editedBy))._id);
 }
 
-// ---------- links ----------
 
-/** Adds or removes the question in the topic's related questions (one stored link, edited from either side). */
 export async function setQuestionTopicLink(questionId: string, nodeId: string, linked: boolean, editedBy: string): Promise<Result> {
   if (!isValidObjectId(questionId) || !isValidObjectId(nodeId)) return fail({ _: "Invalid id" });
   if (!(await Question.exists({ _id: questionId }))) return fail({ questionId: "Question not found" });
@@ -264,7 +261,6 @@ export async function setQuestionTopicLink(questionId: string, nodeId: string, l
   return done((await saveWithRevision(GraphNode, nodeId, { "related.questionIds": next } as never, editedBy))._id);
 }
 
-/** Adds or removes a link from the topic to a note (whole chapter when anchor is '', else one of its headings). */
 export async function setNodeNoteLink(nodeId: string, noteId: string, anchor: string, linked: boolean, editedBy: string): Promise<Result> {
   if (!isValidObjectId(nodeId) || !isValidObjectId(noteId) || typeof anchor !== "string") return fail({ _: "Invalid link" });
   const note = await Note.findById(noteId, { toc: 1 }).lean<{ toc?: { anchor: string }[] }>();
@@ -280,7 +276,6 @@ export async function setNodeNoteLink(nodeId: string, noteId: string, anchor: st
   return done((await saveWithRevision(GraphNode, nodeId, { "related.notes": next } as never, editedBy))._id);
 }
 
-// ---------- graphs and topics ----------
 
 const graphSchema = z.object({
   id: objectId.optional(),
@@ -294,13 +289,14 @@ const graphSchema = z.object({
     .min(2, "A graph needs 2 to 6 tracks")
     .max(6, "A graph needs 2 to 6 tracks"),
   status,
+  updatedAt: version,
 });
 export type GraphInput = z.input<typeof graphSchema>;
 
 export async function saveGraph(input: GraphInput, editedBy: string): Promise<Result> {
   const parsed = graphSchema.safeParse(input);
   if (!parsed.success) return fail(fieldErrors(parsed.error));
-  const { id, tracks, ...rest } = parsed.data;
+  const { id, tracks, updatedAt, ...rest } = parsed.data;
   if (new Set(tracks.map((t) => t.key)).size !== tracks.length) return fail({ tracks: "Track keys must be unique" });
   if (await slugTaken(Graph, rest.slug, id)) return fail({ slug: "Another graph already uses this slug" });
   if (id) {
@@ -310,7 +306,7 @@ export async function saveGraph(input: GraphInput, editedBy: string): Promise<Re
   const data = { ...rest, tracks: tracks.map((t, order) => ({ ...t, order })) };
   if (id) {
     if (!(await Graph.exists({ _id: id }))) return fail({ id: "Graph not found" });
-    return done((await saveWithRevision(Graph, id, data, editedBy))._id);
+    return saved(() => saveWithRevision(Graph, id, data, editedBy, { expectedUpdatedAt: updatedAt }));
   }
   return done((await saveWithRevision(Graph, null, { ...data, order: await nextOrder(Graph) }, editedBy))._id);
 }
@@ -321,9 +317,11 @@ const nodeSchema = z.object({
   slug,
   trackKey: z.string(),
   title: z.string().trim(),
-  prereqIds: z.array(objectId).max(50),
+  prereqIds: z
+    .array(objectId)
+    .max(50)
+    .transform((ids) => [...new Set(ids)]),
   summary: z.string(),
-  // One point per line in the editor; blank lines carry no meaning.
   points: z
     .array(z.string())
     .transform((ps) => ps.map((p) => p.trim()).filter(Boolean))
@@ -333,10 +331,10 @@ const nodeSchema = z.object({
   docsUrl: z.string().trim(),
   subjects,
   status,
+  updatedAt: version,
 });
 export type NodeInput = z.input<typeof nodeSchema>;
 
-// validateNode messages → form fields.
 const NODE_RULE_FIELDS: [RegExp, string][] = [
   [/id must/, "slug"],
   [/unknown track/, "trackKey"],
@@ -351,7 +349,7 @@ const NODE_RULE_FIELDS: [RegExp, string][] = [
 export async function saveNode(input: NodeInput, editedBy: string): Promise<Result> {
   const parsed = nodeSchema.safeParse(input);
   if (!parsed.success) return fail(fieldErrors(parsed.error));
-  const { id, ...data } = parsed.data;
+  const { id, updatedAt, ...data } = parsed.data;
   const graph = await Graph.findById(data.graphId, { tracks: 1 }).lean<{ tracks?: { key: string }[] }>();
   if (!graph) return fail({ graphId: "Graph not found" });
 
@@ -363,67 +361,66 @@ export async function saveNode(input: NodeInput, editedBy: string): Promise<Resu
   if (await slugTaken(GraphNode, data.slug, id, { graphId: data.graphId })) errors.slug ??= "Another topic in this graph uses this slug";
   if (Object.keys(errors).length) return fail(errors);
 
-  const siblings = await GraphNode.find({ graphId: data.graphId }, { title: 1, prereqIds: 1 }).lean<{ _id: Id; title: string; prereqIds?: Id[] }[]>();
-  const selfId = id ?? "new";
-  if (data.prereqIds.includes(selfId)) return fail({ prereqIds: "A topic cannot require itself" });
-  const inGraph = new Set(siblings.map((s) => String(s._id)));
-  if (data.prereqIds.some((p) => !inGraph.has(p))) return fail({ prereqIds: "Prerequisites must be topics in the same graph" });
+  if (id && !(await GraphNode.exists({ _id: id, graphId: data.graphId }))) return fail({ id: "Topic not found" });
+  return inTransaction(async (session) => {
+    await Graph.updateOne({ _id: data.graphId }, { $inc: { prereqVersion: 1 } }, { session });
+    const siblings = await GraphNode.find({ graphId: data.graphId }, { title: 1, prereqIds: 1 }, { session }).lean<{ _id: Id; title: string; prereqIds?: Id[] }[]>();
+    const selfId = id ?? "new";
+    if (data.prereqIds.includes(selfId)) return fail({ prereqIds: "A topic cannot require itself" });
+    const inGraph = new Set(siblings.map((s) => String(s._id)));
+    if (data.prereqIds.some((p) => !inGraph.has(p))) return fail({ prereqIds: "Prerequisites must be topics in the same graph" });
 
-  const edges = Object.fromEntries(siblings.map((s) => [String(s._id), (s.prereqIds ?? []).map(String)]));
-  edges[selfId] = data.prereqIds;
-  const cycle = findCycle(edges);
-  if (cycle) {
-    const titleOf = new Map(siblings.map((s) => [String(s._id), s.title]));
-    titleOf.set(selfId, data.title);
-    // Start the loop at the topic being saved so the message reads from the user's point of view.
-    const loop = cycle.slice(0, -1);
-    const start = Math.max(0, loop.indexOf(selfId));
-    const rotated = [...loop.slice(start), ...loop.slice(0, start)];
-    return fail({ prereqIds: `Creates a cycle: ${[...rotated, rotated[0]].map((n) => titleOf.get(n) ?? n).join(" → ")}` });
-  }
+    const edges = Object.fromEntries(siblings.map((s) => [String(s._id), (s.prereqIds ?? []).map(String)]));
+    edges[selfId] = data.prereqIds;
+    const cycle = findCycle(edges);
+    if (cycle) {
+      const titleOf = new Map(siblings.map((s) => [String(s._id), s.title]));
+      titleOf.set(selfId, data.title);
+      const loop = cycle.slice(0, -1);
+      const start = Math.max(0, loop.indexOf(selfId));
+      const rotated = [...loop.slice(start), ...loop.slice(0, start)];
+      return fail({ prereqIds: `Creates a cycle: ${[...rotated, rotated[0]].map((n) => titleOf.get(n) ?? n).join(" → ")}` });
+    }
 
-  if (id) {
-    if (!(await GraphNode.exists({ _id: id, graphId: data.graphId }))) return fail({ id: "Topic not found" });
-    return done((await saveWithRevision(GraphNode, id, data, editedBy))._id);
-  }
-  return done((await saveWithRevision(GraphNode, null, { ...data, order: await nextOrder(GraphNode, { graphId: data.graphId }) }, editedBy))._id);
+    if (id) return saved(() => saveWithRevision(GraphNode, id, data, editedBy, { expectedUpdatedAt: updatedAt, session }));
+    const order = await nextOrder(GraphNode, { graphId: data.graphId });
+    return done((await saveWithRevision(GraphNode, null, { ...data, order }, editedBy, { session }))._id);
+  });
 }
 
-// ---------- notes ----------
 
-const seriesSchema = z.object({ id: objectId.optional(), slug, title: text("Title"), description: z.string(), subjects, status });
+const seriesSchema = z.object({ id: objectId.optional(), slug, title: text("Title"), description: z.string(), subjects, status, updatedAt: version });
 export type SeriesInput = z.input<typeof seriesSchema>;
 
 export async function saveSeries(input: SeriesInput, editedBy: string): Promise<Result> {
   const parsed = seriesSchema.safeParse(input);
   if (!parsed.success) return fail(fieldErrors(parsed.error));
-  const { id, ...data } = parsed.data;
+  const { id, updatedAt, ...data } = parsed.data;
   if (await slugTaken(NoteSeries, data.slug, id)) return fail({ slug: "Another series already uses this slug" });
   if (id) {
     if (!(await NoteSeries.exists({ _id: id }))) return fail({ id: "Series not found" });
-    return done((await saveWithRevision(NoteSeries, id, data, editedBy))._id);
+    return saved(() => saveWithRevision(NoteSeries, id, data, editedBy, { expectedUpdatedAt: updatedAt }));
   }
   return done((await saveWithRevision(NoteSeries, null, { ...data, order: await nextOrder(NoteSeries) }, editedBy))._id);
 }
 
-const noteSchema = z.object({ id: objectId.optional(), seriesId: objectId, slug, title: text("Title"), body: z.string(), subjects, status });
+const noteSchema = z.object({ id: objectId.optional(), seriesId: objectId, slug, title: text("Title"), body: z.string(), subjects, status, updatedAt: version });
 export type NoteInput = z.input<typeof noteSchema>;
 
 export async function saveNote(input: NoteInput, editedBy: string): Promise<Result> {
   const parsed = noteSchema.safeParse(input);
   if (!parsed.success) return fail(fieldErrors(parsed.error));
-  const { id, ...rest } = parsed.data;
+  const { id, updatedAt, ...rest } = parsed.data;
   if (!(await NoteSeries.exists({ _id: rest.seriesId }))) return fail({ seriesId: "Series not found" });
   if (await slugTaken(Note, rest.slug, id, { seriesId: rest.seriesId })) return fail({ slug: "Another chapter in this series uses this slug" });
   const data = { ...rest, toc: extractToc(rest.body), readMinutes: readMinutes(rest.body) };
   if (id) {
     if (!(await Note.exists({ _id: id, seriesId: rest.seriesId }))) return fail({ id: "Chapter not found" });
-    return done((await saveWithRevision(Note, id, data, editedBy))._id);
+    return saved(() => saveWithRevision(Note, id, data, editedBy, { expectedUpdatedAt: updatedAt }));
   }
   return done((await saveWithRevision(Note, null, { ...data, order: await nextOrder(Note, { seriesId: rest.seriesId }) }, editedBy))._id);
 }
 
-// ---------- subjects ----------
 
 const subjectSchema = z.object({ id: objectId.optional(), slug, name: text("Name") });
 export type SubjectInput = z.input<typeof subjectSchema>;
@@ -435,21 +432,26 @@ export async function saveSubject(input: SubjectInput, editedBy: string): Promis
   if (await slugTaken(Subject, data.slug, id)) return fail({ slug: "That subject already exists" });
   if (id) {
     if (!(await Subject.exists({ _id: id }))) return fail({ id: "Subject not found" });
-    return done(await updateFollowingSlug(Subject, id, data, editedBy));
+    return saved(() => updateFollowingSlug(Subject, id, data, editedBy));
   }
   return done((await saveWithRevision(Subject, null, { ...data, order: await nextOrder(Subject) }, editedBy))._id);
 }
 
-// ---------- revisions ----------
+export async function deleteSubject(id: string): Promise<Result> {
+  if (!isValidObjectId(id)) return fail({ _: "Invalid subject" });
+  const subject = await Subject.findById(id, { slug: 1, name: 1 }).lean<{ slug: string; name: string }>();
+  if (!subject) return fail({ _: "That subject no longer exists." });
+  const counts = await Promise.all(SUBJECT_HOLDERS.map((m) => m.countDocuments({ subjects: subject.slug })));
+  const used = counts.reduce((a, b) => a + b, 0);
+  if (used) return fail({ _: `"${subject.name}" is still listed on ${used} item${used === 1 ? "" : "s"}. Remove it from them first.` });
+  await Subject.deleteOne({ _id: id });
+  return done(id);
+}
+
 
 type Snapshot = Record<string, unknown>;
 const idsOf = (value: unknown) => (Array.isArray(value) ? value.map(String) : []);
 
-/**
- * The rules the editors enforce, applied to a snapshot about to be restored: slugs stay unique,
- * parts/tracks still in use are not dropped, children point at an existing part/track, and
- * topic prerequisites stay in the graph without forming a cycle. Returns field errors or null.
- */
 async function restoreErrors(entityType: string, id: string, snap: Snapshot): Promise<Record<string, string> | null> {
   const slugScope: Record<string, [Model<unknown>, string | null]> = {
     QuestionBook: [QuestionBook, null],
@@ -493,7 +495,6 @@ async function restoreErrors(entityType: string, id: string, snap: Snapshot): Pr
   return null;
 }
 
-/** Restores a revision after checking it against the editors' rules; the restore is itself revisioned. */
 export async function restoreRevisionChecked(revisionId: string, editedBy: string): Promise<Result> {
   if (!isValidObjectId(revisionId)) return fail({ _: "Invalid revision" });
   const revision = await Revision.findById(revisionId).lean<{ entityType: string; entityId: Id; snapshot: Snapshot }>();
@@ -512,12 +513,11 @@ export async function restoreRevisionChecked(revisionId: string, editedBy: strin
       }
     });
   } catch (error) {
-    return fail({ _: error instanceof Error ? error.message : "Restore failed" });
+    return fail({ _: publicMessage(error, "Restore failed because of a database error. Try again.") });
   }
   return done(revision.entityId);
 }
 
-/** Topics whose title matches, limited to the given subjects when any; for the "link topic" picker. */
 export async function searchTopics(
   query: string,
   subjectSlugs: string[],

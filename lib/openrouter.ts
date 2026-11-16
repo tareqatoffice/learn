@@ -5,50 +5,40 @@ export type ContentPart = { type: "text"; text: string } | { type: "image_url"; 
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string | ContentPart[] };
 
-/**
- * A failure the learner may see as is. `detail` carries OpenRouter's own reason (for admins, e.g. the
- * model test); it is never shown to learners.
- */
 export class AiError extends Error {
   constructor(
     message: string,
     readonly detail?: string,
+    readonly reached = false,
   ) {
     super(message);
   }
 }
 
 export type ChatOptions = {
-  /** The OpenRouter key in effect (see getAiConfig in lib/aiSettings.ts). */
   apiKey: string;
-  /** Tried in order: a model that fails, or whose reply `accept` rejects, falls through to the next. */
   models: string[];
   maxTokens?: number;
   temperature?: number;
-  /** Ask for a JSON object matching this schema (models that ignore it are still parsed leniently). */
   jsonSchema?: { name: string; schema: Record<string, unknown> };
-  /** Rejects an unusable reply (e.g. JSON that does not parse), so the next model is tried. */
   accept?: (text: string) => boolean;
-  /** Per model attempt. */
   timeoutMs?: number;
-  /** Injected in tests. */
   fetch?: typeof fetch;
 };
 
 export type ChatReply = { text: string; model: string };
 
-/** Why one model attempt failed; `final` stops the fallback (another model cannot fix it). */
 class AttemptError extends Error {
   constructor(
     message: string,
     readonly final = false,
     readonly detail?: string,
+    readonly reached = true,
   ) {
     super(message);
   }
 }
 
-/** OpenRouter's error message from a failed response body (`{ error: { message, metadata } }`). */
 export function errorDetail(status: number, body: string): string {
   let reason = "";
   try {
@@ -74,7 +64,6 @@ async function attempt(model: string, messages: ChatMessage[], options: ChatOpti
     messages,
     max_tokens: options.maxTokens ?? 800,
     temperature: options.temperature ?? 0.2,
-    // Reasoning models spend max_tokens on thinking and can return empty content; keep thinking short.
     reasoning: { effort: "low" },
     ...(options.jsonSchema
       ? { response_format: { type: "json_schema", json_schema: { ...options.jsonSchema, strict: true } } }
@@ -90,14 +79,14 @@ async function attempt(model: string, messages: ChatMessage[], options: ChatOpti
       signal: AbortSignal.timeout(options.timeoutMs ?? 25_000),
     });
   } catch (error) {
-    console.error(`OpenRouter request to ${model} failed`, error);
+    console.error(`OpenRouter request to ${model} failed: ${error instanceof Error ? error.name : "unknown error"}`);
     const timedOut = error instanceof Error && error.name === "TimeoutError";
-    throw new AttemptError("The AI coach could not be reached. Try again.", false, timedOut ? "Timed out" : "Network error");
+    throw new AttemptError("The AI coach could not be reached. Try again.", false, timedOut ? "Timed out" : "Network error", false);
   }
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    console.error(`OpenRouter error from ${model}`, response.status, body);
+    console.error(`OpenRouter error from ${model}: status ${response.status}, ${body.length} bytes`);
     const detail = errorDetail(response.status, body);
     if (response.status === 401)
       throw new AttemptError("The AI coach is misconfigured (the OpenRouter key was rejected).", true, detail);
@@ -111,7 +100,7 @@ async function attempt(model: string, messages: ChatMessage[], options: ChatOpti
   const choice = data?.choices?.[0];
   const content = choice?.message?.content;
   if (typeof content !== "string" || !content.trim()) {
-    console.error(`OpenRouter returned no content from ${model}`, JSON.stringify(data)?.slice(0, 500));
+    console.error(`OpenRouter returned no content from ${model}: finish_reason ${String(choice?.finish_reason ?? "unknown")}`);
     const reason =
       typeof data?.error?.message === "string"
         ? data.error.message.slice(0, 300)
@@ -120,7 +109,7 @@ async function attempt(model: string, messages: ChatMessage[], options: ChatOpti
   }
   const text = content.trim();
   if (options.accept && !options.accept(text)) {
-    console.error(`Unusable reply from ${model}`, text.slice(0, 500));
+    console.error(`Unusable reply from ${model}: ${text.length} chars, finish_reason ${String(choice?.finish_reason ?? "unknown")}`);
     throw new AttemptError(
       "The AI coach gave an unreadable reply. Try again.",
       false,
@@ -130,7 +119,6 @@ async function attempt(model: string, messages: ChatMessage[], options: ChatOpti
   return text;
 }
 
-/** One chat completion through OpenRouter, falling back through `options.models` in order. */
 export async function chatCompletion(messages: ChatMessage[], options: ChatOptions): Promise<ChatReply> {
   const key = options.apiKey;
   if (!key) throw new AiError("The AI coach is not configured.");
@@ -138,19 +126,20 @@ export async function chatCompletion(messages: ChatMessage[], options: ChatOptio
   if (!models.length) throw new AiError("No AI model is selected.");
 
   let last: AttemptError | undefined;
+  let reached = false;
   for (const model of models) {
     try {
       return { text: await attempt(model, messages, options, key), model };
     } catch (error) {
       if (!(error instanceof AttemptError)) throw error;
       last = error;
+      reached ||= error.reached;
       if (error.final) break;
     }
   }
-  throw new AiError(last?.message ?? "The AI coach failed. Try again.", last?.detail);
+  throw new AiError(last?.message ?? "The AI coach failed. Try again.", last?.detail, reached);
 }
 
-/** The first JSON object in a reply, tolerating code fences and surrounding prose. */
 export function extractJson(text: string): unknown {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
@@ -167,16 +156,13 @@ export type CatalogModel = {
   name: string;
   free: boolean;
   contextLength: number | null;
-  /** Accepts a JSON schema reply format; null when the catalogue does not say. */
   json: boolean | null;
-  /** Accepts images as input. */
   images: boolean;
 };
 
 const CATALOG_TTL_MS = 10 * 60 * 1000;
 let catalogCache: { at: number; models: CatalogModel[] } | undefined;
 
-/** Testing hook. */
 export const resetCatalogCache = () => {
   catalogCache = undefined;
 };
@@ -197,14 +183,11 @@ function supportsJson(params: unknown): boolean | null {
 
 const isZero = (price: unknown) => typeof price === "string" && Number(price) === 0 && price.trim() !== "";
 
-/** Text models from a /models response, free ones first, then by name. */
 export function parseCatalog(data: unknown): CatalogModel[] {
   const rows = (data as { data?: unknown })?.data;
   if (!Array.isArray(rows)) return [];
   return (rows as RawModel[])
     .filter((m): m is RawModel & { id: string } => typeof m.id === "string" && Boolean(m.id))
-    // Chat models only: music, image and video generators also list "text" among their outputs but
-    // cannot coach. OpenRouter's own routers (openrouter/auto, openrouter/free) are kept.
     .filter((m) => {
       const out = m.architecture?.output_modalities;
       if (!Array.isArray(out) || m.id.startsWith("openrouter/")) return true;
@@ -226,7 +209,6 @@ export function parseCatalog(data: unknown): CatalogModel[] {
     );
 }
 
-/** OpenRouter's model catalogue, cached for a few minutes; an empty list with an error when it cannot be read. */
 export async function listCatalog(
   options: { apiKey?: string; fetch?: typeof fetch; now?: number } = {},
 ): Promise<{ models: CatalogModel[]; error?: string }> {
@@ -262,10 +244,6 @@ const CHECK_SCHEMA = {
   },
 };
 
-/**
- * Asks each model for a JSON reply (the format the answer check needs), one at a time (no fallback),
- * and reports how it went.
- */
 export async function checkModels(
   models: string[],
   options: { apiKey: string; fetch?: typeof fetch },
@@ -288,7 +266,6 @@ export async function checkModels(
         model,
         ok: false,
         ms: Date.now() - started,
-        // Admin-only: OpenRouter's own reason (e.g. a data policy that blocks free models) beats a generic message.
         error: error instanceof AiError ? (error.detail ? `${error.message} (${error.detail})` : error.message) : "Failed",
       });
     }
@@ -301,7 +278,6 @@ export type KeyCheck =
   | { status: "rejected" }
   | { status: "unverified" };
 
-/** Asks OpenRouter about a key: rejected (401/403), valid, or unverified when OpenRouter can't be reached. */
 export async function verifyKey(apiKey: string, options: { fetch?: typeof fetch } = {}): Promise<KeyCheck> {
   try {
     const response = await (options.fetch ?? fetch)(`${OPENROUTER_API}/key`, {

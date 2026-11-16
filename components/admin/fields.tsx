@@ -4,10 +4,6 @@ import { StatusChips } from "@/components/StatusChips";
 import { SubjectPicker } from "@/components/SubjectPicker";
 import type { Status } from "@/models/status";
 
-/**
- * Label, control and field error, as used by every admin form. `group` renders a <div> instead of a <label>
- * for controls made of several buttons (chips, pickers), which must not share one label.
- */
 export function Field({ label, error, group, children }: { label: string; error?: string; group?: boolean; children: ReactNode }) {
   const message = error && <span className="text-sm text-destructive">{error}</span>;
   if (group) {
@@ -28,7 +24,6 @@ export function Field({ label, error, group, children }: { label: string; error?
   );
 }
 
-/** One-line text input with its label and error. */
 export function TextField({
   label,
   error,

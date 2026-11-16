@@ -67,6 +67,9 @@ describe("IELTS models", () => {
     await IeltsStudyLog.create({ userId, date: "2026-11-11", skill: "reading", minutes: 30 });
     await expect(IeltsBandEntry.create({ userId, date: "2026-11-11", source: "bogus" })).rejects.toThrow();
     await IeltsBandEntry.create({ userId, date: "2026-11-11", source: "official", bands: { speaking: 6.5 } });
+    for (const source of ["writingSelf", "writingAi"]) {
+      await IeltsBandEntry.create({ userId, date: "2026-11-11", source, bands: { writing: 6 }, attemptId: new Types.ObjectId() });
+    }
     const s = await IeltsPlanSuggestion.create({ userId, kind: "missed", reason: "r", forDate: "2026-11-11" });
     expect(s.status).toBe("pending");
     await IeltsSpeakingItem.create({ type: "part1", title: "Hometown", questions: ["Where?"] });

@@ -27,7 +27,6 @@ const plexMono = IBM_Plex_Mono({
 
 const themeScript = `try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
 
-/** Replaces the root layout when it fails; must render its own html/body. */
 export default function GlobalError({
   error,
   retry,

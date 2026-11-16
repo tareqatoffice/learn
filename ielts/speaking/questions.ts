@@ -25,7 +25,6 @@ type Item = {
 
 const TURNED_OFF = "The AI coach is turned off.";
 
-/** Shuffled with `rng` first, then stably ordered by last use, so never-used (empty date) comes first and ties are random. */
 function leastRecent(items: Item[], lastUsed: Map<string, string>, rng: () => number): Item[] {
   const shuffled = [...items];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -44,10 +43,6 @@ const cueOf = (it: Item): Cue => ({
   roundOff: it.cue?.roundOff ?? [],
 });
 
-/**
- * Published items for a drill or mock, least recently used first (never-used before used; ties by `rng`).
- * `exhausted` means the bank can't give fresh material, so the UI can offer AI-written questions.
- */
 export async function pickQuestions(
   userId: string,
   kind: Kind,
@@ -100,7 +95,6 @@ export async function pickQuestions(
     if (it) questions.part3 = { itemId: it._id, questions: it.questions ?? [] };
   }
 
-  // Exhausted when some needed type has nothing this user hasn't used, or a mock can't be filled.
   const fresh = (list: Item[]) => list.some((i) => !lastUsed.has(String(i._id)));
   let pickable: Item[][];
   if (kind === "mock") {
@@ -114,13 +108,11 @@ export async function pickQuestions(
   return { questions, exhausted: incomplete || !pickable.every(fresh) };
 }
 
-/** True when `questions` lacks a part `kind` needs, so it can't start without AI-written questions. */
 export function missingParts(kind: Kind, questions: QuestionSet): boolean {
   const filled = { p1: !!questions.part1?.frames.length, p2: !!questions.part2, p3: !!questions.part3?.questions.length };
   return !KIND_PARTS[kind].every((p) => filled[p]);
 }
 
-// ---- learner AI fill ----
 
 type Deps = Pick<ChatOptions, "fetch">;
 
@@ -142,7 +134,6 @@ const MOCK_SCHEMA = {
   },
 };
 
-/** Card text for the prompt: cut to the schema's lengths and unable to close the tag early. */
 const clip = (s: string) => s.replace(/<\/?card>/gi, "").trim().slice(0, 200);
 const cardBlock = (cue: Cue) =>
   `\n\nThe set follows this Part 2 cue card:\n<card>\n${clip(cue.topic)}\n${cue.bullets
@@ -150,7 +141,6 @@ const cardBlock = (cue: Cue) =>
     .map((b) => `- ${clip(b)}`)
     .join("\n")}\n${clip(cue.explain)}\n</card>`;
 
-/** A validated set from a model reply, or null when it doesn't fit the same bounds as admin drafts. */
 function toSet(kind: Kind, reply: string): QuestionSet | null {
   const raw = extractJson(reply);
   if (kind === "mock") {
@@ -174,10 +164,6 @@ function toSet(kind: Kind, reply: string): QuestionSet | null {
   return { part3: { questions: item.questions } };
 }
 
-/**
- * One metered AI call that writes questions for a learner when the bank has run out. Nothing is saved to the
- * bank; the set has no item ids. `cue` makes a Part 3 set follow that card. An unusable reply is refunded.
- */
 export async function generateQuestions(
   userId: string,
   kind: Kind,
