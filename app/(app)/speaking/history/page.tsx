@@ -27,13 +27,15 @@ const filterClass = (on: boolean) =>
   );
 
 export default async function SpeakingHistoryPage({ searchParams }: PageProps<"/speaking/history">) {
-  const { task: slug } = await searchParams;
+  const { task: slug, before: rawBefore } = await searchParams;
   const task = typeof slug === "string" ? taskFromSlug(slug) : null;
+  // Older pages are read with the last shown take's id as the cursor (listTakes checks it).
+  const before = typeof rawBefore === "string" ? rawBefore : undefined;
   const user = await requireUser();
   await connectDb();
   const timeZone = await readTimeZone();
   const [takes, trends] = await Promise.all([
-    listTakes(user.userId, { task: task ?? undefined, limit: LIMIT }),
+    listTakes(user.userId, { task: task ?? undefined, limit: LIMIT, before }),
     getTrends(user.userId, 30, timeZone),
   ]);
 
@@ -98,7 +100,23 @@ export default async function SpeakingHistoryPage({ searchParams }: PageProps<"/
             ))}
           </ul>
         )}
-        {takes.length >= LIMIT && <p className="text-xs text-muted-foreground">Showing your latest {LIMIT} takes.</p>}
+        {(before || takes.length >= LIMIT) && (
+          <nav aria-label="More takes" className="flex flex-wrap gap-3 text-sm">
+            {before && (
+              <Link href={`/speaking/history${task ? `?task=${TASK_SLUG[task]}` : ""}`} className="underline underline-offset-2">
+                Newest takes
+              </Link>
+            )}
+            {takes.length >= LIMIT && (
+              <Link
+                href={`/speaking/history?${new URLSearchParams({ ...(task ? { task: TASK_SLUG[task] } : {}), before: takes[takes.length - 1].id })}`}
+                className="underline underline-offset-2"
+              >
+                Load older takes
+              </Link>
+            )}
+          </nav>
+        )}
       </section>
     </div>
   );
