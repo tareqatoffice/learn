@@ -7,6 +7,7 @@ import { markQuestion } from "@/progress/questions";
 import {
   countDeck,
   createSession,
+  discardSession,
   finishSession,
   getSessionView,
   listUnfinished,
@@ -57,6 +58,27 @@ describe("quiz sessions", () => {
       expect(sessionLabel(["CSS", "HTML"])).toBe("CSS · HTML");
       expect(sessionLabel(["CSS", "HTML", "JS"])).toBe("Mixed");
       expect(sessionLabel(["CSS"], "Selectors")).toBe("CSS · Selectors");
+    });
+  });
+
+  describe("discardSession and the resume list (F12)", () => {
+    it("deletes an untouched quiz, finishes one with answers, and hides old ones", async () => {
+      const user = newUserId();
+      await seedQuestions(await seedBook("b"), 2);
+      const empty = await start(user, all());
+      const used = await start(user, all());
+      await recordResult(user, used, (await deckOf(used))[0], "got");
+      const old = await start(user, all());
+      await QuizSession.updateOne({ _id: old }, { $set: { startedAt: new Date(Date.now() - 31 * 86_400_000) } });
+
+      expect((await listUnfinished(user)).map((s) => s.id).sort()).toEqual([empty, used].sort());
+      await discardSession(user, empty);
+      await discardSession(user, used);
+      await discardSession(newUserId(), old); // someone else's: untouched
+      expect(await QuizSession.exists({ _id: empty })).toBeNull();
+      expect((await loadSession(used)).finishedAt).toBeInstanceOf(Date);
+      expect((await loadSession(old)).finishedAt ?? null).toBeNull();
+      expect(await listUnfinished(user)).toEqual([]);
     });
   });
 

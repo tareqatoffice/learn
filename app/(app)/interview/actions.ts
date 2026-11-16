@@ -13,6 +13,7 @@ import { type AiGrade, type AiReply, type AiResult, askFollowUp, gradeAnswer } f
 import {
   countDeck,
   createSession,
+  discardSession,
   finishSession,
   recordResult,
   type QuizFilter,
@@ -92,6 +93,15 @@ export async function clearProgressAction(bookIds: string[]): Promise<{ cleared:
   const user = await requireUser();
   await connectDb();
   return { cleared: await clearQuestionProgress(user.userId, ids) };
+}
+
+/** Removes an unfinished quiz from the resume list (see discardSession). */
+export async function discardQuizAction(sessionId: string): Promise<void> {
+  const id = objectId.parse(sessionId);
+  const user = await requireUser();
+  await connectDb();
+  await discardSession(user.userId, id);
+  refresh();
 }
 
 export async function finishQuizAction(sessionId: string): Promise<void> {

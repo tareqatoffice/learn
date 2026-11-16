@@ -314,12 +314,27 @@ export const SUMMARY_PROJECTION = { "results.answer": 0, "results.coach": 0 };
 export const quizDate = (s: { finishedAt?: Date | null; startedAt?: Date; results: { at: Date }[] }): Date =>
   s.finishedAt ?? s.results.at(-1)?.at ?? s.startedAt ?? new Date(0);
 
-/** Resumable sessions, newest first. */
+/** Unfinished quizzes older than this drop off the resume list (they stay in history and can be resumed there). */
+export const UNFINISHED_MAX_DAYS = 30;
+
+/**
+ * Takes an unfinished quiz off the resume list: one with marked cards is finished (its answers stay
+ * in history), an untouched one is deleted. Other users' sessions are left alone.
+ */
+export async function discardSession(userId: string, sessionId: string): Promise<void> {
+  if (!isValidObjectId(sessionId) || !isValidObjectId(userId)) return;
+  await QuizSession.deleteOne({ _id: sessionId, userId, finishedAt: null, "results.0": { $exists: false } });
+  await QuizSession.updateOne({ _id: sessionId, userId, finishedAt: null }, { $set: { finishedAt: new Date() } });
+}
+
+/** Resumable sessions started in the last UNFINISHED_MAX_DAYS days, newest first. */
 export async function listUnfinished(
   userId: string,
+  now: Date = new Date(),
 ): Promise<{ id: string; label: string; position: number; total: number; startedAt: Date }[]> {
   if (!isValidObjectId(userId)) return [];
-  const sessions = await QuizSession.find({ userId, finishedAt: null }, SUMMARY_PROJECTION)
+  const since = new Date(now.getTime() - UNFINISHED_MAX_DAYS * 86_400_000);
+  const sessions = await QuizSession.find({ userId, finishedAt: null, startedAt: { $gte: since } }, SUMMARY_PROJECTION)
     .sort({ startedAt: -1, _id: -1 })
     .lean<SessionRow[]>();
   const labels = await labelSessions(sessions);

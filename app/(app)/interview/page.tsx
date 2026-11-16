@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ClearProgress } from "@/components/ClearProgress";
 import { ProgressBar } from "@/components/ProgressBar";
+import { DiscardQuizButton } from "@/components/DiscardQuizButton";
 import { QuizSetup } from "@/components/QuizSetup";
 import { listBooksWithProgress } from "@/content/queries";
 import { requireUser } from "@/lib/authz";
@@ -62,12 +63,15 @@ export default async function InterviewPage() {
                         {quiz.position} / {quiz.total} done
                       </span>
                     </span>
-                    <Link
-                      href={`/interview/quiz/${quiz.id}`}
-                      className="shrink-0 rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                    >
-                      Resume
-                    </Link>
+                    <span className="flex shrink-0 items-center gap-1">
+                      <DiscardQuizButton sessionId={quiz.id} label={quiz.label || "Quiz"} />
+                      <Link
+                        href={`/interview/quiz/${quiz.id}`}
+                        className="shrink-0 rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      >
+                        Resume
+                      </Link>
+                    </span>
                   </li>
                 ))}
               </ul>
