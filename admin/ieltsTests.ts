@@ -116,10 +116,13 @@ export async function saveTest(kind: TestKind, id: string | null, input: TestInp
   }
   const data = { title: input.title.trim(), status: input.status, sections: built.sections };
   if (id) {
-    await model(kind).updateOne({ _id: id }, { $set: data });
+    // The sections replaced are read in the same write, so a save racing this one can't make the
+    // recordings to remove come from a stale copy.
+    const before = await model(kind).findOneAndUpdate({ _id: id }, { $set: data }, { returnDocument: "before" }).lean<TestRow>();
+    if (!before) return fail(NOT_FOUND);
     // Recordings no section references any more.
     const kept = new Set(built.sections.map((s) => s.audioKey));
-    const dropped = previous.map((s) => s.audioKey).filter((k) => k && !kept.has(k));
+    const dropped = before.sections.map((s) => s.audioKey).filter((k) => k && !kept.has(k));
     if (dropped.length) await removeFiles(dropped);
     return ok({ id });
   }

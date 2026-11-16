@@ -3,7 +3,7 @@ import { Types } from "mongoose";
 import { z } from "zod";
 import { type ActionResult, fail, ok } from "@/admin/result";
 import { AUDIO_EXT } from "@/lib/audioTypes";
-import { connectDb } from "@/lib/db";
+import { connectDb, inTransaction } from "@/lib/db";
 import { deleteObjects, headObject, presignPut, storageConfigured } from "@/lib/r2";
 import { SpeakingLesson } from "@/models";
 import { STATUSES } from "@/models/status";
@@ -113,10 +113,16 @@ export async function moveLesson(id: string, dir: "up" | "down"): Promise<Action
     .sort({ order: up ? -1 : 1 })
     .lean<{ _id: Types.ObjectId; order: number }>();
   if (!neighbour) return ok();
-  await SpeakingLesson.bulkWrite([
-    { updateOne: { filter: { _id: id }, update: { $set: { order: neighbour.order } } } },
-    { updateOne: { filter: { _id: neighbour._id }, update: { $set: { order: lesson.order } } } },
-  ]);
+  // Both halves of the swap or neither, so two lessons never end up sharing an order.
+  await inTransaction((session) =>
+    SpeakingLesson.bulkWrite(
+      [
+        { updateOne: { filter: { _id: id }, update: { $set: { order: neighbour.order } } } },
+        { updateOne: { filter: { _id: neighbour._id }, update: { $set: { order: lesson.order } } } },
+      ],
+      { session },
+    ),
+  );
   return ok();
 }
 

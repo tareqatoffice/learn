@@ -2,7 +2,7 @@ import { Types } from "mongoose";
 import { z } from "zod";
 import { type ActionResult, fail, ok } from "@/admin/result";
 import { getAiConfig, modelChain } from "@/lib/aiSettings";
-import { connectDb } from "@/lib/db";
+import { connectDb, inTransaction } from "@/lib/db";
 import { AiError, type ChatOptions, chatCompletion, extractJson } from "@/lib/openrouter";
 import { IeltsSpeakingItem } from "@/models";
 import { SAFETY, metered } from "@/progress/quizAi";
@@ -103,10 +103,13 @@ export async function updateItem(id: string, input: ItemInput): Promise<ActionRe
 export async function deleteItem(id: string): Promise<ActionResult> {
   if (!isId(id)) return fail(NOT_FOUND);
   await connectDb();
-  const doc = await IeltsSpeakingItem.findByIdAndDelete(id).lean<{ type: ItemType }>();
-  if (!doc) return fail(NOT_FOUND);
-  if (doc.type === "part2") await IeltsSpeakingItem.updateMany({ type: "part3", cardId: id }, { $unset: { cardId: 1 } });
-  return ok();
+  // The delete and the unlink land together, so no Part 3 set is left pointing at a missing card.
+  const found = await inTransaction(async (session) => {
+    const doc = await IeltsSpeakingItem.findByIdAndDelete(id, { session }).lean<{ type: ItemType }>();
+    if (doc?.type === "part2") await IeltsSpeakingItem.updateMany({ type: "part3", cardId: id }, { $unset: { cardId: 1 } }, { session });
+    return Boolean(doc);
+  });
+  return found ? ok() : fail(NOT_FOUND);
 }
 
 export async function setItemStatus(id: string, status: ItemStatus): Promise<ActionResult> {

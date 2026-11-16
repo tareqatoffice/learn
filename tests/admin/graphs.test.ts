@@ -43,6 +43,21 @@ async function saved(input: ReturnType<typeof node>) {
   return r.id;
 }
 
+describe("saveNode concurrency (D14)", () => {
+  it("never lets two saves at once close a prerequisite loop", async () => {
+    const g = await graph();
+    const a = await saved(node(g, "a"));
+    const b = await saved(node(g, "b"));
+    const [ra, rb] = await Promise.all([
+      saveNode({ id: a, ...node(g, "a", { prereqIds: [b] }) }, ADMIN),
+      saveNode({ id: b, ...node(g, "b", { prereqIds: [a] }) }, ADMIN),
+    ]);
+    expect([ra.ok, rb.ok].filter(Boolean)).toHaveLength(1);
+    const rows = await GraphNode.find({ graphId: g }, { prereqIds: 1 }).lean<{ prereqIds: unknown[] }[]>();
+    expect(rows.filter((r) => r.prereqIds.length)).toHaveLength(1);
+  });
+});
+
 describe("saveGraph", () => {
   it("requires 2 to 6 tracks", async () => {
     const r = await saveGraph({ slug: "x", title: "X", subtitle: "", footer: "", subjects: [], tracks: [TRACKS[0]], status: "draft" }, ADMIN);

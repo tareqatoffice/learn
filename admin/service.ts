@@ -388,30 +388,34 @@ export async function saveNode(input: NodeInput, editedBy: string): Promise<Resu
   if (await slugTaken(GraphNode, data.slug, id, { graphId: data.graphId })) errors.slug ??= "Another topic in this graph uses this slug";
   if (Object.keys(errors).length) return fail(errors);
 
-  const siblings = await GraphNode.find({ graphId: data.graphId }, { title: 1, prereqIds: 1 }).lean<{ _id: Id; title: string; prereqIds?: Id[] }[]>();
-  const selfId = id ?? "new";
-  if (data.prereqIds.includes(selfId)) return fail({ prereqIds: "A topic cannot require itself" });
-  const inGraph = new Set(siblings.map((s) => String(s._id)));
-  if (data.prereqIds.some((p) => !inGraph.has(p))) return fail({ prereqIds: "Prerequisites must be topics in the same graph" });
+  if (id && !(await GraphNode.exists({ _id: id, graphId: data.graphId }))) return fail({ id: "Topic not found" });
+  // The cycle check and the save share a transaction that also bumps the graph, so two topics saved
+  // at once can't each pass the check and together close a loop: the second one conflicts and retries.
+  return inTransaction(async (session) => {
+    await Graph.updateOne({ _id: data.graphId }, { $inc: { prereqVersion: 1 } }, { session });
+    const siblings = await GraphNode.find({ graphId: data.graphId }, { title: 1, prereqIds: 1 }, { session }).lean<{ _id: Id; title: string; prereqIds?: Id[] }[]>();
+    const selfId = id ?? "new";
+    if (data.prereqIds.includes(selfId)) return fail({ prereqIds: "A topic cannot require itself" });
+    const inGraph = new Set(siblings.map((s) => String(s._id)));
+    if (data.prereqIds.some((p) => !inGraph.has(p))) return fail({ prereqIds: "Prerequisites must be topics in the same graph" });
 
-  const edges = Object.fromEntries(siblings.map((s) => [String(s._id), (s.prereqIds ?? []).map(String)]));
-  edges[selfId] = data.prereqIds;
-  const cycle = findCycle(edges);
-  if (cycle) {
-    const titleOf = new Map(siblings.map((s) => [String(s._id), s.title]));
-    titleOf.set(selfId, data.title);
-    // Start the loop at the topic being saved so the message reads from the user's point of view.
-    const loop = cycle.slice(0, -1);
-    const start = Math.max(0, loop.indexOf(selfId));
-    const rotated = [...loop.slice(start), ...loop.slice(0, start)];
-    return fail({ prereqIds: `Creates a cycle: ${[...rotated, rotated[0]].map((n) => titleOf.get(n) ?? n).join(" → ")}` });
-  }
+    const edges = Object.fromEntries(siblings.map((s) => [String(s._id), (s.prereqIds ?? []).map(String)]));
+    edges[selfId] = data.prereqIds;
+    const cycle = findCycle(edges);
+    if (cycle) {
+      const titleOf = new Map(siblings.map((s) => [String(s._id), s.title]));
+      titleOf.set(selfId, data.title);
+      // Start the loop at the topic being saved so the message reads from the user's point of view.
+      const loop = cycle.slice(0, -1);
+      const start = Math.max(0, loop.indexOf(selfId));
+      const rotated = [...loop.slice(start), ...loop.slice(0, start)];
+      return fail({ prereqIds: `Creates a cycle: ${[...rotated, rotated[0]].map((n) => titleOf.get(n) ?? n).join(" → ")}` });
+    }
 
-  if (id) {
-    if (!(await GraphNode.exists({ _id: id, graphId: data.graphId }))) return fail({ id: "Topic not found" });
-    return saved(() => saveWithRevision(GraphNode, id, data, editedBy, { expectedUpdatedAt: updatedAt }));
-  }
-  return done((await saveWithRevision(GraphNode, null, { ...data, order: await nextOrder(GraphNode, { graphId: data.graphId }) }, editedBy))._id);
+    if (id) return saved(() => saveWithRevision(GraphNode, id, data, editedBy, { expectedUpdatedAt: updatedAt, session }));
+    const order = await nextOrder(GraphNode, { graphId: data.graphId });
+    return done((await saveWithRevision(GraphNode, null, { ...data, order }, editedBy, { session }))._id);
+  });
 }
 
 // ---------- notes ----------
