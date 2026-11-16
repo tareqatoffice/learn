@@ -187,6 +187,20 @@ describe("listening and reading attempts", () => {
     expect((await claimSection(u, drill.attemptId, 0, deps)).ok).toBe(false); // closed after submit
   });
 
+  it("reuses the open attempt for the same test and part, but not one whose time ran out (S16)", async () => {
+    const u = user();
+    const testId = await publishedTest(2);
+    const a = await startTestAttempt(u, { skill: "reading", testId, scope: "full", date: "2026-11-12" });
+    const b = await startTestAttempt(u, { skill: "reading", testId, scope: "full", date: "2026-11-12" });
+    const drill = await startTestAttempt(u, { skill: "reading", testId, scope: 0, date: "2026-11-12" });
+    if (!a.ok || !b.ok || !drill.ok) throw new Error("start");
+    expect(b.attemptId).toBe(a.attemptId);
+    expect(drill.attemptId).not.toBe(a.attemptId);
+    const late = new Date(Date.now() + 3 * 3600_000);
+    const c = await startTestAttempt(u, { skill: "reading", testId, scope: "full", date: "2026-11-12" }, late);
+    expect(c.ok && c.attemptId).not.toBe(a.attemptId);
+  });
+
   it("rejects an unknown section", async () => {
     const testId = await publishedTest(1);
     expect((await startTestAttempt(user(), { skill: "reading", testId, scope: 5, date: "2026-11-12" })).ok).toBe(false);

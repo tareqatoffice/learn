@@ -53,6 +53,16 @@ export async function startTestAttempt(
   await connectDb();
   const test = await model(skill).findOne({ _id: testId, status: "published" }).lean<TestRow>();
   if (!test) return fail("That test is no longer available.");
+  // The same test and part already open (a second click, another tab): carry on with it rather than
+  // starting another. A full test whose time has run out is left for the learner to submit.
+  const open = await IeltsTestAttempt.findOne({ userId, skill, testId, scope: String(scope), status: "in_progress" })
+    .sort({ createdAt: -1 })
+    .select("scope startedAt limitSec")
+    .lean<{ _id: Types.ObjectId; scope: string; startedAt: Date; limitSec: number }>();
+  if (open) {
+    const deadline = deadlineOf(open);
+    if (deadline === null || now.getTime() <= deadline) return ok({ attemptId: String(open._id) });
+  }
   let sections: Section[];
   if (scope === "full") sections = test.sections;
   else if (Number.isInteger(scope) && test.sections[scope as number]) sections = [test.sections[scope as number]];

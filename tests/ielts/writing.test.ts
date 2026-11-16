@@ -75,6 +75,17 @@ describe("writing attempts", () => {
   });
   afterAll(() => mongoose.disconnect());
 
+  it("picks up an open attempt of the same kind instead of starting another (S16)", async () => {
+    await prompts();
+    const u = user();
+    const a = await startWritingAttempt(u, { kind: "task2", date: TODAY });
+    const b = await startWritingAttempt(u, { kind: "task2", date: TODAY });
+    const c = await startWritingAttempt(u, { kind: "task1", date: TODAY });
+    if (!a.ok || !b.ok || !c.ok) throw new Error("start");
+    expect(b.attemptId).toBe(a.attemptId);
+    expect(c.attemptId).not.toBe(a.attemptId);
+  });
+
   it("refuses a kind or task index that is only an object key (S13)", async () => {
     await prompts();
     const u = user();

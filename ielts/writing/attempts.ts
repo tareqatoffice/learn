@@ -100,6 +100,9 @@ export async function startWritingAttempt(
   const kind = input?.kind;
   if (!isId(userId) || typeof kind !== "string" || !Object.hasOwn(TASKS_OF, kind)) return failForm("Choose Task 1, Task 2 or a full test.");
   await connectDb();
+  // An open attempt of the same kind is picked up again instead of starting a second one.
+  const open = await IeltsWritingAttempt.findOne({ userId, kind, status: "in_progress" }).sort({ createdAt: -1 }).select("_id").lean<{ _id: Types.ObjectId }>();
+  if (open) return ok({ attemptId: String(open._id) });
   const recent = await IeltsWritingAttempt.find({ userId }).sort({ createdAt: -1 }).limit(RECENT).select("tasks.promptId").lean<{ tasks: { promptId?: Types.ObjectId }[] }[]>();
   const seen = new Set(recent.flatMap((r) => r.tasks.map((t) => String(t.promptId))));
   const tasks: TaskDoc[] = [];
