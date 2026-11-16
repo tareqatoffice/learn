@@ -59,11 +59,14 @@ const STATUSES: { value: NodeStatus; label: string }[] = [
   { value: "done", label: "Done" },
 ];
 
-/** A js code block whose fence is longer than any backtick run inside the code, so the code can never close it. */
+/**
+ * A code block whose fence is longer than any backtick run inside the code, so the code can never
+ * close it. No language is named: topics hold CSS, shell, SQL and more, not only JavaScript.
+ */
 function fencedCode(code: string): string {
   const longest = Math.max(0, ...(code.match(/`+/g) ?? []).map((run) => run.length));
   const fence = "`".repeat(Math.max(3, longest + 1));
-  return `${fence}js\n${code}\n${fence}`;
+  return `${fence}\n${code}\n${fence}`;
 }
 
 const linkClass = "hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
