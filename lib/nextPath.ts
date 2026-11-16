@@ -6,7 +6,6 @@
 export function safeNextPath(value: unknown): string | null {
   if (typeof value !== "string" || value.length > 1024) return null;
   if (!value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return null;
-  // eslint-disable-next-line no-control-regex -- the point is to reject control characters
   if (/[\u0000-\u001f\u007f\\]/.test(value)) return null;
   // Parse against a dummy origin: anything that leaves it is not a plain path.
   try {
