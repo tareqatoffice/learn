@@ -12,7 +12,7 @@ import { AUDIO_EXT } from "@/lib/audioTypes";
 import { connectDb } from "@/lib/db";
 import { AiError, type ChatOptions, chatCompletion, extractJson } from "@/lib/openrouter";
 import { deleteObjects, headObject, presignPut, storageConfigured } from "@/lib/r2";
-import { IeltsListeningTest, IeltsReadingTest, IeltsWritingPrompt } from "@/models";
+import { IeltsListeningTest, IeltsReadingTest, IeltsTestAttempt, IeltsWritingAttempt, IeltsWritingPrompt } from "@/models";
 import { SAFETY, metered } from "@/progress/quizAi";
 
 export type TestKind = "reading" | "listening";
@@ -130,10 +130,22 @@ export async function saveTest(kind: TestKind, id: string | null, input: TestInp
   return ok({ id: String(doc._id) });
 }
 
+/**
+ * Deletes files no longer used by a test or prompt, except those an attempt still points at: an
+ * attempt keeps its own copy of the sections (and Writing tasks their chart), so a learner mid-test
+ * or reviewing one would otherwise lose the audio or the image. Those stay as harmless orphans.
+ */
 async function removeFiles(keys: string[]): Promise<void> {
   if (!keys.length || !storageConfigured()) return;
+  const [audio, images] = await Promise.all([
+    IeltsTestAttempt.distinct("sections.audioKey", { "sections.audioKey": { $in: keys } }),
+    IeltsWritingAttempt.distinct("tasks.imageKey", { "tasks.imageKey": { $in: keys } }),
+  ]);
+  const inUse = new Set<string>([...audio, ...images].map(String));
+  const free = keys.filter((k) => !inUse.has(k));
+  if (!free.length) return;
   try {
-    await deleteObjects(keys);
+    await deleteObjects(free);
   } catch {
     // Orphaned files are harmless.
   }
