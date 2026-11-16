@@ -235,7 +235,7 @@ const KINDS: Record<OrderedKind, { model: Model<unknown>; parent: string | null 
  * Swaps the item with its neighbour among siblings (same parent). When sibling orders are already
  * distinct only the two `order` values swap; ties or missing orders renumber siblings 0..n-1.
  */
-export async function moveItem(kind: OrderedKind, id: string, dir: "up" | "down", editedBy: string): Promise<Result> {
+export async function moveItem(kind: OrderedKind, id: string, dir: "up" | "down"): Promise<Result> {
   const spec = Object.hasOwn(KINDS, kind) ? KINDS[kind] : undefined;
   if (!spec || !isValidObjectId(id) || (dir !== "up" && dir !== "down")) return fail({ _: "Invalid move" });
   const item = await spec.model.findById(id).lean<Record<string, unknown> & { _id: Id }>();
@@ -257,8 +257,9 @@ export async function moveItem(kind: OrderedKind, id: string, dir: "up" | "down"
   const writes = next
     .map((s, i) => ({ id: String(s._id), order: distinct ? orders[i]! : i, current: s.order }))
     .filter((w) => w.order !== w.current);
+  // Order is not editor content (a restore keeps it), so a move writes no revisions.
   await inTransaction(async (session) => {
-    for (const w of writes) await saveWithRevision(spec.model, w.id, { order: w.order }, editedBy, { session });
+    for (const w of writes) await spec.model.updateOne({ _id: w.id }, { $set: { order: w.order } }, { session });
   });
   return done(id);
 }
