@@ -94,14 +94,16 @@ async function attempt(model: string, messages: ChatMessage[], options: ChatOpti
       signal: AbortSignal.timeout(options.timeoutMs ?? 25_000),
     });
   } catch (error) {
-    console.error(`OpenRouter request to ${model} failed`, error);
+    // Only the error's name: messages can echo request details, never the prompt or the key.
+    console.error(`OpenRouter request to ${model} failed: ${error instanceof Error ? error.name : "unknown error"}`);
     const timedOut = error instanceof Error && error.name === "TimeoutError";
     throw new AttemptError("The AI coach could not be reached. Try again.", false, timedOut ? "Timed out" : "Network error", false);
   }
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    console.error(`OpenRouter error from ${model}`, response.status, body);
+    // Status and size only: the body can quote the learner's text back.
+    console.error(`OpenRouter error from ${model}: status ${response.status}, ${body.length} bytes`);
     const detail = errorDetail(response.status, body);
     if (response.status === 401)
       throw new AttemptError("The AI coach is misconfigured (the OpenRouter key was rejected).", true, detail);
@@ -115,7 +117,7 @@ async function attempt(model: string, messages: ChatMessage[], options: ChatOpti
   const choice = data?.choices?.[0];
   const content = choice?.message?.content;
   if (typeof content !== "string" || !content.trim()) {
-    console.error(`OpenRouter returned no content from ${model}`, JSON.stringify(data)?.slice(0, 500));
+    console.error(`OpenRouter returned no content from ${model}: finish_reason ${String(choice?.finish_reason ?? "unknown")}`);
     const reason =
       typeof data?.error?.message === "string"
         ? data.error.message.slice(0, 300)
@@ -124,7 +126,7 @@ async function attempt(model: string, messages: ChatMessage[], options: ChatOpti
   }
   const text = content.trim();
   if (options.accept && !options.accept(text)) {
-    console.error(`Unusable reply from ${model}`, text.slice(0, 500));
+    console.error(`Unusable reply from ${model}: ${text.length} chars, finish_reason ${String(choice?.finish_reason ?? "unknown")}`);
     throw new AttemptError(
       "The AI coach gave an unreadable reply. Try again.",
       false,
