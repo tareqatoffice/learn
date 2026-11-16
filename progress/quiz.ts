@@ -3,6 +3,7 @@ import { type QuestionTopic, topicForQuestion } from "@/content/queries/books";
 import { visibleQuestionFilter } from "@/content/visibility";
 import { AI_ANSWER_MAX } from "@/lib/ai-limits";
 import { ForbiddenError } from "@/lib/authz";
+import { inTransaction } from "@/lib/db";
 import type { QuizAttempt } from "@/lib/quiz-answer";
 import { AiConversation, Question, QuestionBook, QuestionProgress, QuizSession } from "@/models";
 import { markQuestion, type MarkResult } from "./questions";
@@ -19,9 +20,7 @@ export type QuizFilter = {
 
 export type SessionView = {
   sessionId: string;
-  /** Cards behind the cursor (answered or skipped as hidden); the current card is number `position + 1`. */
   position: number;
-  /** Deck length, including cards requeued by a Review mark. */
   total: number;
   done: boolean;
   counts: Record<MarkResult, number>;
@@ -49,7 +48,6 @@ type SessionRow = {
 };
 type BookRow = { _id: Id; slug: string; title: string; order: number; parts: { key: string; title: string }[] };
 
-/** Where a card marked Review goes back into the deck: 5-9 cards later, at most the end (deck.js `requeue`). */
 export function requeueIndex(deckLength: number, cursor: number, rand: () => number): number {
   return Math.min(deckLength, cursor + 1 + 4 + Math.floor(rand() * 5));
 }
@@ -59,7 +57,6 @@ export function sessionLabel(bookTitles: string[], partTitle?: string): string {
   return [books, partTitle].filter(Boolean).join(" · ");
 }
 
-/** Fisher-Yates, as in deck.js `shuffle`. */
 function shuffle<T>(items: T[], rand: () => number): T[] {
   const a = items.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -71,7 +68,6 @@ function shuffle<T>(items: T[], rand: () => number): T[] {
 
 const validIds = (ids: string[]) => ids.filter((id) => isValidObjectId(id));
 
-/** Visible questions matching the filter: questionIds override books/parts; parts apply to a single book only. */
 async function deckQuery(userId: string, filter: QuizFilter) {
   const and: Record<string, unknown>[] = [];
   if (filter.questionIds) {
@@ -81,25 +77,34 @@ async function deckQuery(userId: string, filter: QuizFilter) {
     if (filter.bookIds.length === 1 && filter.partKeys.length) and.push({ partKey: { $in: filter.partKeys } });
   }
   if (filter.mode !== "all") {
-    const progress = filter.mode === "review" ? { userId, status: "review" } : { userId };
+    const progress = filter.mode === "review" ? { userId, status: "review" } : { userId, status: { $ne: null } };
     const seen = await QuestionProgress.distinct("questionId", progress);
     and.push({ _id: filter.mode === "review" ? { $in: seen } : { $nin: seen } });
   }
   return { $and: and };
 }
 
-/** Samples a shuffled deck. An empty deck creates nothing. */
+export async function countDeck(userId: string, filter: QuizFilter): Promise<number> {
+  return Question.countDocuments(await deckQuery(userId, filter));
+}
+
 export async function createSession(
   userId: string,
   filter: QuizFilter,
   rand: () => number = Math.random,
 ): Promise<{ sessionId: string } | { empty: true }> {
   const rows = await Question.find(await deckQuery(userId, filter), { _id: 1 }).sort({ _id: 1 }).lean<{ _id: Id }[]>();
-  const deck = shuffle(rows.map((row) => row._id), rand);
+  let deck = shuffle(rows.map((row) => row._id), rand);
+  if (filter.mode === "review" && deck.length) {
+    const seen = await QuestionProgress.find({ userId, questionId: { $in: deck } }, { questionId: 1, lastSeenAt: 1 }).lean<
+      { questionId: Id; lastSeenAt?: Date }[]
+    >();
+    const at = new Map(seen.map((p) => [String(p.questionId), p.lastSeenAt?.getTime() ?? 0]));
+    deck = deck.slice().sort((a, b) => (at.get(String(a)) ?? 0) - (at.get(String(b)) ?? 0));
+  }
   const questionIds = filter.size ? deck.slice(0, filter.size) : deck;
   if (!questionIds.length) return { empty: true };
 
-  // Store the filter as applied, so labels never show parts or books that were ignored.
   const topic = Boolean(filter.questionIds);
   const session = await QuizSession.create({
     userId,
@@ -123,11 +128,6 @@ async function loadOwned(userId: string, sessionId: string): Promise<SessionRow 
 
 const isDone = (s: SessionRow) => Boolean(s.finishedAt) || s.cursor >= s.questionIds.length;
 
-/**
- * Moves the cursor past cards that are no longer visible (no result recorded), finishing the
- * session when that reaches the end. The write is conditional on the cursor it read; if another
- * request moved it first, re-read and try again (the cursor only grows, so this terminates).
- */
 async function skipHidden(start: SessionRow): Promise<SessionRow> {
   let session = start;
   while (!isDone(session)) {
@@ -150,7 +150,6 @@ async function skipHidden(start: SessionRow): Promise<SessionRow> {
   return session;
 }
 
-/** The last result per unique question. */
 function countResults(results: SessionRow["results"]): SessionView["counts"] {
   const last = new Map(results.map((r) => [String(r.questionId), r.result]));
   const counts = { got: 0, review: 0, skip: 0 };
@@ -196,41 +195,36 @@ async function buildView(session: SessionRow): Promise<SessionView> {
   };
 }
 
-/** The session as the quiz page shows it, or null when it isn't the user's. */
 export async function getSessionView(userId: string, sessionId: string): Promise<SessionView | null> {
   const session = await loadOwned(userId, sessionId);
   return session && buildView(await skipHidden(session));
 }
 
 type CoachRow = {
+  answer?: string;
   messages: { role: "user" | "assistant"; content: string }[];
   feedback?: { verdict: string; score: number; summary: string; strengths: string[]; missing: string[]; model: string };
 };
 
-/**
- * The coach's grade and follow-up chat for the card on screen, to keep with the attempt: the newest
- * conversation about it since the previous mark (so a requeued card does not reuse its earlier chat).
- */
 async function coachSnapshot(userId: string, session: SessionRow, questionId: Id) {
   const since = session.results.at(-1)?.at ?? session.startedAt;
   const row = await AiConversation.findOne(
     { userId, sessionId: session._id, questionId, updatedAt: { $gte: since } },
-    { messages: 1, feedback: 1 },
+    { answer: 1, messages: 1, feedback: 1 },
   )
     .sort({ updatedAt: -1, _id: -1 })
     .lean<CoachRow>();
-  if (!row || (!row.feedback && !row.messages.length)) return null;
+  const answer = row?.answer?.trim() || undefined;
+  if (!row || (!row.feedback && !row.messages.length)) return { coach: null, answer };
   return {
-    ...(row.feedback ?? {}),
-    ...(row.messages.length ? { chat: row.messages.map(({ role, content }) => ({ role, content })) } : {}),
+    coach: {
+      ...(row.feedback ?? {}),
+      ...(row.messages.length ? { chat: row.messages.map(({ role, content }) => ({ role, content })) } : {}),
+    },
+    answer,
   };
 }
 
-/**
- * Applies a mark to the current card. A mark for any other card, or on a finished session, is a
- * no-op returning the current view, so double submits and stale tabs are harmless: the session
- * write is conditional on the cursor it read, and progress is updated only when that write won.
- */
 export async function recordResult(
   userId: string,
   sessionId: string,
@@ -253,38 +247,57 @@ export async function recordResult(
     questionIds,
     ...(cursor >= questionIds.length ? { finishedAt: new Date() } : {}),
   };
-  const answer = attempt?.answer.trim().slice(0, AI_ANSWER_MAX);
-  const coach = await coachSnapshot(userId, session, current);
+  const { coach, answer: graded } = await coachSnapshot(userId, session, current);
+  const typed = attempt?.answer.trim();
+  const answer = (typed || graded)?.slice(0, AI_ANSWER_MAX);
   const entry = {
     questionId: current,
     result,
     at: new Date(),
-    ...(answer && attempt ? { answer, answerMode: attempt.mode } : {}),
+    ...(answer ? { answer, answerMode: typed && attempt ? attempt.mode : "typed" } : {}),
     ...(coach ? { coach } : {}),
   };
-  const applied = await QuizSession.updateOne(
-    { _id: session._id, userId, cursor: session.cursor, finishedAt: null },
-    { $push: { results: entry }, $set: set },
-  );
-  if (applied.matchedCount) await markQuestion(userId, questionId, result);
+  await inTransaction(async (txn) => {
+    const applied = await QuizSession.updateOne(
+      { _id: session._id, userId, cursor: session.cursor, finishedAt: null },
+      { $push: { results: entry }, $set: set },
+      { session: txn },
+    );
+    if (applied.matchedCount) await markQuestion(userId, questionId, result, { session: txn });
+  });
 
   const view = await getSessionView(userId, sessionId);
   if (!view) throw new ForbiddenError("Quiz session not available");
   return view;
 }
 
-/** Ends a session early (or confirms the end); other users' sessions are left alone. */
 export async function finishSession(userId: string, sessionId: string): Promise<void> {
   if (!isValidObjectId(sessionId) || !isValidObjectId(userId)) return;
   await QuizSession.updateOne({ _id: sessionId, userId, finishedAt: null }, { $set: { finishedAt: new Date() } });
 }
 
-/** Resumable sessions, newest first. */
+export const quizHistoryFilter = (userId: string | Types.ObjectId) => ({ userId, "results.0": { $exists: true } });
+
+export const SUMMARY_PROJECTION = { "results.answer": 0, "results.coach": 0 };
+
+export const quizDate = (s: { finishedAt?: Date | null; startedAt?: Date; results: { at: Date }[] }): Date =>
+  s.finishedAt ?? s.results.at(-1)?.at ?? s.startedAt ?? new Date(0);
+
+export const UNFINISHED_MAX_DAYS = 30;
+
+export async function discardSession(userId: string, sessionId: string): Promise<void> {
+  if (!isValidObjectId(sessionId) || !isValidObjectId(userId)) return;
+  await QuizSession.deleteOne({ _id: sessionId, userId, finishedAt: null, "results.0": { $exists: false } });
+  await QuizSession.updateOne({ _id: sessionId, userId, finishedAt: null }, { $set: { finishedAt: new Date() } });
+}
+
 export async function listUnfinished(
   userId: string,
+  now: Date = new Date(),
 ): Promise<{ id: string; label: string; position: number; total: number; startedAt: Date }[]> {
   if (!isValidObjectId(userId)) return [];
-  const sessions = await QuizSession.find({ userId, finishedAt: null })
+  const since = new Date(now.getTime() - UNFINISHED_MAX_DAYS * 86_400_000);
+  const sessions = await QuizSession.find({ userId, finishedAt: null, startedAt: { $gte: since } }, SUMMARY_PROJECTION)
     .sort({ startedAt: -1, _id: -1 })
     .lean<SessionRow[]>();
   const labels = await labelSessions(sessions);
@@ -297,14 +310,11 @@ export async function listUnfinished(
   }));
 }
 
-/** The last result per unique question of a session. */
 export const sessionCounts = (session: Pick<SessionRow, "results">) => countResults(session.results);
 
-/** A display label per session ("JavaScript · Hooks", "Mixed", ...), in the same order. */
 export async function labelSessions(sessions: Pick<SessionRow, "filter" | "questionIds">[]): Promise<string[]> {
   if (!sessions.length) return [];
 
-  // "All books" and topic decks have no books in the filter; label them by the books in the deck.
   const deckIds = sessions.filter((s) => !s.filter.bookIds.length).flatMap((s) => s.questionIds);
   const deckRows = await Question.find({ _id: { $in: deckIds } }, { bookId: 1 }).lean<{ _id: Id; bookId: Id }[]>();
   const bookOfQuestion = new Map(deckRows.map((q) => [String(q._id), String(q.bookId)]));

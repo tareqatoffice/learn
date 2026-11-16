@@ -26,7 +26,6 @@ export default async function IeltsSpeakingPage({ searchParams }: PageProps<"/ie
   const { start } = await searchParams;
   const user = await requireUser();
   await connectDb();
-  // Only whether the coach is on reaches the page; the key never does.
   const [ai, recent, picks] = await Promise.all([
     getAiConfig(),
     listAttempts(user.userId, { limit: 10 }),
@@ -39,7 +38,7 @@ export default async function IeltsSpeakingPage({ searchParams }: PageProps<"/ie
   }));
 
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-4">
+    <div className="grid w-full gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>Speaking practice</h1>
         <Link

@@ -12,7 +12,6 @@ const EXPIRES_IN = 600;
 let override: S3Client | null = null;
 let cached: { key: string; client: S3Client } | null = null;
 
-/** Test seam: replaces the S3 client; pass null to restore the real one. */
 export function setR2Client(client: S3Client | null): void {
   override = client;
 }
@@ -48,10 +47,6 @@ function client(): S3Client {
 
 const bucket = () => getEnv().R2_BUCKET;
 
-/**
- * A presigned PUT for `key`. With `contentLength`, the length is a signed header, so R2 refuses an
- * upload of any other size.
- */
 export function presignPut(key: string, contentType: string, contentLength?: number): Promise<string> {
   return getSignedUrl(
     client(),
@@ -65,7 +60,6 @@ export function presignPut(key: string, contentType: string, contentLength?: num
   );
 }
 
-/** A presigned GET for `key`, valid for `expiresIn` seconds (default 10 minutes). */
 export function presignGet(key: string, expiresIn: number = EXPIRES_IN): Promise<string> {
   return getSignedUrl(client(), new GetObjectCommand({ Bucket: bucket(), Key: key }), { expiresIn });
 }
@@ -100,7 +94,6 @@ export async function deleteObjects(keys: string[]): Promise<void> {
         Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
       }),
     );
-    // A key that is already gone is what we wanted.
     const errors = (res.Errors ?? []).filter((e) => e.Code !== "NoSuchKey");
     if (errors.length) throw new Error(`R2 failed to delete ${errors.length} object(s)`);
   }

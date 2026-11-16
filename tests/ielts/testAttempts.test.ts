@@ -1,9 +1,10 @@
 import mongoose, { Types } from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectDb } from "@/lib/db";
-import { IeltsBandEntry, IeltsListeningTest, IeltsReadingTest } from "@/models";
-import { AUDIO_LINK_SEC, claimSection, deleteTestAttempt, getAttempt, listTestAttempts, listTests, saveAnswers, startTestAttempt, submitAttempt } from "@/ielts/practice/attempts";
+import { IeltsBandEntry, IeltsListeningTest, IeltsReadingTest, IeltsTestAttempt } from "@/models";
+import { AUDIO_LINK_SEC, claimSection, deleteTestAttempt, finishSection, getAttempt, listTestAttempts, listTests, saveAnswers, startTestAttempt, submitAttempt, TIME_UP_MESSAGE } from "@/ielts/practice/attempts";
 import { parseQuestions } from "@/ielts/practice/format";
+import { deleteBandEntry } from "@/ielts/bandHistory";
 import { resetDb } from "../setup/mongo";
 
 const user = () => String(new Types.ObjectId());
@@ -88,6 +89,20 @@ describe("listening and reading attempts", () => {
     expect(await IeltsBandEntry.countDocuments({})).toBe(0);
   });
 
+  it("takes no answers after a full test's deadline and scores only what was saved in time (D8)", async () => {
+    const u = user();
+    const testId = await publishedTest(1);
+    const started = await startTestAttempt(u, { skill: "reading", testId, scope: "full", date: "2026-11-12" });
+    if (!started.ok) throw new Error("start");
+    const id = started.attemptId;
+    await saveAnswers(u, id, { "1": "TRUE" });
+    const doc = await IeltsTestAttempt.findById(id).lean<{ startedAt: Date; limitSec: number }>();
+    const late = new Date(doc!.startedAt.getTime() + (doc!.limitSec + 61) * 1000);
+    expect(await saveAnswers(u, id, { "3": "The cat" }, late)).toEqual({ ok: false, errors: { _: TIME_UP_MESSAGE } });
+    const res = await submitAttempt(u, id, { "3": "The cat" }, late);
+    expect(res).toEqual({ ok: true, raw: 1, total: 3 });
+  });
+
   it("writes a practice band entry only for a full 40-question test", async () => {
     const u = user();
     const lines = Array.from({ length: 40 }, (_, i) => `Q${i} => x`).join("\n");
@@ -102,7 +117,16 @@ describe("listening and reading attempts", () => {
     const res = await submitAttempt(u, started.attemptId, answers);
     expect(res).toEqual({ ok: true, ...{ raw: 30, total: 40, band: 7 } });
     const entry = await IeltsBandEntry.findOne({ userId: u }).lean<{ source: string; bands: { reading: number } }>();
-    expect(entry).toMatchObject({ source: "practice", bands: { reading: 7 } });
+    expect(entry).toMatchObject({ source: "practiceTest", bands: { reading: 7 } });
+    const entryId = String((await IeltsBandEntry.findOne({ userId: u }).lean<{ _id: unknown }>())!._id);
+    expect((await deleteBandEntry(u, entryId)).ok).toBe(false);
+
+    await IeltsBandEntry.deleteMany({});
+    await submitAttempt(u, started.attemptId, {});
+    await submitAttempt(u, started.attemptId, {});
+    expect(await IeltsBandEntry.countDocuments({ userId: u, attemptId: started.attemptId })).toBe(1);
+    await IeltsBandEntry.init();
+    await expect(IeltsBandEntry.create({ userId: u, attemptId: started.attemptId, source: "practiceTest", date: "2026-11-12" })).rejects.toThrow(/duplicate key/);
 
     expect((await deleteTestAttempt(u, started.attemptId)).ok).toBe(true);
     expect(await IeltsBandEntry.countDocuments({})).toBe(0);
@@ -137,19 +161,40 @@ describe("listening and reading attempts", () => {
     expect(JSON.stringify(got.view)).not.toContain("k/a.mp3");
 
     expect(await claimSection(u, full.attemptId, 0, deps)).toEqual({ ok: true, play: { kind: "voice", script: "The secret is cat." } });
-    expect((await claimSection(u, full.attemptId, 0, deps)).ok).toBe(false); // one play in a full test
-    // A recording is signed only now, for long enough to play through a section.
+    expect((await claimSection(u, full.attemptId, 0, deps)).ok).toBe(true);
+    expect(await finishSection(u, full.attemptId, 0)).toEqual({ ok: true });
+    expect((await claimSection(u, full.attemptId, 0, deps)).ok).toBe(false);
+    expect((await finishSection(user(), full.attemptId, 1)).ok).toBe(false);
+    expect((await finishSection(u, full.attemptId, 9)).ok).toBe(false);
+    const again = await getAttempt(u, full.attemptId);
+    expect(again?.state === "run" && again.view.played).toEqual([0]);
     expect(await claimSection(u, full.attemptId, 1, deps)).toEqual({ ok: true, play: { kind: "file", url: `https://r2.test/k/a.mp3?ttl=${AUDIO_LINK_SEC}` } });
+    await finishSection(u, full.attemptId, 1);
     expect((await claimSection(u, full.attemptId, 1, deps)).ok).toBe(false);
-    expect((await claimSection(u, full.attemptId, 2, deps)).ok).toBe(false); // nothing to play
-    expect((await claimSection(user(), full.attemptId, 0, deps)).ok).toBe(false); // someone else's attempt
+    expect((await claimSection(u, full.attemptId, 2, deps)).ok).toBe(false);
+    expect((await claimSection(user(), full.attemptId, 0, deps)).ok).toBe(false);
 
     const drill = await startTestAttempt(u, { skill: "listening", testId: String(doc._id), scope: 1, date: "2026-11-12" });
     if (!drill.ok) throw new Error("start");
     expect((await claimSection(u, drill.attemptId, 0, deps)).ok).toBe(true);
-    expect((await claimSection(u, drill.attemptId, 0, deps)).ok).toBe(true); // drills can be replayed
+    expect((await claimSection(u, drill.attemptId, 0, deps)).ok).toBe(true);
+    expect((await finishSection(u, drill.attemptId, 0)).ok).toBe(false);
     await submitAttempt(u, drill.attemptId, {});
-    expect((await claimSection(u, drill.attemptId, 0, deps)).ok).toBe(false); // closed after submit
+    expect((await claimSection(u, drill.attemptId, 0, deps)).ok).toBe(false);
+  });
+
+  it("reuses the open attempt for the same test and part, but not one whose time ran out (S16)", async () => {
+    const u = user();
+    const testId = await publishedTest(2);
+    const a = await startTestAttempt(u, { skill: "reading", testId, scope: "full", date: "2026-11-12" });
+    const b = await startTestAttempt(u, { skill: "reading", testId, scope: "full", date: "2026-11-12" });
+    const drill = await startTestAttempt(u, { skill: "reading", testId, scope: 0, date: "2026-11-12" });
+    if (!a.ok || !b.ok || !drill.ok) throw new Error("start");
+    expect(b.attemptId).toBe(a.attemptId);
+    expect(drill.attemptId).not.toBe(a.attemptId);
+    const late = new Date(Date.now() + 3 * 3600_000);
+    const c = await startTestAttempt(u, { skill: "reading", testId, scope: "full", date: "2026-11-12" }, late);
+    expect(c.ok && c.attemptId).not.toBe(a.attemptId);
   });
 
   it("rejects an unknown section", async () => {

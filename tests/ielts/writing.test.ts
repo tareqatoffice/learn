@@ -2,7 +2,7 @@ import mongoose, { Types } from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectDb } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
-import { AiUsage, IeltsBandEntry, IeltsWritingPrompt } from "@/models";
+import { AiUsage, IeltsBandEntry, IeltsWritingAttempt, IeltsWritingPrompt } from "@/models";
 import { taskBand, wordCount, writingBand } from "@/ielts/writing/bands";
 import {
   deleteWritingAttempt,
@@ -75,6 +75,27 @@ describe("writing attempts", () => {
   });
   afterAll(() => mongoose.disconnect());
 
+  it("picks up an open attempt of the same kind instead of starting another (S16)", async () => {
+    await prompts();
+    const u = user();
+    const a = await startWritingAttempt(u, { kind: "task2", date: TODAY });
+    const b = await startWritingAttempt(u, { kind: "task2", date: TODAY });
+    const c = await startWritingAttempt(u, { kind: "task1", date: TODAY });
+    if (!a.ok || !b.ok || !c.ok) throw new Error("start");
+    expect(b.attemptId).toBe(a.attemptId);
+    expect(c.attemptId).not.toBe(a.attemptId);
+  });
+
+  it("refuses a kind or task index that is only an object key (S13)", async () => {
+    await prompts();
+    const u = user();
+    expect((await startWritingAttempt(u, { kind: "constructor" as never, date: TODAY })).ok).toBe(false);
+    const started = await startWritingAttempt(u, { kind: "task2", date: TODAY });
+    if (!started.ok) throw new Error("start");
+    expect((await saveWritingText(u, started.attemptId, "constructor" as never, "text", 1)).ok).toBe(false);
+    expect((await saveWritingText(u, started.attemptId, 1, "text", 1)).ok).toBe(false);
+  });
+
   it("fails to start when no prompt is published", async () => {
     const res = await startWritingAttempt(user(), { kind: "task2", date: TODAY });
     expect(res.ok).toBe(false);
@@ -88,9 +109,15 @@ describe("writing attempts", () => {
     const id = started.attemptId;
     expect((await getWritingAttempt(u, id))?.tasks.map((t) => t.task)).toEqual(["task1", "task2"]);
 
-    expect((await submitWriting(u, id)).ok).toBe(false); // nothing written yet
-    await saveWritingText(u, id, 0, "word ".repeat(160), 600);
-    await saveWritingText(u, id, 1, "word ".repeat(120), 1200);
+    expect((await submitWriting(u, id)).ok).toBe(false);
+    const later = new Date(Date.now() + 1800_000);
+    await saveWritingText(u, id, 0, "word ".repeat(160), 600, later);
+    await saveWritingText(u, id, 1, "word ".repeat(120), 1200, later);
+    await saveWritingText(u, id, 1, "word ".repeat(120), 99_999, new Date(Date.now() + 1500_000));
+    const times = (await IeltsWritingAttempt.findById(id).lean<{ tasks: { timeSec: number }[] }>())!.tasks.map((t) => t.timeSec);
+    expect(times[0]).toBe(600);
+    expect(times[1]).toBeGreaterThanOrEqual(1499);
+    expect(times[1]).toBeLessThanOrEqual(1501);
     const submitted = await submitWriting(u, id);
     expect(submitted).toEqual({ ok: true, short: ["task2"] });
     expect((await saveWritingText(u, id, 0, "late edit", 1)).ok).toBe(false);
@@ -101,7 +128,7 @@ describe("writing attempts", () => {
 
     expect((await saveWritingSelf(u, id, 0, { ...SELF, ta: 0 })).ok).toBe(false);
     await saveWritingSelf(u, id, 0, SELF);
-    expect(await IeltsBandEntry.countDocuments({})).toBe(0); // task 2 not rated yet
+    expect(await IeltsBandEntry.countDocuments({})).toBe(0);
     await saveWritingSelf(u, id, 1, SELF);
     expect((await IeltsBandEntry.findOne({ source: "writingSelf" }).lean<{ bands: { writing: number } }>())?.bands.writing).toBe(6);
 

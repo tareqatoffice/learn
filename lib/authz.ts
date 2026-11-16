@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { auth } from "@/auth";
+import { accessStatusFor } from "@/lib/access";
 import { getEnv } from "@/lib/env";
 import type { AccessStatus } from "@/models";
 
 export type RouteAccess = "allow" | "signin" | "forbidden" | "pending" | "blocked";
 
-/** Where a signed-in user who is not (yet) let in is sent; it explains why and what happens next. */
 export const ACCESS_PATH = "/access";
 
 export interface SessionUser {
@@ -24,7 +25,6 @@ export class ForbiddenError extends Error {
   }
 }
 
-/** Reads ADMIN_EMAILS on every call so removing an admin takes effect immediately. */
 export function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   return getEnv().ADMIN_EMAILS.includes(email.trim().toLowerCase());
@@ -33,23 +33,16 @@ export function isAdminEmail(email: string | null | undefined): boolean {
 const isUnder = (pathname: string, base: string) =>
   pathname === base || pathname.startsWith(`${base}/`);
 
-/** Paths that never need a session, so the proxy can skip the access-status lookup for them. */
 export function isPublicPath(pathname: string): boolean {
-  // Content API authenticates with a bearer token inside the route itself.
   return pathname === "/" || isUnder(pathname, "/api/auth") || isUnder(pathname, "/api/content");
 }
 
-/**
- * Pure route policy; the proxy maps the result to a redirect, a 403 or next().
- * `status` is the user's access status from the database, null when the user record is gone.
- */
 export function routeAccess(
   pathname: string,
   session: { email: string; status: AccessStatus | null } | null,
 ): RouteAccess {
   if (isPublicPath(pathname)) return "allow";
   if (!session || !session.status) return "signin";
-  // The access page explains every status, so it must stay reachable whatever the status is.
   if (isUnder(pathname, ACCESS_PATH)) return "allow";
   if (session.status !== "approved") return session.status;
   if (isUnder(pathname, "/admin") || isUnder(pathname, "/api/admin")) {
@@ -71,18 +64,17 @@ async function sessionUser(): Promise<SessionUser | null> {
   };
 }
 
-/**
- * For server components and actions. Redirects to `/` when signed out. The access status (pending,
- * blocked) is enforced once per request by the proxy, which also covers server action posts, so it
- * is not read again here.
- */
+const cachedStatus = cache((userId: string, email: string) => accessStatusFor({ userId, email }));
+
 export async function requireUser(): Promise<SessionUser> {
   const user = await sessionUser();
   if (!user) redirect("/");
+  const status = await cachedStatus(user.userId, user.email);
+  if (!status) redirect("/");
+  if (status !== "approved") redirect(ACCESS_PATH);
   return user;
 }
 
-/** Admins come from ADMIN_EMAILS and are always approved, so no status lookup is needed. */
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await sessionUser();
   if (!user) redirect("/");

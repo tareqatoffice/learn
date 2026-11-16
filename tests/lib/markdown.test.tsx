@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Markdown } from "@/lib/markdown/Markdown";
@@ -43,9 +42,9 @@ describe("Markdown", () => {
     expect(c.innerHTML.toLowerCase()).not.toContain("javascript:");
   });
 
-  it("gives headings unprefixed ids", () => {
+  it("gives headings ids prefixed with h- so they cannot clash with page ids (S14)", () => {
     const c = html("## A b");
-    expect(c.querySelector("h2")?.id).toBe("a-b");
+    expect(c.querySelector("h2")?.id).toBe("h-a-b");
   });
 
   it("renders Bangla text unchanged", () => {

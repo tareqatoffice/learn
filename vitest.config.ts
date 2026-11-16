@@ -3,10 +3,6 @@ import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-// Node treats file:///e:/ and file:///E:/ as different modules. With the app at the
-// repo root, Vite uppercases the drive letter and the worker keeps the shell's, so
-// describe() runs on a copy that never received the runner. Restart once from the
-// uppercased path; chdir cannot change the casing Windows already recorded.
 const root = path.resolve(process.cwd()).replace(/^[a-z]:/, (drive) => drive.toUpperCase());
 if (process.cwd() !== root && !process.env.VITEST_DRIVE_FIXED) {
   const entryIndex = process.argv.findIndex((arg) => /(?:^|[/\\])vitest(?:\.mjs)?$/.test(arg));
@@ -27,10 +23,8 @@ export default defineConfig({
   test: {
     environment: "node",
     globalSetup: ["./tests/setup/mongo.ts"],
-    // Test files share one database and resetDb() empties it, so files must not run concurrently.
     fileParallelism: false,
     include: ["tests/**/*.test.{ts,tsx}"],
-    // next-auth imports "next/server" without an extension, which Node's ESM resolver rejects.
     server: { deps: { inline: ["next-auth"] } },
   },
 });

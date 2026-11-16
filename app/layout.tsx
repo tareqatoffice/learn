@@ -7,6 +7,7 @@ import {
 import NextTopLoader from "nextjs-toploader";
 import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 import "./globals.css";
+import { headers } from "next/headers";
 
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex",
@@ -39,10 +40,10 @@ export const metadata: Metadata = {
   twitter: { card: "summary", title: SITE_NAME, description: SITE_DESCRIPTION },
 };
 
-// Runs before first paint so a saved choice never flashes the wrong theme. Reads the key ThemeToggle writes.
 const themeScript = `try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html
       lang="en"
@@ -50,9 +51,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${plexSans.variable} ${notoBengali.variable} ${plexMono.variable} h-full antialiased`}
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-full min-w-0 flex-col">
+        <a
+          href="#main"
+          className="sr-only z-50 rounded-md bg-background px-3 py-2 text-sm font-medium focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-2 focus:outline-ring"
+        >
+          Skip to content
+        </a>
         <NextTopLoader
           color="#2563c9"
           height={2}

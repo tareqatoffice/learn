@@ -43,14 +43,16 @@ const aiSchema = new Schema(
 const speakingTakeSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    /** Learner-local calendar date, YYYY-MM-DD. */
     date: { type: String, required: true },
     task: { type: String, enum: TASKS, required: true },
     lessonId: { type: Schema.Types.ObjectId, ref: "SpeakingLesson" },
     material: { type: materialSchema, default: () => ({}) },
     media: { type: mediaSchema, required: true },
     transcript: String,
-    transcriptStatus: { type: String, enum: ["none", "pending", "done", "failed", "unavailable"], default: "none" },
+    transcriptStatus: { type: String, enum: ["none", "pending", "running", "done", "failed", "unavailable"], default: "none" },
+    transcribeStartedAt: Date,
+    transcribeAttempts: { type: Number, default: 0 },
+    deletingAt: Date,
     self: { type: selfSchema, default: undefined },
     markers: { type: [markerSchema], default: [] },
     ai: { type: aiSchema, default: undefined },

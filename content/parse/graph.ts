@@ -9,7 +9,6 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 const rec = (v: unknown): Record<string, unknown> => (v && typeof v === "object" ? (v as Record<string, unknown>) : {});
 const strings = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)) : []);
 
-/** Per-node rules of the legacy `validate()` (build.mjs), reusable by the admin editor. */
 export function validateNode(node: ParsedNode, trackKeys: string[]): string[] {
   const errs: string[] = [];
   const at = `node ${node.slug || "?"}`;
@@ -26,7 +25,6 @@ export function validateNode(node: ParsedNode, trackKeys: string[]): string[] {
   return errs;
 }
 
-/** Maps the legacy graph shape (`title, sub, foot, tracks[{k,n}], nodes[{id,tr,t,pre,s,p,c,pit,u}]`) and validates it. */
 export function parseGraph(input: unknown): { graph: ParsedGraph; errors: string[] } {
   const cfg = rec(input);
   const errors: string[] = [];

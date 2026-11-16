@@ -7,12 +7,10 @@ import { REQUEST_NOTE_MAX, REQUEST_NOTE_MIN } from "@/lib/access-limits";
 import { cn } from "@/lib/utils";
 import { Notice } from "@/components/Notice";
 
-/** Lets a pending user tell the reviewing admin who they are; validated here and again on the server. */
 export function AccessRequestForm({ savedNote }: { savedNote?: string }) {
   const [state, action, pending] = useActionState<NoteState, FormData>(sendRequestNoteAction, null);
   const [note, setNote] = useState(savedNote ?? "");
   const [touched, setTouched] = useState(false);
-  // The page does not re-render after a send, so a successful send also counts as having a note.
   const hasNote = !!savedNote || !!state?.ok;
 
   const length = note.trim().length;

@@ -10,7 +10,6 @@ const SHADE = [
   "bg-ok",
 ] as const;
 
-/** Weeks as columns, Monday at the top. The first column is padded so days line up with weekdays. */
 export function ActivityHeatmap({ days }: { days: ActivityDay[] }) {
   const weekday = (date: string) => (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
   const cells: (ActivityDay | null)[] = [...Array<null>(days.length ? weekday(days[0].date) : 0).fill(null), ...days];
@@ -20,8 +19,6 @@ export function ActivityHeatmap({ days }: { days: ActivityDay[] }) {
 
   return (
     <figure className="grid gap-2">
-      {/* A focusable scroll region so keyboard users can reach the older weeks; the cells are
-          decorative and the caption below carries the total. */}
       <div
         tabIndex={0}
         role="region"

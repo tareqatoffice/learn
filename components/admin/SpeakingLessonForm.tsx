@@ -53,8 +53,6 @@ function AudioUpload({
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  // A presigned link is new on every page refresh; keep the first one per stored file so a refresh
-  // (e.g. after saving) doesn't reload the player and lose its position.
   const audioId = currentKey || previewUrl || "";
   const [shown, setShown] = useState({ id: audioId, url: previewUrl });
   if (shown.id !== audioId) setShown({ id: audioId, url: previewUrl });
@@ -116,9 +114,7 @@ export function SpeakingLessonForm({
   audioPreviewUrl,
 }: {
   lesson?: AdminLesson;
-  /** A playable link to the uploaded audio (presigned), for the admin to check it. */
   audioPreviewUrl?: string;
-  /** `slug` carries the subject's id. */
   subjects: { slug: string; name: string }[];
   storageReady: boolean;
 }) {
@@ -128,7 +124,6 @@ export function SpeakingLessonForm({
   const { run, pending, errors, saved, touch } = useAdminAction();
   const del = useAdminAction();
 
-  // Re-seed after the server page refreshes with new data (e.g. an uploaded file's length).
   const [seenDuration, setSeenDuration] = useState(lesson.shadowDurationSec);
   if (seenDuration !== lesson.shadowDurationSec) {
     setSeenDuration(lesson.shadowDurationSec);

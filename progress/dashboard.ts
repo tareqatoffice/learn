@@ -6,7 +6,7 @@ import { Graph, GraphNode, Note, NodeProgress, NoteProgress, NoteSeries, Questio
 import { getProfile, testDayStatus, type TestDayStatus } from "@/ielts/profile";
 import { todayList } from "@/ielts/progress";
 import { localDate } from "@/speaking/schedule";
-import { labelSessions, sessionCounts } from "./quiz";
+import { labelSessions, quizDate, quizHistoryFilter, sessionCounts, SUMMARY_PROJECTION } from "./quiz";
 import type { MarkResult } from "./questions";
 
 type Id = Types.ObjectId;
@@ -19,43 +19,50 @@ export type Dashboard = {
   graphs: { slug: string; title: string; done: number; total: number }[];
   books: { slug: string; title: string; mastered: number; total: number }[];
   series: { slug: string; title: string; read: number; total: number }[];
-  recentQuizzes: { id: string; label: string; got: number; review: number; finishedAt: Date }[];
-  /** Only with an active IELTS profile. */
+  recentQuizzes: { id: string; label: string; got: number; review: number; finished: boolean; date: string }[];
   ielts?: { daysLeft: number; testDay: TestDayStatus; done: number; total: number };
 };
 
 const READY_NEXT_MAX = 3;
 const RECENT_QUIZZES = 5;
 
-/** The most recently opened chapter that is still visible, with its series' read count. */
 async function continueReading(userId: string, series: Dashboard["series"]): Promise<Dashboard["continueReading"]> {
-  // Walks the user's opened chapters newest first and stops at the first visible one.
-  const [note] = await NoteProgress.aggregate<{ slug: string; title: string; seriesId: Id }>([
+  const [note] = await NoteProgress.aggregate<{ slug: string; title: string; seriesId: Id; noteId: Id; read?: boolean }>([
     { $match: { userId: new Types.ObjectId(userId), lastOpenedAt: { $ne: null } } },
     { $sort: { lastOpenedAt: -1 } },
     { $lookup: { from: Note.collection.name, localField: "noteId", foreignField: "_id", as: "note" } },
     { $unwind: "$note" },
     { $match: filterUnder("note", await visibleNoteFilter()) },
     { $limit: 1 },
-    { $project: { _id: 0, slug: "$note.slug", title: "$note.title", seriesId: "$note.seriesId" } },
+    { $project: { _id: 0, slug: "$note.slug", title: "$note.title", seriesId: "$note.seriesId", noteId: "$note._id", read: 1 } },
   ]);
   const parent = note && (await NoteSeries.findById(note.seriesId, { slug: 1, title: 1 }).lean<{ slug: string; title: string }>());
   if (!note || !parent) return null;
+  let chapter = { slug: note.slug, title: note.title };
+  if (note.read) {
+    const chapters = await Note.find(await visibleNoteFilter(String(note.seriesId)), { slug: 1, title: 1 })
+      .sort({ order: 1, _id: 1 })
+      .lean<{ _id: Id; slug: string; title: string }[]>();
+    const read = new Set(
+      (await NoteProgress.find({ userId, read: true, noteId: { $in: chapters.map((c) => c._id) } }, { noteId: 1 }).lean<{ noteId: Id }[]>()).map((r) =>
+        String(r.noteId),
+      ),
+    );
+    const at = chapters.findIndex((c) => String(c._id) === String(note.noteId));
+    const next = [...chapters.slice(at + 1), ...chapters.slice(0, Math.max(at, 0))].find((c) => !read.has(String(c._id)));
+    if (next) chapter = { slug: next.slug, title: next.title };
+  }
   const counts = series.find((s) => s.slug === parent.slug);
   return {
     seriesSlug: parent.slug,
     seriesTitle: parent.title,
-    chapterSlug: note.slug,
-    chapterTitle: note.title,
+    chapterSlug: chapter.slug,
+    chapterTitle: chapter.title,
     read: counts?.read ?? 0,
     total: counts?.total ?? 0,
   };
 }
 
-/**
- * Every visible graph with its done count, then, for graphs the user has started, the topics marked
- * learning and up to three ready topics. One read of the visible topics serves all three.
- */
 async function graphActivity(userId: string): Promise<Pick<Dashboard, "graphs" | "learningNow" | "readyNext">> {
   const nodeFilter = await visibleNodeFilter();
   const [graphs, nodes] = await Promise.all([
@@ -88,7 +95,6 @@ async function graphActivity(userId: string): Promise<Pick<Dashboard, "graphs" |
   return { graphs: shelf, learningNow, readyNext: readyNext.slice(0, READY_NEXT_MAX) };
 }
 
-/** Visible questions in the user's review pile, counted per book in book order. */
 async function reviewPile(userId: string): Promise<Dashboard["reviewPile"]> {
   const rows = await QuestionProgress.aggregate<{ _id: Id; count: number }>([
     { $match: { userId: new Types.ObjectId(userId), status: "review" } },
@@ -105,9 +111,9 @@ async function reviewPile(userId: string): Promise<Dashboard["reviewPile"]> {
   return { total: byBook.reduce((sum, b) => sum + b.count, 0), byBook };
 }
 
-async function recentQuizzes(userId: string): Promise<Dashboard["recentQuizzes"]> {
-  const sessions = await QuizSession.find({ userId, finishedAt: { $ne: null } })
-    .sort({ finishedAt: -1, _id: -1 })
+async function recentQuizzes(userId: string, timeZone: string): Promise<Dashboard["recentQuizzes"]> {
+  const sessions = await QuizSession.find(quizHistoryFilter(userId), SUMMARY_PROJECTION)
+    .sort({ startedAt: -1, _id: -1 })
     .limit(RECENT_QUIZZES)
     .lean<
       {
@@ -115,17 +121,24 @@ async function recentQuizzes(userId: string): Promise<Dashboard["recentQuizzes"]
         filter: { bookIds: Id[]; partKeys: string[]; mode: "unseen" | "review" | "all"; questionIds?: Id[] };
         questionIds: Id[];
         results: { questionId: Id; result: MarkResult; at: Date }[];
-        finishedAt: Date;
+        startedAt: Date;
+        finishedAt?: Date | null;
       }[]
     >();
   const labels = await labelSessions(sessions);
   return sessions.map((s, i) => {
     const counts = sessionCounts(s);
-    return { id: String(s._id), label: labels[i] || "Quiz", got: counts.got, review: counts.review, finishedAt: s.finishedAt };
+    return {
+      id: String(s._id),
+      label: labels[i] || "Quiz",
+      got: counts.got,
+      review: counts.review,
+      finished: Boolean(s.finishedAt),
+      date: localDate(quizDate(s), timeZone),
+    };
   });
 }
 
-/** Days from local today to the test date, and how much of today's list is done. */
 async function ieltsCard(userId: string, timeZone: string, now: Date): Promise<Dashboard["ielts"]> {
   const profile = await getProfile(userId);
   if (!profile || profile.status !== "active") return undefined;
@@ -154,7 +167,7 @@ export async function getDashboard(userId: string, timeZone = "UTC", now = new D
   const [reading, pile, quizzes, ielts] = await Promise.all([
     continueReading(userId, series),
     reviewPile(userId),
-    recentQuizzes(userId),
+    recentQuizzes(userId, timeZone),
     ieltsCard(userId, timeZone, now),
   ]);
   return { continueReading: reading, reviewPile: pile, recentQuizzes: quizzes, ...(ielts ? { ielts } : {}), ...shelf };

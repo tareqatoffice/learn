@@ -6,20 +6,41 @@ import { AdminCard, AdminList, AdminListItem, AdminSection } from "@/components/
 import { ActionStatus, inputClass } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
+import type { TokenLifetime } from "@/admin/tokens";
+import type { TokenScope } from "@/models";
 
-type Row = { id: string; name: string; createdAt: string; lastUsedAt?: string; revokedAt?: string };
+type Row = {
+  id: string;
+  name: string;
+  createdAt: string;
+  scope: TokenScope;
+  expiresAt?: string;
+  expired: boolean;
+  lastUsedAt?: string;
+  revokedAt?: string;
+};
+
+const LIFETIMES: { value: string; label: string; days: TokenLifetime }[] = [
+  { value: "30", label: "30 days", days: 30 },
+  { value: "90", label: "90 days", days: 90 },
+  { value: "365", label: "1 year", days: 365 },
+  { value: "never", label: "Never", days: null },
+];
 
 export function TokensEditor({ tokens }: { tokens: Row[] }) {
   const [name, setName] = useState("");
   const [fresh, setFresh] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [scope, setScope] = useState<TokenScope>("read");
+  const [lifetime, setLifetime] = useState("90");
   const create = useAdminAction();
   const revoke = useAdminAction();
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setCopied(false);
-    create.run(() => createTokenAction(name), {
+    const lifetimeDays = LIFETIMES.find((l) => l.value === lifetime)?.days ?? null;
+    create.run(() => createTokenAction(name, { scope, lifetimeDays }), {
       onSuccess: ({ token }) => {
         setFresh(token);
         setName("");
@@ -41,10 +62,20 @@ export function TokensEditor({ tokens }: { tokens: Row[] }) {
               setName(e.target.value);
             }}
           />
+          <select aria-label="Access" className={`${inputClass} w-auto`} value={scope} onChange={(e) => setScope(e.target.value as TokenScope)}>
+            <option value="read">Read only (list, pull)</option>
+            <option value="write">Read and import</option>
+          </select>
+          <select aria-label="Expires after" className={`${inputClass} w-auto`} value={lifetime} onChange={(e) => setLifetime(e.target.value)}>
+            {LIFETIMES.map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.value === "never" ? "Never expires" : `Expires in ${l.label}`}
+              </option>
+            ))}
+          </select>
           <Button type="submit" disabled={create.pending}>
             Create token
           </Button>
-          {/* The new token itself is the success message. */}
           <ActionStatus saved={false} errors={create.errors} />
         </form>
 
@@ -95,7 +126,8 @@ export function TokensEditor({ tokens }: { tokens: Row[] }) {
             >
               <span className="font-medium">{t.name}</span>
               <span className="ml-2 text-xs text-muted-foreground">
-                created {t.createdAt}
+                {t.scope === "write" ? "read and import" : "read only"} · created {t.createdAt}
+                {t.expiresAt ? ` · ${t.expired ? "expired" : "expires"} ${t.expiresAt}` : " · never expires"}
                 {t.lastUsedAt ? ` · last used ${t.lastUsedAt}` : " · never used"}
                 {t.revokedAt ? ` · revoked ${t.revokedAt}` : ""}
               </span>

@@ -1,13 +1,13 @@
-// Band history: calculator results and mock bands, one row per skill set and date.
 
 import { isValidObjectId } from "mongoose";
 import { connectDb } from "@/lib/db";
 import { IeltsBandEntry } from "@/models";
+import type { IELTS_BAND_SOURCES } from "@/models/ieltsBandEntry";
 import { type ActionResult, fail, ok, type FieldErrors } from "@/admin/result";
 import { isHalfBand, listeningBand, overallBand, readingBand, SKILLS, type Skill } from "@/ielts/bands";
 import { suggestCurrentBand } from "@/ielts/suggestions";
 
-export type BandSource = "official" | "practice" | "mockSelf" | "mockAi" | "writingSelf" | "writingAi" | "other";
+export type BandSource = (typeof IELTS_BAND_SOURCES)[number];
 type Bands = Partial<Record<Skill, number>>;
 
 export type CalculatorInput = {
@@ -84,15 +84,17 @@ export async function listBandEntries(userId: string, from?: string): Promise<Ba
 export async function deleteBandEntry(userId: string, id: string): Promise<ActionResult> {
   if (!isValidObjectId(id)) return fail("That entry doesn't exist. Reload the page.");
   await connectDb();
-  const entry = await IeltsBandEntry.findOne({ _id: id, userId }).select("source").lean<{ source: BandSource }>();
+  const entry = await IeltsBandEntry.findOne({ _id: id, userId }).select("source attemptId").lean<{ source: BandSource; attemptId?: unknown }>();
   if (!entry) return fail("That entry doesn't exist. Reload the page.");
+  if (entry.source === "practiceTest" || (entry.attemptId && entry.source === "practice")) {
+    return fail("Practice test bands are removed when you delete the test attempt.");
+  }
   if (entry.source === "mockSelf" || entry.source === "mockAi") return fail("Mock bands are removed when you delete the mock attempt.");
   if (entry.source === "writingSelf" || entry.source === "writingAi") return fail("Writing bands are removed when you delete the Writing attempt.");
   await IeltsBandEntry.deleteOne({ _id: id, userId });
   return ok();
 }
 
-/** Idempotent: one row per attempt and source. */
 export async function writeMockEntries(userId: string, attemptId: string, date: string, selfBand: number, aiBand?: number): Promise<void> {
   await connectDb();
   const write = (source: "mockSelf" | "mockAi", speaking: number) =>

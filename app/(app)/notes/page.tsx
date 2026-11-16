@@ -34,7 +34,7 @@ export default async function NotesPage() {
               <div className="flex items-baseline justify-between gap-3">
                 <Link
                   href={`/notes/${s.slug}`}
-                  className="inline-block font-medium hover:underline pointer-coarse:py-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  className="min-w-0 truncate font-medium hover:underline pointer-coarse:py-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   {s.title}
                 </Link>

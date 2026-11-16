@@ -3,6 +3,7 @@
 import { Maximize, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactPlayer from "react-player";
+import { Button } from "@/components/ui/button";
 
 const SPEEDS = [1, 1.25, 1.5, 0.75];
 
@@ -11,37 +12,34 @@ function clock(sec: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-const iconButton =
-  "inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50";
-
-/**
- * Audio or video with our own controls (play/pause, seek, time, mute, speed, fullscreen for video) on
- * top of ReactPlayer's media element. `video` shows the picture above the controls; audio hides it.
- * `playerRef` exposes the element so a parent can seek or play it (e.g. jump to a moment).
- */
 export function MediaPlayer({
   src,
   video = false,
   label = video ? "Video" : "Audio",
   playerRef,
   className = "",
+  fallbackDuration,
+  refreshSrc,
 }: {
   src: string;
   video?: boolean;
   label?: string;
   playerRef?: (el: HTMLVideoElement | null) => void;
   className?: string;
+  fallbackDuration?: number;
+  refreshSrc?: () => Promise<string | null>;
 }) {
+  const [currentSrc, setCurrentSrc] = useState(src);
   const el = useRef<HTMLVideoElement | null>(null);
   const screen = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [time, setTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [reported, setDuration] = useState(0);
+  const duration = Number.isFinite(reported) && reported > 0 ? reported : (fallbackDuration ?? 0);
   const [failed, setFailed] = useState(false);
 
-  // A stable ref callback: the parent's function may change identity every render.
   const parentRef = useRef(playerRef);
   useEffect(() => {
     parentRef.current = playerRef;
@@ -51,11 +49,12 @@ export function MediaPlayer({
     parentRef.current?.(node);
   }, []);
 
-  const toggle = () => {
+  const toggle = async () => {
     if (failed) {
-      // Try again: reload the file, e.g. after a dropped connection.
       setFailed(false);
-      el.current?.load();
+      const fresh = refreshSrc ? await refreshSrc().catch(() => null) : null;
+      if (fresh && fresh !== currentSrc) setCurrentSrc(fresh);
+      else el.current?.load();
       setPlaying(true);
       return;
     }
@@ -65,7 +64,7 @@ export function MediaPlayer({
   const player = (
     <ReactPlayer
       ref={setRefs}
-      src={src}
+      src={currentSrc}
       playing={playing}
       muted={muted}
       playbackRate={speed}
@@ -100,14 +99,15 @@ export function MediaPlayer({
         player
       )}
       <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
-        <button
+        <Button
           type="button"
+          size="icon"
           aria-label={playing ? `Pause ${label}` : `Play ${label}`}
-          onClick={toggle}
-          className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring/50"
+          onClick={() => void toggle()}
+          className="size-9 rounded-full"
         >
           {playing ? <Pause className="size-4" aria-hidden /> : <Play className="size-4 translate-x-px" aria-hidden />}
-        </button>
+        </Button>
         <input
           type="range"
           aria-label={`${label} position`}
@@ -126,32 +126,38 @@ export function MediaPlayer({
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
           {failed ? "Can't play. Press play to retry." : `${clock(time)} / ${clock(duration)}`}
         </span>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           aria-label={`Playback speed ${speed}x`}
           onClick={() => setSpeed((s) => SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length])}
-          className={`${iconButton} w-auto px-2 text-xs tabular-nums`}
+          className="tabular-nums"
         >
           {speed}x
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           aria-label={muted ? `Unmute ${label}` : `Mute ${label}`}
           aria-pressed={muted}
           onClick={() => setMuted((m) => !m)}
-          className={iconButton}
+          className="rounded-full"
         >
           {muted ? <VolumeX className="size-4" aria-hidden /> : <Volume2 className="size-4" aria-hidden />}
-        </button>
+        </Button>
         {video && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             aria-label="Fullscreen"
             onClick={() => void screen.current?.requestFullscreen?.()}
-            className={iconButton}
+            className="rounded-full"
           >
             <Maximize className="size-4" aria-hidden />
-          </button>
+          </Button>
         )}
       </div>
     </div>

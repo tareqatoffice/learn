@@ -11,7 +11,6 @@ export default async function AdminLayout({
   try {
     await requireAdmin();
   } catch (error) {
-    // The proxy already blocks non-admins; this keeps the page closed if it is ever bypassed.
     if (error instanceof ForbiddenError) notFound();
     throw error;
   }

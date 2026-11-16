@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { claimSectionAction, saveAnswersAction, submitAttemptAction } from "@/app/(app)/ielts/practice-actions";
+import { claimSectionAction, deleteTestAttemptAction, finishSectionAction, saveAnswersAction, submitAttemptAction } from "@/app/(app)/ielts/practice-actions";
+import { DiscardAttempt } from "@/components/ielts/DiscardAttempt";
 import { ActionStatus } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
+import { chipClass, Tab } from "@/components/Chip";
 import { Button } from "@/components/ui/button";
 import type { RunView, SectionAudioKind } from "@/ielts/practice/attempts";
 import { choicesFor, letter, type PublicGroup, type PublicQuestion } from "@/ielts/practice/marking";
+import { rovingIndex, timeWarning } from "@/lib/a11y";
 import { cn } from "@/lib/utils";
 
 const SAVE_DELAY_MS = 1200;
@@ -17,13 +20,8 @@ function clock(sec: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-/**
- * Plays a Listening section: the recording, or the browser voice reading the script. Both are claimed
- * from the server when Play is pressed (a fresh link, or the script), and a full test allows one play.
- */
-function SectionAudio({ kind, once, attemptId, index }: { kind: SectionAudioKind; once: boolean; attemptId: string; index: number }) {
-  const [played, setPlayed] = useState(false);
-  const [playing, setPlaying] = useState(false);
+function SectionAudio({ kind, once, attemptId, index, heard }: { kind: SectionAudioKind; once: boolean; attemptId: string; index: number; heard: boolean }) {
+  const [state, setState] = useState<"idle" | "playing" | "done">(heard ? "done" : "idle");
   const [src, setSrc] = useState("");
   const [error, setError] = useState("");
 
@@ -31,50 +29,51 @@ function SectionAudio({ kind, once, attemptId, index }: { kind: SectionAudioKind
 
   if (kind === "none") return <p className="text-sm text-muted-foreground">No audio for this section.</p>;
 
+  const failed = (message: string) => {
+    setState("idle");
+    setSrc("");
+    setError(message);
+  };
+
+  const finished = () => {
+    if (!once) return setState("idle");
+    setState("done");
+    finishSectionAction(attemptId, index).catch(() => undefined);
+  };
+
   const play = async () => {
     setError("");
-    setPlayed(true);
-    const res = await claimSectionAction(attemptId, index);
-    if (!res.ok) {
-      setPlayed(false);
-      setError(res.errors._ ?? "Couldn't start the audio.");
-      return;
-    }
-    setPlaying(true);
+    setState("playing");
+    const res = await claimSectionAction(attemptId, index).catch(() => null);
+    if (!res?.ok) return failed((res && res.errors._) || "Couldn't start the audio. Try again.");
     if (res.play.kind === "file") {
       setSrc(res.play.url);
       return;
     }
     const u = new SpeechSynthesisUtterance(res.play.script);
     u.lang = "en-GB";
-    u.onend = () => setPlaying(false);
-    u.onerror = () => setPlaying(false);
+    u.onend = finished;
+    u.onerror = () => failed("The computer voice stopped. Press Play to start again.");
     window.speechSynthesis.speak(u);
   };
 
-  // A drill gets a normal player once its link is signed; a full test plays through once, with no controls.
-  if (src && !once) return <audio controls autoPlay src={src} className="w-full" aria-label="Section audio" />;
+  const loadError = () => failed("The audio couldn't be loaded. Press Play to try again, or ask your admin to check the file.");
 
   return (
     <div className="grid gap-2">
-      {src && (
-        <audio
-          autoPlay
-          src={src}
-          onEnded={() => setPlaying(false)}
-          onError={() => setError("The audio couldn't be loaded. Ask your admin to check the file.")}
-          aria-label="Section audio"
-        />
+      {src && !once && <audio controls autoPlay src={src} onError={loadError} className="w-full" aria-label="Section audio" />}
+      {src && once && <audio autoPlay src={src} onEnded={finished} onError={loadError} aria-label="Section audio" />}
+      {!(src && !once) && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" variant="outline" disabled={state !== "idle"} onClick={() => void play()}>
+            {state === "playing" ? "Playing..." : state === "done" ? "Played" : "Play audio"}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {once ? "You can play it once, like the real test. " : ""}
+            {kind === "voice" ? "Computer voice, not the real test sound." : ""}
+          </span>
+        </div>
       )}
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" variant="outline" disabled={played} onClick={() => void play()}>
-          {playing ? "Playing..." : played ? "Played" : "Play audio"}
-        </Button>
-        <span className="text-xs text-muted-foreground">
-          {once ? "You can play it once, like the real test. " : ""}
-          {kind === "voice" ? "Computer voice, not the real test sound." : ""}
-        </span>
-      </div>
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -89,6 +88,14 @@ function Answer({ q, group, value, onChange }: { q: PublicQuestion; group: Publi
   if (!choices.length) {
     return <input className="w-full max-w-xs rounded-md border border-border bg-background px-3 py-1.5 text-sm" value={value} maxLength={200} onChange={(e) => onChange(e.target.value)} aria-label={`Answer to question ${q.n}`} />;
   }
+  const picked = choices.indexOf(value);
+  const onKey = (e: React.KeyboardEvent<HTMLButtonElement>, i: number) => {
+    const next = rovingIndex(e.key, i, choices.length);
+    if (next === null) return;
+    e.preventDefault();
+    onChange(choices[next]);
+    (e.currentTarget.parentElement?.children[next] as HTMLElement | undefined)?.focus();
+  };
   return (
     <div role="radiogroup" aria-label={`Answer to question ${q.n}`} className="flex flex-wrap gap-2">
       {choices.map((c, i) => {
@@ -100,11 +107,10 @@ function Answer({ q, group, value, onChange }: { q: PublicQuestion; group: Publi
             type="button"
             role="radio"
             aria-checked={on}
+            tabIndex={i === (picked === -1 ? 0 : picked) ? 0 : -1}
+            onKeyDown={(e) => onKey(e, i)}
             onClick={() => onChange(on ? "" : c)}
-            className={cn(
-              "rounded-md border px-3 py-1 text-left text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-              on ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted",
-            )}
+            className={chipClass(on)}
           >
             {text ? `${c}. ${text}` : c}
           </button>
@@ -114,15 +120,14 @@ function Answer({ q, group, value, onChange }: { q: PublicQuestion; group: Publi
   );
 }
 
-/** The answer sheet for a Listening or Reading attempt: timer, autosave, submit. Marking happens on the server. */
 export function TestRunner({ view }: { view: RunView }) {
   const [answers, setAnswers] = useState<Record<string, string>>(view.answers);
   const [index, setIndex] = useState(0);
   const dirty = useRef<Record<string, string>>({});
+  const [saveError, setSaveError] = useState("");
   const [retry, setRetry] = useState(0);
   const full = view.scope === "full";
   const deadline = new Date(view.startedAt).getTime() + view.limitSec * 1000;
-  // null until mounted: the server render has no clock to agree with the browser's.
   const [left, setLeft] = useState<number | null>(null);
   const submitting = useRef(false);
   const lastAutoTry = useRef(0);
@@ -133,7 +138,6 @@ export function TestRunner({ view }: { view: RunView }) {
       if (submitting.current) return;
       run(
         async () => {
-          // Set inside the action so a declined confirm never leaves the guard on.
           submitting.current = true;
           try {
             const res = await submitAttemptAction(view.id, { ...answers, ...dirty.current });
@@ -160,7 +164,6 @@ export function TestRunner({ view }: { view: RunView }) {
     };
   }, [deadline]);
 
-  // The full test submits itself at the limit; a failed try is repeated every few seconds.
   useEffect(() => {
     if (!full || left === null || left > 0 || submitting.current) return;
     if (Date.now() - lastAutoTry.current < RETRY_MS) return;
@@ -172,11 +175,15 @@ export function TestRunner({ view }: { view: RunView }) {
     const batch = dirty.current;
     if (!Object.keys(batch).length) return;
     dirty.current = {};
-    saveAnswersAction(view.id, batch).catch(() => {
-      // Keep the answers and try again shortly; a newer value for the same question wins.
-      dirty.current = { ...batch, ...dirty.current };
-      setTimeout(() => setRetry((n) => n + 1), RETRY_MS);
-    });
+    saveAnswersAction(view.id, batch)
+      .then((res) => {
+        if (!res.ok) setSaveError(res.errors._ ?? "Your answers aren't being saved. Submit, or reload the page.");
+        else setSaveError("");
+      })
+      .catch(() => {
+        dirty.current = { ...batch, ...dirty.current };
+        setTimeout(() => setRetry((n) => n + 1), RETRY_MS);
+      });
   }, [view.id]);
 
   useEffect(() => {
@@ -185,7 +192,6 @@ export function TestRunner({ view }: { view: RunView }) {
     return () => clearTimeout(t);
   }, [answers, retry, flush]);
 
-  // Best effort when the tab is hidden or closed.
   useEffect(() => {
     const hide = () => {
       if (document.visibilityState === "hidden") flush();
@@ -217,33 +223,54 @@ export function TestRunner({ view }: { view: RunView }) {
         <span role="timer" aria-label="Time left" className={cn("font-mono text-lg", left !== null && left <= 60 && "text-destructive")}>
           {left === null ? "--:--" : left >= 0 ? clock(left) : `-${clock(-left)}`}
         </span>
-        <Button type="button" disabled={pending} onClick={() => submit(answered < total ? `You have ${total - answered} unanswered. Submit anyway?` : undefined)}>
-          Submit
-        </Button>
+        <span aria-live="polite" className="sr-only">
+          {timeWarning(left)}
+        </span>
+        <span className="flex items-center gap-2">
+          <DiscardAttempt discard={() => deleteTestAttemptAction(view.id)} back={`/ielts/${view.skill}`} />
+          <Button type="button" disabled={pending} onClick={() => submit(answered < total ? `You have ${total - answered} unanswered. Submit anyway?` : undefined)}>
+            Submit
+          </Button>
+        </span>
       </div>
       <ActionStatus saved={false} errors={errors} />
+      {saveError && (
+        <p role="alert" className="text-sm text-destructive">
+          {saveError}
+        </p>
+      )}
       {left !== null && left <= 0 && !full && <p role="status" className="text-sm text-muted-foreground">Time is up for this section. You can keep going, then submit.</p>}
 
       {view.sections.length > 1 && (
         <div role="tablist" aria-label="Sections" className="flex flex-wrap gap-2">
           {view.sections.map((s, i) => (
-            <button
+            <Tab
               key={i}
-              type="button"
-              role="tab"
-              aria-selected={i === index}
+              selected={i === index}
+              onKeyDown={(e) => {
+                const next = rovingIndex(e.key, i, view.sections.length);
+                if (next === null) return;
+                e.preventDefault();
+                setIndex(next);
+                (e.currentTarget.parentElement?.children[next] as HTMLElement | undefined)?.focus();
+              }}
               onClick={() => setIndex(i)}
-              className={cn("rounded-md border px-3 py-1 text-sm", i === index ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")}
             >
               {s.title}
-            </button>
+            </Tab>
           ))}
         </div>
       )}
 
       <div className={cn("grid gap-6", !listening && "lg:grid-cols-2")}>
         {listening ? (
-          <SectionAudio key={index} kind={view.audio[index] ?? "none"} once={full} attemptId={view.id} index={index} />
+          <div>
+            {view.sections.map((_, i) => (
+              <div key={i} hidden={i !== index}>
+                <SectionAudio kind={view.audio[i] ?? "none"} once={full} attemptId={view.id} index={i} heard={view.played.includes(i)} />
+              </div>
+            ))}
+          </div>
         ) : (
           <article aria-label="Passage" className="whitespace-pre-wrap rounded-lg border border-border p-4 text-sm leading-relaxed lg:max-h-[75vh] lg:overflow-y-auto">
             <h2 className="mb-2 font-medium">{section.title}</h2>

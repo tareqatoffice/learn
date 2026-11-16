@@ -4,7 +4,6 @@ import { importKey } from "@/lib/ids";
 
 const md = (...lines: string[]) => lines.join("\n");
 
-/** The legacy record shape, so the quiz-app cases can be compared as they were written. */
 const records = (src: string, slug = "book") =>
   parseBook(src, slug).questions.map(({ question, part, prompt, answer }) => ({
     question,
@@ -13,8 +12,6 @@ const records = (src: string, slug = "book") =>
     answer,
   }));
 
-// Ported from quiz-app/test/parse.test.js. parseQuestionHeadings and parseNumberedSections
-// are both reached through parseBook, which falls back to numbered sections when no Q heading exists.
 describe("parseBook — legacy quiz-app cases", () => {
   it("extracts H2 questions with part and answer", () => {
     const src = md(
@@ -216,7 +213,6 @@ describe("parseBook — legacy quiz-app cases", () => {
   });
 });
 
-// Ported from quiz-app/test/collect.test.js: ids are importKeys, with a per-book collision suffix.
 describe("parseBook — importKeys", () => {
   it("same question text with different prompts gets different keys, equal to collect()'s ids", () => {
     const slug = "javascript-explained-ebook";

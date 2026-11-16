@@ -21,13 +21,12 @@ export default async function IeltsCalculatorPage() {
   await connectDb();
   const timeZone = await readTimeZone();
   const today = localDate(new Date(), timeZone);
-  // Mock rows belong to their attempts; this page lists only results the learner entered.
   const entries = (await listBandEntries(user.userId))
-    .filter((e) => e.source === "practice" || e.source === "official" || e.source === "other")
+    .filter((e) => (e.source === "practice" || e.source === "official" || e.source === "other") && !e.attemptId)
     .reverse();
 
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-4">
+    <div className="grid w-full gap-4">
       <TimeZoneCookie current={timeZone} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>IELTS band calculator</h1>

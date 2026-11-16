@@ -6,7 +6,6 @@ import { formatBytes } from "@/lib/uploadFile";
 
 export type DropzoneFile = { name: string; size: number };
 
-/** True when `file` matches an `accept` list (".md", "audio/*", "application/json"); no list accepts all. */
 export function matchesAccept(file: { name: string; type: string }, accept?: string): boolean {
   const tokens = (accept ?? "").split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
   if (!tokens.length) return true;
@@ -17,11 +16,6 @@ export function matchesAccept(file: { name: string; type: string }, accept?: str
   );
 }
 
-/**
- * The app's one file picker: a drop target that is also a keyboard-reachable button. It only
- * reports the chosen files; the caller decides what to do with them. `progress` (0..1) shows a bar
- * while `busy`.
- */
 export function FileDropzone({
   label,
   hint,
@@ -35,7 +29,6 @@ export function FileDropzone({
   onFiles,
   onClear,
 }: {
-  /** Accessible name of the file input. */
   label: string;
   hint?: string;
   accept?: string;
@@ -43,11 +36,9 @@ export function FileDropzone({
   disabled?: boolean;
   busy?: boolean;
   progress?: number;
-  /** Files to list under the drop target (already chosen or uploaded). */
   files?: DropzoneFile[];
   icon?: "file" | "audio";
   onFiles: (files: File[]) => void;
-  /** Shows a clear button under the chosen-files list. */
   onClear?: () => void;
 }) {
   const id = useId();
@@ -57,7 +48,6 @@ export function FileDropzone({
   const Icon = icon === "audio" ? FileAudio : FileText;
 
   const take = (list: FileList | null) => {
-    // Dropped files skip the browser's `accept` filter, so apply it here.
     const all = [...(list ?? [])];
     const picked = all.filter((f) => matchesAccept(f, accept));
     setRejected(all.length - picked.length);

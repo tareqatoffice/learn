@@ -7,7 +7,6 @@ import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { CRITERIA, CRITERION_LABEL, type Criterion, speakingBand } from "@/ielts/bands";
 
-/** The learner's saved rating: whole bands per criterion, plus optional 1-5 body-language scores. */
 export type SelfBands = Record<Criterion, number> & {
   notes?: string;
   confidence?: number;
@@ -62,10 +61,6 @@ function Choice({
   );
 }
 
-/**
- * The learner's own rating, before any AI estimate: a whole band 1-9 for each of the four criteria,
- * a note, and 1-5 scores for confidence, eye contact and gestures when the recording has video.
- */
 export function SelfBandsForm({
   attemptId,
   video,

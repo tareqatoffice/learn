@@ -306,6 +306,18 @@ describe("runImport", () => {
       expect(notes[1].subjects).toEqual(["docker"]);
     });
 
+    it("warns that a slug change on an id-matched chapter is ignored (F23)", async () => {
+      await run();
+      const intro = await Note.findOne({ slug: "intro" }).lean<{ _id: unknown }>();
+      const report = await runImport({
+        target: { kind: "series", slug: "s" },
+        source: { kind: "series", files: [{ name: "01-intro.md", content: md(`<!-- learn:note id=${String(intro!._id)} slug=start -->`, "# Intro", "", "Body.") }] },
+        dryRun: true,
+        editedBy,
+      });
+      expect(report.warnings).toEqual(expect.arrayContaining([expect.stringMatching(/slug change to "start" ignored \(kept "intro"\)/)]));
+    });
+
     it("matches notes by slug on re-import and recomputes toc on change", async () => {
       await run();
       expect(await run()).toMatchObject({ creates: 0, updates: 0, unchanged: 2 });
@@ -406,7 +418,6 @@ describe("runImport", () => {
   it("refuses to commit over an item edited after the plan was made", async () => {
     await commitBook();
     const changed = BOOK.replace("X is a thing.", "X is a changed thing.");
-    // The edit lands between planning (reads) and the commit transaction.
     const startSession = mongoose.startSession.bind(mongoose);
     const spy = vi.spyOn(mongoose, "startSession").mockImplementationOnce(async (...args) => {
       await Question.updateOne({ question: "What is X?" }, { $set: { answer: "Edited by an admin." } });

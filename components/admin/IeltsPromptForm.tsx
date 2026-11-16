@@ -64,7 +64,6 @@ function ImageUpload({ promptId, imageKey, previewUrl }: { promptId: string; ima
   );
 }
 
-/** Create or edit a Writing Task 1 or Task 2 prompt. */
 export function IeltsPromptForm({ task, prompt, imagePreviewUrl }: { task: "task1" | "task2"; prompt?: AdminPrompt; imagePreviewUrl?: string }) {
   const router = useRouter();
   const [id] = useState(prompt?.id ?? "");

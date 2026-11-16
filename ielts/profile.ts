@@ -1,6 +1,6 @@
 import type { ClientSession } from "mongoose";
 import { z } from "zod";
-import { connectDb, retryOnDuplicateKey } from "@/lib/db";
+import { connectDb, inTransaction, retryOnDuplicateKey } from "@/lib/db";
 import { IeltsPlan, IeltsProfile } from "@/models";
 import { type ActionResult, fail, ok } from "@/admin/result";
 import { isHalfBand, SKILLS, type Criterion } from "@/ielts/bands";
@@ -75,6 +75,7 @@ export type PlanView = {
 
 type PlanDoc = {
   version: number;
+  inputs?: PlanInputs;
   reason: string;
   createdAt: Date;
   phases: Phase[];
@@ -83,7 +84,6 @@ type PlanDoc = {
   adjustments?: Adjustment[];
 };
 
-/** Only the bands that are set, so Mongoose's undefined fields never leak out. */
 function pickBands(b: Bands | undefined): Bands {
   const out: Bands = {};
   for (const k of ["overall", ...SKILLS] as const) if (typeof b?.[k] === "number") out[k] = b[k];
@@ -119,7 +119,6 @@ function planView(doc: PlanDoc): PlanView {
   };
 }
 
-/** Plan inputs from a profile (validated input or stored view). */
 export function toPlanInputs(
   data: Pick<z.output<typeof profileInput>, "testDate" | "target" | "current" | "minutesPerDay" | "studyDays">,
   today: string,
@@ -150,7 +149,6 @@ function validate(input: ProfileInput, today: string): { data: z.output<typeof p
 
 export type TestDayStatus = "upcoming" | "today" | "passed";
 
-/** Where local `today` sits against the test date: the test day itself is not yet passed. */
 export function testDayStatus(today: string, testDate: string): TestDayStatus {
   if (today < testDate) return "upcoming";
   return today === testDate ? "today" : "passed";
@@ -180,6 +178,15 @@ async function latestPlanDoc(userId: string): Promise<PlanDoc | null> {
   return IeltsPlan.findOne({ userId }).sort({ version: -1 }).lean<PlanDoc>();
 }
 
+export async function planVersionsForChart(userId: string): Promise<(Pick<PlanView, "weeks"> & { startDate: string })[]> {
+  await connectDb();
+  const docs = await IeltsPlan.find({ userId })
+    .sort({ version: 1 })
+    .select("version startDate weeks phases hours reason createdAt")
+    .lean<(PlanDoc & { startDate?: string })[]>();
+  return docs.map((d) => ({ weeks: planView(d).weeks, startDate: d.startDate ?? d.weeks[0]?.start ?? "" }));
+}
+
 export async function currentPlan(userId: string): Promise<PlanView | null> {
   await connectDb();
   const doc = await latestPlanDoc(userId);
@@ -188,7 +195,6 @@ export async function currentPlan(userId: string): Promise<PlanView | null> {
 
 export type PlanVersionSummary = { version: number; reason: string; createdAt: string };
 
-/** Every stored plan version, newest first: "changed on …, because …". */
 export async function planHistory(userId: string): Promise<PlanVersionSummary[]> {
   await connectDb();
   const docs = await IeltsPlan.find({ userId }).sort({ version: -1 }).select("version reason createdAt").lean<
@@ -222,7 +228,6 @@ async function buildPreview(
   return { before: prev ? planView(prev) : null, after, dropped: plan.dropped };
 }
 
-/** What the next version would look like, against the current one. Writes nothing. */
 export async function previewPlan(
   userId: string,
   inputs: PlanInputs,
@@ -242,7 +247,6 @@ export async function previewProfile(userId: string, input: ProfileInput, today:
   return ok(await buildPreview(prev, toPlanInputs(v.data, today), prev?.adjustments ?? [], CHANGED_REASON, {}));
 }
 
-/** Generates a plan from `inputs` and stores it as the next version (inside `ctx.session` when given). Returns the new version number. */
 export async function writePlanVersion(
   userId: string,
   inputs: PlanInputs,
@@ -278,30 +282,50 @@ export async function writePlanVersion(
   });
 }
 
+export function samePlanInputs(a: PlanInputs | undefined, b: PlanInputs): boolean {
+  if (!a) return false;
+  const days = (d: number[]) => [...d].sort((x, y) => x - y).join(",");
+  const bands = (x: Partial<BandSet> | undefined) => JSON.stringify(pickBands(x as Bands));
+  return (
+    a.testDate === b.testDate &&
+    a.minutesPerDay === b.minutesPerDay &&
+    days(a.studyDays ?? []) === days(b.studyDays) &&
+    bands(a.target) === bands(b.target) &&
+    bands(a.current) === bands(b.current)
+  );
+}
+
 export async function saveProfile(userId: string, input: ProfileInput, today: string): Promise<ActionResult<{ version: number }>> {
   const v = validate(input, today);
   if ("errors" in v) return v.errors as ActionResult<never>;
   const { data } = v;
   await connectDb();
-  const prev = await latestPlanDoc(userId);
-  await IeltsProfile.updateOne(
-    { userId },
-    {
-      $set: {
-        testDate: data.testDate,
-        target: pickBands(data.target),
-        current: pickBands(data.current),
-        minutesPerDay: data.minutesPerDay,
-        studyDays: data.studyDays,
-        status: "active",
-        ...(data.examinerVoice !== undefined ? { examinerVoice: data.examinerVoice } : {}),
-        ...(data.mockVideo !== undefined ? { mockVideo: data.mockVideo } : {}),
-        ...(data.drillVideo !== undefined ? { drillVideo: data.drillVideo } : {}),
+  const [prev, profile] = await Promise.all([
+    latestPlanDoc(userId),
+    IeltsProfile.findOne({ userId }).select("status").lean<{ status?: string }>(),
+  ]);
+  const inputs = toPlanInputs(data, today);
+  const replan = !prev || profile?.status !== "active" || !samePlanInputs(prev.inputs, inputs);
+  const version = await inTransaction(async (session) => {
+    await IeltsProfile.updateOne(
+      { userId },
+      {
+        $set: {
+          testDate: data.testDate,
+          target: pickBands(data.target),
+          current: pickBands(data.current),
+          minutesPerDay: data.minutesPerDay,
+          studyDays: data.studyDays,
+          status: "active",
+          ...(data.examinerVoice !== undefined ? { examinerVoice: data.examinerVoice } : {}),
+          ...(data.mockVideo !== undefined ? { mockVideo: data.mockVideo } : {}),
+          ...(data.drillVideo !== undefined ? { drillVideo: data.drillVideo } : {}),
+        },
       },
-    },
-    { upsert: true },
-  );
-  const version = await writePlanVersion(userId, toPlanInputs(data, today), prev?.adjustments ?? [], CHANGED_REASON);
+      { upsert: true, session },
+    );
+    return replan || !prev ? writePlanVersion(userId, inputs, prev?.adjustments ?? [], CHANGED_REASON, { session }) : prev.version;
+  });
   return ok({ version });
 }
 

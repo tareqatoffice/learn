@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { startQuizAction } from "@/app/(app)/interview/actions";
+import { useEffect, useState, useTransition } from "react";
+import { countDeckAction, startQuizAction } from "@/app/(app)/interview/actions";
 import { Chip } from "@/components/Chip";
 import { Button } from "@/components/ui/button";
+import { isNavigationError, START_FAILED } from "@/lib/navigationError";
 import { toggleItem } from "@/lib/utils";
 import type { QuizMode } from "@/progress/quiz";
 
@@ -38,9 +39,24 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
   const [mode, setMode] = useState<QuizMode>("unseen");
   const [size, setSize] = useState<10 | 20 | 50 | null>(20);
   const [empty, setEmpty] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const single = bookIds.length === 1 ? books.find((b) => b.id === bookIds[0]) : undefined;
+  const [count, setCount] = useState<{ key: string; n: number } | null>(null);
+  const key = JSON.stringify([bookIds, single ? partKeys : [], mode, size]);
+  useEffect(() => {
+    let live = true;
+    countDeckAction({ bookIds, partKeys: single ? partKeys : [], mode, size })
+      .then((n) => live && setCount({ key, n }))
+      .catch(() => live && setCount(null));
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  const known = count?.key === key ? count.n : null;
+  const label = known !== null ? `${known} question${known === 1 ? "" : "s"}` : size ? `${size} questions` : "all questions";
 
   function changeBooks(next: string[]) {
     setBookIds(next);
@@ -50,15 +66,20 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
 
   function start() {
     setEmpty(false);
+    setFailed(false);
     startTransition(async () => {
-      // A successful start redirects, so only the empty result ever comes back here.
-      const result = await startQuizAction({ bookIds, partKeys: single ? partKeys : [], mode, size });
-      if (result?.empty) setEmpty(true);
+      try {
+        const result = await startQuizAction({ bookIds, partKeys: single ? partKeys : [], mode, size });
+        if (result?.empty) setEmpty(true);
+      } catch (error) {
+        if (isNavigationError(error)) throw error;
+        setFailed(true);
+      }
     });
   }
 
   return (
-    <section aria-labelledby="new-quiz" className="rounded-xl border border-border bg-card p-5">
+    <section aria-labelledby="new-quiz" className="min-w-0 rounded-xl border border-border bg-card p-5">
       <h2 id="new-quiz" className="text-lg font-semibold">
         New quiz
       </h2>
@@ -104,11 +125,12 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
       </Group>
 
       <div className="mt-6">
-        <Button type="button" size="lg" disabled={pending} onClick={start}>
-          {pending ? "Starting…" : `Start · ${size ? `${size} questions` : "all questions"}`}
+        <Button type="button" size="lg" disabled={pending || known === 0} onClick={start}>
+          {pending ? "Starting…" : `Start · ${label}`}
         </Button>
         <p role="status" className="mt-3 text-sm text-muted-foreground empty:hidden">
-          {empty && "No questions match. Try another mode or book."}
+          {(empty || known === 0) && "No questions match. Try another mode or book."}
+          {failed && START_FAILED}
         </p>
       </div>
     </section>

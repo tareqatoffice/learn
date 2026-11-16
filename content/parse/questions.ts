@@ -1,6 +1,3 @@
-// Parses a question book (markdown) into a ParsedBook. Pure functions, no I/O.
-// Legacy books are read with the heuristics ported from quiz-app/src/lib/parse.js; books pulled
-// from the app carry `<!-- learn:… -->` markers, and then the markers alone decide the structure.
 import type { ParsedBook, ParsedQuestion } from "@/content/types";
 import { importKey, slugify } from "@/lib/ids";
 import { isCanonical, parseCanonical } from "./canonical";
@@ -38,7 +35,6 @@ function cleanAnswer(text: string): string {
   return t;
 }
 
-// Line where the body of heading #idx ends: the next heading of the same or higher level.
 function bodyEnd(lines: string[], headings: Heading[], idx: number): number {
   for (let j = idx + 1; j < headings.length; j++) {
     if (headings[j].level <= headings[idx].level) return headings[j].line;
@@ -52,7 +48,6 @@ function sliceAnswer(lines: string[], headings: Heading[], idx: number): string 
 
 const inRanges = (line: number, ranges: Range[]) => ranges.some(([s, e]) => line >= s && line < e);
 
-/** Returns a function that hands out `base`, then `base-2`, `base-3`… for repeated bases. */
 function uniqueKeys(): (base: string) => string {
   const used = new Set<string>();
   return (base) => {
@@ -63,7 +58,6 @@ function uniqueKeys(): (base: string) => string {
   };
 }
 
-// "Predict the result" questions: snippet first, then <details><summary>Answer</summary> … </details>.
 function splitDetails(body: string): { prompt: string; answer: string } | null {
   const lines = body.split("\n");
   const outside = fenceMask(lines);
@@ -83,7 +77,6 @@ function splitDetails(body: string): { prompt: string; answer: string } | null {
   };
 }
 
-// Untitled puzzles ("### Q61."): leading code block(s) are the question, the rest is the answer.
 function splitLeadingCode(body: string): { prompt: string; answer: string } {
   const lines = body.split("\n");
   const outside = fenceMask(lines);
@@ -101,7 +94,6 @@ function splitLeadingCode(body: string): { prompt: string; answer: string } {
   return { prompt: cleanAnswer(lines.slice(0, end).join("\n")), answer: cleanAnswer(lines.slice(end).join("\n")) };
 }
 
-// B/T questions: everything before the first "**Answer:** …" line is the prompt.
 function splitAnswerLabel(body: string): { prompt: string; answer: string } | null {
   const lines = body.split("\n");
   const outside = fenceMask(lines);
@@ -122,10 +114,6 @@ function questionRecord(kind: string, title: string, part: string, body: string)
   return { question: PUZZLE_QUESTION, part, prompt: split.prompt, answer: split.answer };
 }
 
-// Question-like items in sections that are not Q headings: bold numbered prompts
-// ("**1. Design a URL shortener.**" + answer lines), quoted bold bullets
-// ("- **"Tell me about…"** answer"), and "| Question | Answer |" tables.
-// `used` lists the (0-based) lines the items were built from; the rest is lead-in prose.
 function sectionExtras(text: string, part: string): { items: Item[]; used: number[] } {
   const lines = text.split("\n");
   const outside = fenceMask(lines);
@@ -191,13 +179,8 @@ function splitRapidFire(text: string): { question: string; answer: string }[] {
   return items.map((it) => ({ question: it.question, answer: cleanAnswer(it.answer) }));
 }
 
-/**
- * What a legacy mode found: the questions, the line ranges they were built from, the part headings,
- * and the "source" headings whose sections hold question items but are not questions themselves.
- */
 type ModeResult = { items: Item[]; questionRanges: Range[]; partHeads: Set<number>; sources: Set<number> };
 
-// Q mode: Q/B/T headings, plus question-like items in the direct content of other sections.
 function parseQuestionHeadings(lines: string[], headings: Heading[], excluded: Range[]): ModeResult {
   const items: Item[] = [];
   const questionRanges: Range[] = [];
@@ -206,7 +189,7 @@ function parseQuestionHeadings(lines: string[], headings: Heading[], excluded: R
   let part: string | null = null;
   let section: string | null = null;
   let sectionIdx = -1;
-  let insideQ = -1; // line where the current Q's body ends
+  let insideQ = -1;
   const partOf = () => {
     if (!part && section) partHeads.add(sectionIdx);
     return part || section || "";
@@ -241,7 +224,6 @@ function parseQuestionHeadings(lines: string[], headings: Heading[], excluded: R
   return { items, questionRanges, partHeads, sources };
 }
 
-// Fallback for books without Q headings: each "## N. Topic" is a question.
 function parseNumberedSections(lines: string[], outside: boolean[], headings: Heading[]): ModeResult {
   const items: Item[] = [];
   const questionRanges: Range[] = [];
@@ -261,7 +243,6 @@ function parseNumberedSections(lines: string[], outside: boolean[], headings: He
     const title = m[2].trim();
     const answer = sliceAnswer(lines, headings, i);
     if (RAPID_FIRE.test(title)) {
-      // The heading and any lead-in before the first item are prose, not a question.
       let first = h.line + 1;
       while (first < end && !(outside[first] && RAPID_ITEM.test(lines[first]))) first++;
       sources.add(i);
@@ -279,10 +260,6 @@ const sectionTitle = (text: string) => text.replace(/^\d+\.\s+/, "");
 const isQHeading = (h: Heading) => (h.level === 2 || h.level === 3) && Q_HEAD.test(h.text);
 const isPartHeading = (h: Heading) => h.level === 1 && PART.test(h.text);
 
-/**
- * Contents sections (dropped) and extra sections (kept as raw markdown), outside question bodies.
- * An extra runs to the next heading of the same or higher level, or the next question heading.
- */
 function findSections(lines: string[], headings: Heading[], questionRanges: Range[]) {
   const contents: Range[] = [];
   const extras: { idx: number; range: Range }[] = [];
@@ -305,7 +282,6 @@ function findSections(lines: string[], headings: Heading[], questionRanges: Rang
   return { contents, extras };
 }
 
-/** Joins runs of consecutive lines into markdown, dropping rules and blanks at each run's edges. */
 function joinRuns(lines: string[], picked: number[]): string {
   const runs: string[][] = [];
   picked.forEach((i, k) => {
@@ -327,7 +303,6 @@ function joinRuns(lines: string[], picked: number[]): string {
 
 function parseLegacy(lines: string[], outside: boolean[], bookSlug: string): Structure {
   const headings = scanHeadings(lines, outside);
-  // Q/B/T heading ranges never depend on extras, so extras can be found first and kept out of Q mode.
   const qRanges = headings.flatMap((h, i): Range[] => (isQHeading(h) ? [[h.line, bodyEnd(lines, headings, i)]] : []));
   let { contents, extras } = findSections(lines, headings, qRanges);
   let mode = parseQuestionHeadings(lines, headings, [...contents, ...extras.map((e) => e.range)]);
@@ -337,7 +312,6 @@ function parseLegacy(lines: string[], outside: boolean[], bookSlug: string): Str
   }
   if (mode.items.length === 0) throw new Error(`No questions found in ${bookSlug}`);
 
-  // Every line gets exactly one owner; whatever is left over is reported as unaccounted.
   const owner: string[] = new Array(lines.length).fill("");
   const claim = ([s, e]: Range, who: string) => {
     for (let i = s; i < e; i++) if (!owner[i]) owner[i] = who;
@@ -359,8 +333,6 @@ function parseLegacy(lines: string[], outside: boolean[], bookSlug: string): Str
   const pick = (who: string) => owner.flatMap((o, i) => (o === who ? [i] : []));
   const intro = joinRuns(lines, pick("intro"));
 
-  // A part owns the prose in its range that no question or extra took: lead-ins and source sections.
-  // A heading that is neither (and the prose directly under it) stays unowned.
   const headingAt = new Map(headings.map((h, i) => [h.line, i]));
   const partKey = uniqueKeys();
   const parts: Structure["parts"] = [];
@@ -403,7 +375,6 @@ function parseLegacy(lines: string[], outside: boolean[], bookSlug: string): Str
   };
 }
 
-/** Parses one question book. `bookSlug` prefixes every importKey (repeats get `-2`, `-3`… per book). */
 export function parseBook(md: string, bookSlug: string): ParsedBook {
   const lines = splitLines(md);
   const outside = fenceMask(lines);

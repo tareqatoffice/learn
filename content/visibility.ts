@@ -9,10 +9,6 @@ async function publishedIds(model: Model<unknown>): Promise<Types.ObjectId[]> {
   return rows.map((row) => row._id);
 }
 
-/**
- * Users only see published children of published parents. `restrictTo` narrows
- * the visible parents but never widens past them.
- */
 async function visibleChildFilter(
   parentField: string,
   visibleParents: Types.ObjectId[],
@@ -24,13 +20,10 @@ async function visibleChildFilter(
   return { status: "published", [parentField]: { $in: parents } };
 }
 
-// Read once per server render (a page asks several helpers for the same parents); outside a render,
-// e.g. in tests and scripts, React's `cache` calls straight through.
 export const visibleBookIds = cache(() => publishedIds(QuestionBook));
 export const visibleGraphIds = cache(() => publishedIds(Graph));
 export const visibleSeriesIds = cache(() => publishedIds(NoteSeries));
 
-/** `filter` applied to the sub-document at `path`, e.g. after a `$lookup` into `path`. */
 export function filterUnder(path: string, filter: Filter): Filter {
   return Object.fromEntries(Object.entries(filter).map(([key, value]) => [`${path}.${key}`, value]));
 }

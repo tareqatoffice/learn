@@ -1,11 +1,13 @@
 import mongoose from "mongoose";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ForbiddenError } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 import { Question, QuestionProgress, QuizSession } from "@/models";
 import { markQuestion } from "@/progress/questions";
 import {
+  countDeck,
   createSession,
+  discardSession,
   finishSession,
   getSessionView,
   listUnfinished,
@@ -59,6 +61,57 @@ describe("quiz sessions", () => {
     });
   });
 
+  describe("discardSession and the resume list (F12)", () => {
+    it("deletes an untouched quiz, finishes one with answers, and hides old ones", async () => {
+      const user = newUserId();
+      await seedQuestions(await seedBook("b"), 2);
+      const empty = await start(user, all());
+      const used = await start(user, all());
+      await recordResult(user, used, (await deckOf(used))[0], "got");
+      const old = await start(user, all());
+      await QuizSession.updateOne({ _id: old }, { $set: { startedAt: new Date(Date.now() - 31 * 86_400_000) } });
+
+      expect((await listUnfinished(user)).map((s) => s.id).sort()).toEqual([empty, used].sort());
+      await discardSession(user, empty);
+      await discardSession(user, used);
+      await discardSession(newUserId(), old);
+      expect(await QuizSession.exists({ _id: empty })).toBeNull();
+      expect((await loadSession(used)).finishedAt).toBeInstanceOf(Date);
+      expect((await loadSession(old)).finishedAt ?? null).toBeNull();
+      expect(await listUnfinished(user)).toEqual([]);
+    });
+  });
+
+  describe("countDeck (F10)", () => {
+    it("counts what a deck with the filter would hold", async () => {
+      const user = newUserId();
+      const ids = await seedQuestions(await seedBook("b"), 4);
+      await markQuestion(user, ids[0], "got");
+      expect(await countDeck(user, all())).toBe(4);
+      expect(await countDeck(user, all({ mode: "unseen" }))).toBe(3);
+      expect(await countDeck(user, all({ mode: "review" }))).toBe(0);
+    });
+  });
+
+  describe("recordResult atomicity (D9)", () => {
+    it("keeps the session unchanged when the progress write fails", async () => {
+      const user = newUserId();
+      const book = await seedBook("js");
+      await seedQuestions(book, 2);
+      const id = await start(user, all());
+      const [first] = await deckOf(id);
+      const spy = vi.spyOn(QuestionProgress, "updateOne").mockRejectedValueOnce(new Error("db down"));
+      await expect(recordResult(user, id, first, "got")).rejects.toThrow("db down");
+      spy.mockRestore();
+      const after = await loadSession(id);
+      expect(after.cursor).toBe(0);
+      expect(after.results).toHaveLength(0);
+      await recordResult(user, id, first, "got");
+      expect((await loadSession(id)).results).toHaveLength(1);
+      expect(await QuestionProgress.countDocuments({ userId: user })).toBe(1);
+    });
+  });
+
   describe("createSession", () => {
     it("Review Focus 3: an empty review pile returns empty and creates no session", async () => {
       const user = newUserId();
@@ -79,10 +132,31 @@ describe("quiz sessions", () => {
     it("Review Focus 3: unseen with everything seen returns empty", async () => {
       const user = newUserId();
       const ids = await seedQuestions(await seedBook("b"), 2);
-      for (const id of ids) await markQuestion(user, id, "skip");
+      for (const id of ids) await markQuestion(user, id, "got");
 
       expect(await createSession(user, all({ mode: "unseen" }))).toEqual({ empty: true });
       expect(await QuizSession.countDocuments()).toBe(0);
+    });
+
+    it("keeps skipped questions, including old skip rows with no status, in the unseen deck (F2)", async () => {
+      const user = newUserId();
+      const ids = await seedQuestions(await seedBook("b"), 2);
+      await markQuestion(user, ids[0], "skip");
+      await QuestionProgress.create({ userId: user, questionId: ids[1], bookId: (await Question.findById(ids[1]).lean<{ bookId: unknown }>())!.bookId, status: null, seenCount: 1 });
+      const id = await start(user, all({ mode: "unseen" }));
+      expect((await deckOf(id)).sort()).toEqual([...ids].sort());
+    });
+
+    it("orders a review deck by when each question was last seen, oldest first (F2)", async () => {
+      const user = newUserId();
+      const ids = await seedQuestions(await seedBook("b"), 3);
+      for (const id of ids) await markQuestion(user, id, "review");
+      const day = (n: number) => new Date(Date.UTC(2026, 0, n));
+      await QuestionProgress.updateOne({ userId: user, questionId: ids[0] }, { $set: { lastSeenAt: day(3) } });
+      await QuestionProgress.updateOne({ userId: user, questionId: ids[1] }, { $set: { lastSeenAt: day(1) } });
+      await QuestionProgress.updateOne({ userId: user, questionId: ids[2] }, { $set: { lastSeenAt: day(2) } });
+      const id = await start(user, all({ mode: "review", size: 10 }));
+      expect(await deckOf(id)).toEqual([ids[1], ids[2], ids[0]]);
     });
 
     it("stores a shuffled deck of visible questions with cursor 0 and no results", async () => {
@@ -97,7 +171,6 @@ describe("quiz sessions", () => {
       expect(session.cursor).toBe(0);
       expect(session.results).toEqual([]);
       expect(session.questionIds.map(String).sort()).toEqual([...ids].sort());
-      // Fisher-Yates with rand 0 rotates the sorted ids left by one.
       expect(session.questionIds.map(String)).toEqual([...ids.slice(1), ids[0]]);
     });
 
@@ -280,10 +353,7 @@ describe("quiz sessions", () => {
       const view = await recordResult(user, sessionId, deck[0], "skip");
       expect(view).toMatchObject({ position: 1, total: 3, done: false, counts: { got: 0, review: 0, skip: 1 } });
       expect(view.current!.id).toBe(deck[1]);
-      expect(await QuestionProgress.findOne({ userId: user, questionId: deck[0] }).lean()).toMatchObject({
-        status: null,
-        seenCount: 1,
-      });
+      expect(await QuestionProgress.findOne({ userId: user, questionId: deck[0] }).lean()).toBeNull();
     });
 
     it("requeue: review at cursor 0 of a 10-card deck reinserts the id at index 5", async () => {
@@ -308,7 +378,7 @@ describe("quiz sessions", () => {
       const sessionId = await start(user, all());
       const [q0, q1] = await deckOf(sessionId);
 
-      await recordResult(user, sessionId, q0, "review", () => 0); // deck of 2: requeued at the end
+      await recordResult(user, sessionId, q0, "review", () => 0);
       expect(await deckOf(sessionId)).toEqual([q0, q1, q0]);
       await recordResult(user, sessionId, q1, "got");
       const end = await recordResult(user, sessionId, q0, "got");
@@ -319,7 +389,6 @@ describe("quiz sessions", () => {
         status: "got",
         seenCount: 2,
       });
-      // A late mark on a finished session changes nothing.
       await recordResult(user, sessionId, q0, "review");
       expect((await loadSession(sessionId)).results).toHaveLength(3);
     });

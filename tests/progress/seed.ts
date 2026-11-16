@@ -1,7 +1,6 @@
 import { Types } from "mongoose";
 import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook } from "@/models";
 
-/** Shared fixtures for the progress tests (not a test file itself). */
 
 export const newUserId = () => String(new Types.ObjectId());
 
@@ -15,7 +14,6 @@ export async function seedBook(slug: string, status = "published") {
   return String(book._id);
 }
 
-/** Creates `n` questions in order and returns their ids as strings. */
 export async function seedQuestions(bookId: string, n: number, partKey = "p1", status = "published") {
   const docs = await Question.insertMany(
     Array.from({ length: n }, (_, i) => ({

@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { extFor, grabFrames, pickMime } from "@/lib/media";
 

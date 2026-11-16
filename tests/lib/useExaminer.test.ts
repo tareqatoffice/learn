@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useExaminer } from "@/lib/useExaminer";
@@ -86,7 +85,6 @@ describe("useExaminer", () => {
     expect(listeners.voiceschanged).toBeTypeOf("function");
     loaded = [{ lang: "en-GB", name: "Daniel" }];
     listeners.voiceschanged();
-    // A browser that then reports no voices on the call still gets the loaded one.
     loaded = [];
     void result.current.speak("Hello");
     expect(FakeUtterance.last?.voice?.name).toBe("Daniel");

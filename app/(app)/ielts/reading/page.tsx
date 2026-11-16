@@ -15,7 +15,7 @@ export default async function IeltsReadingPage() {
   const user = await requireUser();
   const [tests, recent] = await Promise.all([listTests("reading"), listTestAttempts(user.userId, { skill: "reading", limit: 10 })]);
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-4">
+    <div className="grid w-full gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>Reading practice</h1>
         <Link href="/ielts" className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">

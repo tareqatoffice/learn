@@ -12,7 +12,6 @@ export async function saveAiSettingsAction(input: AiSettingsInput): Promise<Acti
   return saveAiSettings(input, user.userId);
 }
 
-/** Saves an OpenRouter key (encrypted); it is never sent back to the browser. */
 export async function saveAiKeyAction(
   key: string,
 ): Promise<ActionResult<{ verified: Exclude<KeyCheck, { status: "rejected" }> }>> {
@@ -26,7 +25,6 @@ export async function clearAiKeyAction(): Promise<ActionResult> {
   return ok();
 }
 
-/** A lookup, not an update: sends a tiny prompt to each model so the admin sees which ones answer. */
 export async function testAiModelsAction(models: string[]): Promise<ModelCheck[]> {
   await adminContext();
   const ids = z

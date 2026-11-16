@@ -24,7 +24,6 @@ export function BookForm({ book = EMPTY, subjects }: { book?: AdminBook; subject
         <TextField
           label="Title"
           value={draft.title}
-          // New books follow the title until the slug is edited by hand.
           onChange={(title) => setDraft((d) => ({ ...d, title, slug: d.id || d.slug !== slugify(d.title) ? d.slug : slugify(title) }))}
           error={errors.title}
         />
@@ -67,7 +66,6 @@ export function BookForm({ book = EMPTY, subjects }: { book?: AdminBook; subject
 
 type Section = { key: string; title: string };
 
-/** Editable list of keyed, titled sections with one markdown field each (book parts and extras). */
 function SectionsEditor<T extends Section, F extends Exclude<keyof T, keyof Section>>({
   legend,
   noun,

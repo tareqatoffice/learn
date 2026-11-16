@@ -2,7 +2,7 @@ import { Types } from "mongoose";
 import { z } from "zod";
 import { type ActionResult, fail, ok } from "@/admin/result";
 import { getAiConfig, modelChain } from "@/lib/aiSettings";
-import { connectDb } from "@/lib/db";
+import { connectDb, inTransaction } from "@/lib/db";
 import { AiError, type ChatOptions, chatCompletion, extractJson } from "@/lib/openrouter";
 import { IeltsSpeakingItem } from "@/models";
 import { SAFETY, metered } from "@/progress/quizAi";
@@ -63,7 +63,6 @@ function parse(input: unknown) {
 
 const isCard = async (id: string) => Boolean(await IeltsSpeakingItem.exists({ _id: id, type: "part2" }));
 
-/** The stored fields for a validated input (the type itself never changes after creation). */
 function fields(data: ItemData) {
   const base = { title: data.title, status: data.status, tags: data.tags };
   switch (data.type) {
@@ -99,14 +98,15 @@ export async function updateItem(id: string, input: ItemInput): Promise<ActionRe
   return ok();
 }
 
-/** Removes the item. Deleting a card unlinks the Part 3 sets that followed it (they stay). */
 export async function deleteItem(id: string): Promise<ActionResult> {
   if (!isId(id)) return fail(NOT_FOUND);
   await connectDb();
-  const doc = await IeltsSpeakingItem.findByIdAndDelete(id).lean<{ type: ItemType }>();
-  if (!doc) return fail(NOT_FOUND);
-  if (doc.type === "part2") await IeltsSpeakingItem.updateMany({ type: "part3", cardId: id }, { $unset: { cardId: 1 } });
-  return ok();
+  const found = await inTransaction(async (session) => {
+    const doc = await IeltsSpeakingItem.findByIdAndDelete(id, { session }).lean<{ type: ItemType }>();
+    if (doc?.type === "part2") await IeltsSpeakingItem.updateMany({ type: "part3", cardId: id }, { $unset: { cardId: 1 } }, { session });
+    return Boolean(doc);
+  });
+  return found ? ok() : fail(NOT_FOUND);
 }
 
 export async function setItemStatus(id: string, status: ItemStatus): Promise<ActionResult> {
@@ -124,7 +124,6 @@ export type AdminIeltsItem = {
   aboutYou: boolean;
   questions: string[];
   cue?: { topic: string; bullets: string[]; explain: string; roundOff: string[] };
-  /** "" when not linked. */
   cardId: string;
   status: ItemStatus;
   tags: string[];
@@ -172,7 +171,6 @@ export async function getItemAdmin(id: string): Promise<AdminIeltsItem | null> {
   return doc ? toAdmin(doc) : null;
 }
 
-// ---- AI draft ----
 
 type Deps = Pick<ChatOptions, "fetch">;
 
@@ -217,12 +215,10 @@ const strings = (v: unknown, max: number, count: number) =>
     : [];
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
-/** A model reply as item input for `type` (over-long lists and strings trimmed), or null when it doesn't fit the bounds. */
 export function parseDraft(reply: string, type: ItemType, cardId?: string): ItemData | null {
   return draftFromRaw(extractJson(reply), type, cardId);
 }
 
-/** Same as `parseDraft` for an already-parsed JSON value. */
 export function draftFromRaw(value: unknown, type: ItemType, cardId?: string): ItemData | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
@@ -243,10 +239,6 @@ export function draftFromRaw(value: unknown, type: ItemType, cardId?: string): I
   return parsed.success ? parsed.data : null;
 }
 
-/**
- * One metered AI call that saves a draft item (`status: "draft"`, `generated: true`). A Part 3 draft can
- * follow a Part 2 card. An unusable reply is refunded and nothing is saved.
- */
 export async function generateItemDraft(
   adminUserId: string,
   type: ItemType,

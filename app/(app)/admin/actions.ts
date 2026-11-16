@@ -15,8 +15,8 @@ export async function moveItemAction(
   id: string,
   dir: "up" | "down",
 ): Promise<Result> {
-  const user = await adminContext();
-  return moveItem(kind, id, dir, user.email);
+  await adminContext();
+  return moveItem(kind, id, dir);
 }
 
 export async function setStatusAction(

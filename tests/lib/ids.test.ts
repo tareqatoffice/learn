@@ -9,7 +9,6 @@ describe("fnv1a", () => {
 
 describe("importKey", () => {
   it("matches the id collect() gives the legacy question", () => {
-    // Hard-coded from quiz-app/src/lib/collect.js: the React book's "What is React?".
     expect(importKey("react-questions-ebook", "What is React?", "")).toBe(
       "react-questions-ebook-1a2oeen",
     );

@@ -4,7 +4,6 @@ export type LineSeries<P> = {
   color: string;
   dash?: string;
   pick: (p: P) => number | undefined;
-  /** Draw the points without joining them (e.g. official results). */
   dotsOnly?: boolean;
 };
 
@@ -12,7 +11,6 @@ const W = 600;
 const H = 140;
 const PAD = { left: 28, right: 8, top: 8, bottom: 18 };
 
-/** Lines through the points that have a value; gaps stay gaps. */
 function paths(points: ({ x: number; y: number } | null)[]): string {
   let d = "";
   let pen = false;
@@ -27,14 +25,12 @@ function paths(points: ({ x: number; y: number } | null)[]): string {
   return d;
 }
 
-/** Whole numbers inside the domain. */
 function wholeTicks([lo, hi]: [number, number]): number[] {
   const ticks: number[] = [];
   for (let v = Math.ceil(lo); v <= hi; v++) ticks.push(v);
   return ticks;
 }
 
-/** Inline-SVG line chart with a legend: one line per series, optional horizontal and vertical reference lines. */
 export function LineChart<P>({
   points,
   series,

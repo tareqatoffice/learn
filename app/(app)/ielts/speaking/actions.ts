@@ -1,6 +1,8 @@
 "use server";
 
-import { type ActionResult, ok } from "@/admin/result";
+import { z } from "zod";
+import { type ActionResult, fail, ok } from "@/admin/result";
+import { confirmInput, recordingInput, shape } from "@/lib/actionInput";
 import {
   confirmPart,
   deleteAttempt,
@@ -21,7 +23,6 @@ import { localDate } from "@/speaking/schedule";
 import { setBodyConsent } from "@/speaking/settings";
 import { readTimeZone } from "@/speaking/timezone";
 
-// Every action signs in first and acts as the session user; ids in the input never pick the user.
 
 async function session(): Promise<string> {
   const user = await requireUser();
@@ -29,7 +30,6 @@ async function session(): Promise<string> {
   return user.userId;
 }
 
-/** The learner's local date, from the time-zone cookie. */
 async function today(): Promise<string> {
   return localDate(new Date(), await readTimeZone());
 }
@@ -53,7 +53,10 @@ export async function generateQuestionsAction(kind: Kind): Promise<AiResult<Ques
 }
 
 export async function startPartAction(attemptId: string, input: StartPartInput) {
-  return startPart(await session(), attemptId, input);
+  const userId = await session();
+  const valid = shape(recordingInput.extend({ part: z.string().max(5) }), input);
+  if (!valid) return fail("That request isn't valid. Reload the page and try again.");
+  return startPart(userId, attemptId, valid as StartPartInput);
 }
 
 export async function confirmPartAction(
@@ -61,7 +64,9 @@ export async function confirmPartAction(
   part: Part,
   input: Parameters<typeof confirmPart>[3],
 ): Promise<ActionResult> {
-  return confirmPart(await session(), attemptId, part, input);
+  const userId = await session();
+  if (!shape(confirmInput, input)) return fail("That request isn't valid. Reload the page and try again.");
+  return confirmPart(userId, attemptId, part, input);
 }
 
 export async function transcribePartAction(attemptId: string, part: Part): Promise<ActionResult<{ transcript: string }>> {

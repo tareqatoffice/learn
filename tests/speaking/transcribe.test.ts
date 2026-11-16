@@ -11,6 +11,7 @@ import { resetEnvCache } from "@/lib/env";
 import { SpeakingTake, SpeakingUsage } from "@/models";
 import { SttError } from "@/lib/stt";
 import { transcribeTake } from "@/speaking/transcribe";
+import { MAX_TRANSCRIBE_ATTEMPTS, TRANSCRIBE_ATTEMPTS_MESSAGE } from "@/recording/transcribe";
 import * as r2 from "@/lib/r2";
 import { resetDb } from "../setup/mongo";
 
@@ -51,6 +52,19 @@ describe("transcribeTake", () => {
   });
   afterAll(() => mongoose.disconnect());
 
+  it("transcribes an 'unavailable' take only once speech-to-text is set up (F16)", async () => {
+    const id = await makeTake(user, { transcriptStatus: "unavailable" });
+    vi.stubEnv("CF_AI_TOKEN", "");
+    resetEnvCache();
+    expect((await transcribeTake(user, id, { transcribe: stub("hello") })).ok).toBe(false);
+    vi.stubEnv("R2_ACCOUNT_ID", "acct");
+    vi.stubEnv("CF_AI_TOKEN", "token");
+    resetEnvCache();
+    expect(await transcribeTake(user, id, { transcribe: stub("hello") })).toEqual({ ok: true, transcript: "hello" });
+    expect((await statusOf(id)).transcriptStatus).toBe("done");
+    vi.unstubAllEnvs();
+  });
+
   it("saves the transcript and marks done", async () => {
     const id = await makeTake(user);
     const res = await transcribeTake(user, id, { transcribe: stub("hello") });
@@ -67,16 +81,56 @@ describe("transcribeTake", () => {
     expect(r2.getObjectBytes).toHaveBeenCalledWith("takes/u/v.audio.webm");
   });
 
-  it("marks failed and refunds usage on STT error", async () => {
+  it("marks failed on STT error, refunding only a call that never reached speech-to-text (S4)", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const id = await makeTake(user);
     const res = await transcribeTake(user, id, {
       transcribe: vi.fn(async () => {
-        throw new SttError("boom");
+        throw new SttError("boom", false);
       }),
     });
     expect(res.ok).toBe(false);
     expect((await statusOf(id)).transcriptStatus).toBe("failed");
     expect(await usageCount(user)).toBe(0);
+    await transcribeTake(user, id, {
+      transcribe: vi.fn(async () => {
+        throw new SttError("Speech-to-text failed with status 500");
+      }),
+    });
+    expect(await usageCount(user)).toBe(1);
+    log.mockRestore();
+  });
+
+  it("stops after the attempt cap (S4)", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const id = await makeTake(user, { transcriptStatus: "failed" });
+    const failing = vi.fn(async (): Promise<string> => {
+      throw new SttError("Speech-to-text failed with status 500");
+    });
+    for (let i = 0; i < MAX_TRANSCRIBE_ATTEMPTS; i++) await transcribeTake(user, id, { transcribe: failing });
+    log.mockRestore();
+    expect(failing).toHaveBeenCalledTimes(MAX_TRANSCRIBE_ATTEMPTS);
+    const res = await transcribeTake(user, id, { transcribe: stub() });
+    expect(res).toEqual({ ok: false, errors: { _: TRANSCRIBE_ATTEMPTS_MESSAGE } });
+  });
+
+  it("lets only one of two concurrent requests reach speech-to-text (S4)", async () => {
+    const id = await makeTake(user);
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const slow = vi.fn(async () => {
+      await gate;
+      return "hello";
+    });
+    const first = transcribeTake(user, id, { transcribe: slow });
+    await vi.waitFor(() => expect(slow).toHaveBeenCalledTimes(1));
+    const second = await transcribeTake(user, id, { transcribe: slow });
+    expect(second.ok).toBe(false);
+    release();
+    expect((await first).ok).toBe(true);
+    expect(slow).toHaveBeenCalledTimes(1);
   });
 
   it("logs the STT error without the audio", async () => {
@@ -98,11 +152,15 @@ describe("transcribeTake", () => {
   it("returns the failure even when the refund and the failed-status update throw", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const usageUpdate = vi.spyOn(SpeakingUsage, "updateOne").mockRejectedValueOnce(new Error("db down"));
-    const takeUpdate = vi.spyOn(SpeakingTake, "updateOne").mockRejectedValueOnce(new Error("db down"));
     const id = await makeTake(user);
+    const realUpdate = SpeakingTake.updateOne.bind(SpeakingTake);
+    const takeUpdate = vi
+      .spyOn(SpeakingTake, "updateOne")
+      .mockImplementationOnce(realUpdate as never)
+      .mockRejectedValueOnce(new Error("db down"));
     const res = await transcribeTake(user, id, {
       transcribe: vi.fn(async () => {
-        throw new SttError("boom");
+        throw new SttError("boom", false);
       }),
     });
     expect(res).toEqual({ ok: false, errors: { _: "Couldn't transcribe the recording. Try again." } });

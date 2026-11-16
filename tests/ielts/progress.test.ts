@@ -19,7 +19,6 @@ async function setup(over: Record<string, unknown> = {}, days = 14) {
     TODAY,
   );
   expect(res.ok).toBe(true);
-  // createdAt defaults to the real clock; pin it to the plan's start.
   await IeltsProfile.collection.updateOne({ userId: new Types.ObjectId(u) }, { $set: { createdAt: new Date(`${TODAY}T00:00:00Z`) } });
   const plan = (await currentPlan(u))!;
   return { u, plan };
@@ -57,8 +56,8 @@ describe("ielts progress", () => {
   it("practice minutes capped at 50 %", async () => {
     const { u, plan } = await setup();
     const target = plan.weeks[0].minutes.speaking;
-    await take(u, TODAY, target * 60 * 3); // three times the target
-    await attempt(u, TODAY, { parts: [{ part: "p1", media: media(120) }] }); // 2 min
+    await take(u, TODAY, target * 60 * 3);
+    await attempt(u, TODAY, { parts: [{ part: "p1", media: media(120) }] });
     const p = await weekProgress(u, plan, 0, TZ);
     expect(p.fromPractice).toBeCloseTo(target / 2);
     expect(p.done.speaking).toBeCloseTo(2 + target / 2);
@@ -67,7 +66,7 @@ describe("ielts progress", () => {
   it("practice before profile creation ignored", async () => {
     const { u, plan } = await setup();
     await take(u, "2026-11-10", 600);
-    await take(u, "2026-11-12", 600, false); // not stored
+    await take(u, "2026-11-12", 600, false);
     const p = await weekProgress(u, plan, 0, TZ);
     expect(p.fromPractice).toBe(0);
     await take(u, "2026-11-12", 60);
@@ -86,7 +85,7 @@ describe("ielts progress", () => {
   });
 
   it("non-study day has empty list", async () => {
-    const { u } = await setup({ studyDays: [1, 2, 3, 4, 5] }); // 2026-11-14 is a Saturday
+    const { u } = await setup({ studyDays: [1, 2, 3, 4, 5] });
     expect(await todayList(u, "2026-11-14", TZ)).toEqual([]);
     expect((await todayList(u, "2026-11-13", TZ)).length).toBeGreaterThan(0);
   });
@@ -146,7 +145,7 @@ describe("ielts progress", () => {
 
     it("scales proportionally, floors to 5 and stays within minutesPerDay", async () => {
       const { u, plan } = await setup({ minutesPerDay: 25 });
-      await setWeek(u, plan.version, { listening: 140, reading: 70, writing: 70, speaking: 70 }); // wants 20/10/10/10 = 50
+      await setWeek(u, plan.version, { listening: 140, reading: 70, writing: 70, speaking: 70 });
       const list = await todayList(u, TODAY, TZ);
       const m = Object.fromEntries(list.map((i) => [i.skill, i.minutes]));
       expect(m).toEqual({ listening: 10, reading: 5, writing: 5, speaking: 5 });
@@ -155,7 +154,7 @@ describe("ielts progress", () => {
 
     it("counts a mock's minutes in the cap even when the speaking share is 0", async () => {
       const { u, plan } = await setup({ minutesPerDay: 30 });
-      await setWeek(u, plan.version, { listening: 140, reading: 140, writing: 0, speaking: 0 }, 1); // wants 20/20/0 + 15
+      await setWeek(u, plan.version, { listening: 140, reading: 140, writing: 0, speaking: 0 }, 1);
       const list = await todayList(u, TODAY, TZ);
       expect(list.find((i) => i.skill === "speaking")).toMatchObject({ kind: "mock" });
       expect(list.reduce((s, i) => s + i.minutes, 0)).toBeLessThanOrEqual(30);
@@ -173,14 +172,13 @@ describe("ielts progress", () => {
   it("profile cut-off uses the learner's local day", async () => {
     const { u, plan } = await setup();
     await IeltsPlan.updateOne({ userId: u, version: plan.version }, { $set: { "weeks.0.minutes.speaking": 140 } });
-    // 23:30 UTC on the 12th is already the 13th in Dhaka (UTC+6).
     await IeltsProfile.collection.updateOne({ userId: new Types.ObjectId(u) }, { $set: { createdAt: new Date("2026-11-12T23:30:00Z") } });
     const week = { weeks: [{ ...plan.weeks[0], minutes: { ...plan.weeks[0].minutes, speaking: 140 } }] };
-    await take(u, "2026-11-12", 60); // the UTC day: before the Dhaka cut-off
+    await take(u, "2026-11-12", 60);
     expect((await weekProgress(u, week, 0, "Asia/Dhaka")).fromPractice).toBe(0);
     await take(u, "2026-11-13", 60);
     expect((await weekProgress(u, week, 0, "Asia/Dhaka")).fromPractice).toBe(1);
-    expect((await weekProgress(u, week, 0, "UTC")).fromPractice).toBe(2); // UTC cut-off is the 12th
+    expect((await weekProgress(u, week, 0, "UTC")).fromPractice).toBe(2);
   });
 
   it("focus drill label", async () => {

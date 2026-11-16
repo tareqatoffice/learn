@@ -1,8 +1,3 @@
-/**
- * Loads a full backup or a content export into an EMPTY database, keeping original ids.
- *
- *   npm run restore -- backups/learn-2026-10-19.json
- */
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

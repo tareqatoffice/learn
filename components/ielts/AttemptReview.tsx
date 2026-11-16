@@ -10,6 +10,7 @@ import {
   transcribePartAction,
 } from "@/app/(app)/ielts/speaking/actions";
 import { firstError } from "@/admin/result";
+import { confirm } from "@/components/ConfirmDialog";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import { Notice } from "@/components/Notice";
 import { BodyConsentDialog } from "@/components/speaking/BodyConsentDialog";
@@ -30,7 +31,6 @@ export const KIND_NAME = { mock: "Full mock", part1: "Part 1 drill", part2: "Par
 const card = "grid gap-3 rounded-xl border border-border bg-card p-5";
 const DATE = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" });
 
-/** A saved self-rating has a number for every criterion. */
 function asSelf(raw: Record<string, unknown> | undefined): SelfBands | null {
   if (!raw || !CRITERIA.every((c) => typeof raw[c] === "number")) return null;
   return raw as SelfBands;
@@ -38,11 +38,6 @@ function asSelf(raw: Record<string, unknown> | undefined): SelfBands | null {
 
 type TranscriptState = { status: string; text?: string };
 
-/**
- * One part's transcript. The runner starts transcription in the background after each part is stored. If a
- * part is still "pending" when this page opens (that request didn't finish or failed), this starts it once;
- * a repeat for a part that is already done is refused or refunded server-side.
- */
 function PartTranscript({
   attemptId,
   part,
@@ -174,13 +169,9 @@ function PartCard({
         <ul aria-label="Marked moments" className="flex flex-wrap gap-2">
           {view.markers.map((m, i) => (
             <li key={`${m.atSec}-${i}`}>
-              <button
-                type="button"
-                onClick={() => seek(m.atSec)}
-                className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:py-2.5"
-              >
+              <Button type="button" variant="outline" size="xs" onClick={() => seek(m.atSec)}>
                 <span className="tabular-nums">{clock(m.atSec)}</span> {m.label}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -246,14 +237,9 @@ function EstimateDetails({ ai }: { ai: AiEstimate }) {
 
 type BusyKind = "estimate" | "body" | "consent" | null;
 
-/**
- * One attempt, in a fixed order: playback with transcripts, your own bands, then the AI estimate.
- * The AI section stays hidden until your bands are saved.
- */
 export function AttemptReview({ attempt, aiOn, bodyConsent: initialConsent }: { attempt: AttemptView; aiOn: boolean; bodyConsent: boolean }) {
   const router = useRouter();
   const stored = KIND_PARTS[attempt.kind].flatMap((p) => attempt.parts.filter((v) => v.part === p && v.stored && v.mediaUrl));
-  // Refreshes (after transcription) bring new presigned URLs; keep the first so playback isn't reset.
   const [urls] = useState(() => Object.fromEntries(stored.map((v) => [v.part, v.mediaUrl!])) as Partial<Record<Part, string>>);
   const [transcripts, setTranscripts] = useState<Partial<Record<Part, TranscriptState>>>(() =>
     Object.fromEntries(stored.map((v) => [v.part, { status: v.transcriptStatus, text: v.transcript }])),
@@ -328,7 +314,14 @@ export function AttemptReview({ attempt, aiOn, bodyConsent: initialConsent }: { 
   }
 
   async function remove() {
-    if (!window.confirm("Delete this attempt? Its recordings, ratings and band entries are removed for good.")) return;
+    if (
+      !(await confirm({
+        description: "Delete this attempt? Its recordings, ratings and band entries are removed for good.",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     setDeleting(true);
     setDeleteError("");
     try {

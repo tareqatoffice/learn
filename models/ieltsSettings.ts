@@ -1,6 +1,5 @@
 import mongoose, { Schema, model } from "mongoose";
 
-/** Singleton: plan arithmetic and suggestion thresholds. */
 const ieltsSettingsSchema = new Schema(
   {
     key: { type: String, default: "default", unique: true },

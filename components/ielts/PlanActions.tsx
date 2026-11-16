@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteAllIeltsDataAction, endPlanAction, removeAdjustmentAction } from "@/app/(app)/ielts/actions";
 import { firstError, type ActionResult } from "@/admin/result";
+import { confirm } from "@/components/ConfirmDialog";
 import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 
-/** Runs an action, refreshes the page on success and shows its error otherwise. */
 function useAction(onDone?: (router: ReturnType<typeof useRouter>) => void) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +36,17 @@ export function EndPlanButton({ variant = "outline" }: { variant?: "outline" | "
         variant={variant}
         disabled={pending}
         onClick={() => {
-          if (!window.confirm("End this plan? Your history and band entries stay. You can start a new plan any time.")) return;
-          run(endPlanAction);
+          void (async () => {
+            if (
+              !(await confirm({
+                description: "End this plan? Your history and band entries stay. You can start a new plan any time.",
+                destructive: true,
+              }))
+            ) {
+              return;
+            }
+            run(endPlanAction);
+          })();
         }}
       >
         End this plan
@@ -59,13 +68,18 @@ export function DeleteIeltsDataButton() {
         variant="destructive"
         disabled={pending}
         onClick={() => {
-          if (
-            !window.confirm(
-              "Delete all your IELTS data? Your profile, plans, band entries, study logs and Speaking recordings are removed for good. Speaking Practice is not affected. This cannot be undone.",
-            )
-          )
-            return;
-          run(deleteAllIeltsDataAction);
+          void (async () => {
+            if (
+              !(await confirm({
+                description:
+                  "Delete all your IELTS data? Your profile, plans, band entries, study logs and Speaking recordings are removed for good. Speaking Practice is not affected. This cannot be undone.",
+                destructive: true,
+              }))
+            ) {
+              return;
+            }
+            run(deleteAllIeltsDataAction);
+          })();
         }}
       >
         Delete my IELTS data
@@ -75,7 +89,6 @@ export function DeleteIeltsDataButton() {
   );
 }
 
-/** Removes one standing change from the plan (a new plan version). */
 export function RemoveAdjustmentButton({ id, label }: { id: string; label: string }) {
   const { run, error, pending } = useAction();
   return (

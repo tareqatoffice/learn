@@ -3,9 +3,11 @@ import { getEnv } from "@/lib/env";
 const MODEL = "@cf/openai/whisper-large-v3-turbo";
 
 export class SttError extends Error {
-  constructor(message: string) {
+  readonly reached: boolean;
+  constructor(message: string, reached = true) {
     super(message);
     this.name = "SttError";
+    this.reached = reached;
   }
 }
 
@@ -33,7 +35,7 @@ export async function transcribe(
       body: JSON.stringify({ audio: Buffer.from(audio).toString("base64") }),
     });
   } catch (error) {
-    throw new SttError(`Speech-to-text request failed: ${(error as Error).message}`);
+    throw new SttError(`Speech-to-text request failed: ${(error as Error).message}`, false);
   }
   if (!res.ok) throw new SttError(`Speech-to-text failed with status ${res.status}`);
   const data = (await res.json().catch(() => null)) as { result?: { text?: unknown } } | null;

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { connectDb, retryOnDuplicateKey } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { isAdminEmail } from "@/lib/authz";
+import { isLocalMongoUri } from "@/lib/mongoUri";
 import { User } from "@/models";
 
 type Provider = NonNullable<NextAuthConfig["providers"]>[number];
@@ -16,10 +17,6 @@ export interface SignInProfile {
   picture?: string;
 }
 
-/**
- * Creates or updates the user document and records the login time and role. A first sign-in is an
- * access request: the new user starts "pending" until an admin approves it (admins start approved).
- */
 export async function upsertUserOnSignIn(
   profile: SignInProfile,
 ): Promise<{ userId: string; role: "user" | "admin" }> {
@@ -34,8 +31,6 @@ export async function upsertUserOnSignIn(
     role,
     lastLoginAt: new Date(),
   };
-  // Match the Google subject first, then fall back to the email (first login after a dev login).
-  // Two first sign-ins racing on the unique email: the loser's retry updates the winner's doc.
   const doc =
     (await User.findOneAndUpdate({ googleId: profile.sub }, { $set: fields }, { returnDocument: "after" })) ??
     (await retryOnDuplicateKey(() =>
@@ -48,7 +43,19 @@ export async function upsertUserOnSignIn(
   return { userId: String(doc._id), role };
 }
 
-/** Email drives admin rights and account linking, so Google must vouch for it. */
+export const EMAIL_IN_USE_ERROR = "email-in-use";
+
+export async function emailTakenByAnother(profile: { sub?: string; email?: string }): Promise<boolean> {
+  if (!profile.sub || !profile.email) return false;
+  await connectDb();
+  const email = profile.email.trim().toLowerCase();
+  const [linked, owner] = await Promise.all([
+    User.findOne({ googleId: profile.sub }, { _id: 1 }).lean<{ _id: unknown }>(),
+    User.findOne({ email }, { _id: 1 }).lean<{ _id: unknown }>(),
+  ]);
+  return Boolean(linked && owner && String(linked._id) !== String(owner._id));
+}
+
 export function isSignInAllowed({
   account,
   profile,
@@ -66,8 +73,7 @@ export function getProviders(): Provider[] {
   const providers: Provider[] = [
     Google({ clientId: env.AUTH_GOOGLE_ID, clientSecret: env.AUTH_GOOGLE_SECRET }),
   ];
-  // Local testing only: never available in production builds.
-  if (process.env.NODE_ENV === "development" && env.AUTH_DEV_LOGIN) {
+  if (process.env.NODE_ENV === "development" && env.AUTH_DEV_LOGIN && isLocalMongoUri(env.MONGODB_URI)) {
     providers.push(
       Credentials({
         id: "credentials",
@@ -85,12 +91,17 @@ export function getProviders(): Provider[] {
   return providers;
 }
 
-// Lazy config: getEnv() must not run at import time (e.g. during `next build`).
 export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
   providers: getProviders(),
   session: { strategy: "jwt" as const },
   callbacks: {
-    signIn: ({ account, profile }) => isSignInAllowed({ account, profile }),
+    async signIn({ account, profile }) {
+      if (!isSignInAllowed({ account, profile })) return false;
+      if (account?.provider === "google" && (await emailTakenByAnother({ sub: profile?.sub ?? undefined, email: profile?.email ?? undefined }))) {
+        return `/?error=${EMAIL_IN_USE_ERROR}`;
+      }
+      return true;
+    },
     async jwt({ token, account, profile, user }) {
       if (account) {
         const email = (profile?.email ?? user?.email ?? token.email) as string | undefined;
@@ -109,7 +120,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
       return token;
     },
     session({ session, token }) {
-      // Admin status is recomputed on every request, not stored in the 30-day JWT.
       session.user = {
         ...session.user,
         id: (token.userId as string | undefined) ?? "",

@@ -1,11 +1,8 @@
-// Canonical (pulled) question-book format: `<!-- learn:book|part|question|answer|extra … -->` markers,
-// each followed by its heading; the markers alone decide what every line belongs to.
 import { slugify } from "@/lib/ids";
 import { HEADING, PUZZLE_QUESTION, unaccountedLine, type Item, type Structure } from "./shared";
 
 const MARKER = /^<!--\s*learn:(book|part|question|answer|extra)\b(.*?)-->\s*$/;
 
-/** True when the book carries `<!-- learn:… -->` markers outside code fences. */
 export function isCanonical(lines: string[], outside: boolean[]): boolean {
   return lines.some((line, i) => outside[i] && MARKER.test(line));
 }
@@ -21,11 +18,9 @@ export function parseCanonical(lines: string[], outside: boolean[]): Structure {
   });
   const markLines = new Set(marks.map((m) => m.line));
   const unaccounted: Structure["unaccounted"] = [];
-  // Marker lines inside a segment are never content: a stray one is reported, a used one is a boundary.
   const used = new Set<number>();
   const text = (from: number, to: number) =>
     lines.slice(from, to).filter((_, k) => !markLines.has(from + k)).join("\n").trim();
-  // The heading right after a marker (blank lines allowed in between), if there is one.
   const takeHeading = (from: number, to: number) => {
     let i = from;
     while (i < to && !lines[i].trim()) i++;
@@ -38,7 +33,6 @@ export function parseCanonical(lines: string[], outside: boolean[]): Structure {
   const bookEnd = structural.length ? structural[0].line : lines.length;
   const bookStart = bookMark && bookMark.line < bookEnd ? bookMark.line + 1 : 0;
   if (bookStart > 0) used.add(bookStart - 1);
-  // Nothing may precede the book marker.
   for (let i = 0; i < bookStart - 1; i++) if (lines[i].trim()) unaccounted.push(unaccountedLine(lines, i));
   const head = takeHeading(bookStart, bookEnd);
   const titled = head.level === 1;

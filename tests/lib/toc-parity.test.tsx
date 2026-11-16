@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Markdown } from "@/lib/markdown/Markdown";
@@ -31,7 +30,7 @@ describe("extractToc parity with <Markdown>", () => {
     const rendered = [...container.querySelectorAll("h2, h3")].map((h) => ({
       depth: Number(h.tagName[1]),
       text: h.textContent,
-      anchor: h.id,
+      anchor: h.id.replace(/^h-/, ""),
     }));
     const toc = extractToc(doc);
     expect(toc).toEqual(rendered);

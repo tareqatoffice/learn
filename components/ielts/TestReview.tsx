@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils";
 
 const mmss = (s: number) => `${Math.floor(s / 60)} min ${s % 60} s`;
 
-/** The marked attempt: score, approximate band for a full 40-question test, and every question with its key. */
 export function TestReview({ view }: { view: ReviewView }) {
   const router = useRouter();
   const del = useAdminAction();

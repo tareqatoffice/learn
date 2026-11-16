@@ -9,7 +9,6 @@ export type RecorderState =
 export type RecorderResult = {
   blob: Blob;
   audioBlob?: Blob;
-  /** Base mime type (no codecs), the form the upload URL is signed for. */
   mime: string;
   audioMime?: string;
   durationSec: number;
@@ -49,11 +48,6 @@ function makeTake(
   return take;
 }
 
-/**
- * Records a speaking take with MediaRecorder (audio, or camera + mic with a parallel audio-only
- * recording for transcription). `start` must be called from a user gesture (iOS Safari). The take
- * stops at `capSec`, and also when the page is hidden or locked, keeping what was recorded.
- */
 export function useRecorder({
   kind,
   capSec,
@@ -181,7 +175,7 @@ export function useRecorder({
           : { audio: true },
       );
     } catch (e) {
-      if (myAsk !== askId.current) return; // cancelled while asking
+      if (myAsk !== askId.current) return;
       asking.current = false;
       if (!mounted.current) return;
       setError(errorMessage(e));
@@ -189,7 +183,6 @@ export function useRecorder({
       return;
     }
     if (myAsk !== askId.current) {
-      // reset() or a page hide happened while the permission prompt was open.
       media.getTracks().forEach((t) => t.stop());
       return;
     }
@@ -215,7 +208,6 @@ export function useRecorder({
         main.current = makeTake(media, mime, { audioBitsPerSecond: AUDIO_BPS });
         side.current = null;
       }
-      // The recorder can end on its own (mic unplugged, permission revoked, iOS audio interruption).
       main.current.recorder.onerror = () => finish();
       for (const t of [main.current, side.current]) {
         if (t) t.recorder.onstop = () => finish();
@@ -262,7 +254,6 @@ export function useRecorder({
     askId.current++;
     asking.current = false;
     if (main.current) {
-      // Discard an in-flight take without producing a result.
       finishing.current = true;
       clearTimers();
       main.current.recorder.ondataavailable = null;
@@ -271,7 +262,6 @@ export function useRecorder({
         try {
           if (t && t.recorder.state !== "inactive") t.recorder.stop();
         } catch {
-          // already stopped
         }
       }
       main.current = null;
@@ -285,7 +275,6 @@ export function useRecorder({
     setState("idle");
   }, []);
 
-  // A locked or backgrounded page may be suspended and its recorder cut off: stop now, keep the data.
   useEffect(() => {
     const onHidden = () => {
       if (document.visibilityState === "hidden") stop();
@@ -310,7 +299,6 @@ export function useRecorder({
         try {
           if (t.recorder.state !== "inactive") t.recorder.stop();
         } catch {
-          // already stopped
         }
       }
       main.current = null;

@@ -8,19 +8,13 @@ const messageSchema = new Schema(
   { _id: false },
 );
 
-/**
- * A follow-up chat with the quiz coach about one card. The server keeps the history, so the model
- * only ever sees assistant turns it wrote itself. Conversations expire a week after their last turn.
- */
 const aiConversationSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     sessionId: { type: Schema.Types.ObjectId, ref: "QuizSession", required: true },
     questionId: { type: Schema.Types.ObjectId, ref: "Question", required: true },
-    /** The learner's typed answer to the card, if any. */
     answer: { type: String, default: "" },
     messages: { type: [messageSchema], default: [] },
-    /** The grade, when the conversation was opened by grading the answer. */
     feedback: {
       type: new Schema(
         {

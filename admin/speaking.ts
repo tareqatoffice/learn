@@ -3,7 +3,7 @@ import { Types } from "mongoose";
 import { z } from "zod";
 import { type ActionResult, fail, ok } from "@/admin/result";
 import { AUDIO_EXT } from "@/lib/audioTypes";
-import { connectDb } from "@/lib/db";
+import { connectDb, inTransaction } from "@/lib/db";
 import { deleteObjects, headObject, presignPut, storageConfigured } from "@/lib/r2";
 import { SpeakingLesson } from "@/models";
 import { STATUSES } from "@/models/status";
@@ -86,7 +86,6 @@ export async function updateLesson(id: string, input: LessonInput): Promise<Acti
   return res.matchedCount ? ok() : fail(NOT_FOUND);
 }
 
-/** Removes the lesson and its audio. Users' takes and day plans are left alone. */
 export async function deleteLesson(id: string): Promise<ActionResult> {
   if (!isId(id)) return fail(NOT_FOUND);
   await connectDb();
@@ -97,7 +96,6 @@ export async function deleteLesson(id: string): Promise<ActionResult> {
     try {
       await deleteObjects([key]);
     } catch {
-      // The lesson is gone; an orphaned audio file is harmless.
     }
   }
   return ok();
@@ -113,10 +111,15 @@ export async function moveLesson(id: string, dir: "up" | "down"): Promise<Action
     .sort({ order: up ? -1 : 1 })
     .lean<{ _id: Types.ObjectId; order: number }>();
   if (!neighbour) return ok();
-  await SpeakingLesson.bulkWrite([
-    { updateOne: { filter: { _id: id }, update: { $set: { order: neighbour.order } } } },
-    { updateOne: { filter: { _id: neighbour._id }, update: { $set: { order: lesson.order } } } },
-  ]);
+  await inTransaction((session) =>
+    SpeakingLesson.bulkWrite(
+      [
+        { updateOne: { filter: { _id: id }, update: { $set: { order: neighbour.order } } } },
+        { updateOne: { filter: { _id: neighbour._id }, update: { $set: { order: lesson.order } } } },
+      ],
+      { session },
+    ),
+  );
   return ok();
 }
 
@@ -135,7 +138,6 @@ export async function startLessonAudioUpload(
   if (!(await SpeakingLesson.exists({ _id: id }))) return fail(NOT_FOUND);
   const ext = AUDIO_EXT[type] ?? "audio";
   const key = `lessons/${id}/${randomBytes(12).toString("hex")}.${ext}`;
-  // The length is signed, so R2 refuses an upload of any other size (the 50 MB cap can't be dodged).
   return ok({ uploadUrl: await presignPut(key, type, size), key });
 }
 
@@ -155,7 +157,6 @@ export async function confirmLessonAudio(id: string, key: string, durationSec: n
     try {
       await deleteObjects([key]);
     } catch {
-      // Orphaned file only.
     }
     return fail("Audio can be 50 MB at most.");
   }
@@ -165,7 +166,6 @@ export async function confirmLessonAudio(id: string, key: string, durationSec: n
     try {
       await deleteObjects([previous]);
     } catch {
-      // Orphaned file only.
     }
   }
   return ok();

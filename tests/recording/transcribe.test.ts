@@ -56,7 +56,6 @@ describe("recording transcription", () => {
     const t = stub();
     const uid = String(legacyUserId);
     await mongoose.connection.collection("speakingtakes").insertOne({ ...legacyTake, transcriptStatus: "pending" });
-    // One call from the IELTS-style path, one from Speaking Practice: same user, same counter.
     expect((await transcribeMedia(uid, media, { transcribe: t })).ok).toBe(true);
     expect((await transcribeTake(uid, String(legacyTakeId), { transcribe: t })).ok).toBe(true);
     const res = await transcribeMedia(uid, media, { transcribe: t });
@@ -65,16 +64,22 @@ describe("recording transcription", () => {
     expect(await usageCount(uid)).toBe(2);
   });
 
-  it("refunds on an STT error", async () => {
+  it("refunds when speech-to-text never answered, but not once it did (S4)", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await transcribeMedia(user, media, {
       transcribe: vi.fn(async () => {
         expect(await usageCount(user)).toBe(1);
-        throw new SttError("boom");
+        throw new SttError("network down", false);
       }),
     });
     expect(res).toEqual({ ok: false, errors: { _: "Couldn't transcribe the recording. Try again." } });
     expect(await usageCount(user)).toBe(0);
+    await transcribeMedia(user, media, {
+      transcribe: vi.fn(async () => {
+        throw new SttError("Speech-to-text failed with status 500");
+      }),
+    });
+    expect(await usageCount(user)).toBe(1);
     log.mockRestore();
   });
 
@@ -90,7 +95,7 @@ describe("recording transcription", () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await transcribeMedia(user, media, {
       transcribe: vi.fn(async () => {
-        throw new SttError("boom");
+        throw new SttError("boom", false);
       }),
       onError: async () => {
         throw new Error("db down");

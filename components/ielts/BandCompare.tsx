@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils";
 export const PRONUNCIATION_NOTE =
   "Estimated from the transcript only — the AI can't hear your accent or sounds. Your recording is kept so a later version can check pronunciation from audio.";
 
-/** A gap this big between your band and the AI's is called out. */
 const DIFFERS_BY = 1;
 
 type Ai = { bands: Record<Criterion, number>; overall: number };
@@ -15,10 +14,6 @@ const Estimate = ({ value }: { value: number }) => (
   </>
 );
 
-/**
- * Your bands next to the AI's, criterion by criterion. Every AI band is labelled an estimate;
- * a difference of 1.0 or more is highlighted; Pronunciation is greyed because the AI only saw a transcript.
- */
 export function BandCompare({ self, ai }: { self: Record<Criterion, number>; ai: Ai }) {
   const mine = speakingBand(self);
   const rows = [

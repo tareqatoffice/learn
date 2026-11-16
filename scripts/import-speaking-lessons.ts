@@ -1,12 +1,3 @@
-/**
- * Inserts drafted speaking lessons (from notes and interview questions) as `draft` SpeakingLessons.
- * Dry run by default; nothing is written without --write. Lessons are matched by title, so
- * re-running skips ones that already exist. New lessons get an `order` after the current highest.
- *
- *   npx tsx scripts/import-speaking-lessons.ts                       # dry run
- *   npx tsx scripts/import-speaking-lessons.ts --write               # insert drafts
- *   npx tsx scripts/import-speaking-lessons.ts --file other.json     # another input file
- */
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

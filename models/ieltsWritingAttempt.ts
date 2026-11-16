@@ -28,7 +28,6 @@ const taskSchema = new Schema(
   { _id: false },
 );
 
-/** A Writing drill (one task) or full test (both), with the learner's text and ratings. */
 const ieltsWritingAttemptSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
