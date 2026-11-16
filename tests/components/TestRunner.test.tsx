@@ -67,6 +67,13 @@ describe("TestRunner", () => {
     await waitFor(() => expect(saveAnswersAction).toHaveBeenCalledWith("a1", { "1": "cat" }), { timeout: 3000 });
   });
 
+  it("says why when the server refuses an autosave (U5)", async () => {
+    saveAnswersAction.mockResolvedValue({ ok: false, errors: { _: "Time is up for this test, so new answers aren't saved. Submit to see your score." } });
+    render(<TestRunner view={view()} />);
+    await userEvent.type(screen.getByLabelText("Answer to question 1"), "cat");
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/Time is up/), { timeout: 3000 });
+  });
+
   it("retries a save that failed, so answers are not left only in memory", async () => {
     saveAnswersAction.mockRejectedValueOnce(new Error("offline")).mockResolvedValue({ ok: true });
     render(<TestRunner view={view()} />);

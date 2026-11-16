@@ -124,6 +124,7 @@ export function TestRunner({ view }: { view: RunView }) {
   const [answers, setAnswers] = useState<Record<string, string>>(view.answers);
   const [index, setIndex] = useState(0);
   const dirty = useRef<Record<string, string>>({});
+  const [saveError, setSaveError] = useState("");
   const [retry, setRetry] = useState(0);
   const full = view.scope === "full";
   const deadline = new Date(view.startedAt).getTime() + view.limitSec * 1000;
@@ -177,11 +178,17 @@ export function TestRunner({ view }: { view: RunView }) {
     const batch = dirty.current;
     if (!Object.keys(batch).length) return;
     dirty.current = {};
-    saveAnswersAction(view.id, batch).catch(() => {
-      // Keep the answers and try again shortly; a newer value for the same question wins.
-      dirty.current = { ...batch, ...dirty.current };
-      setTimeout(() => setRetry((n) => n + 1), RETRY_MS);
-    });
+    saveAnswersAction(view.id, batch)
+      .then((res) => {
+        // Refused (time is up, already submitted): retrying won't help, so say why instead.
+        if (!res.ok) setSaveError(res.errors._ ?? "Your answers aren't being saved. Submit, or reload the page.");
+        else setSaveError("");
+      })
+      .catch(() => {
+        // Keep the answers and try again shortly; a newer value for the same question wins.
+        dirty.current = { ...batch, ...dirty.current };
+        setTimeout(() => setRetry((n) => n + 1), RETRY_MS);
+      });
   }, [view.id]);
 
   useEffect(() => {
@@ -230,6 +237,11 @@ export function TestRunner({ view }: { view: RunView }) {
         </span>
       </div>
       <ActionStatus saved={false} errors={errors} />
+      {saveError && (
+        <p role="alert" className="text-sm text-destructive">
+          {saveError}
+        </p>
+      )}
       {left !== null && left <= 0 && !full && <p role="status" className="text-sm text-muted-foreground">Time is up for this section. You can keep going, then submit.</p>}
 
       {view.sections.length > 1 && (

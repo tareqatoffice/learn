@@ -24,6 +24,7 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
   const [active, setActive] = useState(0);
   const { run, pending, errors } = useAdminAction();
   const dirty = useRef(new Set<number>());
+  const [saveError, setSaveError] = useState("");
   const latest = useRef({ texts, secs });
   useEffect(() => {
     latest.current = { texts, secs };
@@ -39,10 +40,16 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
   const flush = useCallback(() => {
     for (const i of [...dirty.current]) {
       dirty.current.delete(i);
-      saveWritingTextAction(view.id, i, latest.current.texts[i], latest.current.secs[i]).catch(() => {
-        dirty.current.add(i);
-        setTimeout(() => setRetry((n) => n + 1), RETRY_MS);
-      });
+      saveWritingTextAction(view.id, i, latest.current.texts[i], latest.current.secs[i])
+        .then((res) => {
+          // Refused (submitted elsewhere, gone): retrying won't help, so say why instead.
+          if (!res.ok) setSaveError(res.errors._ ?? "Your text isn't being saved. Reload the page.");
+          else setSaveError("");
+        })
+        .catch(() => {
+          dirty.current.add(i);
+          setTimeout(() => setRetry((n) => n + 1), RETRY_MS);
+        });
     }
   }, [view.id]);
 
@@ -116,6 +123,11 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
         </span>
       </div>
       <ActionStatus saved={false} errors={errors} />
+      {saveError && (
+        <p role="alert" className="text-sm text-destructive">
+          {saveError}
+        </p>
+      )}
 
       {view.tasks.length > 1 && (
         <div role="tablist" aria-label="Tasks" className="flex gap-2">
