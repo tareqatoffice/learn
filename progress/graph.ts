@@ -107,7 +107,7 @@ export async function getGraphProgress(
     visibleIds ??
     (await GraphNode.find(await visibleNodeFilter(graphId), { _id: 1 }).lean<{ _id: Types.ObjectId }[]>()).map((n) => n._id);
   const rows = await NodeProgress.find(
-    { userId, nodeId: { $in: ids } },
+    { userId, graphId, nodeId: { $in: ids } },
     { nodeId: 1, status: 1 },
   ).lean<{ nodeId: Types.ObjectId; status: "learning" | "done" }[]>();
   return Object.fromEntries(rows.map((row) => [String(row.nodeId), row.status]));

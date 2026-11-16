@@ -9,7 +9,8 @@ import type { BodyFeedback, SpeechFeedback } from "@/speaking/coach";
 import { BodyConsentDialog } from "./BodyConsentDialog";
 import type { SelfRating } from "./SelfRatingForm";
 
-export type CoachAi = { speech?: Partial<SpeechFeedback>; body?: Partial<BodyFeedback> };
+/** `model` is the AI model that wrote the last stored feedback. */
+export type CoachAi = { speech?: Partial<SpeechFeedback>; body?: Partial<BodyFeedback>; model?: string };
 
 function List({ title, items }: { title: string; items?: string[] }) {
   if (!items?.length) return null;
@@ -176,6 +177,7 @@ export function CoachPanel({
         </div>
       )}
       {error && <Notice>{error}</Notice>}
+      {ai.model && (ai.speech || ai.body) && <p className="text-xs text-muted-foreground">Feedback written by {ai.model}.</p>}
 
       {ai.speech && (
         <section aria-label="Speech feedback" className="grid gap-3 rounded-lg border border-border p-4">

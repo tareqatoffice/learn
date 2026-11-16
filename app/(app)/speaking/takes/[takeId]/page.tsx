@@ -57,6 +57,7 @@ export default async function TakePage({ params }: PageProps<"/speaking/takes/[t
         <p className="mt-1 text-sm text-muted-foreground">
           {TASK_LABEL[take.task]} · {DATE.format(new Date(`${take.date}T00:00:00Z`))} · {clock(take.durationSec)} ·{" "}
           {take.kind === "video" ? "video" : "audio"}
+          {take.size ? ` · ${(take.size / 1_000_000).toFixed(1)} MB` : ""}
         </p>
       </div>
       <TakeReview take={take} aiOn={ai.settings.active} bodyConsent={settings.bodyConsent} />
