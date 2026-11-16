@@ -383,7 +383,7 @@ async function ieltsArea(userId: Id, w: Window) {
     history: history
       .sort(newestFirst)
       .slice(0, HISTORY_MAX)
-      .map(({ at: _at, ...item }) => item),
+      .map((item): AttemptHistoryItem => ({ id: item.id, date: item.date, area: item.area, kind: item.kind, done: item.done, href: item.href, ...(item.band !== undefined ? { band: item.band } : {}) })),
     bands: bands.map((b) => ({ date: b.date, source: b.source, bands: b.bands ?? {}, ...(b.overall !== undefined ? { overall: b.overall } : {}) })),
   };
 }
