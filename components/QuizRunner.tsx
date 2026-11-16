@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import {
   askFollowUpAction,
   finishQuizAction,
@@ -15,7 +15,6 @@ import type { SessionView } from "@/progress/quiz";
 /** Connects a quiz session to the Server Actions; the card itself only knows callbacks. */
 export function QuizRunner({ initial, aiEnabled = false }: { initial: SessionView; aiEnabled?: boolean }) {
   const [view, setView] = useState(initial);
-  const [, startTransition] = useTransition();
 
   async function onResult(result: MarkResult, attempt?: QuizAttempt): Promise<SessionView> {
     if (!view.current) return view;
@@ -24,11 +23,10 @@ export function QuizRunner({ initial, aiEnabled = false }: { initial: SessionVie
     return next;
   }
 
-  function onFinish() {
-    startTransition(async () => {
-      await finishQuizAction(view.sessionId);
-      setView((v) => ({ ...v, done: true, current: null }));
-    });
+  // Rejections reach the card, which says the end wasn't saved.
+  async function onFinish() {
+    await finishQuizAction(view.sessionId);
+    setView((v) => ({ ...v, done: true, current: null }));
   }
 
   const coach: QuizCoach | undefined = aiEnabled

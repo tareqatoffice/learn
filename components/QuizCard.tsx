@@ -18,7 +18,8 @@ export type QuizCardProps = {
   view: SessionView;
   /** Records the mark (with the learner's answer, if any) and resolves with the session as it now stands. */
   onResult: (result: MarkResult, attempt?: QuizAttempt) => Promise<SessionView>;
-  onFinish: () => void;
+  /** Ends the quiz early; rejects when the end could not be saved. */
+  onFinish: () => Promise<void>;
   /** The AI coach (OpenRouter); without it the card is a plain flashcard. */
   coach?: QuizCoach;
 };
@@ -68,6 +69,10 @@ export function QuizCard({ view, onResult, onFinish, coach }: QuizCardProps) {
 
 function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card: Card }) {
   const [revealed, setRevealed] = useState(false);
+  const revealedRef = useRef(false);
+  useEffect(() => {
+    revealedRef.current = revealed;
+  }, [revealed]);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const [answer, setAnswer] = useState("");
@@ -76,6 +81,31 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
   const spoken = useRef(false);
   const answerRef = useRef("");
   const [grade, setGrade] = useState<AiGrade | null>(null);
+  const [ending, setEnding] = useState(false);
+  const [endFailed, setEndFailed] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+
+  // After a mark the old card's buttons are gone; put focus on the new question so keyboard and
+  // screen-reader users carry on from it (the first card keeps the page's natural focus).
+  useEffect(() => {
+    if (view.position > 0) heading.current?.focus();
+    // Only on mount: each card is its own instance.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function end() {
+    const left = view.total - view.position;
+    if (!window.confirm(`End the quiz now? ${left} card${left === 1 ? "" : "s"} won't be shown; your marks so far are kept.`)) return;
+    setEnding(true);
+    setEndFailed(false);
+    try {
+      await onFinish();
+    } catch {
+      setEndFailed(true);
+    } finally {
+      setEnding(false);
+    }
+  }
 
   function changeAnswer(value: string, source: "typed" | "voice") {
     // Clearing the box starts the answer over, so its mode counts only what is there now.
@@ -151,6 +181,8 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
       }
       const result = KEYS[e.key.toLowerCase()];
       if (!result) return;
+      // Got it / Review judge an answer, so their keys wait for the reveal; Skip works any time.
+      if (result !== "skip" && !revealedRef.current) return;
       e.preventDefault();
       void mark(result);
     }
@@ -172,7 +204,7 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
         <div className="h-full bg-ok" style={{ width: `${(view.position / Math.max(view.total, 1)) * 100}%` }} />
       </div>
 
-      <h1 className="mt-5 text-xl font-semibold leading-snug">
+      <h1 ref={heading} tabIndex={-1} className="mt-5 text-xl font-semibold leading-snug focus-visible:outline-none">
         <Markdown source={card.question} inline />
       </h1>
       {card.prompt && (
@@ -181,7 +213,8 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
         </div>
       )}
 
-      {!revealed && (
+      {/* With the coach on, the answer box stays after the reveal so the answer can still be checked. */}
+      {(!revealed || (coach && !grade)) && (
         <div className="mt-4">
           <AnswerBox
             value={answer}
@@ -195,7 +228,7 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
       )}
 
       <div aria-live="polite" className="mt-4 grid gap-4">
-        {revealed && answer.trim() && !feedback && (
+        {revealed && !coach && answer.trim() && !feedback && (
           <div className="rounded-lg border border-dashed border-border p-3 text-sm">
             <p className="text-muted-foreground">Your answer</p>
             <p className="mt-1 whitespace-pre-wrap">{answer}</p>
@@ -270,10 +303,12 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
 
       {failed && <Notice className="mt-3">Could not save that answer. Try again.</Notice>}
 
+      {endFailed && <Notice className="mt-3">Could not end the quiz. Try again.</Notice>}
+
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
-        <span>{coach ? "Ctrl+Enter checks your answer." : ""}</span>
-        <Button type="button" variant="ghost" size="sm" onClick={onFinish}>
-          End quiz
+        <span>{coach ? "Ctrl+Enter checks your answer. G and R work once the answer is shown." : "G and R work once the answer is shown."}</span>
+        <Button type="button" variant="ghost" size="sm" disabled={ending || pending} onClick={() => void end()}>
+          {ending ? "Ending…" : "End quiz"}
         </Button>
       </div>
     </section>
