@@ -7,8 +7,9 @@ const nextConfig: NextConfig = {
     return [{ source: "/:path*", headers: STATIC_SECURITY_HEADERS }];
   },
   experimental: {
-    // Admin "Import markdown" posts whole books and note series through Server Actions (default limit 1 MB).
-    serverActions: { bodySizeLimit: "10mb" },
+    // Whole-book imports go to /api/admin/import with their own limit. 2 MB (not the 1 MB default) fits
+    // the largest action body: Speaking body-language feedback sends up to six 200 KB video stills.
+    serverActions: { bodySizeLimit: "2mb" },
   },
   turbopack: {
     rules: {

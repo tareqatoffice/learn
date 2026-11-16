@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { commitImportAction, previewImportAction, type ImportInput } from "@/app/(app)/admin/import/actions";
+import type { ImportInput } from "@/admin/import";
 import { inputClass } from "@/components/admin/SaveBar";
 import { SubjectPicker } from "@/components/SubjectPicker";
 import { Button } from "@/components/ui/button";
@@ -62,7 +62,17 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
       setError(null);
       const input = build();
       if (typeof input === "string") return setError(input);
-      const r = await (commit ? commitImportAction(input) : previewImportAction(input));
+      let r: ImportReport | { error: string };
+      try {
+        const res = await fetch("/api/admin/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ input, dryRun: !commit }),
+        });
+        r = (await res.json().catch(() => ({ error: `The import failed (${res.status}). Try again.` }))) as typeof r;
+      } catch {
+        return setError("The import didn't reach the server. Check your connection and try again.");
+      }
       if ("error" in r) return setError(r.error);
       setReport(r);
       setPreviewClean(!commit && !r.errors.length);

@@ -137,6 +137,14 @@ describe("content API tokens", () => {
     expect((await res.json()).errors).toEqual(["target not found"]);
   });
 
+  it("refuses an import body over the size limit before reading it (S9)", async () => {
+    const { token: t } = await token();
+    const res = await importContent(
+      new Request(`${URL_BASE}/api/content/import`, { method: "POST", headers: { ...auth(t), "Content-Length": "20000000" }, body: importBody() }),
+    );
+    expect(res.status).toBe(413);
+  });
+
   it("rejects a malformed body", async () => {
     const { token: t } = await token();
     const res = await importContent(new Request(`${URL_BASE}/api/content/import`, { method: "POST", headers: auth(t), body: "{" }));

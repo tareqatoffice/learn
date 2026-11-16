@@ -11,7 +11,11 @@ export const importFields = {
   source: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("book"), markdown: z.string().max(MAX_TEXT) }),
     z.object({ kind: z.literal("series"), files: z.array(z.object({ name: z.string().max(200), content: z.string().max(MAX_TEXT) })).max(500) }),
-    z.object({ kind: z.literal("graph"), json: z.unknown() }),
+    z.object({
+      kind: z.literal("graph"),
+      // Validated in detail by parseGraph; capped here so a huge value is refused up front.
+      json: z.unknown().refine((v) => (JSON.stringify(v) ?? "").length <= MAX_TEXT, "The graph JSON is too large"),
+    }),
   ]),
   title: z.string().max(200).optional(),
   /** Applied when the import creates the target; its new items inherit them. */

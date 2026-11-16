@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { runImport } from "@/content/import/run";
 import { importFields } from "@/content/import/schema";
+import { BodyError, IMPORT_BODY_MAX, readJsonBody } from "@/lib/jsonBody";
 import { withToken } from "@/lib/tokenAuth";
 import { issuesMessage } from "@/lib/zod";
 
@@ -15,8 +16,9 @@ export function POST(req: Request): Promise<Response> {
   return withToken(req, async (token) => {
     let parsed: z.infer<typeof body>;
     try {
-      parsed = body.parse(await req.json());
+      parsed = body.parse(await readJsonBody(req, IMPORT_BODY_MAX));
     } catch (error) {
+      if (error instanceof BodyError) return Response.json({ error: error.message }, { status: error.status });
       const message =
         error instanceof z.ZodError
           ? issuesMessage(error)
