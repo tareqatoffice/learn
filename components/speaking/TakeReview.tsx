@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { deleteTakeAction, takeMediaUrlsAction, transcribeTakeAction } from "@/app/(app)/speaking/actions";
 import { firstError } from "@/admin/result";
+import { confirm } from "@/components/ConfirmDialog";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
@@ -133,7 +134,14 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
   const reference = take.task === "recordReview" ? take.material.prompt : take.material.text;
 
   async function remove() {
-    if (!window.confirm("Delete this recording? The video or audio and its ratings are removed for good.")) return;
+    if (
+      !(await confirm({
+        description: "Delete this recording? The video or audio and its ratings are removed for good.",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     setDeleting(true);
     setDeleteError("");
     try {

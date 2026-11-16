@@ -3,7 +3,7 @@
 import { BookOpen, MessagesSquare, Network, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { toast } from "@/components/Toast";
+import { toast } from "sonner";
 import type { SearchHit } from "@/content/queries/search";
 import { lockPageScroll } from "@/lib/scrollLock";
 import { SEARCH_EVENT } from "@/lib/searchBus";
@@ -111,7 +111,7 @@ export function CommandPalette() {
         if ((e as Error).name === "AbortError") return;
         // Recorded against this term too, so the list stops saying it is still searching.
         setResult({ term: trimmed, hits: [], failed: true });
-        toast("Search is not answering. Try again in a moment.", "error");
+        toast.error("Search is not answering. Try again in a moment.");
       }
     }, DEBOUNCE_MS);
     return () => {

@@ -14,6 +14,12 @@ const { deleteTestAttemptAction, push } = vi.hoisted(() => ({ deleteTestAttemptA
 vi.mock("@/app/(app)/ielts/practice-actions", () => ({ saveAnswersAction, submitAttemptAction, claimSectionAction, finishSectionAction, deleteTestAttemptAction }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push }) }));
 
+const confirmMock = vi.hoisted(() => vi.fn(async () => true));
+vi.mock("@/components/ConfirmDialog", () => ({
+  confirm: (...args: unknown[]) => confirmMock(...args),
+  ConfirmHost: () => null,
+}));
+
 import { TestRunner } from "@/components/ielts/TestRunner";
 import type { RunView } from "@/ielts/practice/attempts";
 
@@ -49,6 +55,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   vi.useRealTimers();
+  confirmMock.mockResolvedValue(true);
 });
 
 describe("TestRunner", () => {
@@ -96,7 +103,7 @@ describe("TestRunner", () => {
 
   it("submits with the typed answers and allows another try after a failure", async () => {
     submitAttemptAction.mockResolvedValueOnce({ ok: false, errors: { _: "Try again" } }).mockResolvedValue({ ok: true, raw: 1, total: 1 });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmMock.mockResolvedValue(true);
     render(<TestRunner view={view()} />);
     await userEvent.type(screen.getByLabelText("Answer to question 1"), "cat");
     await userEvent.click(screen.getByRole("button", { name: "Submit" }));
@@ -108,13 +115,13 @@ describe("TestRunner", () => {
 
   it("does not lock the guard when the unanswered-questions prompt is declined", async () => {
     submitAttemptAction.mockResolvedValue({ ok: true, raw: 0, total: 1 });
-    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValue(true);
+    confirmMock.mockResolvedValueOnce(false).mockResolvedValue(true);
     render(<TestRunner view={view()} />);
     await userEvent.click(screen.getByRole("button", { name: "Submit" }));
     expect(submitAttemptAction).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Submit" }));
     await waitFor(() => expect(submitAttemptAction).toHaveBeenCalledTimes(1));
-    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(confirmMock).toHaveBeenCalledTimes(2);
   });
 
   it("fetches the script for the computer voice only when play is pressed", async () => {
@@ -180,11 +187,10 @@ describe("TestRunner", () => {
   });
 
   it("discards the attempt after a confirm and goes back to the skill page (F4)", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmMock.mockResolvedValue(true);
     render(<TestRunner view={view()} />);
     await userEvent.click(screen.getByRole("button", { name: "Discard" }));
     await waitFor(() => expect(deleteTestAttemptAction).toHaveBeenCalledWith("a1"));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/ielts/reading"));
-    confirm.mockRestore();
   });
 });

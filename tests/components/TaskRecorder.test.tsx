@@ -44,6 +44,12 @@ vi.mock("@/app/(app)/speaking/actions", () => actions);
 const push = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh: vi.fn() }) }));
 
+const confirmMock = vi.hoisted(() => vi.fn(async () => true));
+vi.mock("@/components/ConfirmDialog", () => ({
+  confirm: (...args: unknown[]) => confirmMock(...args),
+  ConfirmHost: () => null,
+}));
+
 const base = {
   date: "2026-11-10",
   lessonId: "64b000000000000000000003",
@@ -60,6 +66,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  confirmMock.mockResolvedValue(true);
 });
 
 describe("TaskRecorder", () => {
@@ -233,7 +240,7 @@ describe("TaskRecorder", () => {
 
   it("Discard deletes the take it started", async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmMock.mockResolvedValue(true);
     upload.uploadTake.mockRejectedValueOnce(new upload.UploadError("The upload failed (500). Try again."));
     recorder.value = {
       ...recorder.value,
@@ -248,7 +255,7 @@ describe("TaskRecorder", () => {
 
   it("Discard with no started take deletes nothing", async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmMock.mockResolvedValue(true);
     actions.startTakeAction.mockResolvedValueOnce({ ok: false, errors: { _: "Invalid recording size." } } as never);
     recorder.value = {
       ...recorder.value,

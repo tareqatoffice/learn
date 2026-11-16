@@ -4,8 +4,15 @@ import path from "node:path";
 import { act, cleanup, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
+const { refresh, confirmMock } = vi.hoisted(() => ({
+  refresh: vi.fn(),
+  confirmMock: vi.fn(async () => true),
+}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push: vi.fn() }) }));
+vi.mock("@/components/ConfirmDialog", () => ({
+  confirm: (...args: unknown[]) => confirmMock(...args),
+  ConfirmHost: () => null,
+}));
 
 import { ADMIN_NAV } from "@/admin/nav";
 import { fail, firstError, ok } from "@/admin/result";
@@ -17,6 +24,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   vi.restoreAllMocks();
+  confirmMock.mockResolvedValue(true);
 });
 
 describe("ActionResult helpers", () => {
@@ -57,7 +65,7 @@ describe("useAdminAction", () => {
   });
 
   it("does nothing when the confirm prompt is declined, and can skip the refresh", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
+    confirmMock.mockResolvedValueOnce(false);
     const action = vi.fn(async () => ok());
     const { result } = renderHook(() => useAdminAction());
     await act(async () => result.current.run(action, { confirm: "Sure?" }));

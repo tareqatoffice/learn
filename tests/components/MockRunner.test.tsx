@@ -75,6 +75,12 @@ vi.mock("@/lib/uploadTake", () => upload);
 const push = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh: vi.fn() }) }));
 
+const confirmMock = vi.hoisted(() => vi.fn(async () => true));
+vi.mock("@/components/ConfirmDialog", () => ({
+  confirm: (...args: unknown[]) => confirmMock(...args),
+  ConfirmHost: () => null,
+}));
+
 const ID = "64b000000000000000000042";
 
 const questions: MockQuestions = {
@@ -132,6 +138,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.clearAllMocks();
+  confirmMock.mockResolvedValue(true);
   upload.uploadTake.mockReset();
   upload.uploadTake.mockImplementation(async () => {});
 });
@@ -438,15 +445,17 @@ describe("MockRunner", () => {
 
   it("finishes without a failed part only after the learner confirms", async () => {
     upload.uploadTake.mockRejectedValue(new upload.UploadError("The upload failed (500). Try again."));
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    confirmMock.mockResolvedValue(false);
     renderRunner("part1");
     await click(/^start/i);
     await click(/end part 1/i);
     await click(/finish without/i);
-    expect(confirm).toHaveBeenCalledWith("Part 1 hasn't saved. Finish without it?");
+    expect(confirmMock).toHaveBeenCalledWith(
+      expect.objectContaining({ description: "Part 1 hasn't saved. Finish without it?" }),
+    );
     await tick(0);
     expect(actions.finishAttempt).not.toHaveBeenCalled();
-    confirm.mockReturnValue(true);
+    confirmMock.mockResolvedValue(true);
     await click(/finish without/i);
     await tick(0);
     expect(actions.finishAttempt).toHaveBeenCalledWith(ID, { paused: false });

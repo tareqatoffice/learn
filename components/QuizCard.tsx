@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { confirm } from "@/components/ConfirmDialog";
 import { AnswerBox, FeedbackPanel, FollowUpChat } from "@/components/QuizCoach";
 import { Notice } from "@/components/Notice";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -95,7 +96,14 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
 
   async function end() {
     const left = view.total - view.position;
-    if (!window.confirm(`End the quiz now? ${left} card${left === 1 ? "" : "s"} won't be shown; your marks so far are kept.`)) return;
+    if (
+      !(await confirm({
+        description: `End the quiz now? ${left} card${left === 1 ? "" : "s"} won't be shown; your marks so far are kept.`,
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     setEnding(true);
     setEndFailed(false);
     try {

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * "nothing matched" results, which are answers rather than faults.
  *
  * For feedback with no control to sit beside — the control has scrolled away, or there is no room —
- * use `toast()` from components/Toast instead.
+ * use `toast` from `sonner` instead.
  */
 export function Notice({
   tone = "error",

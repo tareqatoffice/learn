@@ -11,6 +11,7 @@ import { useEffect } from "react";
 export function useLeaveGuard(active: boolean, prompt: string, key: string): void {
   useEffect(() => {
     if (!active) return;
+    // Native confirm: must stay synchronous for click/popstate gates (AlertDialog cannot block these).
     const leave = () => window.confirm(prompt);
     const onClick = (e: MouseEvent) => {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;

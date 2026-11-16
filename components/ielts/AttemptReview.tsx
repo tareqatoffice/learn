@@ -10,6 +10,7 @@ import {
   transcribePartAction,
 } from "@/app/(app)/ielts/speaking/actions";
 import { firstError } from "@/admin/result";
+import { confirm } from "@/components/ConfirmDialog";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import { Notice } from "@/components/Notice";
 import { BodyConsentDialog } from "@/components/speaking/BodyConsentDialog";
@@ -328,7 +329,14 @@ export function AttemptReview({ attempt, aiOn, bodyConsent: initialConsent }: { 
   }
 
   async function remove() {
-    if (!window.confirm("Delete this attempt? Its recordings, ratings and band entries are removed for good.")) return;
+    if (
+      !(await confirm({
+        description: "Delete this attempt? Its recordings, ratings and band entries are removed for good.",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     setDeleting(true);
     setDeleteError("");
     try {

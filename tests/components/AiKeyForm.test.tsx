@@ -3,13 +3,18 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { saveAiKeyAction, clearAiKeyAction, refresh } = vi.hoisted(() => ({
+const { saveAiKeyAction, clearAiKeyAction, refresh, confirmMock } = vi.hoisted(() => ({
   saveAiKeyAction: vi.fn(),
   clearAiKeyAction: vi.fn(async () => ({ ok: true as const })),
   refresh: vi.fn(),
+  confirmMock: vi.fn(async () => true),
 }));
 vi.mock("@/app/(app)/admin/ai/actions", () => ({ saveAiKeyAction, clearAiKeyAction }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+vi.mock("@/components/ConfirmDialog", () => ({
+  confirm: (...args: unknown[]) => confirmMock(...args),
+  ConfirmHost: () => null,
+}));
 
 import { AiKeyForm } from "@/components/admin/AiKeyForm";
 
@@ -17,6 +22,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   vi.restoreAllMocks();
+  confirmMock.mockResolvedValue(true);
 });
 
 describe("AiKeyForm", () => {
@@ -58,13 +64,13 @@ describe("AiKeyForm", () => {
   });
 
   it("asks before removing the saved key, then removes it", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    confirmMock.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     render(<AiKeyForm source="settings" hint="abcd" unreadable={false} />);
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Remove saved key" }));
     expect(clearAiKeyAction).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Remove saved key" }));
-    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(confirmMock).toHaveBeenCalledTimes(2);
     expect(clearAiKeyAction).toHaveBeenCalled();
     expect(await screen.findByText("Saved key removed.")).toBeTruthy();
   });

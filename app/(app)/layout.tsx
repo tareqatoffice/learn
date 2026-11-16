@@ -1,7 +1,8 @@
 import { containerClass } from "@/components/AppHeader";
 import { CommandPalette } from "@/components/CommandPalette";
-import { Toaster } from "@/components/Toast";
+import { ConfirmHost } from "@/components/ConfirmDialog";
 import { TopBar } from "@/components/TopBar";
+import { Toaster } from "@/components/ui/sonner";
 import { requireUser } from "@/lib/authz";
 import { cn } from "@/lib/utils";
 import type { Metadata } from "next";
@@ -24,6 +25,7 @@ export default async function AppLayout({
       {/* One of each for the whole signed-in app: the palette opens on ⌘K or the header's button. */}
       <CommandPalette />
       <Toaster />
+      <ConfirmHost />
     </>
   );
 }

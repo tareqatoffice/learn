@@ -4,6 +4,7 @@ import { Circle, Pause, Play, Square } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { type ActionResult, firstError } from "@/admin/result";
+import { confirm } from "@/components/ConfirmDialog";
 import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import type { Kind } from "@/ielts/speaking/questions";
@@ -376,11 +377,18 @@ export function MockRunner({
     return () => clearTimeout(t);
   }, [stage, allSaved]);
 
-  function finishWithout() {
+  async function finishWithout() {
     const failed = (Object.keys(uploads) as Part[]).filter((p) => uploads[p]?.status === "failed");
     const names = failed.map((p) => NAME[p]).join(" and ");
     const many = failed.length > 1;
-    if (!window.confirm(`${names} ${many ? "haven't" : "hasn't"} saved. Finish without ${many ? "them" : "it"}?`)) return;
+    if (
+      !(await confirm({
+        description: `${names} ${many ? "haven't" : "hasn't"} saved. Finish without ${many ? "them" : "it"}?`,
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     for (const p of failed) takes.current.delete(p);
     setUploads((all) => Object.fromEntries(Object.entries(all).filter(([p]) => !failed.includes(p as Part))));
   }

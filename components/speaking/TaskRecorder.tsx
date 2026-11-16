@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { confirmTakeAction, deleteTakeAction, generateMaterialAction, startTakeAction } from "@/app/(app)/speaking/actions";
 import { firstError } from "@/admin/result";
+import { confirm } from "@/components/ConfirmDialog";
 import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { UploadError, uploadTake } from "@/lib/uploadTake";
@@ -278,8 +279,8 @@ export function TaskRecorder({
     void rec.start();
   }
 
-  function discard() {
-    if (!window.confirm("Discard this recording? It hasn't been saved.")) return;
+  async function discard() {
+    if (!(await confirm({ description: "Discard this recording? It hasn't been saved.", destructive: true }))) return;
     // Remove the started (unconfirmed) take and anything it uploaded; best effort.
     const takeId = started.current?.takeId;
     if (takeId) void deleteTakeAction(takeId).catch(() => undefined);

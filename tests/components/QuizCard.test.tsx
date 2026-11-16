@@ -2,6 +2,13 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const confirmMock = vi.hoisted(() => vi.fn(async () => true));
+vi.mock("@/components/ConfirmDialog", () => ({
+  confirm: (...args: unknown[]) => confirmMock(...args),
+  ConfirmHost: () => null,
+}));
+
 import { type QuizCoach, QuizCard } from "@/components/QuizCard";
 import type { SessionView } from "@/progress/quiz";
 
@@ -27,7 +34,11 @@ const view = (over: Partial<SessionView> = {}): SessionView => ({
 
 const ANSWER = "A function that keeps its scope.";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  confirmMock.mockReset();
+  confirmMock.mockResolvedValue(true);
+});
 
 function setup(over: Partial<SessionView> = {}, onResult = vi.fn(() => Promise.resolve(view({ position: 4 })))) {
   const onFinish = vi.fn();
@@ -121,7 +132,7 @@ describe("QuizCard", () => {
   });
 
   it("asks before ending the quiz and reports a failed end (U1)", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValue(true);
+    confirmMock.mockResolvedValueOnce(false).mockResolvedValue(true);
     const { onFinish, user } = setup();
     await user.click(screen.getByRole("button", { name: "End quiz" }));
     expect(onFinish).not.toHaveBeenCalled();
@@ -129,7 +140,6 @@ describe("QuizCard", () => {
     await user.click(screen.getByRole("button", { name: "End quiz" }));
     expect(onFinish).toHaveBeenCalledTimes(1);
     expect((await screen.findByText(/could not end the quiz/i))).toBeTruthy();
-    confirm.mockRestore();
   });
 
   it("moves focus to the new question after a mark, not on the first card (U8)", () => {
