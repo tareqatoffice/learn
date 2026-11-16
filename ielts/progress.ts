@@ -1,3 +1,4 @@
+import { Types } from "mongoose";
 import { connectDb } from "@/lib/db";
 import { IeltsSpeakingAttempt, IeltsStudyLog, IeltsTestAttempt, IeltsWritingAttempt, SpeakingTake } from "@/models";
 import { type ActionResult, fail, ok } from "@/admin/result";
@@ -175,6 +176,39 @@ export async function todayList(userId: string, today: string, timeZone: string)
     }
   }
   return items;
+}
+
+/** How far back a study session can be logged, counting today. */
+export const STUDY_LOG_DAYS = 14;
+
+export type StudyLogEntry = { id: string; date: string; skill: Skill; minutes: number };
+
+/** The learner's newest study log entries, newest first. */
+export async function listStudyLogs(userId: string, limit = 10): Promise<StudyLogEntry[]> {
+  if (!Types.ObjectId.isValid(userId)) return [];
+  await connectDb();
+  const rows = await IeltsStudyLog.find({ userId })
+    .sort({ date: -1, _id: -1 })
+    .limit(limit)
+    .select("date skill minutes")
+    .lean<{ _id: Types.ObjectId; date: string; skill: Skill; minutes: number }[]>();
+  return rows.map((r) => ({ id: String(r._id), date: r.date, skill: r.skill, minutes: r.minutes }));
+}
+
+/** Removes one of the learner's own study log entries. */
+export async function deleteStudyLog(userId: string, id: string): Promise<ActionResult> {
+  if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(id)) return fail("That entry doesn't exist.");
+  await connectDb();
+  const res = await IeltsStudyLog.deleteOne({ _id: id, userId });
+  return res.deletedCount ? ok() : fail("That entry doesn't exist.");
+}
+
+/** A study log date the learner may pick: today or up to STUDY_LOG_DAYS - 1 days before it, never later. */
+export function studyLogDateError(date: string, today: string): string | null {
+  if (!DATE.test(date)) return "Enter the date as YYYY-MM-DD.";
+  if (date > today) return "You can't log study for a day that hasn't happened yet.";
+  if (date < addDays(today, -(STUDY_LOG_DAYS - 1))) return `Log study from the last ${STUDY_LOG_DAYS} days only.`;
+  return null;
 }
 
 export async function logStudy(userId: string, input: { date: string; skill: Skill; minutes: number }): Promise<ActionResult> {

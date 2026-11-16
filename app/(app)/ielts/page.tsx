@@ -11,13 +11,14 @@ import { TimeZoneCookie } from "@/components/speaking/TimeZoneCookie";
 import { listBandEntries } from "@/ielts/bandHistory";
 import { phaseOn, weekOn } from "@/ielts/plan";
 import { currentPlan, getProfile, testDayStatus } from "@/ielts/profile";
-import { todayList } from "@/ielts/progress";
+import { listStudyLogs, STUDY_LOG_DAYS, todayList } from "@/ielts/progress";
 import { listPending, runChecks } from "@/ielts/suggestions";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
-import { localDate } from "@/speaking/schedule";
+import { StudyLog } from "@/components/ielts/StudyLog";
+import { addDays, localDate } from "@/speaking/schedule";
 import { readTimeZone } from "@/speaking/timezone";
 
 export const metadata = buildMetadata({
@@ -133,11 +134,12 @@ export default async function IeltsPage() {
   }
 
   await runChecks(user.userId, today, timeZone);
-  const [plan, suggestions, items, entries] = await Promise.all([
+  const [plan, suggestions, items, entries, studyLogs] = await Promise.all([
     currentPlan(user.userId),
     listPending(user.userId, today),
     todayList(user.userId, today, timeZone),
     listBandEntries(user.userId),
+    listStudyLogs(user.userId),
   ]);
   const week = plan ? weekOn(plan, today) : null;
 
@@ -164,6 +166,7 @@ export default async function IeltsPage() {
         </section>
       )}
       <TodayList items={items} />
+      <StudyLog today={today} minDate={addDays(today, -(STUDY_LOG_DAYS - 1))} entries={studyLogs} />
       {plan?.hours.short && <HoursWarning needed={plan.hours.needed} available={plan.hours.available} />}
       <LatestBands entries={entries} target={profile.target} />
     </div>

@@ -5,7 +5,7 @@ import { deleteAllIeltsData } from "@/ielts/data";
 import { deleteBandEntry, saveCalculatorResult, type CalculatorInput } from "@/ielts/bandHistory";
 import type { Skill } from "@/ielts/bands";
 import { endPlan, previewProfile, saveProfile, type ProfileInput } from "@/ielts/profile";
-import { logStudy } from "@/ielts/progress";
+import { deleteStudyLog, logStudy, studyLogDateError } from "@/ielts/progress";
 import { approveSuggestion, dismissSuggestion, removeAdjustment } from "@/ielts/suggestions";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
@@ -37,9 +37,18 @@ export async function endPlanAction(): Promise<ActionResult> {
   return endPlan(await session());
 }
 
-export async function logStudyAction(skill: Skill, minutes: number): Promise<ActionResult> {
+/** Logs study time, today unless `date` names another of the last two weeks. */
+export async function logStudyAction(skill: Skill, minutes: number, date?: string): Promise<ActionResult> {
   const userId = await session();
-  return logStudy(userId, { date: await today(), skill, minutes });
+  const now = await today();
+  const day = date ?? now;
+  const dateError = studyLogDateError(day, now);
+  if (dateError) return fail({ date: dateError });
+  return logStudy(userId, { date: day, skill, minutes });
+}
+
+export async function deleteStudyLogAction(id: string): Promise<ActionResult> {
+  return deleteStudyLog(await session(), id);
 }
 
 export async function approveSuggestionAction(id: string) {

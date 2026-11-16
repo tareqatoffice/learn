@@ -88,6 +88,21 @@ describe("ielts actions", () => {
     expect(log).toMatchObject({ date: today, minutes: 20 });
   });
 
+  it("logs study on a recent day, refuses future or old days, and deletes only the learner's own entries (F21)", async () => {
+    const me = id();
+    session.userId = me;
+    expect((await actions.logStudyAction("writing", 15, addDays(today, -3))).ok).toBe(true);
+    expect(await actions.logStudyAction("writing", 15, addDays(today, 1))).toMatchObject({ ok: false, errors: { date: expect.any(String) } });
+    expect(await actions.logStudyAction("writing", 15, addDays(today, -20))).toMatchObject({ ok: false, errors: { date: expect.any(String) } });
+    const entry = await IeltsStudyLog.findOne({ userId: me }).lean<{ _id: unknown; date: string }>();
+    expect(entry?.date).toBe(addDays(today, -3));
+    session.userId = id();
+    expect((await actions.deleteStudyLogAction(String(entry!._id))).ok).toBe(false);
+    session.userId = me;
+    expect((await actions.deleteStudyLogAction(String(entry!._id))).ok).toBe(true);
+    expect(await IeltsStudyLog.countDocuments({ userId: me })).toBe(0);
+  });
+
   it("ends the plan and deletes all data for the session user only", async () => {
     const me = id();
     const other = id();
