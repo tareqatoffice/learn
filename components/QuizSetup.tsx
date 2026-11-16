@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { countDeckAction, startQuizAction } from "@/app/(app)/interview/actions";
 import { Chip } from "@/components/Chip";
 import { Button } from "@/components/ui/button";
+import { isNavigationError, START_FAILED } from "@/lib/navigationError";
 import { toggleItem } from "@/lib/utils";
 import type { QuizMode } from "@/progress/quiz";
 
@@ -38,6 +39,7 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
   const [mode, setMode] = useState<QuizMode>("unseen");
   const [size, setSize] = useState<10 | 20 | 50 | null>(20);
   const [empty, setEmpty] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const single = bookIds.length === 1 ? books.find((b) => b.id === bookIds[0]) : undefined;
@@ -66,10 +68,16 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
 
   function start() {
     setEmpty(false);
+    setFailed(false);
     startTransition(async () => {
-      // A successful start redirects, so only the empty result ever comes back here.
-      const result = await startQuizAction({ bookIds, partKeys: single ? partKeys : [], mode, size });
-      if (result?.empty) setEmpty(true);
+      try {
+        // A successful start redirects, so only the empty result ever comes back here.
+        const result = await startQuizAction({ bookIds, partKeys: single ? partKeys : [], mode, size });
+        if (result?.empty) setEmpty(true);
+      } catch (error) {
+        if (isNavigationError(error)) throw error;
+        setFailed(true);
+      }
     });
   }
 
@@ -125,6 +133,7 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
         </Button>
         <p role="status" className="mt-3 text-sm text-muted-foreground empty:hidden">
           {(empty || known === 0) && "No questions match. Try another mode or book."}
+          {failed && START_FAILED}
         </p>
       </div>
     </section>

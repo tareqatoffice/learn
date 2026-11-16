@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { prereqMessage } from "@/graph/layout";
 import { Markdown } from "@/lib/markdown/Markdown";
 import type { NodeStatus } from "@/progress/graph";
+import { isNavigationError, START_FAILED } from "@/lib/navigationError";
 import { cn } from "@/lib/utils";
 import { Notice } from "@/components/Notice";
 
@@ -115,6 +116,9 @@ export function TopicPanel({ node, status, onStatus, related, blockedBy = [], pe
         size: null,
       });
       if (result?.empty) setQuizMessage("None of these questions are available right now.");
+    } catch (error) {
+      if (isNavigationError(error)) throw error;
+      setQuizMessage(START_FAILED);
     } finally {
       setStarting(false);
     }

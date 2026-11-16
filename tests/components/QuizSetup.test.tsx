@@ -23,6 +23,14 @@ describe("QuizSetup (F10)", () => {
     expect(countDeckAction).toHaveBeenLastCalledWith({ bookIds: [], partKeys: [], mode: "unseen", size: 20 });
   });
 
+  it("says so when starting fails (U9)", async () => {
+    startQuizAction.mockRejectedValueOnce(new Error("offline"));
+    render(<QuizSetup books={[]} />);
+    await waitFor(() => expect((screen.getByRole("button", { name: /^Start/ }) as HTMLButtonElement).disabled).toBe(false));
+    await userEvent.click(screen.getByRole("button", { name: /^Start/ }));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/Couldn't start the quiz/));
+  });
+
   it("disables Start and says so when nothing matches", async () => {
     countDeckAction.mockResolvedValue(0);
     render(<QuizSetup books={[]} />);
