@@ -117,6 +117,44 @@ describe("TaskRecorder", () => {
     confirm.mockRestore();
   });
 
+  it("asks before saving a very short take, and saves it only when kept (U16)", async () => {
+    const user = userEvent.setup();
+    recorder.value = {
+      ...recorder.value,
+      state: "stopped",
+      elapsedSec: 1,
+      result: { blob: new Blob(["x"], { type: "audio/webm" }), mime: "audio/webm", durationSec: 1 },
+    };
+    render(<TaskRecorder {...base} task="readAloud" material={{ title: "P", text: "Read me.", generated: false }} />);
+    expect(await screen.findByText(/only 0:01 long/)).toBeTruthy();
+    expect(actions.startTakeAction).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Save it" }));
+    await waitFor(() => expect(actions.startTakeAction).toHaveBeenCalled());
+  });
+
+  it("can cancel an upload in progress and keeps the recording for a retry (U16)", async () => {
+    const user = userEvent.setup();
+    upload.uploadTake.mockImplementationOnce(
+      (_url: unknown, _blob: unknown, _mime: unknown, opts: unknown) =>
+        new Promise<void>((_resolve, reject) => {
+          const o = opts as { signal: AbortSignal; onProgress: (f: number) => void };
+          o.onProgress(0.4);
+          o.signal.addEventListener("abort", () => reject(new upload.UploadError("The upload was cancelled.")));
+        }),
+    );
+    recorder.value = {
+      ...recorder.value,
+      state: "stopped",
+      elapsedSec: 42,
+      result: { blob: new Blob(["x"], { type: "audio/webm" }), mime: "audio/webm", durationSec: 42 },
+    };
+    render(<TaskRecorder {...base} task="readAloud" material={{ title: "P", text: "Read me.", generated: false }} />);
+    expect(await screen.findByText(/40%/)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Cancel upload" }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/cancelled/);
+    expect(screen.getByRole("button", { name: /try again/i })).toBeTruthy();
+  });
+
   it("TaskRecorder shows retry after a failed upload", async () => {
     const user = userEvent.setup();
     upload.uploadTake.mockRejectedValueOnce(new upload.UploadError("The upload failed (500). Try again."));
@@ -134,7 +172,7 @@ describe("TaskRecorder", () => {
     expect(actions.startTakeAction).toHaveBeenCalledWith(
       expect.objectContaining({ task: "readAloud", kind: "audio", mime: "audio/webm", date: base.date, size: 1 }),
     );
-    expect(upload.uploadTake).toHaveBeenCalledWith("https://r2.test/put", expect.any(Blob), "audio/webm");
+    expect(upload.uploadTake).toHaveBeenCalledWith("https://r2.test/put", expect.any(Blob), "audio/webm", expect.objectContaining({ signal: expect.any(AbortSignal) }));
 
     await user.click(retry);
     await waitFor(() => expect(actions.confirmTakeAction).toHaveBeenCalledWith("64b000000000000000000009", 42));

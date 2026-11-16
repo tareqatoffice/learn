@@ -28,9 +28,12 @@ type Started = {
 };
 type Save =
   | { phase: "idle" }
-  | { phase: "saving"; step: string }
+  | { phase: "saving"; step: string; progress?: number }
   | { phase: "failed"; error: string }
   | { phase: "saved" };
+
+/** Takes shorter than this ask before they are uploaded. */
+const SHORT_TAKE_SEC = 3;
 
 // Presigned upload URLs live 10 minutes; past this a retry starts a fresh take for new URLs.
 const REUSE_MS = 8 * 60 * 1000;
@@ -108,6 +111,8 @@ export function TaskRecorder({
   const audioRef = useRef<HTMLAudioElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
   const started = useRef<Started | null>(null);
+  // Aborts the upload in flight ("Cancel upload"); the recording stays on the page for a retry.
+  const uploadAbort = useRef<AbortController | null>(null);
   const savedFor = useRef<RecorderResult | null>(null);
   const clipTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const clipPlaying = useRef(false);
@@ -203,16 +208,24 @@ export function TaskRecorder({
           );
         }
         const two = Boolean(s.audioUploadUrl && result.audioBlob);
+        const cancel = new AbortController();
+        uploadAbort.current = cancel;
+        const upload = async (url: string, blob: Blob, mime: string, step: string) => {
+          setSave({ phase: "saving", step, progress: 0 });
+          await uploadTake(url, blob, mime, {
+            signal: cancel.signal,
+            onProgress: (progress) => setSave({ phase: "saving", step, progress }),
+          });
+        };
         if (!s.main) {
-          setSave({ phase: "saving", step: two ? "Uploading the video (1 of 2)…" : "Uploading the recording…" });
-          await uploadTake(s.uploadUrl, result.blob, result.mime);
+          await upload(s.uploadUrl, result.blob, result.mime, two ? "Uploading the video (1 of 2)…" : "Uploading the recording…");
           s.main = true;
         }
         if (two && !s.audio) {
-          setSave({ phase: "saving", step: "Uploading the audio (2 of 2)…" });
-          await uploadTake(s.audioUploadUrl!, result.audioBlob!, result.audioMime!);
+          await upload(s.audioUploadUrl!, result.audioBlob!, result.audioMime!, "Uploading the audio (2 of 2)…");
           s.audio = true;
         }
+        uploadAbort.current = null;
         setSave({
           phase: "saving",
           step:
@@ -241,7 +254,10 @@ export function TaskRecorder({
     if (!rec.result || savedFor.current === rec.result) return;
     savedFor.current = rec.result;
     started.current = null;
-    void persist(rec.result);
+    // A slip of a take (a second or two) waits for the learner to keep or discard it.
+    // persist() is the upload itself (an external system); its first status update is intended.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (rec.result.durationSec >= SHORT_TAKE_SEC) void persist(rec.result);
   }, [rec.result, persist]);
 
   function begin() {
@@ -412,11 +428,37 @@ export function TaskRecorder({
         {rec.state === "error" && <Notice>{rec.error}</Notice>}
         {clipError && <Notice>{clipError}</Notice>}
 
+        {/* A take this short is more likely a slip than practice: keep or discard it first. */}
+        {rec.result && rec.result.durationSec < SHORT_TAKE_SEC && save.phase === "idle" && (
+          <div className="grid gap-3">
+            <p className="text-sm">That take is only {clock(rec.result?.durationSec ?? 0)} long. Keep it?</p>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => rec.result && void persist(rec.result)}>Save it</Button>
+              <Button variant="outline" onClick={discard}>
+                Discard
+              </Button>
+            </div>
+          </div>
+        )}
         {save.phase === "saving" && (
           <div className="grid gap-1.5" role="status">
-            <span className="text-sm">{save.step}</span>
+            <span className="flex items-center justify-between gap-3 text-sm">
+              <span>
+                {save.step}
+                {save.progress !== undefined && ` ${Math.round(save.progress * 100)}%`}
+              </span>
+              {save.progress !== undefined && (
+                <Button variant="ghost" size="sm" onClick={() => uploadAbort.current?.abort()}>
+                  Cancel upload
+                </Button>
+              )}
+            </span>
             <div aria-hidden className="h-1.5 overflow-hidden rounded-full bg-muted">
-              <div className="h-full w-1/3 animate-pulse rounded-full bg-ring" />
+              {save.progress !== undefined ? (
+                <div className="h-full rounded-full bg-ring transition-[width]" style={{ width: `${Math.round(save.progress * 100)}%` }} />
+              ) : (
+                <div className="h-full w-1/3 animate-pulse rounded-full bg-ring" />
+              )}
             </div>
           </div>
         )}
