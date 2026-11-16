@@ -3,11 +3,12 @@
 import { isValidObjectId } from "mongoose";
 import { connectDb } from "@/lib/db";
 import { IeltsBandEntry } from "@/models";
+import type { IELTS_BAND_SOURCES } from "@/models/ieltsBandEntry";
 import { type ActionResult, fail, ok, type FieldErrors } from "@/admin/result";
 import { isHalfBand, listeningBand, overallBand, readingBand, SKILLS, type Skill } from "@/ielts/bands";
 import { suggestCurrentBand } from "@/ielts/suggestions";
 
-export type BandSource = "official" | "practice" | "mockSelf" | "mockAi" | "writingSelf" | "writingAi" | "other";
+export type BandSource = (typeof IELTS_BAND_SOURCES)[number];
 type Bands = Partial<Record<Skill, number>>;
 
 export type CalculatorInput = {
