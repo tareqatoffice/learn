@@ -88,6 +88,19 @@ describe("TaskRecorder", () => {
     expect((screen.getByRole("button", { name: /start/i }) as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("allows a free practice take with no material, and hides Generate with AI when the coach is off (F8)", () => {
+    render(<TaskRecorder {...base} lessonId={null} task="recordReview" material={null} aiOn={false} hasLesson={false} />);
+    expect(screen.getByText(/No speaking lessons are published yet/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Generate with AI" })).toBeNull();
+    expect((screen.getByRole("button", { name: /start/i }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("offers Generate with AI when the coach is on (F8)", () => {
+    render(<TaskRecorder {...base} task="readAloud" material={null} />);
+    expect(screen.getByText(/Today's lesson has nothing for this task/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Generate with AI" })).toBeTruthy();
+  });
+
   it("TaskRecorder shows retry after a failed upload", async () => {
     const user = userEvent.setup();
     upload.uploadTake.mockRejectedValueOnce(new upload.UploadError("The upload failed (500). Try again."));

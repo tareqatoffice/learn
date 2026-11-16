@@ -5,6 +5,7 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { mins } from "@/components/speaking/format";
 import { type Material, TaskRecorder } from "@/components/speaking/TaskRecorder";
 import { TimeZoneCookie } from "@/components/speaking/TimeZoneCookie";
+import { getAiConfig } from "@/lib/aiSettings";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 import { presignGet } from "@/lib/r2";
@@ -38,7 +39,7 @@ export default async function TaskPage({ params }: PageProps<"/speaking/[task]">
   const user = await requireUser();
   await connectDb();
   const timeZone = await readTimeZone();
-  const today = await getToday(user.userId, timeZone);
+  const [today, ai] = await Promise.all([getToday(user.userId, timeZone), getAiConfig()]);
   const lesson = today.lesson && lessonHasPart(today.lesson, task) ? today.lesson : null;
 
   let material: Material | null = null;
@@ -100,6 +101,8 @@ export default async function TaskPage({ params }: PageProps<"/speaking/[task]">
           clipSec={task === "shadowing" ? lesson?.shadow?.durationSec : undefined}
           videoDefault={today.settings.video[task]}
           storage={today.storage}
+          aiOn={ai.settings.active}
+          hasLesson={Boolean(today.lesson)}
         />
       )}
     </div>

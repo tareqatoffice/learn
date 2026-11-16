@@ -72,6 +72,8 @@ export function TaskRecorder({
   clipSec,
   videoDefault,
   storage,
+  aiOn = true,
+  hasLesson = true,
 }: {
   task: TaskKey;
   date: string;
@@ -81,6 +83,10 @@ export function TaskRecorder({
   clipSec?: number;
   videoDefault: boolean;
   storage: boolean;
+  /** Whether the AI coach can write material; without it the button is not offered. */
+  aiOn?: boolean;
+  /** False when no lesson is published at all, as opposed to today's lesson lacking this task. */
+  hasLesson?: boolean;
 }) {
   const router = useRouter();
   const [material, setMaterial] = useState(initialMaterial);
@@ -295,7 +301,8 @@ export function TaskRecorder({
   }
 
   const idle = rec.state === "idle" || rec.state === "error";
-  const canStart = idle && material !== null && (!shadowing || headphones) && save.phase === "idle";
+  // Without material the learner can still record freely (shadowing always has its clip by now).
+  const canStart = idle && (material !== null || !shadowing) && (!shadowing || headphones) && save.phase === "idle";
 
   return (
     <div className="grid gap-4">
@@ -304,17 +311,21 @@ export function TaskRecorder({
       ) : (
         <section className="grid gap-3 rounded-xl border border-border bg-card p-5">
           <p className="text-sm text-muted-foreground">
-            Today&apos;s lesson has nothing for this task. The AI coach can write some practice material for you.
+            {hasLesson ? "Today's lesson has nothing for this task." : "No speaking lessons are published yet."}{" "}
+            {aiOn ? "The AI coach can write some practice material for you, or you" : "You"} can record a free practice
+            take: speak about anything for as long as you like.
           </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={generate} disabled={generating}>
-              {generating ? "Writing…" : "Generate with AI"}
-            </Button>
-            {generateError && <Notice>{generateError}</Notice>}
-          </div>
+          {aiOn && (
+            <div className="flex flex-wrap items-center gap-3">
+              <Button onClick={generate} disabled={generating}>
+                {generating ? "Writing…" : "Generate with AI"}
+              </Button>
+              {generateError && <Notice>{generateError}</Notice>}
+            </div>
+          )}
         </section>
       )}
-      {material?.generated && idle && save.phase === "idle" && (
+      {material?.generated && aiOn && idle && save.phase === "idle" && (
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="outline" size="sm" onClick={generate} disabled={generating}>
             {generating ? "Writing…" : "Write something else"}
