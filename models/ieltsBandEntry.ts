@@ -22,5 +22,7 @@ const ieltsBandEntrySchema = new Schema(
 );
 
 ieltsBandEntrySchema.index({ userId: 1, date: 1 });
+// One synced entry per attempt and source; typed-in entries have no attemptId and are not limited.
+ieltsBandEntrySchema.index({ userId: 1, attemptId: 1, source: 1 }, { unique: true, partialFilterExpression: { attemptId: { $exists: true } } });
 
 export const IeltsBandEntry = mongoose.models.IeltsBandEntry || model("IeltsBandEntry", ieltsBandEntrySchema);

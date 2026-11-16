@@ -1,8 +1,8 @@
 // Listening and Reading attempts: start, autosave, submit (marked here, never in the browser), review.
 
-import { Types } from "mongoose";
+import { type ClientSession, Types } from "mongoose";
 import { type ActionResult, fail, ok } from "@/admin/result";
-import { connectDb } from "@/lib/db";
+import { connectDb, inTransaction } from "@/lib/db";
 import { presignGet, storageConfigured } from "@/lib/r2";
 import { IeltsBandEntry, IeltsListeningTest, IeltsReadingTest, IeltsTestAttempt } from "@/models";
 import { numberSections, scoreSections, toPublic, type PublicSection, type Score, type Section } from "./marking";
@@ -125,6 +125,21 @@ type SubmitRow = {
 
 const plainAnswers = (m: SubmitRow["answers"]): Record<string, string> => (m instanceof Map ? Object.fromEntries(m) : { ...(m ?? {}) });
 
+/** Upserts the practice band of a submitted full test (idempotent, so it also repairs a missing one). */
+async function syncPracticeBand(
+  userId: string,
+  attemptId: string,
+  a: { scope: string; date: string; skill: TestSkill; score?: { band?: number } },
+  session?: ClientSession,
+): Promise<void> {
+  if (a.scope !== "full" || a.score?.band === undefined) return;
+  await IeltsBandEntry.updateOne(
+    { userId, attemptId, source: "practice" },
+    { $set: { date: a.date, bands: { [a.skill]: a.score.band } } },
+    { upsert: true, session },
+  );
+}
+
 export async function submitAttempt(
   userId: string,
   attemptId: string,
@@ -137,33 +152,36 @@ export async function submitAttempt(
   await connectDb();
   const attempt = await IeltsTestAttempt.findOne({ _id: attemptId, userId }).lean<SubmitRow>();
   if (!attempt) return fail(NOT_FOUND);
-  if (attempt.status === "submitted") return ok(summary(attempt.score as SubmitResult));
+  if (attempt.status === "submitted") {
+    await syncPracticeBand(userId, attemptId, attempt);
+    return ok(summary(attempt.score as SubmitResult));
+  }
 
   const score = scoreSections(attempt.skill, attempt.sections, plainAnswers(attempt.answers));
   const elapsed = Math.round((now.getTime() - new Date(attempt.startedAt).getTime()) / 1000);
   const timeSec = Math.max(0, Math.min(elapsed, attempt.limitSec + GRACE_SEC));
-  // Only the first submit wins; a second tab loses the race and reads the stored score.
-  const res = await IeltsTestAttempt.updateOne(
-    { _id: attemptId, userId, status: "in_progress" },
-    {
-      $set: {
-        status: "submitted",
-        submittedAt: now,
-        timeSec,
-        score: { raw: score.raw, total: score.total, ...(score.band !== undefined ? { band: score.band } : {}), results: score.results },
+  // Only the first submit wins; a second tab loses the race and reads the stored score. The submit
+  // and its band entry are written together.
+  const won = await inTransaction(async (session) => {
+    const res = await IeltsTestAttempt.updateOne(
+      { _id: attemptId, userId, status: "in_progress" },
+      {
+        $set: {
+          status: "submitted",
+          submittedAt: now,
+          timeSec,
+          score: { raw: score.raw, total: score.total, ...(score.band !== undefined ? { band: score.band } : {}), results: score.results },
+        },
       },
-    },
-  );
-  if (!res.matchedCount) {
-    const again = await IeltsTestAttempt.findOne({ _id: attemptId, userId }).select("score").lean<{ score?: SubmitResult }>();
-    return ok(summary(again?.score as SubmitResult));
-  }
-  if (attempt.scope === "full" && score.band !== undefined) {
-    await IeltsBandEntry.updateOne(
-      { userId, attemptId, source: "practice" },
-      { $set: { date: attempt.date, bands: { [attempt.skill]: score.band } } },
-      { upsert: true },
+      { session },
     );
+    if (res.matchedCount) await syncPracticeBand(userId, attemptId, { ...attempt, score }, session);
+    return res.matchedCount > 0;
+  });
+  if (!won) {
+    const again = await IeltsTestAttempt.findOne({ _id: attemptId, userId }).select("score scope date skill").lean<SubmitRow>();
+    if (again) await syncPracticeBand(userId, attemptId, again);
+    return ok(summary(again?.score as SubmitResult));
   }
   return ok({ raw: score.raw, total: score.total, ...(score.band !== undefined ? { band: score.band } : {}) });
 }

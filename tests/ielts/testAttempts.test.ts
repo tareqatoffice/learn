@@ -118,6 +118,14 @@ describe("listening and reading attempts", () => {
     const entry = await IeltsBandEntry.findOne({ userId: u }).lean<{ source: string; bands: { reading: number } }>();
     expect(entry).toMatchObject({ source: "practice", bands: { reading: 7 } });
 
+    // Submitting again re-creates a band entry that went missing, without duplicating it (D12).
+    await IeltsBandEntry.deleteMany({});
+    await submitAttempt(u, started.attemptId, {});
+    await submitAttempt(u, started.attemptId, {});
+    expect(await IeltsBandEntry.countDocuments({ userId: u, attemptId: started.attemptId })).toBe(1);
+    await IeltsBandEntry.init();
+    await expect(IeltsBandEntry.create({ userId: u, attemptId: started.attemptId, source: "practice", date: "2026-11-12" })).rejects.toThrow(/duplicate key/);
+
     expect((await deleteTestAttempt(u, started.attemptId)).ok).toBe(true);
     expect(await IeltsBandEntry.countDocuments({})).toBe(0);
   });
