@@ -22,7 +22,9 @@ async function session(): Promise<string> {
 
 export async function startTakeAction(input: StartTakeInput) {
   const userId = await session();
-  const { task, date, lessonId, material, kind, mime, audioMime, size, audioSize } = input ?? ({} as StartTakeInput);
+  const { task, lessonId, material, kind, mime, audioMime, size, audioSize } = input ?? ({} as StartTakeInput);
+  // The take's day is the learner's local today, worked out here rather than taken from the browser.
+  const date = localDate(new Date(), await readTimeZone());
   return startTake(userId, { task, date, lessonId: lessonId ?? null, material, kind, mime, audioMime, size, audioSize });
 }
 

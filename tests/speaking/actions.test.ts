@@ -19,6 +19,7 @@ vi.mock("@/lib/stt", () => ({ sttConfigured: vi.fn(() => false), transcribe: vi.
 import * as actions from "@/app/(app)/speaking/actions";
 import { connectDb } from "@/lib/db";
 import { SpeakingDay, SpeakingLesson, SpeakingProfile, SpeakingTake } from "@/models";
+import { localDate } from "@/speaking/schedule";
 import { resetDb } from "../setup/mongo";
 
 const id = () => String(new Types.ObjectId());
@@ -111,9 +112,17 @@ describe("speaking actions", () => {
 
   it("surfaces startTake's messages", async () => {
     session.userId = id();
-    const res = await actions.startTakeAction({ ...input, date: "2020-01-01" });
+    const res = await actions.startTakeAction({ ...input, task: "nope" as never });
     expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.errors._).toBe("That date isn't today.");
+    if (!res.ok) expect(res.errors._).toBe("Unknown task.");
+  });
+
+  it("dates a take by the learner's local day on the server, ignoring the browser's date (D13)", async () => {
+    session.userId = id();
+    const res = await actions.startTakeAction({ ...input, date: "2020-01-01" });
+    if (!res.ok) throw new Error(JSON.stringify(res.errors));
+    const take = await SpeakingTake.findById(res.takeId).lean<{ date: string }>();
+    expect(take?.date).toBe(localDate(new Date(), "Europe/London"));
   });
 
   it("signed-out users are rejected", async () => {

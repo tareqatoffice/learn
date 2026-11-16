@@ -116,11 +116,20 @@ export async function startWritingAttempt(
 }
 
 /** Saves a task's text and the seconds spent so far; only while the attempt is open. */
-export async function saveWritingText(userId: string, attemptId: string, index: number, text: string, timeSec: number): Promise<ActionResult> {
+export async function saveWritingText(
+  userId: string,
+  attemptId: string,
+  index: number,
+  text: string,
+  timeSec: number,
+  now: Date = new Date(),
+): Promise<ActionResult> {
   const a = await own(userId, attemptId);
   if (!a || a.status !== "in_progress" || !a.tasks[index]) return failForm("This attempt was already submitted or doesn't exist.");
   if (typeof text !== "string" || text.length > MAX_TEXT_CHARS) return failForm(`The text is limited to ${MAX_TEXT_CHARS} characters.`);
-  const secs = Number.isFinite(timeSec) ? Math.max(0, Math.min(Math.round(timeSec), 4 * 3600)) : 0;
+  // A task can't have taken longer than the attempt has been open.
+  const open = Math.max(0, Math.round((now.getTime() - new Date(a.startedAt).getTime()) / 1000));
+  const secs = Number.isFinite(timeSec) ? Math.max(0, Math.min(Math.round(timeSec), open, 4 * 3600)) : 0;
   await IeltsWritingAttempt.updateOne(
     { _id: attemptId, userId, status: "in_progress" },
     { $set: { [`tasks.${index}.text`]: text, [`tasks.${index}.wordCount`]: wordCount(text), [`tasks.${index}.timeSec`]: secs } },
