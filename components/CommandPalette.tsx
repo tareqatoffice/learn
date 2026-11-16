@@ -44,6 +44,8 @@ export function CommandPalette() {
     failed: false,
   });
   const [at, setAt] = useState(0);
+  // Bumped by "Try again" after a failed search, to send the same term once more.
+  const [retry, setRetry] = useState(0);
   const trimmed = term.trim();
   const short = trimmed.length < MIN_CHARS;
   const answered = result.term === trimmed;
@@ -116,7 +118,13 @@ export function CommandPalette() {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [trimmed, open, short]);
+  }, [trimmed, open, short, retry]);
+
+  // Arrow keys can move the selection past the visible part of a long list.
+  useEffect(() => {
+    if (!shown.length) return;
+    document.getElementById(`${listId}-option-${active}`)?.scrollIntoView?.({ block: "nearest" });
+  }, [active, shown.length, listId]);
 
   function go(hit: SearchHit) {
     close();
@@ -186,19 +194,34 @@ export function CommandPalette() {
             Type at least {MIN_CHARS} characters.
           </p>
         ) : shown.length === 0 ? (
-          <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-            {busy
-              ? "Searching…"
-              : result.failed
-                ? "Search is not answering. Try again in a moment."
-                : "Nothing matched. Try fewer words."}
-          </p>
-        ) : (
-          <ul id={listId} role="listbox" aria-label="Results" className="grid gap-0.5">
+          <div className="grid justify-items-center gap-2 px-2 py-6 text-center text-sm text-muted-foreground">
+            <p>
+              {busy
+                ? "Searching…"
+                : result.failed
+                  ? "Search is not answering."
+                  : "Nothing matched. Try fewer words."}
+            </p>
+            {!busy && result.failed && (
+              <button
+                type="button"
+                onClick={() => {
+                  setResult({ term: "", hits: [], failed: false });
+                  setRetry((n) => n + 1);
+                }}
+                className="rounded-md border border-border px-3 py-1 text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        ) : null}
+        {/* Always in the page, empty or not, so the input's aria-controls points at something. */}
+        <ul id={listId} role="listbox" aria-label="Results" className="grid gap-0.5 empty:hidden">
             {shown.map((hit, i) => {
               const { icon: Icon, label } = KIND[hit.kind];
               return (
-                <li key={`${hit.kind}-${hit.href}`}>
+                <li key={`${hit.kind}-${hit.href}`} role="presentation">
                   <button
                     type="button"
                     id={optionId(i)}
@@ -222,8 +245,7 @@ export function CommandPalette() {
                 </li>
               );
             })}
-          </ul>
-        )}
+        </ul>
       </div>
 
       <div className="flex items-center gap-4 border-t border-border px-4 py-2 text-xs text-muted-foreground">
