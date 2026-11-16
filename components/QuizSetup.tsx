@@ -58,7 +58,7 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   const known = count?.key === key ? count.n : null;
-  const label = known !== null ? `${known} question${known === 1 ? "" : "s"}` : size ? `up to ${size} questions` : "all questions";
+  const label = known !== null ? `${known} question${known === 1 ? "" : "s"}` : size ? `${size} questions` : "all questions";
 
   function changeBooks(next: string[]) {
     setBookIds(next);
