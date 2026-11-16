@@ -1,27 +1,35 @@
-import { findLiveToken } from "@/admin/tokens";
+import { findLiveToken, type LiveToken } from "@/admin/tokens";
 import { connectDb } from "@/lib/db";
+import type { TokenScope } from "@/models";
 
 /**
- * Bearer-token check for the content API. Throws a 401 Response for a missing,
- * unknown or revoked token; route handlers return it as is.
+ * Bearer-token check for the content API. Throws a 401 Response for a missing, unknown, revoked or
+ * expired token, and a 403 when the token's scope does not cover `need`; route handlers return it.
  */
-export async function requireToken(req: Request): Promise<{ tokenId: string; name: string }> {
+export async function requireToken(req: Request, need: TokenScope = "read"): Promise<LiveToken> {
   const header = req.headers.get("authorization") ?? "";
   const match = header.match(/^Bearer\s+(\S+)$/i);
   if (!match) throw unauthorized();
   await connectDb();
   const token = await findLiveToken(match[1]);
   if (!token) throw unauthorized();
+  if (need === "write" && token.scope !== "write") {
+    throw Response.json({ error: "This API token is read-only; imports need a token with write access" }, { status: 403 });
+  }
   return token;
 }
 
-const unauthorized = () => Response.json({ error: "Missing, unknown or revoked API token" }, { status: 401 });
+const unauthorized = () => Response.json({ error: "Missing, unknown, revoked or expired API token" }, { status: 401 });
 
-/** Runs a token-authenticated handler, turning a thrown Response (the 401) into the reply. */
-export async function withToken(req: Request, handler: (token: { tokenId: string; name: string }) => Promise<Response>): Promise<Response> {
-  let token: { tokenId: string; name: string };
+/** Runs a token-authenticated handler, turning a thrown Response (the 401 or 403) into the reply. */
+export async function withToken(
+  req: Request,
+  handler: (token: LiveToken) => Promise<Response>,
+  need: TokenScope = "read",
+): Promise<Response> {
+  let token: LiveToken;
   try {
-    token = await requireToken(req);
+    token = await requireToken(req, need);
   } catch (error) {
     if (error instanceof Response) return error;
     throw error;

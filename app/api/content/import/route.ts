@@ -35,5 +35,5 @@ export function POST(req: Request): Promise<Response> {
       editedBy: `token:${token.name}`,
     });
     return Response.json(report, { status: report.errors.length ? 400 : 200 });
-  });
+  }, "write");
 }
