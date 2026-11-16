@@ -1,19 +1,14 @@
 import Link from "next/link";
+import { chipClass } from "@/components/Chip";
 import { clock } from "@/components/speaking/format";
 import { TimeZoneCookie } from "@/components/speaking/TimeZoneCookie";
 import { TrendChart } from "@/components/speaking/TrendChart";
 import { pageTitleClass } from "@/lib/ui";
-import { cn } from "@/lib/utils";
 import type { TaskKey } from "@/speaking/tasks";
 import { TASKS, TASK_LABEL, TASK_SLUG } from "@/speaking/tasks";
 
 const LIMIT = 100;
 const DATE = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" });
-const filterClass = (on: boolean) =>
-  cn(
-    "rounded-full border px-3 py-1 text-sm transition-colors pointer-coarse:px-3.5 pointer-coarse:py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-    on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:bg-muted",
-  );
 
 type Take = Awaited<ReturnType<typeof import("@/speaking/takes").listTakes>>[number];
 type TrendDay = Awaited<ReturnType<typeof import("@/speaking/progress").getTrends>>[number];
@@ -50,7 +45,7 @@ export function SpeakingHistory({
           Takes
         </h2>
         <nav aria-label="Filter by task" className="flex flex-wrap gap-2">
-          <Link href="/speaking/history" aria-current={!task ? "page" : undefined} className={filterClass(!task)}>
+          <Link href="/speaking/history" aria-current={!task ? "page" : undefined} className={chipClass(!task)}>
             All
           </Link>
           {TASKS.map((t) => (
@@ -58,7 +53,7 @@ export function SpeakingHistory({
               key={t}
               href={`/speaking/history?task=${TASK_SLUG[t]}`}
               aria-current={task === t ? "page" : undefined}
-              className={filterClass(task === t)}
+              className={chipClass(task === t)}
             >
               {TASK_LABEL[t]}
             </Link>

@@ -7,6 +7,7 @@ import { firstError } from "@/admin/result";
 import { generateQuestionsAction, startAttemptAction } from "@/app/(app)/ielts/speaking/actions";
 import { Notice } from "@/components/Notice";
 import { clock } from "@/components/speaking/format";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { AttemptSummary } from "@/ielts/speaking/attempts";
 import type { Kind } from "@/ielts/speaking/questions";
@@ -53,7 +54,11 @@ function Option({ option, aiOn, storage, highlight }: { option: HubOption; aiOn:
       <div className="grid gap-1">
         <h3 className="font-semibold">
           {option.title}
-          {highlight && <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">On today&apos;s list</span>}
+          {highlight && (
+            <Badge variant="primary" className="ml-2">
+              On today&apos;s list
+            </Badge>
+          )}
         </h3>
         <p className="text-sm text-muted-foreground">{option.blurb}</p>
       </div>

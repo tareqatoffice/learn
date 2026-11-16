@@ -43,7 +43,7 @@ function ScoreGroup({
           <label
             key={n}
             className={cn(
-              "grid size-9 cursor-pointer place-items-center rounded-lg border text-sm tabular-nums transition-colors has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring pointer-coarse:size-11",
+              "grid size-9 cursor-pointer place-items-center rounded-full border text-sm tabular-nums transition-colors has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring pointer-coarse:size-11",
               value === n ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:bg-muted",
             )}
           >

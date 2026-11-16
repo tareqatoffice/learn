@@ -5,6 +5,7 @@ import { claimSectionAction, deleteTestAttemptAction, finishSectionAction, saveA
 import { DiscardAttempt } from "@/components/ielts/DiscardAttempt";
 import { ActionStatus } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
+import { chipClass, Tab } from "@/components/Chip";
 import { Button } from "@/components/ui/button";
 import type { RunView, SectionAudioKind } from "@/ielts/practice/attempts";
 import { choicesFor, letter, type PublicGroup, type PublicQuestion } from "@/ielts/practice/marking";
@@ -118,10 +119,7 @@ function Answer({ q, group, value, onChange }: { q: PublicQuestion; group: Publi
             tabIndex={i === (picked === -1 ? 0 : picked) ? 0 : -1}
             onKeyDown={(e) => onKey(e, i)}
             onClick={() => onChange(on ? "" : c)}
-            className={cn(
-              "rounded-md border px-3 py-1 text-left text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-              on ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted",
-            )}
+            className={chipClass(on)}
           >
             {text ? `${c}. ${text}` : c}
           </button>
@@ -263,12 +261,9 @@ export function TestRunner({ view }: { view: RunView }) {
       {view.sections.length > 1 && (
         <div role="tablist" aria-label="Sections" className="flex flex-wrap gap-2">
           {view.sections.map((s, i) => (
-            <button
+            <Tab
               key={i}
-              type="button"
-              role="tab"
-              aria-selected={i === index}
-              tabIndex={i === index ? 0 : -1}
+              selected={i === index}
               onKeyDown={(e) => {
                 const next = rovingIndex(e.key, i, view.sections.length);
                 if (next === null) return;
@@ -277,10 +272,9 @@ export function TestRunner({ view }: { view: RunView }) {
                 (e.currentTarget.parentElement?.children[next] as HTMLElement | undefined)?.focus();
               }}
               onClick={() => setIndex(i)}
-              className={cn("rounded-md border px-3 py-1 text-sm", i === index ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")}
             >
               {s.title}
-            </button>
+            </Tab>
           ))}
         </div>
       )}

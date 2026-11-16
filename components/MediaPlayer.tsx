@@ -3,6 +3,7 @@
 import { Maximize, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactPlayer from "react-player";
+import { Button } from "@/components/ui/button";
 
 const SPEEDS = [1, 1.25, 1.5, 0.75];
 
@@ -10,9 +11,6 @@ function clock(sec: number): string {
   const s = Math.max(0, Math.floor(Number.isFinite(sec) ? sec : 0));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
-
-const iconButton =
-  "inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50";
 
 /**
  * Audio or video with our own controls (play/pause, seek, time, mute, speed, fullscreen for video) on
@@ -111,14 +109,15 @@ export function MediaPlayer({
         player
       )}
       <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
-        <button
+        <Button
           type="button"
+          size="icon"
           aria-label={playing ? `Pause ${label}` : `Play ${label}`}
           onClick={() => void toggle()}
-          className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="size-9 rounded-full"
         >
           {playing ? <Pause className="size-4" aria-hidden /> : <Play className="size-4 translate-x-px" aria-hidden />}
-        </button>
+        </Button>
         <input
           type="range"
           aria-label={`${label} position`}
@@ -137,32 +136,38 @@ export function MediaPlayer({
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
           {failed ? "Can't play. Press play to retry." : `${clock(time)} / ${clock(duration)}`}
         </span>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           aria-label={`Playback speed ${speed}x`}
           onClick={() => setSpeed((s) => SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length])}
-          className={`${iconButton} w-auto px-2 text-xs tabular-nums`}
+          className="tabular-nums"
         >
           {speed}x
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           aria-label={muted ? `Unmute ${label}` : `Mute ${label}`}
           aria-pressed={muted}
           onClick={() => setMuted((m) => !m)}
-          className={iconButton}
+          className="rounded-full"
         >
           {muted ? <VolumeX className="size-4" aria-hidden /> : <Volume2 className="size-4" aria-hidden />}
-        </button>
+        </Button>
         {video && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             aria-label="Fullscreen"
             onClick={() => void screen.current?.requestFullscreen?.()}
-            className={iconButton}
+            className="rounded-full"
           >
             <Maximize className="size-4" aria-hidden />
-          </button>
+          </Button>
         )}
       </div>
     </div>

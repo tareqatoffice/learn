@@ -4,7 +4,7 @@ import { Maximize2, Minus, Plus } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { setNodeStatusAction } from "@/app/(app)/graphs/actions";
-import { Chip } from "@/components/Chip";
+import { Chip, chipClass } from "@/components/Chip";
 import { ProgressBar } from "@/components/ProgressBar";
 import { type NodeState, STATE_LABEL, StatusGlyph, StatusIcon } from "@/components/StatusIcon";
 import { TopicPanel, type TopicPanelProps } from "@/components/TopicPanel";
@@ -341,12 +341,7 @@ export function GraphView({ data }: { data: GraphData }) {
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted-foreground">Up next</span>
             {upNext.slice(0, 3).map((n) => (
-              <button
-                key={n.id}
-                type="button"
-                onClick={() => pick(n.slug)}
-                className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:py-2"
-              >
+              <button key={n.id} type="button" onClick={() => pick(n.slug)} className={chipClass(false, "gap-2")}>
                 <StatusGlyph state="ready" color={colorOf(n.trackKey)} />
                 {n.title}
               </button>

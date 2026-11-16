@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { chipClass } from "@/components/Chip";
 import { ActivityHeatmap } from "@/components/profile/ActivityHeatmap";
 import { TimeZoneCookie } from "@/components/speaking/TimeZoneCookie";
 import { Card as TrackCard, ProgressRows } from "@/components/TrackCard";
@@ -276,16 +277,13 @@ export function Profile({
         </div>
       </header>
 
-      <nav aria-label="Profile sections" className="flex gap-1 overflow-x-auto border-b border-border">
+      <nav aria-label="Profile sections" className="flex flex-wrap gap-2">
         {PROFILE_TABS.map((t) => (
           <Link
             key={t}
             href={t === "overview" ? "/profile" : `/profile?tab=${t}`}
             aria-current={t === tab ? "page" : undefined}
-            className={cn(
-              "-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-              t === tab ? "border-ring text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
+            className={chipClass(t === tab, "shrink-0")}
           >
             {TAB_LABEL[t]}
           </Link>

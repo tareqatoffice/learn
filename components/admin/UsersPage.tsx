@@ -3,9 +3,11 @@ import Link from "next/link";
 import type { AdminUserRow } from "@/admin/queries";
 import { UserAccessActions, UserAccessFlash } from "@/components/admin/UserAccessActions";
 import { inputClass } from "@/components/admin/SaveBar";
+import { AdminList, AdminListItem, AdminPage } from "@/components/admin/layout";
+import { chipClass } from "@/components/Chip";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/format";
-import { AdminList, AdminListItem, AdminPage } from "@/components/admin/layout";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -23,10 +25,10 @@ const EMPTY: Record<Tab, string> = {
   all: "No users have signed in yet.",
 };
 
-const BADGE: Record<AdminUserRow["status"], { label: string; className: string }> = {
-  pending: { label: "Pending", className: "border-ring/40 bg-ring/10 text-ring" },
-  approved: { label: "Approved", className: "border-ok/40 bg-ok/10 text-ok" },
-  blocked: { label: "Blocked", className: "border-destructive/40 bg-destructive/10 text-destructive" },
+const BADGE: Record<AdminUserRow["status"], { label: string; variant: "ring" | "ok" | "destructive" }> = {
+  pending: { label: "Pending", variant: "ring" },
+  approved: { label: "Approved", variant: "ok" },
+  blocked: { label: "Blocked", variant: "destructive" },
 };
 
 function UserRow({ user: u }: { user: AdminUserRow }) {
@@ -58,9 +60,9 @@ function UserRow({ user: u }: { user: AdminUserRow }) {
           <p className="flex flex-wrap items-center gap-2">
             <span className="font-medium">{u.name || u.email}</span>
             {u.isAdmin ? (
-              <span className="rounded-full border border-border px-2 text-xs text-muted-foreground">Admin</span>
+              <Badge variant="muted">Admin</Badge>
             ) : (
-              <span className={cn("rounded-full border px-2 text-xs font-medium", badge.className)}>{badge.label}</span>
+              <Badge variant={badge.variant}>{badge.label}</Badge>
             )}
           </p>
           {u.name && <p className="truncate text-muted-foreground">{u.email}</p>}
@@ -134,26 +136,21 @@ export function UsersPage({
     >
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <nav aria-label="Filter users by status" className="flex flex-wrap gap-1 rounded-lg border border-border bg-card p-1">
+        <nav aria-label="Filter users by status" className="flex flex-wrap gap-2">
           {TABS.map((t) => (
             <Link
               key={t.value}
               href={href(t.value)}
               aria-current={tab === t.value ? "page" : undefined}
-              className={cn(
-                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium pointer-coarse:py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring",
-                tab === t.value ? "bg-muted text-foreground" : "text-muted-foreground",
-              )}
+              className={chipClass(tab === t.value, "gap-1.5")}
             >
               {t.label}
-              <span
-                className={cn(
-                  "rounded-full px-1.5 text-xs tabular-nums",
-                  t.value === "pending" && counts.pending > 0 ? "bg-ring text-primary-foreground" : "bg-background",
-                )}
+              <Badge
+                variant={t.value === "pending" && counts.pending > 0 ? "primary" : "default"}
+                className="tabular-nums"
               >
                 {counts[t.value]}
-              </span>
+              </Badge>
             </Link>
           ))}
         </nav>

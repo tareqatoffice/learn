@@ -9,6 +9,7 @@ import { Field, StatusField, SubjectsField, TextField } from "@/components/admin
 import { inputClass, SaveBar } from "@/components/admin/SaveBar";
 import { useSaveForm, withoutEmptyId } from "@/components/admin/useSaveForm";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 type Topic = { id: string; title: string; graphTitle: string };
@@ -73,16 +74,19 @@ export function QuestionForm({
           {topics.length === 0 && <p className="text-sm text-muted-foreground">Not linked to any topic.</p>}
           <ul className="flex flex-wrap gap-2">
             {topics.map((t) => (
-              <li key={t.id} className="flex items-center gap-1 rounded-full border border-border px-3 py-1 text-sm">
-                {t.graphTitle} › {t.title}
-                <button
-                  type="button"
-                  aria-label={`Unlink ${t.title}`}
-                  className="ml-1 inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground pointer-coarse:size-9"
-                  onClick={() => link(t, false)}
-                >
-                  ×
-                </button>
+              <li key={t.id}>
+                <Badge variant="default" size="md" className="gap-1 pr-1">
+                  {t.graphTitle} › {t.title}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`Unlink ${t.title}`}
+                    onClick={() => link(t, false)}
+                  >
+                    ×
+                  </Button>
+                </Badge>
               </li>
             ))}
           </ul>

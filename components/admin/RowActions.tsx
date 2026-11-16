@@ -5,10 +5,8 @@ import { moveItemAction, setStatusAction } from "@/app/(app)/admin/actions";
 import { firstError } from "@/admin/result";
 import type { OrderedKind, StatusKind } from "@/admin/service";
 import { useAdminAction } from "@/components/admin/useAdminAction";
+import { Button } from "@/components/ui/button";
 import type { Status } from "@/models/status";
-
-const buttonClass =
-  "rounded border border-border px-2 py-0.5 text-xs pointer-coarse:min-h-9 pointer-coarse:min-w-9 hover:bg-muted disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-ring";
 
 /** Up/down and a status select for one row of an admin list. */
 export function RowActions({ kind, id, status, label }: { kind: OrderedKind; id: string; status?: Status; label: string }) {
@@ -17,12 +15,12 @@ export function RowActions({ kind, id, status, label }: { kind: OrderedKind; id:
 
   return (
     <span className="flex items-center gap-1">
-      <button type="button" className={buttonClass} disabled={pending} aria-label={`Move ${label} up`} onClick={() => run(() => moveItemAction(kind, id, "up"))}>
+      <Button type="button" variant="outline" size="xs" disabled={pending} aria-label={`Move ${label} up`} onClick={() => run(() => moveItemAction(kind, id, "up"))}>
         ↑
-      </button>
-      <button type="button" className={buttonClass} disabled={pending} aria-label={`Move ${label} down`} onClick={() => run(() => moveItemAction(kind, id, "down"))}>
+      </Button>
+      <Button type="button" variant="outline" size="xs" disabled={pending} aria-label={`Move ${label} down`} onClick={() => run(() => moveItemAction(kind, id, "down"))}>
         ↓
-      </button>
+      </Button>
       {status && kind !== "subject" && (
         <select
           aria-label={`Status of ${label}`}

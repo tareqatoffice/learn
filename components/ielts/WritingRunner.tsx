@@ -6,6 +6,7 @@ import { deleteWritingAction, saveWritingTextAction, submitWritingAction } from 
 import { DiscardAttempt } from "@/components/ielts/DiscardAttempt";
 import { ActionStatus } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
+import { Tab } from "@/components/Chip";
 import { Button } from "@/components/ui/button";
 import type { WritingView } from "@/ielts/writing/attempts";
 import { MAX_TEXT_CHARS, MIN_WORDS, TASK_LIMIT_SEC, wordCount } from "@/ielts/writing/bands";
@@ -146,12 +147,9 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
       {view.tasks.length > 1 && (
         <div role="tablist" aria-label="Tasks" className="flex gap-2">
           {view.tasks.map((t, i) => (
-            <button
+            <Tab
               key={i}
-              type="button"
-              role="tab"
-              aria-selected={i === active}
-              tabIndex={i === active ? 0 : -1}
+              selected={i === active}
               onKeyDown={(e) => {
                 const next = rovingIndex(e.key, i, view.tasks.length);
                 if (next === null) return;
@@ -160,10 +158,9 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
                 (e.currentTarget.parentElement?.children[next] as HTMLElement | undefined)?.focus();
               }}
               onClick={() => setActive(i)}
-              className={cn("rounded-md border px-3 py-1 text-sm", i === active ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")}
             >
               {t.task === "task1" ? "Task 1" : "Task 2"}
-            </button>
+            </Tab>
           ))}
         </div>
       )}

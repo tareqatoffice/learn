@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { chipClass } from "@/components/Chip";
 import { OverlayMenu } from "@/components/OverlayMenu";
 import type { QuestionStep } from "@/content/queries";
 import { Markdown } from "@/lib/markdown/Markdown";
@@ -154,7 +155,7 @@ export function QuestionView({ view }: { view: QuestionViewData }) {
           <p className="mt-4 text-sm">
             <Link
               href={`/graphs/${encodeURIComponent(topic.graphSlug)}?topic=${encodeURIComponent(topic.nodeSlug)}`}
-              className="rounded-full border border-border px-3 py-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              className={chipClass(false, "text-muted-foreground")}
             >
               Graph topic: {topic.title}
             </Link>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { chipClass } from "@/components/Chip";
 import { BandCharts } from "@/components/ielts/BandCharts";
 import { dateLabel } from "@/components/ielts/format";
 import type { AttemptSummary } from "@/ielts/speaking/attempts";
@@ -24,8 +25,6 @@ function matches(f: Filter, a: AttemptSummary): boolean {
 }
 
 const minutes = (sec: number) => `${Math.max(1, Math.round(sec / 60))} min`;
-
-const linkClass = "rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 type BandPoint = Awaited<ReturnType<typeof import("@/ielts/history").bandSeries>>[number];
 type CriteriaPoint = Awaited<ReturnType<typeof import("@/ielts/history").criteriaSeries>>[number];
@@ -73,7 +72,7 @@ export function IeltsHistory({
               key={f.key}
               href={f.key === "all" ? "/ielts/history" : `/ielts/history?show=${f.key}`}
               aria-current={f.key === filter ? "page" : undefined}
-              className={`${linkClass} ${f.key === filter ? "bg-muted font-medium" : ""}`}
+              className={chipClass(f.key === filter)}
             >
               {f.label}
             </Link>

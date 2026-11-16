@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { chipClass } from "@/components/Chip";
 import { confirm } from "@/components/ConfirmDialog";
 import { AnswerBox, FeedbackPanel, FollowUpChat } from "@/components/QuizCoach";
 import { Notice } from "@/components/Notice";
@@ -302,7 +303,7 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
         {card.topic && (
           <Link
             href={`/graphs/${encodeURIComponent(card.topic.graphSlug)}?topic=${encodeURIComponent(card.topic.nodeSlug)}`}
-            className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className={chipClass(false, "text-xs text-muted-foreground")}
           >
             Graph topic: {card.topic.title}
           </Link>

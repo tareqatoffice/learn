@@ -2,6 +2,7 @@
 
 import { Mic, MicOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AI_ANSWER_MAX, AI_MESSAGE_MAX } from "@/lib/ai-limits";
 import { useSpeechInput } from "@/lib/useSpeechInput";
@@ -122,10 +123,10 @@ export function AnswerBox({
   );
 }
 
-const VERDICT: Record<AiVerdict, { label: string; className: string }> = {
-  correct: { label: "Correct", className: "border-ok/40 bg-ok/10 text-ok" },
-  partial: { label: "Partly right", className: "border-track-1/40 bg-track-1/10 text-track-1" },
-  incorrect: { label: "Not quite", className: "border-destructive/40 bg-destructive/10 text-destructive" },
+const VERDICT: Record<AiVerdict, { label: string; variant: "ok" | "track" | "destructive" }> = {
+  correct: { label: "Correct", variant: "ok" },
+  partial: { label: "Partly right", variant: "track" },
+  incorrect: { label: "Not quite", variant: "destructive" },
 };
 
 export function FeedbackPanel({ feedback, model }: { feedback: AiFeedback; model?: string }) {
@@ -133,9 +134,9 @@ export function FeedbackPanel({ feedback, model }: { feedback: AiFeedback; model
   return (
     <section aria-label="AI feedback" className="rounded-lg border border-border bg-background p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className={cn("rounded-full border px-2.5 py-0.5 text-sm font-medium", verdict.className)}>
+        <Badge variant={verdict.variant} size="md">
           {verdict.label}
-        </span>
+        </Badge>
         <span className="text-sm tabular-nums text-muted-foreground">{feedback.score} / 100</span>
       </div>
       <p className="mt-3 text-sm">{feedback.summary}</p>

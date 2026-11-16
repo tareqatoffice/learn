@@ -175,13 +175,9 @@ function PartCard({
         <ul aria-label="Marked moments" className="flex flex-wrap gap-2">
           {view.markers.map((m, i) => (
             <li key={`${m.atSec}-${i}`}>
-              <button
-                type="button"
-                onClick={() => seek(m.atSec)}
-                className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:py-2.5"
-              >
+              <Button type="button" variant="outline" size="xs" onClick={() => seek(m.atSec)}>
                 <span className="tabular-nums">{clock(m.atSec)}</span> {m.label}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
