@@ -31,7 +31,7 @@ export default async function IeltsWritingAttemptPage({ params }: { params: Prom
           Back to Writing
         </Link>
       </div>
-      {view.status === "in_progress" ? <WritingRunner view={view} imageUrls={imageUrls} /> : <WritingReview view={view} />}
+      {view.status === "in_progress" ? <WritingRunner view={view} imageUrls={imageUrls} /> : <WritingReview view={view} imageUrls={imageUrls} />}
     </div>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { claimSectionAction, finishSectionAction, saveAnswersAction, submitAttemptAction } from "@/app/(app)/ielts/practice-actions";
+import { claimSectionAction, deleteTestAttemptAction, finishSectionAction, saveAnswersAction, submitAttemptAction } from "@/app/(app)/ielts/practice-actions";
+import { DiscardAttempt } from "@/components/ielts/DiscardAttempt";
 import { ActionStatus } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
@@ -221,9 +222,12 @@ export function TestRunner({ view }: { view: RunView }) {
         <span role="timer" aria-label="Time left" className={cn("font-mono text-lg", left !== null && left <= 60 && "text-destructive")}>
           {left === null ? "--:--" : left >= 0 ? clock(left) : `-${clock(-left)}`}
         </span>
-        <Button type="button" disabled={pending} onClick={() => submit(answered < total ? `You have ${total - answered} unanswered. Submit anyway?` : undefined)}>
-          Submit
-        </Button>
+        <span className="flex items-center gap-2">
+          <DiscardAttempt discard={() => deleteTestAttemptAction(view.id)} back={`/ielts/${view.skill}`} />
+          <Button type="button" disabled={pending} onClick={() => submit(answered < total ? `You have ${total - answered} unanswered. Submit anyway?` : undefined)}>
+            Submit
+          </Button>
+        </span>
       </div>
       <ActionStatus saved={false} errors={errors} />
       {left !== null && left <= 0 && !full && <p role="status" className="text-sm text-muted-foreground">Time is up for this section. You can keep going, then submit.</p>}

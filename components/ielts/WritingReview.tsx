@@ -12,7 +12,7 @@ import { MIN_WORDS, taskBand, WRITING_CRITERIA, writingCriterionLabel, type Writ
 
 type TaskView = WritingView["tasks"][number];
 
-function TaskReview({ attemptId, index, task }: { attemptId: string; index: number; task: TaskView }) {
+function TaskReview({ attemptId, index, task, imageUrl }: { attemptId: string; index: number; task: TaskView; imageUrl?: string }) {
   const rate = useAdminAction();
   const ask = useAdminAction();
   const [self, setSelf] = useState<Partial<Record<WritingCriterion, number>>>(() => ({ ...task.self }));
@@ -29,6 +29,14 @@ function TaskReview({ attemptId, index, task }: { attemptId: string; index: numb
       <p className="text-sm text-muted-foreground">
         {task.wordCount} words{task.wordCount < MIN_WORDS[task.task] ? ` (under the ${MIN_WORDS[task.task]}-word minimum)` : ""}
       </p>
+      <details className="rounded-md border border-border p-3 text-sm">
+        <summary className="cursor-pointer font-medium">The task</summary>
+        <p className="mt-2 whitespace-pre-wrap">{task.brief}</p>
+        {imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element -- a presigned R2 link; next/image would need a remote pattern
+          <img src={imageUrl} alt={task.imageAlt || "Chart for Task 1"} className="mt-2 max-w-full rounded border border-border" />
+        )}
+      </details>
       <details className="rounded-md border border-border p-3 text-sm">
         <summary className="cursor-pointer font-medium">Your answer</summary>
         <p className="mt-2 whitespace-pre-wrap">{task.text}</p>
@@ -147,7 +155,7 @@ function TaskReview({ attemptId, index, task }: { attemptId: string; index: numb
 }
 
 /** The submitted answer(s): rate yourself, then ask for the AI estimate, side by side. */
-export function WritingReview({ view }: { view: WritingView }) {
+export function WritingReview({ view, imageUrls = [] }: { view: WritingView; imageUrls?: string[] }) {
   const router = useRouter();
   const del = useAdminAction();
   return (
@@ -165,7 +173,7 @@ export function WritingReview({ view }: { view: WritingView }) {
         </p>
       )}
       {view.tasks.map((t, i) => (
-        <TaskReview key={i} attemptId={view.id} index={i} task={t} />
+        <TaskReview key={i} attemptId={view.id} index={i} task={t} imageUrl={imageUrls[i] || undefined} />
       ))}
       <div className="flex flex-wrap items-center gap-3">
         <Link href="/ielts/writing" className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted">

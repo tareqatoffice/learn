@@ -10,8 +10,9 @@ const { saveAnswersAction, submitAttemptAction, claimSectionAction, finishSectio
   finishSectionAction: vi.fn(async () => ({ ok: true })),
   refresh: vi.fn(),
 }));
-vi.mock("@/app/(app)/ielts/practice-actions", () => ({ saveAnswersAction, submitAttemptAction, claimSectionAction, finishSectionAction }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+const { deleteTestAttemptAction, push } = vi.hoisted(() => ({ deleteTestAttemptAction: vi.fn(async () => ({ ok: true })), push: vi.fn() }));
+vi.mock("@/app/(app)/ielts/practice-actions", () => ({ saveAnswersAction, submitAttemptAction, claimSectionAction, finishSectionAction, deleteTestAttemptAction }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push }) }));
 
 import { TestRunner } from "@/components/ielts/TestRunner";
 import type { RunView } from "@/ielts/practice/attempts";
@@ -158,5 +159,14 @@ describe("TestRunner", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/couldn't be loaded/));
     expect((screen.getAllByRole("button", { name: "Play audio" })[0] as HTMLButtonElement).disabled).toBe(false);
     expect(screen.getByRole("button", { name: "Played", hidden: true })).toBeTruthy();
+  });
+
+  it("discards the attempt after a confirm and goes back to the skill page (F4)", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<TestRunner view={view()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Discard" }));
+    await waitFor(() => expect(deleteTestAttemptAction).toHaveBeenCalledWith("a1"));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/ielts/reading"));
+    confirm.mockRestore();
   });
 });

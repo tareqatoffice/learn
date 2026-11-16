@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { saveWritingTextAction, submitWritingAction } from "@/app/(app)/ielts/practice-actions";
+import { deleteWritingAction, saveWritingTextAction, submitWritingAction } from "@/app/(app)/ielts/practice-actions";
+import { DiscardAttempt } from "@/components/ielts/DiscardAttempt";
 import { ActionStatus } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
@@ -107,9 +108,12 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
           {clock(left)}
         </span>
         <span className="text-xs text-muted-foreground">The timer never cuts you off. Your text saves automatically.</span>
-        <Button type="button" disabled={pending || texts.some((t) => !t.trim())} onClick={submit}>
-          Submit
-        </Button>
+        <span className="flex items-center gap-2">
+          <DiscardAttempt discard={() => deleteWritingAction(view.id)} back="/ielts/writing" />
+          <Button type="button" disabled={pending || texts.some((t) => !t.trim())} onClick={submit}>
+            Submit
+          </Button>
+        </span>
       </div>
       <ActionStatus saved={false} errors={errors} />
 
