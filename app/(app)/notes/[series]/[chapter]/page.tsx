@@ -46,7 +46,10 @@ export default async function ChapterPage({
   await connectDb();
   const view = await loadChapter(user.userId, series, chapter);
   if (!view) notFound();
-  await openNote(user.userId, view.chapter.id);
+  // "Last opened" is a convenience: a failed write must not stop the chapter from rendering.
+  await openNote(user.userId, view.chapter.id).catch((error: unknown) => {
+    console.error(`Couldn't record opening chapter ${view.chapter.id}: ${error instanceof Error ? error.message : String(error)}`);
+  });
 
   const position =
     view.series.chapters.findIndex((c) => c.slug === view.chapter.slug) + 1;
