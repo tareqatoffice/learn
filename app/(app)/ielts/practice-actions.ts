@@ -3,6 +3,7 @@
 import { type ActionResult } from "@/admin/result";
 import {
   claimSection,
+  finishSection,
   deleteTestAttempt,
   saveAnswers,
   startTestAttempt,
@@ -47,6 +48,10 @@ export async function startTestAction(skill: TestSkill, testId: string, scope: "
 
 export async function claimSectionAction(attemptId: string, index: number): Promise<ActionResult<{ play: SectionPlay }>> {
   return claimSection(await session(), attemptId, index);
+}
+
+export async function finishSectionAction(attemptId: string, index: number): Promise<ActionResult> {
+  return finishSection(await session(), attemptId, index);
 }
 
 export async function saveAnswersAction(attemptId: string, answers: Record<string, string>): Promise<ActionResult> {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { claimSectionAction, saveAnswersAction, submitAttemptAction } from "@/app/(app)/ielts/practice-actions";
+import { claimSectionAction, finishSectionAction, saveAnswersAction, submitAttemptAction } from "@/app/(app)/ielts/practice-actions";
 import { ActionStatus } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
@@ -19,11 +19,12 @@ function clock(sec: number): string {
 
 /**
  * Plays a Listening section: the recording, or the browser voice reading the script. Both are claimed
- * from the server when Play is pressed (a fresh link, or the script), and a full test allows one play.
+ * from the server when Play is pressed (a fresh link, or the script). A full test allows one play,
+ * used up only when playback reaches the end, so a reload or a load error can be retried. Every
+ * section's player stays mounted for the whole attempt, so switching sections never stops the audio.
  */
-function SectionAudio({ kind, once, attemptId, index }: { kind: SectionAudioKind; once: boolean; attemptId: string; index: number }) {
-  const [played, setPlayed] = useState(false);
-  const [playing, setPlaying] = useState(false);
+function SectionAudio({ kind, once, attemptId, index, heard }: { kind: SectionAudioKind; once: boolean; attemptId: string; index: number; heard: boolean }) {
+  const [state, setState] = useState<"idle" | "playing" | "done">(heard ? "done" : "idle");
   const [src, setSrc] = useState("");
   const [error, setError] = useState("");
 
@@ -31,50 +32,53 @@ function SectionAudio({ kind, once, attemptId, index }: { kind: SectionAudioKind
 
   if (kind === "none") return <p className="text-sm text-muted-foreground">No audio for this section.</p>;
 
+  const failed = (message: string) => {
+    setState("idle");
+    setSrc("");
+    setError(message);
+  };
+
+  // A full test records the play on the server; a drill can simply be played again.
+  const finished = () => {
+    if (!once) return setState("idle");
+    setState("done");
+    finishSectionAction(attemptId, index).catch(() => undefined);
+  };
+
   const play = async () => {
     setError("");
-    setPlayed(true);
-    const res = await claimSectionAction(attemptId, index);
-    if (!res.ok) {
-      setPlayed(false);
-      setError(res.errors._ ?? "Couldn't start the audio.");
-      return;
-    }
-    setPlaying(true);
+    setState("playing");
+    const res = await claimSectionAction(attemptId, index).catch(() => null);
+    if (!res?.ok) return failed((res && res.errors._) || "Couldn't start the audio. Try again.");
     if (res.play.kind === "file") {
       setSrc(res.play.url);
       return;
     }
     const u = new SpeechSynthesisUtterance(res.play.script);
     u.lang = "en-GB";
-    u.onend = () => setPlaying(false);
-    u.onerror = () => setPlaying(false);
+    u.onend = finished;
+    u.onerror = () => failed("The computer voice stopped. Press Play to start again.");
     window.speechSynthesis.speak(u);
   };
 
-  // A drill gets a normal player once its link is signed; a full test plays through once, with no controls.
-  if (src && !once) return <audio controls autoPlay src={src} className="w-full" aria-label="Section audio" />;
+  const loadError = () => failed("The audio couldn't be loaded. Press Play to try again, or ask your admin to check the file.");
 
   return (
     <div className="grid gap-2">
-      {src && (
-        <audio
-          autoPlay
-          src={src}
-          onEnded={() => setPlaying(false)}
-          onError={() => setError("The audio couldn't be loaded. Ask your admin to check the file.")}
-          aria-label="Section audio"
-        />
+      {/* A drill gets a normal player once its link is signed; a full test plays through once, with no controls. */}
+      {src && !once && <audio controls autoPlay src={src} onError={loadError} className="w-full" aria-label="Section audio" />}
+      {src && once && <audio autoPlay src={src} onEnded={finished} onError={loadError} aria-label="Section audio" />}
+      {!(src && !once) && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" variant="outline" disabled={state !== "idle"} onClick={() => void play()}>
+            {state === "playing" ? "Playing..." : state === "done" ? "Played" : "Play audio"}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {once ? "You can play it once, like the real test. " : ""}
+            {kind === "voice" ? "Computer voice, not the real test sound." : ""}
+          </span>
+        </div>
       )}
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" variant="outline" disabled={played} onClick={() => void play()}>
-          {playing ? "Playing..." : played ? "Played" : "Play audio"}
-        </Button>
-        <span className="text-xs text-muted-foreground">
-          {once ? "You can play it once, like the real test. " : ""}
-          {kind === "voice" ? "Computer voice, not the real test sound." : ""}
-        </span>
-      </div>
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -243,7 +247,13 @@ export function TestRunner({ view }: { view: RunView }) {
 
       <div className={cn("grid gap-6", !listening && "lg:grid-cols-2")}>
         {listening ? (
-          <SectionAudio key={index} kind={view.audio[index] ?? "none"} once={full} attemptId={view.id} index={index} />
+          <div>
+            {view.sections.map((_, i) => (
+              <div key={i} hidden={i !== index}>
+                <SectionAudio kind={view.audio[i] ?? "none"} once={full} attemptId={view.id} index={i} heard={view.played.includes(i)} />
+              </div>
+            ))}
+          </div>
         ) : (
           <article aria-label="Passage" className="whitespace-pre-wrap rounded-lg border border-border p-4 text-sm leading-relaxed lg:max-h-[75vh] lg:overflow-y-auto">
             <h2 className="mb-2 font-medium">{section.title}</h2>

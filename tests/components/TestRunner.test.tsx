@@ -3,13 +3,14 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { saveAnswersAction, submitAttemptAction, claimSectionAction, refresh } = vi.hoisted(() => ({
+const { saveAnswersAction, submitAttemptAction, claimSectionAction, finishSectionAction, refresh } = vi.hoisted(() => ({
   saveAnswersAction: vi.fn(),
   submitAttemptAction: vi.fn(),
   claimSectionAction: vi.fn(),
+  finishSectionAction: vi.fn(async () => ({ ok: true })),
   refresh: vi.fn(),
 }));
-vi.mock("@/app/(app)/ielts/practice-actions", () => ({ saveAnswersAction, submitAttemptAction, claimSectionAction }));
+vi.mock("@/app/(app)/ielts/practice-actions", () => ({ saveAnswersAction, submitAttemptAction, claimSectionAction, finishSectionAction }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 import { TestRunner } from "@/components/ielts/TestRunner";
@@ -24,6 +25,7 @@ const view = (over: Partial<RunView> = {}): RunView => ({
   startedAt: new Date().toISOString(),
   answers: {},
   audio: ["none"],
+  played: [],
   sections: [
     {
       title: "Passage 1",
@@ -128,5 +130,33 @@ describe("TestRunner", () => {
     render(<TestRunner view={view({ skill: "listening", scope: "full", audio: ["file"], sections: [{ ...view().sections[0], hasAudio: true }] })} />);
     await userEvent.click(screen.getByRole("button", { name: "Play audio" }));
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/already been played/));
+  });
+
+  it("keeps a full-test recording playing across a section switch and uses the play only at the end (F1)", async () => {
+    claimSectionAction.mockResolvedValueOnce({ ok: true, play: { kind: "file", url: "https://r2.test/a.mp3?sig" } });
+    const two = { ...view().sections[0], hasAudio: true };
+    const { container } = render(
+      <TestRunner view={view({ skill: "listening", scope: "full", audio: ["file", "none"], sections: [two, { ...two, title: "Part 2" }] })} />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Play audio" }));
+    await waitFor(() => expect(container.querySelector("audio")).not.toBeNull());
+    const audio = container.querySelector("audio")!;
+    await userEvent.click(screen.getByRole("tab", { name: "Part 2" }));
+    expect(container.querySelector("audio")).toBe(audio); // same element, still mounted
+    expect(finishSectionAction).not.toHaveBeenCalled();
+    audio.dispatchEvent(new Event("ended"));
+    await waitFor(() => expect(finishSectionAction).toHaveBeenCalledWith("a1", 0));
+  });
+
+  it("lets a full-test section be played again after a load error, and shows heard sections as played", async () => {
+    claimSectionAction.mockResolvedValueOnce({ ok: true, play: { kind: "file", url: "https://r2.test/a.mp3?sig" } });
+    const s = { ...view().sections[0], hasAudio: true };
+    const { container } = render(<TestRunner view={view({ skill: "listening", scope: "full", audio: ["file", "file"], played: [1], sections: [s, { ...s, title: "Part 2" }] })} />);
+    await userEvent.click(screen.getAllByRole("button", { name: "Play audio" })[0]);
+    await waitFor(() => expect(container.querySelector("audio")).not.toBeNull());
+    container.querySelector("audio")!.dispatchEvent(new Event("error"));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/couldn't be loaded/));
+    expect((screen.getAllByRole("button", { name: "Play audio" })[0] as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByRole("button", { name: "Played", hidden: true })).toBeTruthy();
   });
 });

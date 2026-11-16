@@ -163,6 +163,8 @@ export type RunView = {
    * audio link nor the script is in the page: both come from `claimSection` when Play is pressed.
    */
   audio: SectionAudioKind[];
+  /** Full test only: sections already heard to the end, which cannot be played again. */
+  played: number[];
 };
 
 export type SectionAudioKind = "file" | "voice" | "none";
@@ -221,6 +223,7 @@ export async function getAttempt(
       answers: plainAnswers(a.answers),
       sections: toPublic(a.sections),
       audio: a.sections.map((s): SectionAudioKind => (s.audioKey ? "file" : s.script ? "voice" : "none")),
+      played: a.scope === "full" ? ((a as { played?: number[] }).played ?? []) : [],
     },
   };
 }
@@ -233,7 +236,9 @@ export type SectionPlay = { kind: "file"; url: string } | { kind: "voice"; scrip
 /**
  * What a Listening section plays, handed out when Play is pressed: a freshly signed link to its
  * recording, or the script for the browser voice (the script holds the answers). Only while the
- * attempt is open, and in a full test only once per section, recorded here rather than in the browser.
+ * attempt is open. A full test plays each section once, but the play is only used up when it
+ * reaches the end (`finishSection`): a reload, a section switch or a load error mid-play does not
+ * cost the learner the section.
  */
 export async function claimSection(
   userId: string,
@@ -245,20 +250,25 @@ export async function claimSection(
   if (!isId(attemptId) || !isId(userId) || !Number.isInteger(index) || index < 0) return fail(NOT_FOUND);
   await connectDb();
   const a = await IeltsTestAttempt.findOne({ _id: attemptId, userId, status: "in_progress" })
-    .select("skill scope sections")
-    .lean<{ skill: TestSkill; scope: string; sections: Section[] }>();
+    .select("skill scope sections played")
+    .lean<{ skill: TestSkill; scope: string; sections: Section[]; played?: number[] }>();
   const section = a?.sections[index];
   if (!a || a.skill !== "listening" || !section || (!section.audioKey && !section.script)) return fail("There is no audio for this section.");
   if (section.audioKey && !storage()) return fail("Audio storage isn't set up.");
-  if (a.scope === "full") {
-    const claimed = await IeltsTestAttempt.updateOne(
-      { _id: attemptId, userId, status: "in_progress", played: { $ne: index } },
-      { $addToSet: { played: index } },
-    );
-    if (!claimed.matchedCount) return fail("This section has already been played. A full test plays it once.");
-  }
+  if (a.scope === "full" && a.played?.includes(index)) return fail("This section has already been played. A full test plays it once.");
   if (section.audioKey) return ok({ play: { kind: "file", url: await sign(section.audioKey, AUDIO_LINK_SEC) } });
   return ok({ play: { kind: "voice", script: section.script } });
+}
+
+/** Records that a full-test section played to the end, so it cannot be claimed again. Drills ignore it. */
+export async function finishSection(userId: string, attemptId: string, index: number): Promise<ActionResult> {
+  if (!isId(attemptId) || !isId(userId) || !Number.isInteger(index) || index < 0) return fail(NOT_FOUND);
+  await connectDb();
+  const res = await IeltsTestAttempt.updateOne(
+    { _id: attemptId, userId, status: "in_progress", skill: "listening", scope: "full", [`sections.${index}`]: { $exists: true } },
+    { $addToSet: { played: index } },
+  );
+  return res.matchedCount ? ok() : fail(NOT_FOUND);
 }
 
 export type AttemptListItem = {
