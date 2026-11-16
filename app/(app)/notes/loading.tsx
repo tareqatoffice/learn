@@ -1,5 +1,5 @@
-import { ListPageSkeleton } from "@/components/PageSkeleton";
+import { CardGridSkeleton } from "@/components/PageSkeleton";
 
 export default function Loading() {
-  return <ListPageSkeleton />;
+  return <CardGridSkeleton titleWidth="w-44" />;
 }
