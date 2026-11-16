@@ -3,8 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 const session = vi.hoisted(() => ({ userId: null as string | null }));
 vi.mock("@/auth", () => ({
-  auth: () =>
-    Promise.resolve(session.userId ? { user: { id: session.userId, email: "learner@example.test", name: "Learner" } } : null),
+  auth: async () => (await import("../setup/session")).approvedSession(session.userId),
 }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "Europe/London" }) }) }));
 vi.mock("@/lib/r2", () => ({
