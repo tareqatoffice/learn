@@ -36,6 +36,31 @@ export type StartTakeInput = {
   audioSize?: number;
 };
 
+/**
+ * Removes the user's takes whose upload never finished within OPEN_TAKE_MS: their R2 objects (any
+ * that reached it), then the documents. Best effort, run on each new take; a failure leaves them for
+ * the next sweep.
+ */
+export async function sweepAbandonedTakes(userId: string, now: Date = new Date()): Promise<number> {
+  if (!isId(userId)) return 0;
+  await connectDb();
+  const stale = await SpeakingTake.find({ userId, "media.stored": false, createdAt: { $lt: new Date(now.getTime() - OPEN_TAKE_MS) } })
+    .select("media")
+    .limit(50)
+    .lean<{ _id: Types.ObjectId; media: MediaDoc }[]>();
+  if (!stale.length) return 0;
+  const ids = stale.map((t) => t._id);
+  await SpeakingTake.updateMany({ _id: { $in: ids }, "media.stored": false }, { $set: { deletingAt: now } });
+  try {
+    await removeMedia(stale.map((t) => t.media));
+  } catch {
+    await SpeakingTake.updateMany({ _id: { $in: ids } }, { $unset: { deletingAt: 1 } });
+    return 0;
+  }
+  const res = await SpeakingTake.deleteMany({ _id: { $in: ids }, userId, "media.stored": false });
+  return res.deletedCount ?? 0;
+}
+
 export async function startTake(
   userId: string,
   input: StartTakeInput,
@@ -56,6 +81,7 @@ export async function startTake(
   }
 
   await connectDb();
+  await sweepAbandonedTakes(userId).catch(() => 0);
   const [open, recent] = await Promise.all([
     SpeakingTake.countDocuments({ userId, "media.stored": false, createdAt: { $gte: new Date(Date.now() - OPEN_TAKE_MS) } }),
     SpeakingTake.countDocuments({ userId, createdAt: { $gte: new Date(Date.now() - 86_400_000) } }),
@@ -110,6 +136,7 @@ type TakeDoc = {
   lessonId?: Types.ObjectId | null;
   material?: { title?: string; text?: string; prompt?: string; generated?: boolean };
   media: MediaDoc;
+  deletingAt?: Date;
   transcript?: string;
   transcriptStatus?: string;
   self?: { fluency?: number; confidence?: number; eyeContact?: number; gestures?: number; note?: string };
@@ -131,7 +158,7 @@ async function ownTake(userId: string, takeId: string): Promise<TakeDoc | null> 
 
 export async function confirmTake(userId: string, takeId: string, durationSec: number): Promise<ActionResult> {
   const take = await ownTake(userId, takeId);
-  if (!take) return fail("Recording not found.");
+  if (!take || take.deletingAt) return fail("Recording not found.");
   if (typeof durationSec !== "number" || !Number.isFinite(durationSec) || durationSec < 0) {
     return fail("Invalid recording length.");
   }
@@ -144,7 +171,7 @@ export async function confirmTake(userId: string, takeId: string, durationSec: n
   if (!main.ok) return fail(main.error);
 
   await SpeakingTake.updateOne(
-    { _id: takeId, userId, "media.stored": false },
+    { _id: takeId, userId, "media.stored": false, deletingAt: null },
     {
       $set: {
         "media.stored": true,
@@ -283,26 +310,39 @@ export async function saveSelfRating(
   return ok();
 }
 
-/** Deletes a take, stored or only started: its R2 objects (missing ones are fine), then the document. */
+/**
+ * Deletes a take, stored or only started: marks it as deleting (so a confirm racing this one
+ * cannot store it), removes its R2 objects (missing ones are fine), then the document.
+ */
 export async function deleteTake(userId: string, takeId: string): Promise<ActionResult> {
   const take = await ownTake(userId, takeId);
   if (!take) return fail("Recording not found.");
+  await SpeakingTake.updateOne({ _id: takeId, userId }, { $set: { deletingAt: new Date() } });
   try {
     await removeMedia([take.media]);
   } catch {
+    await SpeakingTake.updateOne({ _id: takeId, userId }, { $unset: { deletingAt: 1 } });
     return fail("Couldn't delete the recording. Try again.");
   }
   await SpeakingTake.deleteOne({ _id: takeId, userId });
   return ok();
 }
 
+/** Every take of the user, objects first. Throws on an R2 failure, before any document is removed. */
 export async function deleteAllTakes(userId: string): Promise<number> {
   if (!isId(userId)) return 0;
   await connectDb();
   const takes = await SpeakingTake.find({ userId }).select("media.key media.audioKey").lean<{ _id: Types.ObjectId; media: MediaDoc }[]>();
   if (!takes.length) return 0;
-  await removeMedia(takes.map((t) => t.media));
-  const res = await SpeakingTake.deleteMany({ userId, _id: { $in: takes.map((t) => t._id) } });
+  const ids = takes.map((t) => t._id);
+  await SpeakingTake.updateMany({ userId, _id: { $in: ids } }, { $set: { deletingAt: new Date() } });
+  try {
+    await removeMedia(takes.map((t) => t.media));
+  } catch (error) {
+    await SpeakingTake.updateMany({ userId, _id: { $in: ids } }, { $unset: { deletingAt: 1 } });
+    throw error;
+  }
+  const res = await SpeakingTake.deleteMany({ userId, _id: { $in: ids } });
   return res.deletedCount ?? 0;
 }
 

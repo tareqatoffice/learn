@@ -55,6 +55,8 @@ const speakingTakeSchema = new Schema(
     transcribeStartedAt: Date,
     /** Transcriptions tried for this take; capped so a failing recording can't be retried forever. */
     transcribeAttempts: { type: Number, default: 0 },
+    /** Set while the take's recordings are being removed, so a late confirm cannot store it. */
+    deletingAt: Date,
     self: { type: selfSchema, default: undefined },
     markers: { type: [markerSchema], default: [] },
     ai: { type: aiSchema, default: undefined },

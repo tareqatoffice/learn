@@ -1,6 +1,6 @@
 "use server";
 
-import { type ActionResult, ok } from "@/admin/result";
+import { type ActionResult, fail, ok } from "@/admin/result";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 import type { AiResult } from "@/progress/quizAi";
@@ -8,7 +8,7 @@ import { type BodyFeedback, type SpeechFeedback, bodyFeedback, generateMaterial,
 import { swapLesson } from "@/speaking/lessons";
 import { localDate } from "@/speaking/schedule";
 import { saveProfile, setBodyConsent } from "@/speaking/settings";
-import { type StartTakeInput, confirmTake, deleteTake, saveSelfRating, startTake } from "@/speaking/takes";
+import { type StartTakeInput, confirmTake, deleteAllTakes, deleteTake, saveSelfRating, startTake } from "@/speaking/takes";
 import { readTimeZone } from "@/speaking/timezone";
 import { transcribeTake } from "@/speaking/transcribe";
 
@@ -62,6 +62,16 @@ export async function deleteTakeAction(takeId: string): Promise<ActionResult> {
 }
 
 /** Swaps today's lesson; "today" is the learner's local date, read from the time-zone cookie. */
+/** Deletes every recording the user made in Speaking practice, files first. */
+export async function deleteAllTakesAction(): Promise<ActionResult<{ deleted: number }>> {
+  const userId = await session();
+  try {
+    return ok({ deleted: await deleteAllTakes(userId) });
+  } catch {
+    return fail("Couldn't delete your recordings. Nothing was removed; try again.");
+  }
+}
+
 export async function swapLessonAction(lessonId: string): Promise<ActionResult> {
   const userId = await session();
   const id = typeof lessonId === "string" ? lessonId : "";

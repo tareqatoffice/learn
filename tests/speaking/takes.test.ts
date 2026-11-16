@@ -12,7 +12,7 @@ vi.mock("@/lib/stt", () => ({ sttConfigured: vi.fn(() => true) }));
 
 import { connectDb } from "@/lib/db";
 import { SpeakingLesson, SpeakingTake } from "@/models";
-import { MAX_OPEN_TAKES, MAX_TAKES_PER_DAY, OPEN_TAKE_MS, deleteAllTakes, deleteTake, confirmTake, getTake, listTakes, saveSelfRating, startTake } from "@/speaking/takes";
+import { MAX_OPEN_TAKES, MAX_TAKES_PER_DAY, OPEN_TAKE_MS, sweepAbandonedTakes, deleteAllTakes, deleteTake, confirmTake, getTake, listTakes, saveSelfRating, startTake } from "@/speaking/takes";
 import * as r2 from "@/lib/r2";
 import * as stt from "@/lib/stt";
 import { resetDb } from "../setup/mongo";
@@ -129,6 +129,31 @@ describe("speaking takes", () => {
     await SpeakingTake.collection.updateMany({}, { $set: { createdAt: new Date(Date.now() - OPEN_TAKE_MS - 1000) } });
     expect((await startTake(u, base)).ok).toBe(true);
     expect((await startTake(user(), base)).ok).toBe(true); // another user is unaffected
+  });
+
+  it("sweeps a user's takes left unconfirmed for over an hour, files first (D5)", async () => {
+    const u = user();
+    const old = await start(u);
+    const fresh = await start(u);
+    const kept = await start(user());
+    await SpeakingTake.collection.updateMany({ _id: { $in: [new Types.ObjectId(old.takeId), new Types.ObjectId(kept.takeId)] } }, { $set: { createdAt: new Date(Date.now() - OPEN_TAKE_MS - 1000) } });
+    vi.mocked(r2.deleteObjects).mockClear();
+    expect(await sweepAbandonedTakes(u)).toBe(1);
+    expect(r2.deleteObjects).toHaveBeenCalledWith([`takes/${u}/${old.takeId}.webm`]);
+    expect(await SpeakingTake.exists({ _id: old.takeId })).toBeNull();
+    expect(await SpeakingTake.exists({ _id: fresh.takeId })).toBeTruthy();
+    expect(await SpeakingTake.exists({ _id: kept.takeId })).toBeTruthy(); // someone else's
+  });
+
+  it("keeps abandoned takes when R2 fails, and a take being deleted cannot be confirmed (D5)", async () => {
+    const u = user();
+    const t = await start(u);
+    await SpeakingTake.collection.updateOne({ _id: new Types.ObjectId(t.takeId) }, { $set: { createdAt: new Date(Date.now() - OPEN_TAKE_MS - 1000) } });
+    vi.mocked(r2.deleteObjects).mockRejectedValueOnce(new Error("r2 down"));
+    expect(await sweepAbandonedTakes(u)).toBe(0);
+    expect(await SpeakingTake.exists({ _id: t.takeId, deletingAt: null })).toBeTruthy();
+    await SpeakingTake.updateOne({ _id: t.takeId }, { $set: { deletingAt: new Date() } });
+    expect((await confirmTake(u, t.takeId, 3)).ok).toBe(false);
   });
 
   it("startTake refuses past the daily limit (S3)", async () => {

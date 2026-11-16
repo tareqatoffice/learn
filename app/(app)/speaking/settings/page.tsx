@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DeleteAllTakes } from "@/components/speaking/DeleteAllTakes";
 import { SpeakingSettingsForm } from "@/components/speaking/SpeakingSettingsForm";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
@@ -8,7 +9,7 @@ import { getEffectiveSettings } from "@/speaking/settings";
 
 export const metadata = buildMetadata({
   title: "Speaking settings",
-  description: "Daily targets, which speaking tasks are on, video defaults and body-language consent.",
+  description: "Daily targets, which speaking tasks are on, video defaults, body-language consent and your recordings.",
   path: "/speaking/settings",
 });
 
@@ -27,6 +28,7 @@ export default async function SpeakingSettingsPage() {
         <p className="mt-1 text-sm text-muted-foreground">Targets are minutes a day; many short takes add up.</p>
       </div>
       <SpeakingSettingsForm settings={settings} />
+      <DeleteAllTakes />
     </div>
   );
 }

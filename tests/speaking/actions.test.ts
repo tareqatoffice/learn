@@ -126,6 +126,7 @@ describe("speaking actions", () => {
       ["speechFeedbackAction", () => actions.speechFeedbackAction(takeId)],
       ["bodyFeedbackAction", () => actions.bodyFeedbackAction(takeId, [])],
       ["generateMaterialAction", () => actions.generateMaterialAction("readAloud")],
+      ["deleteAllTakesAction", () => actions.deleteAllTakesAction()],
       ["deleteTakeAction", () => actions.deleteTakeAction(takeId)],
       ["swapLessonAction", () => actions.swapLessonAction(id())],
       ["saveProfileAction", () => actions.saveProfileAction({})],
