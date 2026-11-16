@@ -4,7 +4,7 @@ import { SpeakingTake } from "@/models";
 import { type ActionResult, fail } from "@/admin/result";
 import type { MediaDoc } from "@/recording/mediaCore";
 import { MAX_TRANSCRIBE_ATTEMPTS, STALE_TRANSCRIBE_MS, TRANSCRIBE_ATTEMPTS_MESSAGE, transcribeMedia } from "@/recording/transcribe";
-import type { transcribe } from "@/lib/stt";
+import { sttConfigured, type transcribe } from "@/lib/stt";
 
 const isId = (id: unknown) => typeof id === "string" && Types.ObjectId.isValid(id);
 
@@ -21,7 +21,9 @@ export async function transcribeTake(
     transcribeAttempts?: number;
   }>();
   if (!take || !take.media.stored) return fail("Recording not found.");
-  if (!["pending", "failed", "running"].includes(take.transcriptStatus ?? "")) {
+  // "unavailable" takes were saved while speech-to-text was off; they can be transcribed once it is on.
+  const retryable = ["pending", "failed", "running", ...(sttConfigured() ? ["unavailable"] : [])];
+  if (!retryable.includes(take.transcriptStatus ?? "")) {
     return fail("This recording can't be transcribed.");
   }
   if ((take.transcribeAttempts ?? 0) >= MAX_TRANSCRIBE_ATTEMPTS) return fail(TRANSCRIBE_ATTEMPTS_MESSAGE);
@@ -36,7 +38,7 @@ export async function transcribeTake(
       "media.stored": true,
       transcribeAttempts: { $not: { $gte: MAX_TRANSCRIBE_ATTEMPTS } },
       $or: [
-        { transcriptStatus: { $in: ["pending", "failed"] } },
+        { transcriptStatus: { $in: retryable.filter((s) => s !== "running") } },
         { transcriptStatus: "running", transcribeStartedAt: { $lt: new Date(now.getTime() - STALE_TRANSCRIBE_MS) } },
       ],
     },

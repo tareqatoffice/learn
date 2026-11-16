@@ -52,6 +52,19 @@ describe("transcribeTake", () => {
   });
   afterAll(() => mongoose.disconnect());
 
+  it("transcribes an 'unavailable' take only once speech-to-text is set up (F16)", async () => {
+    const id = await makeTake(user, { transcriptStatus: "unavailable" });
+    vi.stubEnv("CF_AI_TOKEN", "");
+    resetEnvCache();
+    expect((await transcribeTake(user, id, { transcribe: stub("hello") })).ok).toBe(false);
+    vi.stubEnv("R2_ACCOUNT_ID", "acct");
+    vi.stubEnv("CF_AI_TOKEN", "token");
+    resetEnvCache();
+    expect(await transcribeTake(user, id, { transcribe: stub("hello") })).toEqual({ ok: true, transcript: "hello" });
+    expect((await statusOf(id)).transcriptStatus).toBe("done");
+    vi.unstubAllEnvs();
+  });
+
   it("saves the transcript and marks done", async () => {
     const id = await makeTake(user);
     const res = await transcribeTake(user, id, { transcribe: stub("hello") });

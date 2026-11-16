@@ -239,7 +239,8 @@ export async function getTake(userId: string, takeId: string): Promise<TakeView 
     capSec: media.capSec,
     size: media.size,
     transcript: take.transcript,
-    transcriptStatus: take.transcriptStatus ?? "none",
+    // Saved while speech-to-text was off: once it is set up, the page offers (and starts) a transcript.
+    transcriptStatus: take.transcriptStatus === "unavailable" && sttConfigured() ? "pending" : (take.transcriptStatus ?? "none"),
     self: take.self ? { ...take.self } : undefined,
     markers: (take.markers ?? []).map((m) => ({ atSec: m.atSec, label: m.label })),
     ai,
