@@ -1,5 +1,6 @@
 "use server";
 
+import { refresh } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
@@ -24,5 +25,7 @@ export async function setNodeStatusAction(
     if (e instanceof PrereqNotDoneError) return { error: e.message };
     throw e;
   }
+  // Re-render the page so its cached copy (Back from another page) shows the saved status.
+  refresh();
   return {};
 }

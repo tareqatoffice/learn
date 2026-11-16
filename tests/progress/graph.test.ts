@@ -4,6 +4,8 @@ const session = vi.hoisted(() => ({ userId: null as string | null }));
 vi.mock("@/auth", () => ({
   auth: async () => (await import("../setup/session")).approvedSession(session.userId),
 }));
+const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock("next/cache", () => ({ refresh }));
 
 import { setNodeStatusAction } from "@/app/(app)/graphs/actions";
 import { ForbiddenError } from "@/lib/authz";
@@ -149,7 +151,10 @@ describe("graph progress", () => {
     const b = await seedNode(graphId, "b", { prereqIds: [a] });
 
     expect(await setNodeStatusAction(b, "done")).toEqual({ error: "Finish first: a title" });
+    expect(refresh).not.toHaveBeenCalled();
     expect(await setNodeStatusAction(a, "done")).toEqual({});
+    // A saved status re-renders the page, so Back from elsewhere shows it (D2).
+    expect(refresh).toHaveBeenCalledTimes(1);
     expect(await setNodeStatusAction(b, "done")).toEqual({});
   });
 

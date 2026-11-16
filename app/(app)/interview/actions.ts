@@ -1,5 +1,6 @@
 "use server";
 
+import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { AI_ANSWER_MAX, AI_MESSAGE_MAX } from "@/lib/ai-limits";
@@ -62,7 +63,7 @@ export async function recordResultAction(
     });
   const user = await requireUser();
   await connectDb();
-  return recordResult(
+  const view = await recordResult(
     user.userId,
     input.sessionId,
     input.questionId,
@@ -70,6 +71,9 @@ export async function recordResultAction(
     Math.random,
     input.attempt,
   );
+  // Keep the page's cached copy current, so Back from another page resumes at the right card.
+  refresh();
+  return view;
 }
 
 /** Clears the user's question progress for the given books (empty list = every book). */
@@ -85,6 +89,7 @@ export async function finishQuizAction(sessionId: string): Promise<void> {
   const user = await requireUser();
   await connectDb();
   await finishSession(user.userId, id);
+  refresh();
 }
 
 /** Runs an AI call, turning failures into a message (thrown errors are masked in production). */
