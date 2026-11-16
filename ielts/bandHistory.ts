@@ -85,8 +85,12 @@ export async function listBandEntries(userId: string, from?: string): Promise<Ba
 export async function deleteBandEntry(userId: string, id: string): Promise<ActionResult> {
   if (!isValidObjectId(id)) return fail("That entry doesn't exist. Reload the page.");
   await connectDb();
-  const entry = await IeltsBandEntry.findOne({ _id: id, userId }).select("source").lean<{ source: BandSource }>();
+  const entry = await IeltsBandEntry.findOne({ _id: id, userId }).select("source attemptId").lean<{ source: BandSource; attemptId?: unknown }>();
   if (!entry) return fail("That entry doesn't exist. Reload the page.");
+  // Any band synced from an attempt (older ones were stored as "practice") goes with the attempt.
+  if (entry.source === "practiceTest" || (entry.attemptId && entry.source === "practice")) {
+    return fail("Practice test bands are removed when you delete the test attempt.");
+  }
   if (entry.source === "mockSelf" || entry.source === "mockAi") return fail("Mock bands are removed when you delete the mock attempt.");
   if (entry.source === "writingSelf" || entry.source === "writingAi") return fail("Writing bands are removed when you delete the Writing attempt.");
   await IeltsBandEntry.deleteOne({ _id: id, userId });

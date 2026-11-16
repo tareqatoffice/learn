@@ -12,7 +12,8 @@ import { SKILL_LABEL, bandLabel, dateLabel } from "./format";
 
 const SOURCE_LABEL: Record<BandSource, string> = {
   official: "Official result",
-  practice: "Practice test",
+  practice: "Practice test (entered)",
+  practiceTest: "Practice test in Learn",
   other: "Other",
   mockSelf: "Speaking mock (your rating)",
   mockAi: "Speaking mock (AI estimate)",

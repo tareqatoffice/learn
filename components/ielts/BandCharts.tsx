@@ -16,7 +16,7 @@ type BandRow = Partial<BandPoint> & { date: string };
 
 const own = (sources: BandPoint["source"][], pick: (p: BandPoint) => number | undefined) => (p: BandRow) =>
   p.source && sources.includes(p.source) ? pick(p as BandPoint) : undefined;
-const SELF_SOURCES: BandPoint["source"][] = ["practice", "other"];
+const SELF_SOURCES: BandPoint["source"][] = ["practice", "practiceTest", "other"];
 
 const BAND_SERIES: LineSeries<BandRow>[] = [
   { key: "overall", label: "Overall (practice)", color: "var(--chart-1)", pick: own(SELF_SOURCES, (p) => p.overall) },

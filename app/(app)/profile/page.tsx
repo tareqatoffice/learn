@@ -62,7 +62,7 @@ const BAND_KEYS = [
   ["writing", "W"],
   ["speaking", "S"],
 ] as const;
-const SOURCE: Record<string, string> = { official: "Official", practice: "Practice test", mockSelf: "Mock (self)", mockAi: "Mock (AI)", writingSelf: "Writing (self)", writingAi: "Writing (AI)", other: "Other" };
+const SOURCE: Record<string, string> = { official: "Official", practice: "Practice test (entered)", practiceTest: "Practice test", mockSelf: "Mock (self)", mockAi: "Mock (AI)", writingSelf: "Writing (self)", writingAi: "Writing (AI)", other: "Other" };
 
 function Overview({ d }: { d: ProfileData }) {
   return (

@@ -3,17 +3,32 @@ import type { BandEntryView } from "@/ielts/bandHistory";
 import type { BandSet } from "@/ielts/plan";
 import { bandLabel, dateLabel } from "./format";
 
-/** Last Speaking mock (self and AI estimate), latest overall from band history, and the target. */
+const SKILL_ROWS = [
+  ["listening", "Listening"],
+  ["reading", "Reading"],
+  ["writing", "Writing"],
+  ["speaking", "Speaking"],
+] as const;
+
+/**
+ * The newest band for each skill and overall from band history (any source), the last Speaking mock
+ * (self and AI estimate), and the target.
+ */
 export function LatestBands({ entries, target }: { entries: BandEntryView[]; target: BandSet }) {
   const newest = (pred: (e: BandEntryView) => boolean) => entries.filter(pred).at(-1);
   const self = newest((e) => e.source === "mockSelf" && e.bands.speaking !== undefined);
   const ai = newest((e) => e.source === "mockAi" && e.bands.speaking !== undefined);
   const overall = newest((e) => e.overall !== undefined);
   const speakingTarget = target.speaking ?? target.overall;
+  const perSkill = SKILL_ROWS.map(([skill, name]): [string, string, string | undefined] => {
+    const e = newest((x) => x.bands[skill] !== undefined);
+    return [`Latest ${name}`, e ? bandLabel(e.bands[skill]!) : "–", e && dateLabel(e.date)];
+  });
 
   const rows: [string, string, string | undefined][] = [
     ["Target", bandLabel(target.overall), undefined],
     ["Speaking target", bandLabel(speakingTarget), undefined],
+    ...perSkill,
     ["Last Speaking mock (your rating)", self ? bandLabel(self.bands.speaking!) : "–", self && dateLabel(self.date)],
     ["Last Speaking mock (AI estimate)", ai ? bandLabel(ai.bands.speaking!) : "–", ai && dateLabel(ai.date)],
     ["Latest overall", overall ? bandLabel(overall.overall!) : "–", overall && dateLabel(overall.date)],

@@ -4,6 +4,7 @@ import { connectDb } from "@/lib/db";
 import { IeltsBandEntry, IeltsListeningTest, IeltsReadingTest, IeltsTestAttempt } from "@/models";
 import { AUDIO_LINK_SEC, claimSection, deleteTestAttempt, finishSection, getAttempt, listTestAttempts, listTests, saveAnswers, startTestAttempt, submitAttempt, TIME_UP_MESSAGE } from "@/ielts/practice/attempts";
 import { parseQuestions } from "@/ielts/practice/format";
+import { deleteBandEntry } from "@/ielts/bandHistory";
 import { resetDb } from "../setup/mongo";
 
 const user = () => String(new Types.ObjectId());
@@ -116,7 +117,10 @@ describe("listening and reading attempts", () => {
     const res = await submitAttempt(u, started.attemptId, answers);
     expect(res).toEqual({ ok: true, ...{ raw: 30, total: 40, band: 7 } });
     const entry = await IeltsBandEntry.findOne({ userId: u }).lean<{ source: string; bands: { reading: number } }>();
-    expect(entry).toMatchObject({ source: "practice", bands: { reading: 7 } });
+    expect(entry).toMatchObject({ source: "practiceTest", bands: { reading: 7 } });
+    const entryId = String((await IeltsBandEntry.findOne({ userId: u }).lean<{ _id: unknown }>())!._id);
+    // Owned by the attempt: not deletable on its own (F22).
+    expect((await deleteBandEntry(u, entryId)).ok).toBe(false);
 
     // Submitting again re-creates a band entry that went missing, without duplicating it (D12).
     await IeltsBandEntry.deleteMany({});
@@ -124,7 +128,7 @@ describe("listening and reading attempts", () => {
     await submitAttempt(u, started.attemptId, {});
     expect(await IeltsBandEntry.countDocuments({ userId: u, attemptId: started.attemptId })).toBe(1);
     await IeltsBandEntry.init();
-    await expect(IeltsBandEntry.create({ userId: u, attemptId: started.attemptId, source: "practice", date: "2026-11-12" })).rejects.toThrow(/duplicate key/);
+    await expect(IeltsBandEntry.create({ userId: u, attemptId: started.attemptId, source: "practiceTest", date: "2026-11-12" })).rejects.toThrow(/duplicate key/);
 
     expect((await deleteTestAttempt(u, started.attemptId)).ok).toBe(true);
     expect(await IeltsBandEntry.countDocuments({})).toBe(0);

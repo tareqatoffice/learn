@@ -1,7 +1,10 @@
 import mongoose, { Schema, model } from "mongoose";
 
-/** Where a band entry came from: typed in (official, practice, other) or synced from an attempt. */
-export const IELTS_BAND_SOURCES = ["official", "practice", "mockSelf", "mockAi", "writingSelf", "writingAi", "other"] as const;
+/**
+ * Where a band entry came from: typed in (official, practice, other) or synced from an attempt
+ * (practiceTest for Listening/Reading tests taken here, mock* for Speaking, writing* for Writing).
+ */
+export const IELTS_BAND_SOURCES = ["official", "practice", "practiceTest", "mockSelf", "mockAi", "writingSelf", "writingAi", "other"] as const;
 
 const ieltsBandEntrySchema = new Schema(
   {

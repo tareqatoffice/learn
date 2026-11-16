@@ -134,7 +134,7 @@ async function syncPracticeBand(
 ): Promise<void> {
   if (a.scope !== "full" || a.score?.band === undefined) return;
   await IeltsBandEntry.updateOne(
-    { userId, attemptId, source: "practice" },
+    { userId, attemptId, source: "practiceTest" },
     { $set: { date: a.date, bands: { [a.skill]: a.score.band } } },
     { upsert: true, session },
   );
