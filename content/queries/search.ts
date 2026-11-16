@@ -1,12 +1,12 @@
 import type { Types } from "mongoose";
-import { visibleNodeFilter, visibleNoteFilter, visibleQuestionFilter } from "@/content/visibility";
+import { visibleBookIds, visibleGraphIds, visibleNodeFilter, visibleNoteFilter, visibleQuestionFilter, visibleSeriesIds } from "@/content/visibility";
 import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook } from "@/models";
 
 type Id = Types.ObjectId;
 
 export type SearchHit = {
-  kind: "question" | "topic" | "chapter";
-  /** The matched thing: a question, a graph topic or a chapter. */
+  kind: "book" | "graph" | "series" | "question" | "topic" | "chapter";
+  /** The matched thing: a book, graph or note series, or a question, graph topic or chapter. */
   title: string;
   /** Where it lives — the book, graph or series it belongs to. */
   context: string;
@@ -15,6 +15,8 @@ export type SearchHit = {
 
 /** Per kind, so one content type cannot crowd the others out of the list. */
 const PER_KIND = 6;
+/** Rows read per kind before ranking, so a prefix match further down still makes the cut. */
+const CANDIDATES = PER_KIND * 5;
 export const SEARCH_MIN = 2;
 
 /**
@@ -49,25 +51,39 @@ type Parent = { _id: Id; slug: string; title: string };
 
 /**
  * Titles matching `input` across every content type the user can see, for the command palette.
- * Questions match on their question text, topics and chapters on their title; bodies are left out
- * on purpose, so a hit is always something the user can read in the list.
+ * Books, graphs and series match on their title, questions on their question text, topics and
+ * chapters on their title; bodies are left out on purpose, so a hit is always something the user
+ * can read in the list. Within each kind, titles that start with the term come first.
  */
 export async function searchContent(input: string): Promise<SearchHit[]> {
   const query = input.trim();
   if (query.length < SEARCH_MIN) return [];
   const match = term(query);
+  const lower = query.toLowerCase();
+  const startsFirst = <T>(rows: T[], text: (row: T) => string): T[] =>
+    rows
+      .map((row, i) => ({ row, i, rank: text(row).toLowerCase().startsWith(lower) ? 0 : 1 }))
+      .sort((a, b) => a.rank - b.rank || a.i - b.i)
+      .slice(0, PER_KIND)
+      .map((x) => x.row);
 
-  const [questions, nodes, notes] = await Promise.all([
+  const [bookRows, graphRows, seriesRows, questionRows, nodeRows, noteRows] = await Promise.all([
+    QuestionBook.find({ _id: { $in: await visibleBookIds() }, title: match }, { title: 1, slug: 1 }).limit(CANDIDATES).lean<Parent[]>(),
+    Graph.find({ _id: { $in: await visibleGraphIds() }, title: match }, { title: 1, slug: 1 }).limit(CANDIDATES).lean<Parent[]>(),
+    NoteSeries.find({ _id: { $in: await visibleSeriesIds() }, title: match }, { title: 1, slug: 1 }).limit(CANDIDATES).lean<Parent[]>(),
     Question.find({ ...(await visibleQuestionFilter()), question: match }, { question: 1, bookId: 1 })
-      .limit(PER_KIND)
+      .limit(CANDIDATES)
       .lean<{ _id: Id; question: string; bookId: Id }[]>(),
     GraphNode.find({ ...(await visibleNodeFilter()), title: match }, { title: 1, slug: 1, graphId: 1 })
-      .limit(PER_KIND)
+      .limit(CANDIDATES)
       .lean<{ _id: Id; title: string; slug: string; graphId: Id }[]>(),
     Note.find({ ...(await visibleNoteFilter()), title: match }, { title: 1, slug: 1, seriesId: 1 })
-      .limit(PER_KIND)
+      .limit(CANDIDATES)
       .lean<{ _id: Id; title: string; slug: string; seriesId: Id }[]>(),
   ]);
+  const questions = startsFirst(questionRows, (q) => plain(q.question));
+  const nodes = startsFirst(nodeRows, (n) => n.title);
+  const notes = startsFirst(noteRows, (n) => n.title);
 
   const [books, graphs, series] = await Promise.all([
     parents<Parent>(QuestionBook, questions.map((q) => q.bookId)),
@@ -77,6 +93,9 @@ export async function searchContent(input: string): Promise<SearchHit[]> {
 
   // A hit whose parent has gone missing is dropped rather than linked to a dead route.
   const hits: SearchHit[] = [
+    ...startsFirst(bookRows, (b) => b.title).map<SearchHit>((b) => ({ kind: "book", title: b.title, context: "Question book", href: `/interview/${b.slug}` })),
+    ...startsFirst(graphRows, (g) => g.title).map<SearchHit>((g) => ({ kind: "graph", title: g.title, context: "Graph", href: `/graphs/${g.slug}` })),
+    ...startsFirst(seriesRows, (s) => s.title).map<SearchHit>((s) => ({ kind: "series", title: s.title, context: "Note series", href: `/notes/${s.slug}` })),
     ...questions.flatMap<SearchHit>((q) => {
       const book = books.get(String(q.bookId));
       return book
@@ -105,6 +124,6 @@ export async function searchContent(input: string): Promise<SearchHit[]> {
   ];
 
   // A title that starts with the term is what the user most likely meant.
-  const starts = (hit: SearchHit) => (hit.title.toLowerCase().startsWith(query.toLowerCase()) ? 0 : 1);
+  const starts = (hit: SearchHit) => (hit.title.toLowerCase().startsWith(lower) ? 0 : 1);
   return hits.sort((a, b) => starts(a) - starts(b));
 }

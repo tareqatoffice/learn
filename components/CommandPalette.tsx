@@ -15,6 +15,9 @@ const MIN_CHARS = 2;
 const DEBOUNCE_MS = 180;
 
 const KIND = {
+  book: { icon: MessagesSquare, label: "Book" },
+  graph: { icon: Network, label: "Graph" },
+  series: { icon: BookOpen, label: "Series" },
   question: { icon: MessagesSquare, label: "Question" },
   topic: { icon: Network, label: "Topic" },
   chapter: { icon: BookOpen, label: "Chapter" },
