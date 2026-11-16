@@ -86,7 +86,6 @@ export async function updateLesson(id: string, input: LessonInput): Promise<Acti
   return res.matchedCount ? ok() : fail(NOT_FOUND);
 }
 
-/** Removes the lesson and its audio. Users' takes and day plans are left alone. */
 export async function deleteLesson(id: string): Promise<ActionResult> {
   if (!isId(id)) return fail(NOT_FOUND);
   await connectDb();
@@ -97,7 +96,6 @@ export async function deleteLesson(id: string): Promise<ActionResult> {
     try {
       await deleteObjects([key]);
     } catch {
-      // The lesson is gone; an orphaned audio file is harmless.
     }
   }
   return ok();
@@ -113,7 +111,6 @@ export async function moveLesson(id: string, dir: "up" | "down"): Promise<Action
     .sort({ order: up ? -1 : 1 })
     .lean<{ _id: Types.ObjectId; order: number }>();
   if (!neighbour) return ok();
-  // Both halves of the swap or neither, so two lessons never end up sharing an order.
   await inTransaction((session) =>
     SpeakingLesson.bulkWrite(
       [
@@ -141,7 +138,6 @@ export async function startLessonAudioUpload(
   if (!(await SpeakingLesson.exists({ _id: id }))) return fail(NOT_FOUND);
   const ext = AUDIO_EXT[type] ?? "audio";
   const key = `lessons/${id}/${randomBytes(12).toString("hex")}.${ext}`;
-  // The length is signed, so R2 refuses an upload of any other size (the 50 MB cap can't be dodged).
   return ok({ uploadUrl: await presignPut(key, type, size), key });
 }
 
@@ -161,7 +157,6 @@ export async function confirmLessonAudio(id: string, key: string, durationSec: n
     try {
       await deleteObjects([key]);
     } catch {
-      // Orphaned file only.
     }
     return fail("Audio can be 50 MB at most.");
   }
@@ -171,7 +166,6 @@ export async function confirmLessonAudio(id: string, key: string, durationSec: n
     try {
       await deleteObjects([previous]);
     } catch {
-      // Orphaned file only.
     }
   }
   return ok();

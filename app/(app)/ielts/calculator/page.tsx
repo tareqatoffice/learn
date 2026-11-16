@@ -21,8 +21,6 @@ export default async function IeltsCalculatorPage() {
   await connectDb();
   const timeZone = await readTimeZone();
   const today = localDate(new Date(), timeZone);
-  // Attempt rows (mocks, Writing, practice tests) belong to their attempts; this page lists only
-  // results the learner entered (older practice-test rows were stored as "practice" with an attempt).
   const entries = (await listBandEntries(user.userId))
     .filter((e) => (e.source === "practice" || e.source === "official" || e.source === "other") && !e.attemptId)
     .reverse();

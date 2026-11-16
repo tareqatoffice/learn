@@ -109,7 +109,6 @@ describe("saveQuestion", () => {
     const stale = await saveQuestion({ id: q, ...questionInput(book, { answer: "Theirs" }), updatedAt: opened }, ADMIN);
     expect(stale).toEqual({ ok: false, errors: { _: STALE_EDIT_MESSAGE } });
     expect((await Question.findById(q).lean<{ answer: string }>())?.answer).toBe("Mine");
-    // Saving again with the version the first save returned works.
     expect((await saveQuestion({ id: q, ...questionInput(book, { answer: "Again" }), updatedAt: first.updatedAt }, ADMIN)).ok).toBe(true);
   });
 
@@ -153,7 +152,7 @@ describe("moveItem", () => {
     expect(await moveItem("question", ids[3], "up")).toMatchObject({ ok: true, id: ids[3] });
     const orders = await Promise.all(ids.map(async (id) => (await Question.findById(id).lean<{ order: number }>())?.order));
     expect(orders).toEqual([1, 2, 4, 3, 5]);
-    expect(await Revision.countDocuments({ entityType: "Question" })).toBe(0); // order-only change: no revisions (D11)
+    expect(await Revision.countDocuments({ entityType: "Question" })).toBe(0);
   });
 });
 

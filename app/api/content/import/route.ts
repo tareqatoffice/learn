@@ -11,7 +11,6 @@ const body = z.object({
   publish: z.boolean().optional(),
 });
 
-/** POST an import; a dry run (the default) only reports. 400 when the report has errors. */
 export function POST(req: Request): Promise<Response> {
   return withToken(req, async (token) => {
     let parsed: z.infer<typeof body>;

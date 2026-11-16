@@ -42,11 +42,10 @@ describe("ielts profile", () => {
     const u = user();
     await saveProfile(u, input(), TODAY);
     expect(await saveProfile(u, input({ examinerVoice: false, studyDays: [6, 5, 4, 3, 2, 1, 0] }), TODAY)).toEqual({ ok: true, version: 1 });
-    expect(await saveProfile(u, input(), addDays(TODAY, 3))).toEqual({ ok: true, version: 1 }); // a later day alone changes nothing
+    expect(await saveProfile(u, input(), addDays(TODAY, 3))).toEqual({ ok: true, version: 1 });
     expect(await IeltsPlan.countDocuments({ userId: u })).toBe(1);
     expect(await saveProfile(u, input({ minutesPerDay: 90 }), TODAY)).toEqual({ ok: true, version: 2 });
     expect(await saveProfile(u, input({ minutesPerDay: 90, target: { overall: 7.5 } }), TODAY)).toEqual({ ok: true, version: 3 });
-    // Resuming an ended plan always makes a fresh one.
     await endPlan(u);
     expect(await saveProfile(u, input({ minutesPerDay: 90, target: { overall: 7.5 } }), TODAY)).toEqual({ ok: true, version: 4 });
   });

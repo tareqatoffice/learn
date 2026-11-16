@@ -11,7 +11,6 @@ import { toggleItem } from "@/lib/utils";
 
 export type ClearBook = { id: string; title: string };
 
-/** Picks all books or some of them and clears the user's question progress there, after a confirm. */
 export function ClearProgress({ books }: { books: ClearBook[] }) {
   const router = useRouter();
   const [bookIds, setBookIds] = useState<string[]>([]);
@@ -44,7 +43,6 @@ export function ClearProgress({ books }: { books: ClearBook[] }) {
             ? { tone: "ok", text: `Cleared progress on ${cleared} question${cleared === 1 ? "" : "s"}.` }
             : { tone: "info", text: "There was no progress to clear." },
         );
-        // Keep the selection: resetting it would arm the button for "all books".
         router.refresh();
       } catch {
         setMessage({ tone: "error", text: "Could not clear progress. Try again." });

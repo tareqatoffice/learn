@@ -12,7 +12,7 @@ import {
 } from "@/ielts/plan";
 import { addDays } from "@/speaking/schedule";
 
-const TODAY = "2026-11-11"; // a Wednesday
+const TODAY = "2026-11-11";
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const SETTINGS: PlanSettings = { hoursPerBand: 200, split: { foundation: 30, skills: 45, mocks: 25 } };
 
@@ -40,7 +40,6 @@ function weekTotal(w: { minutes: Record<string, number> }): number {
 describe("studyDaysBetween", () => {
   it("counts inclusive days on the given weekdays, by the date string itself", () => {
     expect(studyDaysBetween("2026-11-11", "2026-11-17", ALL_DAYS)).toBe(7);
-    // 2026-11-15 is a Sunday (0), 2026-11-14 a Saturday (6).
     expect(studyDaysBetween("2026-11-11", "2026-11-17", [0, 6])).toBe(2);
     expect(studyDaysBetween("2026-11-15", "2026-11-15", [0])).toBe(1);
     expect(studyDaysBetween("2026-11-12", "2026-11-11", ALL_DAYS)).toBe(0);
@@ -124,7 +123,6 @@ describe("weekly minutes", () => {
   });
 
   it.each([30, 150])("keeps every skill at 15 %% or more of a small week (%i min)", (perWeek) => {
-    // One study day a week (Wednesday, the start day), Speaking already at target.
     const plan = generatePlan(
       inputs({
         minutesPerDay: perWeek,
@@ -143,7 +141,6 @@ describe("weekly minutes", () => {
   });
 
   it("skips the floor when a week is too small for it, keeping the total", () => {
-    // Sundays only: the last, 2-day week (Wed..Thu) has no study days, so only spread minutes.
     const adj: Adjustment = { id: "a1", kind: "spreadShortfall", minutes: 3, fromWeek: 14, createdAt: new Date(`${TODAY}T09:00:00Z`) };
     const plan = generatePlan(inputs({ studyDays: [0] }), [adj], SETTINGS);
     const w = plan.weeks[14];
@@ -166,7 +163,6 @@ describe("weekly minutes", () => {
   });
 
   it("counts only study days", () => {
-    // Weekdays only: the first week (Wed..Tue) has 5 study days.
     const plan = generatePlan(inputs({ studyDays: [1, 2, 3, 4, 5] }), [], SETTINGS);
     expect(weekTotal(plan.weeks[0])).toBe(5 * 60);
   });

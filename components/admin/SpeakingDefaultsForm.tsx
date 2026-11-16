@@ -7,7 +7,6 @@ import { SaveBar, inputClass } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
 import { TASKS, TASK_LABEL, type TaskKey } from "@/speaking/tasks";
 
-/** The default daily target, in minutes, for each speaking task. */
 export function SpeakingDefaultsForm({ initial }: { initial: Record<TaskKey, number> }) {
   const [text, setText] = useState<Record<TaskKey, string>>(
     () => Object.fromEntries(TASKS.map((t) => [t, String(initial[t])])) as Record<TaskKey, string>,

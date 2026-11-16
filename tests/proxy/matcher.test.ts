@@ -4,7 +4,6 @@ vi.mock("@/auth", () => ({ auth: vi.fn() }));
 
 import { config } from "@/proxy";
 
-// Next anchors the matcher source at both ends before matching the request path.
 const matcher = new RegExp(`^${config.matcher[0]}$`);
 
 describe("proxy matcher", () => {
@@ -15,7 +14,6 @@ describe("proxy matcher", () => {
     "/dashboard",
     "/dashboard/svg",
     "/api/x.ico",
-    // Image-looking paths below the root can still hit a page and its server actions (audit S1).
     "/speaking/x.png",
     "/notes/a/x.png",
     "/img/a.png",

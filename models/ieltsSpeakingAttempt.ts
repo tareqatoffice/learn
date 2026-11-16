@@ -30,7 +30,6 @@ const questionsSchema = new Schema(
   { _id: false },
 );
 
-/** The questions an attempt was given (bank item ids, or the text itself for AI-written sets). */
 export type IeltsSpeakingQuestions = {
   part1?: { itemIds: Types.ObjectId[]; frames: { title: string; questions: string[] }[] };
   part2?: { itemId?: Types.ObjectId; cue: { topic: string; bullets: string[]; explain: string; roundOff: string[] } };
@@ -46,13 +45,10 @@ const partSchema = new Schema(
   {
     part: { type: String, enum: ["p1", "p2", "p3"], required: true },
     media: { type: mediaSchema, required: true },
-    /** Set on each startPart, so concurrent starts and confirms of the same part can tell uploads apart. */
     uploadId: String,
     transcript: String,
     transcriptStatus: { type: String, enum: ["none", "pending", "running", "done", "failed", "unavailable"], default: "none" },
-    /** When the running transcription was claimed; a claim older than a few minutes can be taken over. */
     transcribeStartedAt: Date,
-    /** Transcriptions tried for this part; capped so a failing recording can't be retried forever. */
     transcribeAttempts: { type: Number, default: 0 },
     markers: { type: [markerSchema], default: [] },
   },
@@ -84,7 +80,6 @@ const aiSchema = new Schema(
 const ieltsSpeakingAttemptSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    /** Learner-local calendar date, YYYY-MM-DD. */
     date: { type: String, required: true },
     kind: { type: String, enum: ["mock", "part1", "part2", "part3"], required: true },
     status: { type: String, enum: ["inProgress", "complete", "incomplete"], default: "inProgress" },

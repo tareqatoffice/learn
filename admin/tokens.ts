@@ -3,13 +3,11 @@ import { isValidObjectId, type Types } from "mongoose";
 import { isAdminEmail } from "@/lib/authz";
 import { ApiToken, TOKEN_SCOPES, type TokenScope, User } from "@/models";
 
-/** Lifetimes the admin can pick for a new token, in days; null means it never expires. */
 export const TOKEN_LIFETIMES = [30, 90, 365, null] as const;
 export type TokenLifetime = (typeof TOKEN_LIFETIMES)[number];
 
 export type LiveToken = { tokenId: string; name: string; scope: TokenScope };
 
-/** Only this hash is stored; the token itself is shown once at creation. */
 export const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
 export async function createToken(
@@ -35,7 +33,6 @@ export async function createToken(
   return { id: String(doc._id), token };
 }
 
-/** False when there was no live token with that id (already revoked, or never existed). */
 export async function revokeToken(id: string): Promise<boolean> {
   if (!isValidObjectId(id)) return false;
   const res = await ApiToken.updateOne({ _id: id, revokedAt: null }, { $set: { revokedAt: new Date() } });
@@ -71,11 +68,6 @@ export async function listTokens(now: Date = new Date()): Promise<TokenRow[]> {
   }));
 }
 
-/**
- * The live token behind a bearer value, recording its use; null when there is none. A token is
- * live while it is not revoked or expired and its creator is still in ADMIN_EMAILS, so removing an
- * admin also cuts off the tokens they made.
- */
 export async function findLiveToken(token: string, now: Date = new Date()): Promise<LiveToken | null> {
   const doc = await ApiToken.findOne(
     { tokenHash: hashToken(token), revokedAt: null, $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] },

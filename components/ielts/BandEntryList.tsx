@@ -21,7 +21,6 @@ const SOURCE_LABEL: Record<BandSource, string> = {
   writingAi: "Writing test (AI estimate)",
 };
 
-/** Saved calculator results, newest first, each removable. Mock rows are removed with their attempt. */
 export function BandEntryList({ entries }: { entries: BandEntryView[] }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);

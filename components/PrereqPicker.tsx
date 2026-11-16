@@ -2,7 +2,6 @@
 
 import { Chip } from "@/components/Chip";
 
-/** Same-graph topics as toggle chips; the topic being edited is never offered. */
 export function PrereqPicker({
   options,
   selfId,

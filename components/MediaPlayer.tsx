@@ -12,13 +12,6 @@ function clock(sec: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-/**
- * Audio or video with our own controls (play/pause, seek, time, mute, speed, fullscreen for video) on
- * top of ReactPlayer's media element. `video` shows the picture above the controls; audio hides it.
- * `playerRef` exposes the element so a parent can seek or play it (e.g. jump to a moment).
- * `fallbackDuration` stands in while the file reports none (recorder WebM has no duration header),
- * and `refreshSrc` fetches a freshly signed link when playback fails, e.g. after the old one expired.
- */
 export function MediaPlayer({
   src,
   video = false,
@@ -47,7 +40,6 @@ export function MediaPlayer({
   const duration = Number.isFinite(reported) && reported > 0 ? reported : (fallbackDuration ?? 0);
   const [failed, setFailed] = useState(false);
 
-  // A stable ref callback: the parent's function may change identity every render.
   const parentRef = useRef(playerRef);
   useEffect(() => {
     parentRef.current = playerRef;
@@ -59,8 +51,6 @@ export function MediaPlayer({
 
   const toggle = async () => {
     if (failed) {
-      // Try again: with a freshly signed link when the parent can get one (the old one may have
-      // expired), else reload the same file, e.g. after a dropped connection.
       setFailed(false);
       const fresh = refreshSrc ? await refreshSrc().catch(() => null) : null;
       if (fresh && fresh !== currentSrc) setCurrentSrc(fresh);

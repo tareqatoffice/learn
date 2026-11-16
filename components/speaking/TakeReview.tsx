@@ -13,10 +13,6 @@ import { CoachPanel, type CoachAi } from "./CoachPanel";
 import { SelfRatingForm, type SelfRating } from "./SelfRatingForm";
 import { ShadowPlayer } from "./ShadowPlayer";
 
-/**
- * The take's transcript and its status. A freshly saved take arrives "pending": this starts the
- * transcription once, here rather than in the recorder, so navigating to this page never waits on it.
- */
 export function TakeTranscript({ takeId, status, transcript }: { takeId: string; status: string; transcript?: string }) {
   const router = useRouter();
   const [text, setText] = useState(transcript);
@@ -25,7 +21,6 @@ export function TakeTranscript({ takeId, status, transcript }: { takeId: string;
   const [error, setError] = useState("");
   const startedFor = useRef<string | null>(null);
 
-  // A refresh brings the server's latest status down as props.
   const [shown, setShown] = useState({ status, transcript });
   if (shown.status !== status || shown.transcript !== transcript) {
     setShown({ status, transcript });
@@ -50,7 +45,6 @@ export function TakeTranscript({ takeId, status, transcript }: { takeId: string;
       setState("failed");
     } finally {
       setBusy(false);
-      // Bring down the stored status (and let the coach see the transcript).
       router.refresh();
     }
   }, [takeId, router]);
@@ -121,14 +115,12 @@ export function TakeTranscript({ takeId, status, transcript }: { takeId: string;
   );
 }
 
-/** One take: playback, transcript, self-rating, then AI feedback, and delete. */
 export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: boolean; bodyConsent: boolean }) {
   const router = useRouter();
   const player = useRef<HTMLMediaElement | null>(null);
   const [self, setSelf] = useState<SelfRating | undefined>(take.self);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  // Refreshes (after transcription) bring new presigned URLs; keep the first so playback isn't reset.
   const [urls] = useState({ media: take.mediaUrl, audio: take.audioUrl, source: take.sourceAudioUrl });
   const video = take.kind === "video";
   const reference = take.task === "recordReview" ? take.material.prompt : take.material.text;

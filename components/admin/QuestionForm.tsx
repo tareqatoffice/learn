@@ -37,7 +37,6 @@ export function QuestionForm({
 
   const searchTopics = () => startTransition(async () => setResults(await searchTopicsAction(search, draft.subjects)));
 
-  // Links save on their own (not with the form), through the shared admin action flow.
   const linking = useAdminAction();
   function link(topic: Topic, linked: boolean) {
     linking.run(() => setQuestionTopicLinkAction(draft.id, topic.id, linked), {
@@ -98,7 +97,6 @@ export function QuestionForm({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
-                // Enter would submit (save) the question form; here it runs the search instead.
                 if (e.key !== "Enter") return;
                 e.preventDefault();
                 searchTopics();

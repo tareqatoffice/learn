@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 
-/** Pulsing placeholder block for loading UIs. */
 function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div

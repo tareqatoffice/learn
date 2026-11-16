@@ -21,15 +21,12 @@ export async function transcribeTake(
     transcribeAttempts?: number;
   }>();
   if (!take || !take.media.stored) return fail("Recording not found.");
-  // "unavailable" takes were saved while speech-to-text was off; they can be transcribed once it is on.
   const retryable = ["pending", "failed", "running", ...(sttConfigured() ? ["unavailable"] : [])];
   if (!retryable.includes(take.transcriptStatus ?? "")) {
     return fail("This recording can't be transcribed.");
   }
   if ((take.transcribeAttempts ?? 0) >= MAX_TRANSCRIBE_ATTEMPTS) return fail(TRANSCRIBE_ATTEMPTS_MESSAGE);
 
-  // Claim the take first, so two requests (a retry, a second tab) can't both spend the daily cap and
-  // both pay for speech-to-text. A claim left by a crashed request can be taken over after a while.
   const now = deps.now ?? new Date();
   const claim = await SpeakingTake.updateOne(
     {
@@ -46,7 +43,6 @@ export async function transcribeTake(
   );
   if (!claim.matchedCount) return fail("This recording is already being transcribed. Reload the page in a minute.");
 
-  // Only this claim may write the outcome.
   const ours = { _id: takeId, userId, transcriptStatus: "running", transcribeStartedAt: now };
   const before = take.transcriptStatus === "failed" ? "failed" : "pending";
   const res = await transcribeMedia(userId, take.media, {
@@ -60,7 +56,6 @@ export async function transcribeTake(
       await SpeakingTake.updateOne(ours, { $set: { transcriptStatus: "failed" } });
     },
   });
-  // Refused before the call (daily cap, missing object): release the claim and the attempt.
   if (!res.ok) await SpeakingTake.updateOne(ours, { $set: { transcriptStatus: before }, $inc: { transcribeAttempts: -1 } });
   return res;
 }

@@ -12,7 +12,6 @@ import { connectDb } from "@/lib/db";
 import { localDate } from "@/speaking/schedule";
 import { readTimeZone } from "@/speaking/timezone";
 
-// Every action signs in first and acts as the session user; ids in the input never pick the user.
 
 async function session(): Promise<string> {
   const user = await requireUser();
@@ -20,7 +19,6 @@ async function session(): Promise<string> {
   return user.userId;
 }
 
-/** The learner's local date, from the time-zone cookie. */
 async function today(): Promise<string> {
   return localDate(new Date(), await readTimeZone());
 }
@@ -37,7 +35,6 @@ export async function endPlanAction(): Promise<ActionResult> {
   return endPlan(await session());
 }
 
-/** Logs study time, today unless `date` names another of the last two weeks. */
 export async function logStudyAction(skill: Skill, minutes: number, date?: string): Promise<ActionResult> {
   const userId = await session();
   const now = await today();
@@ -74,7 +71,6 @@ export async function deleteBandEntryAction(id: string): Promise<ActionResult> {
   return deleteBandEntry(await session(), id);
 }
 
-/** The client asks for confirmation before calling this. */
 export async function deleteAllIeltsDataAction(): Promise<ActionResult> {
   const userId = await session();
   try {

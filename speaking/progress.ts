@@ -16,7 +16,6 @@ type Row = {
 
 const ZERO = { minutes: 0 };
 
-/** Stored takes only; unstored uploads never count. */
 function storedTakes(userId: string, filter: Record<string, unknown> = {}) {
   return SpeakingTake.find({ userId, "media.stored": true, ...filter });
 }
@@ -25,7 +24,6 @@ export async function getToday(
   userId: string,
   timeZone: string,
   now: Date = new Date(),
-  /** False while the browser's time zone is unknown: today's lesson is shown but not fixed to the day. */
   opts: { assignLesson?: boolean } = {},
 ): Promise<{
   date: string;

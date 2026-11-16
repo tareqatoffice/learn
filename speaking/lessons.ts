@@ -80,10 +80,8 @@ export async function todaysLesson(
   const finished = (l: LessonView) =>
     TASKS.every((task) => !enabled[task] || !lessonHasPart(l, task) || done.has(`${l.id}:${task}`));
 
-  // Everything finished: no assignment, so the UI can offer generated material.
   const pick = lessons.find((l) => !finished(l));
   if (!pick) return null;
-  // Without a known time zone `date` may be the wrong day, so the pick is shown but not kept.
   if (opts.assign !== false) await assign(userId, date, pick.id);
   return pick;
 }

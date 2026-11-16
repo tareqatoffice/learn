@@ -13,11 +13,6 @@ import {
 import type { MediaDoc } from "@/recording/mediaCore";
 import { removeMedia } from "@/recording/upload";
 
-/**
- * Deletes every piece of a user's IELTS data: the R2 objects of their attempts' parts, then the attempts,
- * band entries, study logs, plan, suggestions and profile. Speaking Practice (takes, profile, usage) is
- * left alone; `deleteAllTakes` covers that. Throws on R2 failure, before any document is removed.
- */
 export async function deleteAllIeltsData(userId: string): Promise<void> {
   if (!Types.ObjectId.isValid(userId)) return;
   await connectDb();

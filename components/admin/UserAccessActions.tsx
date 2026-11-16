@@ -11,10 +11,6 @@ import { cn } from "@/lib/utils";
 type Flash = { tone: "ok" | "error"; text: string } | null;
 const FlashContext = createContext<(flash: Flash) => void>(() => {});
 
-/**
- * Wraps the user list with one live region, so the result of approving or blocking stays visible
- * even when the row itself leaves the current tab after the refresh.
- */
 export function UserAccessFlash({ children }: { children: React.ReactNode }) {
   const [flash, setFlash] = useState<Flash>(null);
   return (
@@ -44,7 +40,6 @@ export function UserAccessFlash({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Approve / block / unblock for one non-admin user. Blocking asks for confirmation and an optional reason. */
 export function UserAccessActions({
   id,
   email,

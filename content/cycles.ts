@@ -1,9 +1,5 @@
-/**
- * Finds a dependency cycle in `edges` (node -> prerequisites). Returns a closed path such as
- * `['a','b','a']`, or null for a DAG. Edges to nodes that are not keys of `edges` are ignored.
- */
 export function findCycle(edges: Record<string, string[]>): string[] | null {
-  const state = new Map<string, 1 | 2>(); // 1 = on the current path, 2 = fully explored
+  const state = new Map<string, 1 | 2>();
   const path: string[] = [];
   const visit = (id: string): string[] | null => {
     if (!Object.hasOwn(edges, id) || state.get(id) === 2) return null;

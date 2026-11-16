@@ -12,7 +12,6 @@ import type { QuizAttempt } from "@/lib/quiz-answer";
 import type { MarkResult } from "@/progress/questions";
 import type { SessionView } from "@/progress/quiz";
 
-/** Connects a quiz session to the Server Actions; the card itself only knows callbacks. */
 export function QuizRunner({ initial, aiEnabled = false }: { initial: SessionView; aiEnabled?: boolean }) {
   const [view, setView] = useState(initial);
 
@@ -23,7 +22,6 @@ export function QuizRunner({ initial, aiEnabled = false }: { initial: SessionVie
     return next;
   }
 
-  // Rejections reach the card, which says the end wasn't saved.
   async function onFinish() {
     await finishQuizAction(view.sessionId);
     setView((v) => ({ ...v, done: true, current: null }));

@@ -7,7 +7,6 @@ import { issuesMessage } from "@/lib/zod";
 const input = z.object({ ...importFields, publish: z.boolean() });
 export type ImportInput = z.input<typeof input>;
 
-/** The admin "Import" form's preview (dryRun) or commit, as the signed-in admin `editedBy`. */
 export async function runAdminImport(raw: unknown, dryRun: boolean, editedBy: string): Promise<ImportReport | { error: string }> {
   const parsed = input.safeParse(raw);
   if (!parsed.success) return { error: issuesMessage(parsed.error) };

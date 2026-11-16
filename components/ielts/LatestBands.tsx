@@ -10,10 +10,6 @@ const SKILL_ROWS = [
   ["speaking", "Speaking"],
 ] as const;
 
-/**
- * The newest band for each skill and overall from band history (any source), the last Speaking mock
- * (self and AI estimate), and the target.
- */
 export function LatestBands({ entries, target }: { entries: BandEntryView[]; target: BandSet }) {
   const newest = (pred: (e: BandEntryView) => boolean) => entries.filter(pred).at(-1);
   const self = newest((e) => e.source === "mockSelf" && e.bands.speaking !== undefined);

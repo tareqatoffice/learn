@@ -74,7 +74,7 @@ describe("quiz sessions", () => {
       expect((await listUnfinished(user)).map((s) => s.id).sort()).toEqual([empty, used].sort());
       await discardSession(user, empty);
       await discardSession(user, used);
-      await discardSession(newUserId(), old); // someone else's: untouched
+      await discardSession(newUserId(), old);
       expect(await QuizSession.exists({ _id: empty })).toBeNull();
       expect((await loadSession(used)).finishedAt).toBeInstanceOf(Date);
       expect((await loadSession(old)).finishedAt ?? null).toBeNull();
@@ -106,7 +106,6 @@ describe("quiz sessions", () => {
       const after = await loadSession(id);
       expect(after.cursor).toBe(0);
       expect(after.results).toHaveLength(0);
-      // Marking again then works and writes both.
       await recordResult(user, id, first, "got");
       expect((await loadSession(id)).results).toHaveLength(1);
       expect(await QuestionProgress.countDocuments({ userId: user })).toBe(1);
@@ -172,7 +171,6 @@ describe("quiz sessions", () => {
       expect(session.cursor).toBe(0);
       expect(session.results).toEqual([]);
       expect(session.questionIds.map(String).sort()).toEqual([...ids].sort());
-      // Fisher-Yates with rand 0 rotates the sorted ids left by one.
       expect(session.questionIds.map(String)).toEqual([...ids.slice(1), ids[0]]);
     });
 
@@ -355,7 +353,6 @@ describe("quiz sessions", () => {
       const view = await recordResult(user, sessionId, deck[0], "skip");
       expect(view).toMatchObject({ position: 1, total: 3, done: false, counts: { got: 0, review: 0, skip: 1 } });
       expect(view.current!.id).toBe(deck[1]);
-      // A skip leaves the question unseen (F2).
       expect(await QuestionProgress.findOne({ userId: user, questionId: deck[0] }).lean()).toBeNull();
     });
 
@@ -381,7 +378,7 @@ describe("quiz sessions", () => {
       const sessionId = await start(user, all());
       const [q0, q1] = await deckOf(sessionId);
 
-      await recordResult(user, sessionId, q0, "review", () => 0); // deck of 2: requeued at the end
+      await recordResult(user, sessionId, q0, "review", () => 0);
       expect(await deckOf(sessionId)).toEqual([q0, q1, q0]);
       await recordResult(user, sessionId, q1, "got");
       const end = await recordResult(user, sessionId, q0, "got");
@@ -392,7 +389,6 @@ describe("quiz sessions", () => {
         status: "got",
         seenCount: 2,
       });
-      // A late mark on a finished session changes nothing.
       await recordResult(user, sessionId, q0, "review");
       expect((await loadSession(sessionId)).results).toHaveLength(3);
     });

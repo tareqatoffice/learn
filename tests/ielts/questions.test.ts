@@ -43,7 +43,6 @@ describe("pickQuestions", () => {
     expect(await missing("part1")).toBe(true);
     await p1("About me", { aboutYou: true });
     expect(await missing("part1")).toBe(false);
-    // A card whose only Part 3 set belongs to another card: no Part 3 for the mock.
     await p2("Card");
     await p3("Other card", { cardId: new Types.ObjectId() });
     expect(await missing("mock")).toBe(true);

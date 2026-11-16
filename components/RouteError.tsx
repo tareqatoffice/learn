@@ -10,15 +10,12 @@ const GENERIC_MESSAGE = "Something went wrong while loading this page.";
 type RouteErrorProps = {
   error: unknown;
   retry: () => void;
-  /** Extra home/dashboard link under the retry button. */
   homeHref?: string;
   homeLabel?: string;
-  /** Optional second recovery link (e.g. Home beside Dashboard). */
   secondaryHref?: string;
   secondaryLabel?: string;
 };
 
-/** User-facing copy: never expose raw messages when a digest exists or in production. */
 export function userFacingErrorMessage(
   error: unknown,
   digest?: string,
@@ -39,7 +36,6 @@ export function errorDigest(error: unknown): string | undefined {
   return undefined;
 }
 
-/** Shared fallback for `error.tsx` / `global-error.tsx` boundaries. */
 export function RouteError({
   error,
   retry,

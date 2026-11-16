@@ -1,4 +1,3 @@
-/** Bodies larger than a route allows are refused before they are read into memory. */
 export class BodyError extends Error {
   constructor(
     message: string,
@@ -9,10 +8,6 @@ export class BodyError extends Error {
   }
 }
 
-/**
- * Reads a JSON request body of at most `maxBytes`: a declared Content-Length over the limit is refused
- * before reading, and so is an actual body that turns out longer (a missing or false header).
- */
 export async function readJsonBody(req: Request, maxBytes: number): Promise<unknown> {
   const declared = Number(req.headers.get("content-length") ?? "");
   if (Number.isFinite(declared) && declared > maxBytes) throw new BodyError(`The body is over the ${Math.round(maxBytes / 1_000_000)} MB limit`, 413);
@@ -25,5 +20,4 @@ export async function readJsonBody(req: Request, maxBytes: number): Promise<unkn
   }
 }
 
-/** The limit for content imports (a whole book or note series), shared by both import routes. */
 export const IMPORT_BODY_MAX = 10_000_000;

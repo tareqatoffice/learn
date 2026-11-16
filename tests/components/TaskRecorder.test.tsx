@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -183,10 +182,8 @@ describe("TaskRecorder", () => {
 
     await user.click(retry);
     await waitFor(() => expect(actions.confirmTakeAction).toHaveBeenCalledWith("64b000000000000000000009", 42));
-    // The retry reuses the take it already started.
     expect(actions.startTakeAction).toHaveBeenCalledTimes(1);
     expect(push).toHaveBeenCalledWith("/speaking/takes/64b000000000000000000009");
-    // The review page starts transcription; the recorder only navigates.
     expect(actions.transcribeTakeAction).not.toHaveBeenCalled();
   });
 

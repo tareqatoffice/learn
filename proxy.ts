@@ -5,10 +5,6 @@ import { ACCESS_PATH, isPublicPath, routeAccess } from "@/lib/authz";
 import { buildCsp, newNonce } from "@/lib/csp";
 import { signInPath } from "@/lib/nextPath";
 
-/**
- * Lets the request through with a per-request CSP nonce: Next reads it from the request's CSP header
- * and puts it on its own scripts; the root layout reads `x-nonce` for the inline theme script.
- */
 function nextWithCsp(req: NextRequest): NextResponse {
   const nonce = newNonce();
   const csp = buildCsp({ nonce, dev: process.env.NODE_ENV === "development" });
@@ -20,14 +16,11 @@ function nextWithCsp(req: NextRequest): NextResponse {
   return res;
 }
 
-// NextAuth is configured lazily (see auth.ts), so `auth(callback)` resolves to the
-// request handler asynchronously and cannot be used directly as the export.
 export async function proxy(request: NextRequest, event: NextFetchEvent) {
   const handler = await auth(async (req) => {
     const { pathname } = req.nextUrl;
     const user = req.auth?.user;
     const email = user?.email;
-    // Every non-public request re-reads the status, so approving or blocking someone applies at once.
     const status =
       email && !isPublicPath(pathname) ? await accessStatusFor({ userId: user?.id, email }) : null;
     const access = routeAccess(pathname, email ? { email, status } : null);
@@ -44,7 +37,6 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
         ? NextResponse.json({ error: "Forbidden" }, { status: 403 })
         : new NextResponse("Forbidden", { status: 403 });
     }
-    // Signed out: the sign-in page keeps where they were going and sends them there afterwards.
     return isApi
       ? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
       : NextResponse.redirect(new URL(signInPath(`${pathname}${req.nextUrl.search}`), req.nextUrl));
@@ -52,9 +44,6 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
   return handler(request, event as never);
 }
 
-// Only Next's own assets and image files at the root of public/ skip the proxy. Deeper paths such as
-// /notes/a/x.png are proxied: they can still reach a page and carry a server action post.
-// Next requires this config to be a literal, so tests read `config.matcher[0]`.
 export const config = {
   matcher: ["/((?!_next/static/|_next/image|favicon\\.ico$|[^/]+\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };

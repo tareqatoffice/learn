@@ -20,7 +20,6 @@ export default async function DashboardPage() {
     getDashboard(user.userId, timeZone),
     getToday(user.userId, timeZone, new Date(), { assignLesson: await hasTimeZoneCookie() }),
   ]);
-  // requireUser falls back to the email when the Google profile has no name; never greet with an address.
   const firstName =
     user.name && user.name !== user.email ? user.name.split(" ")[0] : undefined;
 

@@ -17,7 +17,6 @@ afterAll(() => mongoose.disconnect());
 
 const zero = () => 0;
 
-/** One user with progress across every section. */
 async function fixtures() {
   const user = newUserId();
   const js = await seedBook("js");
@@ -111,9 +110,9 @@ describe("getDashboard", () => {
     const { user, n2, s } = await fixtures();
     const n3 = await seedNote(s, "vol");
     await Note.updateOne({ _id: n3 }, { order: 2 });
-    await setNoteRead(user, n2, true); // last opened ("net") is now read
+    await setNoteRead(user, n2, true);
     expect((await getDashboard(user)).continueReading).toMatchObject({ chapterSlug: "vol", read: 2, total: 3 });
-    await setNoteRead(user, n3, true); // whole series read: stay on the last opened chapter
+    await setNoteRead(user, n3, true);
     expect((await getDashboard(user)).continueReading).toMatchObject({ chapterSlug: "net" });
   });
 
@@ -146,7 +145,6 @@ describe("getDashboard", () => {
       "2026-11-11",
     );
     expect(res.ok).toBe(true);
-    // 23:30 UTC is already 12 Nov in Auckland, so one day fewer remains there.
     const utc = (await getDashboard(user, "UTC", now)).ielts;
     expect(utc).toMatchObject({ daysLeft: 30, done: 0 });
     expect(utc!.total).toBeGreaterThan(0);

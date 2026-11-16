@@ -48,11 +48,9 @@ export type AttemptSessionSummary = {
 export type Attempt = {
   at: Date;
   result: MarkResult;
-  /** Empty when the learner revealed the answer without answering. */
   answer: string;
   answerMode: AnswerMode | null;
   coach: CoachRecord | null;
-  /** Null when the question has been deleted or unpublished since. */
   question: null | {
     question: string;
     prompt: string;
@@ -64,7 +62,6 @@ export type Attempt = {
 
 export type AttemptLog = AttemptSessionSummary & { items: Attempt[] };
 
-/** How many sessions the history page and the full export include, newest first. */
 export const HISTORY_LIMIT = 200;
 
 const summarize = (s: SessionRow, label: string): AttemptSessionSummary => ({
@@ -73,7 +70,6 @@ const summarize = (s: SessionRow, label: string): AttemptSessionSummary => ({
   startedAt: s.startedAt,
   finishedAt: s.finishedAt ?? null,
   attempts: s.results.length,
-  // answerMode is stored only alongside an answer, so it counts answers without loading them.
   answered: s.results.filter((r) => r.answerMode).length,
   counts: sessionCounts(s),
 });
@@ -85,14 +81,12 @@ async function ownedSessions(userId: string, sessionId?: string, projection?: ob
   return QuizSession.find(query, projection).sort({ startedAt: -1, _id: -1 }).limit(HISTORY_LIMIT).lean<SessionRow[]>();
 }
 
-/** Sessions with at least one marked card, newest first. */
 export async function listAttemptSessions(userId: string): Promise<AttemptSessionSummary[]> {
   const sessions = await ownedSessions(userId, undefined, SUMMARY_PROJECTION);
   const labels = await labelSessions(sessions);
   return sessions.map((s, i) => summarize(s, labels[i]));
 }
 
-/** Every attempt of one session, or of all recent sessions, with the questions as they now read. */
 export async function getAttemptLogs(userId: string, sessionId?: string): Promise<AttemptLog[]> {
   const sessions = await ownedSessions(userId, sessionId);
   if (!sessions.length) return [];
@@ -142,12 +136,10 @@ export async function getAttemptLogs(userId: string, sessionId?: string): Promis
 export const MARK_LABEL: Record<MarkResult, string> = { got: "Got it", review: "Needs review", skip: "Skipped" };
 export const VERDICT_LABEL = { correct: "Correct", partial: "Partly right", incorrect: "Not quite" } as const;
 
-/** "1 attempt", "3 attempts". */
 export const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 const day = (d: Date) => d.toISOString().slice(0, 10);
 const time = (d: Date) => d.toISOString().slice(0, 16).replace("T", " ") + " UTC";
-/** One line of Markdown: the question title must not break the heading. */
 const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
 const quote = (s: string) =>
   s
@@ -203,7 +195,6 @@ function attemptMarkdown(item: Attempt, n: number): string {
   return lines.join("\n");
 }
 
-/** The attempt logs as one Markdown file, written for a learner to hand to another AI for review. */
 export function attemptsMarkdown(logs: AttemptLog[], exportedAt = new Date()): string {
   const total = logs.reduce((sum, l) => sum + l.items.length, 0);
   const answered = logs.reduce((sum, l) => sum + l.answered, 0);
@@ -230,7 +221,6 @@ export function attemptsMarkdown(logs: AttemptLog[], exportedAt = new Date()): s
   return out.join("\n");
 }
 
-/** A filesystem-safe file name for an export. */
 export function exportFileName(label: string | null, at = new Date()): string {
   const slug = (label ?? "all")
     .toLowerCase()

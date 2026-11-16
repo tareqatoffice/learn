@@ -19,7 +19,6 @@ const chatSchema = new Schema(
   { _id: false },
 );
 
-/** The AI coach's grade of the attempt and the follow-up chat, copied in when the card is marked (conversations expire). */
 const coachSchema = new Schema(
   {
     verdict: { type: String, enum: ["correct", "partial", "incorrect"] },
@@ -38,7 +37,6 @@ const resultSchema = new Schema(
     questionId: { type: Schema.Types.ObjectId, required: true },
     result: { type: String, enum: ["got", "review", "skip"], required: true },
     at: { type: Date, default: Date.now },
-    /** What the learner wrote or dictated before marking; absent when they only revealed the answer. */
     answer: String,
     answerMode: { type: String, enum: ANSWER_MODES },
     coach: { type: coachSchema, default: undefined },

@@ -2,10 +2,6 @@ import { auth } from "@/auth";
 import { connectDb } from "@/lib/db";
 import { attemptsMarkdown, exportFileName, getAttemptLogs } from "@/progress/attempts";
 
-/**
- * The signed-in user's quiz attempts as a Markdown download: one session with `?session=<id>`,
- * otherwise every recent session. Only the user's own sessions are ever read.
- */
 export async function GET(request: Request): Promise<Response> {
   const session = await auth();
   const userId = session?.user?.id;

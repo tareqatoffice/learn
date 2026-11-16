@@ -6,23 +6,15 @@ type Id = Types.ObjectId;
 
 export type SearchHit = {
   kind: "book" | "graph" | "series" | "question" | "topic" | "chapter";
-  /** The matched thing: a book, graph or note series, or a question, graph topic or chapter. */
   title: string;
-  /** Where it lives — the book, graph or series it belongs to. */
   context: string;
   href: string;
 };
 
-/** Per kind, so one content type cannot crowd the others out of the list. */
 const PER_KIND = 6;
-/** Rows read per kind before ranking, so a prefix match further down still makes the cut. */
 const CANDIDATES = PER_KIND * 5;
 export const SEARCH_MIN = 2;
 
-/**
- * Question text is markdown; the palette lists one plain line per hit, so inline markers come off.
- * Matching still runs against the stored text, so a term inside backticks is still found.
- */
 function plain(md: string): string {
   return md
     .replace(/`([^`]*)`/g, "$1")
@@ -32,12 +24,10 @@ function plain(md: string): string {
     .trim();
 }
 
-/** A user's term is a literal, not a pattern: escape it before it reaches a regex. */
 function term(input: string): RegExp {
   return new RegExp(input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
 }
 
-/** Maps parent ids to the fields a hit needs from them. */
 async function parents<T extends { _id: Id }>(
   model: { find: (f: object, p: object) => { lean: <R>() => Promise<R> } },
   ids: Id[],
@@ -49,12 +39,6 @@ async function parents<T extends { _id: Id }>(
 
 type Parent = { _id: Id; slug: string; title: string };
 
-/**
- * Titles matching `input` across every content type the user can see, for the command palette.
- * Books, graphs and series match on their title, questions on their question text, topics and
- * chapters on their title; bodies are left out on purpose, so a hit is always something the user
- * can read in the list. Within each kind, titles that start with the term come first.
- */
 export async function searchContent(input: string): Promise<SearchHit[]> {
   const query = input.trim();
   if (query.length < SEARCH_MIN) return [];
@@ -91,7 +75,6 @@ export async function searchContent(input: string): Promise<SearchHit[]> {
     parents<Parent>(NoteSeries, notes.map((n) => n.seriesId)),
   ]);
 
-  // A hit whose parent has gone missing is dropped rather than linked to a dead route.
   const hits: SearchHit[] = [
     ...startsFirst(bookRows, (b) => b.title).map<SearchHit>((b) => ({ kind: "book", title: b.title, context: "Question book", href: `/interview/${b.slug}` })),
     ...startsFirst(graphRows, (g) => g.title).map<SearchHit>((g) => ({ kind: "graph", title: g.title, context: "Graph", href: `/graphs/${g.slug}` })),
@@ -123,7 +106,6 @@ export async function searchContent(input: string): Promise<SearchHit[]> {
     }),
   ];
 
-  // A title that starts with the term is what the user most likely meant.
   const starts = (hit: SearchHit) => (hit.title.toLowerCase().startsWith(lower) ? 0 : 1);
   return hits.sort((a, b) => starts(a) - starts(b));
 }

@@ -12,7 +12,6 @@ import { PlanPreview } from "./PlanPreview";
 import { SKILL_LABEL, bandLabel } from "./format";
 
 const BANDS = Array.from({ length: 11 }, (_, i) => 4 + i / 2);
-// Monday first; the values are weekday numbers with 0 = Sunday.
 const DAYS = [
   [1, "Mon"],
   [2, "Tue"],
@@ -102,10 +101,6 @@ function BandSelect({
   );
 }
 
-/**
- * Setup (no `initial`) and profile edits. Saving always goes through a before/after preview of the
- * rebuilt plan, including standing changes it would drop; editing any field after a preview clears it.
- */
 export function ProfileForm({ today, initial }: { today: string; initial?: ProfileView }) {
   const router = useRouter();
   const [s, setS] = useState(() => initialState(initial, today));

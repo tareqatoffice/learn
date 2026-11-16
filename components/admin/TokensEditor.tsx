@@ -76,7 +76,6 @@ export function TokensEditor({ tokens }: { tokens: Row[] }) {
           <Button type="submit" disabled={create.pending}>
             Create token
           </Button>
-          {/* The new token itself is the success message. */}
           <ActionStatus saved={false} errors={create.errors} />
         </form>
 

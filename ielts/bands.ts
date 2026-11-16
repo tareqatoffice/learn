@@ -1,4 +1,3 @@
-// Pure band maths. No mongoose or server imports: client components import this.
 
 export type Skill = "listening" | "reading" | "writing" | "speaking";
 export const SKILLS: Skill[] = ["listening", "reading", "writing", "speaking"];
@@ -13,10 +12,8 @@ export const CRITERION_LABEL: Record<Criterion, string> = {
   pronunciation: "Pronunciation",
 };
 
-// Guards against float noise just under a boundary (e.g. 6.2499999999999).
 const EPS = 1e-9;
 
-/** Round to the half band: fraction < 0.25 down, 0.25 to < 0.75 to .5, >= 0.75 up. */
 export function roundHalf(mean: number): number {
   const whole = Math.floor(mean + EPS);
   const frac = mean - whole;
@@ -39,13 +36,11 @@ export function speakingBand(c: Record<Criterion, number>): number {
 
 type Table = ReadonlyArray<readonly [minRaw: number, band: number]>;
 
-// Approximate; commonly published Academic conversion; not official.
 const LISTENING_TABLE: Table = [
   [39, 9], [37, 8.5], [35, 8], [32, 7.5], [30, 7], [26, 6.5], [23, 6], [18, 5.5],
   [16, 5], [13, 4.5], [10, 4], [8, 3.5], [6, 3], [4, 2.5], [2, 2], [1, 1], [0, 0],
 ];
 
-// Approximate; commonly published Academic conversion; not official.
 const READING_TABLE: Table = [
   [39, 9], [37, 8.5], [35, 8], [33, 7.5], [30, 7], [27, 6.5], [23, 6], [19, 5.5],
   [15, 5], [13, 4.5], [10, 4], [8, 3.5], [6, 3], [4, 2.5], [2, 2], [1, 1], [0, 0],

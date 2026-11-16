@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 
-/** Shared selected-pill styles for chips, filter links, and tabs. */
 export function chipClass(on: boolean, className?: string) {
   return cn(
     "inline-flex max-w-full items-center rounded-full border px-3 py-1 text-left text-sm break-words transition-colors pointer-coarse:px-3.5 pointer-coarse:py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60",
@@ -11,7 +10,6 @@ export function chipClass(on: boolean, className?: string) {
   );
 }
 
-/** A pill toggle; `on` is announced through aria-pressed. */
 export function Chip({
   on,
   onClick,
@@ -32,7 +30,6 @@ export function Chip({
   );
 }
 
-/** Exclusive tab button; same look as Chip. */
 export function Tab({
   selected,
   children,

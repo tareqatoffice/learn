@@ -6,7 +6,6 @@ import { ActionStatus } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
 
-/** "Delete all my recordings": every Speaking practice take, its video and audio, after a confirm. */
 export function DeleteAllTakes() {
   const { run, pending, errors } = useAdminAction();
   const [done, setDone] = useState<number | null>(null);

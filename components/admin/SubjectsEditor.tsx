@@ -59,7 +59,6 @@ export function SubjectsEditor({ subjects }: { subjects: Row[] }) {
       {subjects.map((s) => (
         <SubjectRow key={s.id} row={s} />
       ))}
-      {/* The last row adds a subject; its key changes after an add, so it starts empty again. */}
       <SubjectRow key={`new-${subjects.length}`} row={{ id: "", slug: "", name: "" }} />
     </AdminList>
   );

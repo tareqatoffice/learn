@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import type { SuggestionView } from "@/ielts/suggestions";
 import { PlanPreview } from "./PlanPreview";
 
-/** One pending plan suggestion. The plan changes only when the learner clicks approve. */
 export function SuggestionCard({ suggestion }: { suggestion: SuggestionView }) {
   const router = useRouter();
   const [showPreview, setShowPreview] = useState(false);
@@ -21,7 +20,6 @@ export function SuggestionCard({ suggestion }: { suggestion: SuggestionView }) {
     start(async () => {
       const res = await action(suggestion.id);
       if (!res.ok) setError(firstError(res.errors) ?? "That didn't work. Try again.");
-      // Also on failure: a stale suggestion is gone from the server, so reloading drops it.
       router.refresh();
     });
   }

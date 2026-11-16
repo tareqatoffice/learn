@@ -37,7 +37,6 @@ export default async function GraphPage({
 
   return (
     <div className="grid gap-6">
-      {/* GraphView reads the selected topic from ?topic= itself. */}
       <GraphView data={data} />
       {data.graph.footer && (
         <footer className="text-sm text-muted-foreground">

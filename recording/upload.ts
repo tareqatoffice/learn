@@ -9,22 +9,15 @@ const tooLarge = (maxBytes: number) =>
 const isSize = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n > 0;
 
 export type PrepareUploadInput = {
-  /** R2 key without extension, e.g. `takes/<userId>/<takeId>`. */
   keyBase: string;
   kind: "audio" | "video";
   mime: string;
   audioMime?: string;
-  /** Byte size of the recorded blob; it is signed into the upload URL, so only that size uploads. */
   size: number;
-  /** Byte size of the audio-only blob (video recordings). */
   audioSize?: number;
   capSec: number;
 };
 
-/**
- * Validates a recording about to be uploaded and presigns its PUT URL(s). Keys are
- * `${keyBase}.${ext}` and, for video, `${keyBase}.audio.${ext}`. The returned media is not stored yet.
- */
 export async function prepareUpload(
   input: PrepareUploadInput,
 ): Promise<ActionResult<{ media: MediaDoc; uploadUrl: string; audioUploadUrl?: string; maxBytes: number }>> {
@@ -62,11 +55,6 @@ export async function prepareUpload(
   return ok({ media, uploadUrl, ...(audioUploadUrl ? { audioUploadUrl } : {}), maxBytes });
 }
 
-/**
- * Checks the uploaded object(s) exist, are non-empty and within the cap. A rejected upload is
- * removed from R2 so nothing oversize or partial is left in the bucket; the caller keeps its
- * document so the client can upload again to the same URLs and retry.
- */
 export async function verifyUpload(media: MediaDoc): Promise<{ ok: true; size: number } | { ok: false; error: string }> {
   const reject = async () => {
     try {
@@ -76,7 +64,6 @@ export async function verifyUpload(media: MediaDoc): Promise<{ ok: true; size: n
     }
     return { ok: false as const, error: UPLOAD_FAILED };
   };
-  // The stored type must be the one the URL was signed for (an empty one from storage is let through).
   const wrongType = (stored: string, expected: string | undefined) => Boolean(stored) && baseMime(stored) !== baseMime(expected ?? "");
   const main = await headObject(media.key);
   if (!main || main.size <= 0 || main.size > capBytes(media.capSec, media.kind === "video")) return reject();
@@ -89,14 +76,12 @@ export async function verifyUpload(media: MediaDoc): Promise<{ ok: true; size: n
   return { ok: true, size: main.size };
 }
 
-/** Presigned GET URLs for a stored recording, or null when it isn't stored. */
 export async function playbackUrls(media: MediaDoc): Promise<{ url: string; audioUrl?: string } | null> {
   if (!media.stored) return null;
   const url = await presignGet(media.key);
   return media.audioKey ? { url, audioUrl: await presignGet(media.audioKey) } : { url };
 }
 
-/** Deletes every R2 object of these recordings; keys already gone are fine. Throws on R2 failure. */
 export async function removeMedia(medias: MediaDoc[]): Promise<void> {
   await deleteObjects(medias.flatMap(keysOf));
 }

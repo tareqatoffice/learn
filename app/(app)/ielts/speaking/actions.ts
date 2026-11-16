@@ -23,7 +23,6 @@ import { localDate } from "@/speaking/schedule";
 import { setBodyConsent } from "@/speaking/settings";
 import { readTimeZone } from "@/speaking/timezone";
 
-// Every action signs in first and acts as the session user; ids in the input never pick the user.
 
 async function session(): Promise<string> {
   const user = await requireUser();
@@ -31,7 +30,6 @@ async function session(): Promise<string> {
   return user.userId;
 }
 
-/** The learner's local date, from the time-zone cookie. */
 async function today(): Promise<string> {
   return localDate(new Date(), await readTimeZone());
 }

@@ -11,7 +11,6 @@ import type { ImportReport } from "@/content/types";
 type Kind = "book" | "series" | "graph";
 type Files = { name: string; size: number; content: string }[];
 
-/** Paste or upload content, preview the import, then commit exactly what was previewed. */
 export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string; name: string }[] }) {
   const [kind, setKind] = useState<Kind>("book");
   const [slug, setSlug] = useState("");
@@ -21,12 +20,10 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
   const [text, setText] = useState("");
   const [files, setFiles] = useState<Files>([]);
   const [report, setReport] = useState<ImportReport | null>(null);
-  // True only while the inputs are exactly what the last clean preview saw; any edit clears it.
   const [previewClean, setPreviewClean] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  /** Wraps a setter so every input change invalidates the last preview. */
   const edit =
     <T,>(setter: (value: T) => void) =>
     (value: T) => {
@@ -34,7 +31,6 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
       setter(value);
     };
 
-  // Built only when Preview or Commit is pressed, never per keystroke.
   function build(): ImportInput | string {
     const target = { kind, slug: slug.trim() };
     const base = { target, title: title.trim() || undefined, subjects, publish };
@@ -54,7 +50,6 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
     return { ...base, source: { kind, markdown: body } };
   }
 
-  // A commit that reports errors wrote nothing (the plan stopped it, or the transaction rolled back).
   const committed = report !== null && !report.dryRun && report.errors.length === 0;
 
   const go = (commit: boolean) =>

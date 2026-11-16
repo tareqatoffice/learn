@@ -1,4 +1,3 @@
-// Band history: calculator results and mock bands, one row per skill set and date.
 
 import { isValidObjectId } from "mongoose";
 import { connectDb } from "@/lib/db";
@@ -87,7 +86,6 @@ export async function deleteBandEntry(userId: string, id: string): Promise<Actio
   await connectDb();
   const entry = await IeltsBandEntry.findOne({ _id: id, userId }).select("source attemptId").lean<{ source: BandSource; attemptId?: unknown }>();
   if (!entry) return fail("That entry doesn't exist. Reload the page.");
-  // Any band synced from an attempt (older ones were stored as "practice") goes with the attempt.
   if (entry.source === "practiceTest" || (entry.attemptId && entry.source === "practice")) {
     return fail("Practice test bands are removed when you delete the test attempt.");
   }
@@ -97,7 +95,6 @@ export async function deleteBandEntry(userId: string, id: string): Promise<Actio
   return ok();
 }
 
-/** Idempotent: one row per attempt and source. */
 export async function writeMockEntries(userId: string, attemptId: string, date: string, selfBand: number, aiBand?: number): Promise<void> {
   await connectDb();
   const write = (source: "mockSelf" | "mockAi", speaking: number) =>

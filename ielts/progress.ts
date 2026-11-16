@@ -10,7 +10,6 @@ import { addDays, localDate } from "@/speaking/schedule";
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PRACTICE_SHARE = 0.5;
 const DEFAULT_MOCK_MINUTES = 15;
-/** The second mock of a week waits this many days after the first. */
 const MOCK_GAP_DAYS = 3;
 
 export type TodayItem = {
@@ -36,7 +35,6 @@ function dayRange(from: string, to: string): string[] {
   return out;
 }
 
-/** Per-day minutes over an inclusive range of learner-local dates: stored IELTS recordings plus logged study. */
 export async function dailyMinutes(userId: string, from: string, to: string): Promise<DayTotals> {
   const out: DayTotals = Object.fromEntries(dayRange(from, to).map((d) => [d, empty()]));
   if (from > to) return out;
@@ -75,7 +73,6 @@ async function completeMockDates(userId: string, from: string, to: string): Prom
   return rows.map((r) => r.date).sort();
 }
 
-/** Progress in `week` counting only dates up to `through`. */
 async function progressThrough(userId: string, week: Week, through: string, timeZone: string) {
   const to = through < week.end ? through : week.end;
   const days = await dailyMinutes(userId, week.start, to);
@@ -94,7 +91,6 @@ async function progressThrough(userId: string, week: Week, through: string, time
   return { done, fromPractice, mocksDone: mockDates.length, mockDates };
 }
 
-/** Week totals. Speaking = IELTS recordings + Speaking Practice (from the profile's creation day, capped at 50 % of the target). */
 export async function weekProgress(
   userId: string,
   plan: Pick<PlanView, "weeks">,
@@ -117,18 +113,15 @@ export async function todayList(userId: string, today: string, timeZone: string)
   if (!found) return [];
   const { week } = found;
 
-  // Targets are set from what was done before today, so an item doesn't shrink as it is completed.
   const before = await progressThrough(userId, week, addDays(today, -1), timeZone);
   const daysLeft = Math.max(1, studyDaysBetween(today, week.end, profile.studyDays));
 
-  // The first mock is re-offered on every study day until done; the second waits for the gap after the first.
   const mock =
     before.mocksDone < week.mocks && (before.mocksDone === 0 || today >= addDays(before.mockDates[0], MOCK_GAP_DAYS));
 
   const wanted = Object.fromEntries(
     SKILLS.map((s) => [s, roundUp5(Math.max(0, week.minutes[s] - before.done[s]) / daysLeft)]),
   ) as Record<Skill, number>;
-  // A mock takes time even when the Speaking share is spent, so it counts toward the daily cap.
   if (mock) wanted.speaking = Math.max(wanted.speaking, DEFAULT_MOCK_MINUTES);
   const total = SKILLS.reduce((s, k) => s + wanted[k], 0);
   const scale = total > profile.minutesPerDay ? profile.minutesPerDay / total : 1;
@@ -178,12 +171,10 @@ export async function todayList(userId: string, today: string, timeZone: string)
   return items;
 }
 
-/** How far back a study session can be logged, counting today. */
 export const STUDY_LOG_DAYS = 14;
 
 export type StudyLogEntry = { id: string; date: string; skill: Skill; minutes: number };
 
-/** The learner's newest study log entries, newest first. */
 export async function listStudyLogs(userId: string, limit = 10): Promise<StudyLogEntry[]> {
   if (!Types.ObjectId.isValid(userId)) return [];
   await connectDb();
@@ -195,7 +186,6 @@ export async function listStudyLogs(userId: string, limit = 10): Promise<StudyLo
   return rows.map((r) => ({ id: String(r._id), date: r.date, skill: r.skill, minutes: r.minutes }));
 }
 
-/** Removes one of the learner's own study log entries. */
 export async function deleteStudyLog(userId: string, id: string): Promise<ActionResult> {
   if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(id)) return fail("That entry doesn't exist.");
   await connectDb();
@@ -203,7 +193,6 @@ export async function deleteStudyLog(userId: string, id: string): Promise<Action
   return res.deletedCount ? ok() : fail("That entry doesn't exist.");
 }
 
-/** A study log date the learner may pick: today or up to STUDY_LOG_DAYS - 1 days before it, never later. */
 export function studyLogDateError(date: string, today: string): string | null {
   if (!DATE.test(date)) return "Enter the date as YYYY-MM-DD.";
   if (date > today) return "You can't log study for a day that hasn't happened yet.";

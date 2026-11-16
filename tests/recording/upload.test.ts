@@ -14,7 +14,6 @@ import { legacyTake, legacyTakeId, legacyUserId } from "./fixtures/legacyTake";
 const VARS = ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"] as const;
 const UPLOAD_FAILED = "Your recording didn't finish uploading. Try again.";
 
-// A real client (so presigning works offline) whose network calls are mocked.
 let s3: S3Client;
 let send: ReturnType<typeof vi.fn>;
 let heads: Record<string, number | null>;

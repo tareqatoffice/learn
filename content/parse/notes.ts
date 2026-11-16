@@ -5,13 +5,11 @@ import { fenceMask, splitLines } from "./shared";
 const NOTE_MARKER = /^<!--\s*learn:note\b(.*?)-->\s*$/;
 const H1 = /^#\s+(.+?)\s*$/;
 
-/** `03-networking.md` -> `networking`. */
 function slugFromFileName(fileName: string): string {
   const base = fileName.split(/[\\/]/).pop() ?? fileName;
   return base.replace(/\.md$/i, "").replace(/^\d+-/, "");
 }
 
-/** Parses one note file: title is the first H1 outside code fences, body is everything after it. */
 export function parseChapter(md: string, fileName: string): ParsedChapter {
   const lines = splitLines(md);
   let slug = slugFromFileName(fileName);

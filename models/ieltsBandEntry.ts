@@ -1,9 +1,5 @@
 import mongoose, { Schema, model } from "mongoose";
 
-/**
- * Where a band entry came from: typed in (official, practice, other) or synced from an attempt
- * (practiceTest for Listening/Reading tests taken here, mock* for Speaking, writing* for Writing).
- */
 export const IELTS_BAND_SOURCES = ["official", "practice", "practiceTest", "mockSelf", "mockAi", "writingSelf", "writingAi", "other"] as const;
 
 const ieltsBandEntrySchema = new Schema(
@@ -18,14 +14,12 @@ const ieltsBandEntrySchema = new Schema(
       speaking: Number,
     },
     overall: Number,
-    /** The Speaking, Writing, Listening or Reading attempt this entry came from (the source says which). */
     attemptId: { type: Schema.Types.ObjectId },
   },
   { timestamps: true },
 );
 
 ieltsBandEntrySchema.index({ userId: 1, date: 1 });
-// One synced entry per attempt and source; typed-in entries have no attemptId and are not limited.
 ieltsBandEntrySchema.index({ userId: 1, attemptId: 1, source: 1 }, { unique: true, partialFilterExpression: { attemptId: { $exists: true } } });
 
 export const IeltsBandEntry = mongoose.models.IeltsBandEntry || model("IeltsBandEntry", ieltsBandEntrySchema);

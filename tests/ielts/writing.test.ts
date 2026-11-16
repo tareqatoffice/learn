@@ -109,11 +109,10 @@ describe("writing attempts", () => {
     const id = started.attemptId;
     expect((await getWritingAttempt(u, id))?.tasks.map((t) => t.task)).toEqual(["task1", "task2"]);
 
-    expect((await submitWriting(u, id)).ok).toBe(false); // nothing written yet
+    expect((await submitWriting(u, id)).ok).toBe(false);
     const later = new Date(Date.now() + 1800_000);
     await saveWritingText(u, id, 0, "word ".repeat(160), 600, later);
     await saveWritingText(u, id, 1, "word ".repeat(120), 1200, later);
-    // A claimed time longer than the attempt has been open is cut to that (D13).
     await saveWritingText(u, id, 1, "word ".repeat(120), 99_999, new Date(Date.now() + 1500_000));
     const times = (await IeltsWritingAttempt.findById(id).lean<{ tasks: { timeSec: number }[] }>())!.tasks.map((t) => t.timeSec);
     expect(times[0]).toBe(600);
@@ -129,7 +128,7 @@ describe("writing attempts", () => {
 
     expect((await saveWritingSelf(u, id, 0, { ...SELF, ta: 0 })).ok).toBe(false);
     await saveWritingSelf(u, id, 0, SELF);
-    expect(await IeltsBandEntry.countDocuments({})).toBe(0); // task 2 not rated yet
+    expect(await IeltsBandEntry.countDocuments({})).toBe(0);
     await saveWritingSelf(u, id, 1, SELF);
     expect((await IeltsBandEntry.findOne({ source: "writingSelf" }).lean<{ bands: { writing: number } }>())?.bands.writing).toBe(6);
 

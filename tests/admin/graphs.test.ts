@@ -161,7 +161,7 @@ describe("restoreRevisionChecked", () => {
     const a = await saved(node(g, "a"));
     const b = await saved(node(g, "b"));
     await saved(node(g, "a", { id: a, prereqIds: [b] }));
-    await saved(node(g, "a", { id: a, prereqIds: [] })); // stores the a -> b version
+    await saved(node(g, "a", { id: a, prereqIds: [] }));
     await saved(node(g, "b", { id: b, prereqIds: [a] }));
 
     const aNeedsB = await revisionWith(a, (s) => (s.prereqIds as unknown[]).length === 1);

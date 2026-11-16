@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -212,7 +211,6 @@ describe("QuizCard", () => {
       expect(screen.getByText(ANSWER)).toBeTruthy();
       expect(screen.getByText("Coach suggests: Review")).toBeTruthy();
       expect(screen.getByRole("button", { name: "Review" }).getAttribute("aria-describedby")).toBe("quiz-suggested");
-      // The follow-up chat opens with the coach's question.
       expect(screen.getByText("Values or variables?")).toBeTruthy();
     });
 
@@ -230,7 +228,6 @@ describe("QuizCard", () => {
       await user.type(screen.getByLabelText("Your answer"), "Keeps scope");
       await user.keyboard("{Control>}{Enter}{Enter}{/Control}");
       expect(grade).toHaveBeenCalledTimes(1);
-      // Focus stays in the (read-only) box; even from <body>, Space and G must do nothing mid-check.
       expect(document.activeElement).toBe(screen.getByLabelText("Your answer"));
       (document.activeElement as HTMLElement).blur();
       await user.keyboard(" g");
@@ -334,7 +331,6 @@ describe("QuizCard", () => {
       await say("keep their scope", true);
       expect((screen.getByLabelText("Your answer") as HTMLTextAreaElement).value).toBe("Closures keep their scope");
 
-      // Mid-dictation, marks and the reveal wait: the phrase being spoken is not in the answer yet.
       expect((screen.getByRole("button", { name: /got it/i }) as HTMLButtonElement).disabled).toBe(true);
       expect((screen.getByRole("button", { name: /show answer/i }) as HTMLButtonElement).disabled).toBe(true);
       (document.activeElement as HTMLElement).blur();

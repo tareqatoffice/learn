@@ -13,13 +13,10 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export type ConfirmOptions = {
-  /** Short heading; defaults to "Are you sure?" */
   title?: string;
-  /** Body copy — typically the former window.confirm string. */
   description: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  /** Uses the destructive button variant on the confirm action. */
   destructive?: boolean;
 };
 
@@ -27,16 +24,11 @@ type Pending = ConfirmOptions & { resolve: (ok: boolean) => void };
 
 let openConfirm: ((pending: Pending) => void) | null = null;
 
-/**
- * Promise-based confirm via the shared AlertDialog host mounted in the (app) layout.
- * Resolves true on confirm, false on cancel / dismiss. Falls back to false if the host is not mounted.
- */
 export function confirm(options: ConfirmOptions): Promise<boolean> {
   if (!openConfirm) return Promise.resolve(false);
   return new Promise((resolve) => openConfirm!({ ...options, resolve }));
 }
 
-/** Single AlertDialog for the signed-in app; pair with `confirm()`. */
 export function ConfirmHost() {
   const [pending, setPending] = useState<Pending | null>(null);
   const resolveRef = useRef<((ok: boolean) => void) | null>(null);

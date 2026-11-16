@@ -6,7 +6,6 @@ import type { AccessStatus } from "@/models";
 type Session = { user: { id: string; email: string } } | null;
 let session: Session = null;
 
-// auth(callback) resolves to a handler; the request carries the session as `req.auth`.
 vi.mock("@/auth", () => ({
   auth: (callback: (req: NextRequest & { auth: Session }) => unknown) =>
     Promise.resolve((req: NextRequest) => callback(Object.assign(req, { auth: session }))),

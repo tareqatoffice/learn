@@ -44,20 +44,17 @@ type AttemptDoc = {
   createdAt?: Date;
 };
 
-/** The caller's own attempt, or null for a bad id or someone else's attempt. */
 async function ownAttempt(userId: string, attemptId: string): Promise<AttemptDoc | null> {
   if (!isId(userId) || !isId(attemptId)) return null;
   await connectDb();
   return IeltsSpeakingAttempt.findOne({ _id: attemptId, userId }).lean<AttemptDoc>();
 }
 
-// ---- questions given by the caller (AI-written sets come back from the client) ----
 
 const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, MAX_TEXT) : null);
 const texts = (v: unknown, max: number) => (Array.isArray(v) ? v.map(text).filter((s): s is string => !!s).slice(0, max) : []);
 const oid = (v: unknown) => (v instanceof Types.ObjectId ? v : isId(v) ? new Types.ObjectId(v) : undefined);
 
-/** The parts of `set` that `kind` uses, with text trimmed and bounded; null when a needed part is missing. */
 function cleanSet(kind: Kind, set: QuestionSet): QuestionSet | null {
   const out: QuestionSet = {};
   const parts = KIND_PARTS[kind];
@@ -122,10 +119,6 @@ export type StartPartInput = {
   audioSize?: number;
 };
 
-/**
- * Presigns the upload for one part. Calling it again for a part that isn't stored yet replaces that
- * part's media (its old R2 objects are removed first); a stored part is refused.
- */
 export async function startPart(
   userId: string,
   attemptId: string,
@@ -152,11 +145,9 @@ export async function startPart(
   if (!upload.ok) return upload;
   const { media, uploadUrl, audioUploadUrl, maxBytes } = upload;
   const video = media.kind === "video" ? { videoUsed: true } : {};
-  // Names this upload, so a concurrent start that replaced the row first is detected even when both reuse a key.
   const uploadId = String(new Types.ObjectId());
 
   if (existing) {
-    // Update first: only the call that wins the row touches the old R2 objects.
     const res = await IeltsSpeakingAttempt.updateOne(
       { _id: attemptId, userId, parts: { $elemMatch: { part, "media.stored": false, uploadId: existing.uploadId ?? null } } },
       {
@@ -170,7 +161,6 @@ export async function startPart(
     try {
       if (stale.length) await deleteObjects(stale);
     } catch (error) {
-      // The row already points at the new upload; an old object left behind is only storage.
       console.error(`Couldn't remove the replaced upload ${existing.media.key}`, error);
     }
   } else {
@@ -183,10 +173,6 @@ export async function startPart(
   return ok({ uploadUrl, ...(audioUploadUrl ? { audioUploadUrl } : {}), maxBytes });
 }
 
-/**
- * Another start for the same part wrote first. Removes the R2 keys this call presigned, except any the
- * winner's media also uses, so nothing untracked can be left in the bucket.
- */
 async function lostRace(userId: string, attemptId: string, part: Part, media: MediaDoc): Promise<{ ok: false; errors: Record<string, string> }> {
   const current = (await ownAttempt(userId, attemptId))?.parts.find((p) => p.part === part);
   const kept = new Set(current ? keysOf(current.media) : []);
@@ -199,10 +185,6 @@ async function lostRace(userId: string, attemptId: string, part: Part, media: Me
   return current?.media.stored ? fail("This part is already saved.") : fail("This part was started again elsewhere. Try again.");
 }
 
-/**
- * Sets `complete` once every part the kind needs is stored; a no-op otherwise. Atomic against concurrent confirms.
- * Also matches `inProgress`, so a run left by a reload or navigation still completes when its last part is confirmed.
- */
 async function promoteIfComplete(userId: string, attemptId: string, kind: Kind): Promise<boolean> {
   const res = await IeltsSpeakingAttempt.updateOne(
     {
@@ -225,7 +207,6 @@ const isMarker = (m: Marker, capSec: number) =>
   !!m.label.trim() &&
   m.label.length <= MAX_LABEL;
 
-/** Marks an uploaded part stored once its objects check out. Idempotent. */
 export async function confirmPart(
   userId: string,
   attemptId: string,
@@ -246,11 +227,9 @@ export async function confirmPart(
     return fail(`Each marker needs a label up to ${MAX_LABEL} characters, placed within the recording.`);
   }
 
-  // A rejected upload keeps its row (the client uploads again to the same URLs); verifyUpload clears R2.
   const main = await verifyUpload(row.media);
   if (!main.ok) return fail(main.error);
 
-  // Keyed on the verified upload, so a part replaced by a concurrent startPart isn't marked stored.
   const res = await IeltsSpeakingAttempt.updateOne(
     { _id: attemptId, userId, parts: { $elemMatch: { part, "media.stored": false, uploadId: row.uploadId ?? null } } },
     {
@@ -265,10 +244,8 @@ export async function confirmPart(
   );
   if (!res.matchedCount) {
     const now = (await ownAttempt(userId, attemptId))?.parts.find((p) => p.part === part);
-    // Stored meanwhile by a concurrent confirm of the same upload: fine. Otherwise the part was replaced.
     if (!(now?.media.stored && now.uploadId === row.uploadId)) return fail("This part was started again. Upload it again.");
   }
-  // A part confirmed after the attempt was finished can complete it.
   await promoteIfComplete(userId, attemptId, attempt.kind);
   return ok();
 }
@@ -285,8 +262,6 @@ export async function transcribePart(
   if (!["pending", "failed", "running"].includes(row.transcriptStatus ?? "")) return fail("This recording can't be transcribed.");
   if ((row.transcribeAttempts ?? 0) >= MAX_TRANSCRIBE_ATTEMPTS) return fail(TRANSCRIBE_ATTEMPTS_MESSAGE);
 
-  // Claim the part first, so two requests (a retry, a second tab) can't both spend the daily cap and
-  // both pay for speech-to-text. A claim left by a crashed request can be taken over after a while.
   const now = deps.now ?? new Date();
   const claim = await IeltsSpeakingAttempt.updateOne(
     {
@@ -308,7 +283,6 @@ export async function transcribePart(
   );
   if (!claim.matchedCount) return fail("This recording is already being transcribed. Reload the page in a minute.");
 
-  // Only this claim may write the outcome.
   const ours = { _id: attemptId, userId, parts: { $elemMatch: { part, transcriptStatus: "running", transcribeStartedAt: now } } };
   const before = row.transcriptStatus === "failed" ? "failed" : "pending";
   const res = await transcribeMedia(userId, row.media, {
@@ -324,15 +298,12 @@ export async function transcribePart(
       await IeltsSpeakingAttempt.updateOne(ours, { $set: { "parts.$.transcriptStatus": "failed" } });
     },
   });
-  // Refused before the call (daily cap, missing object): release the claim and the attempt.
   if (!res.ok) await IeltsSpeakingAttempt.updateOne(ours, { $set: { "parts.$.transcriptStatus": before }, $inc: { "parts.$.transcribeAttempts": -1 } });
   return res;
 }
 
-/** A transcription claimed longer ago than this is treated as abandoned. */
 const STALE_CLAIM_MS = 5 * 60_000;
 
-/** Ends the attempt: complete when every part its kind needs is stored, otherwise incomplete. */
 export async function finishAttempt(
   userId: string,
   attemptId: string,
@@ -349,16 +320,10 @@ export async function finishAttempt(
   if (input.paused === true) set.paused = true;
   if (input.notes?.trim()) set.notes = input.notes.trim();
   await IeltsSpeakingAttempt.updateOne({ _id: attemptId, userId }, { $set: set });
-  // A part confirmed between our read and write would otherwise leave a full attempt marked incomplete.
   if (status === "incomplete" && (await promoteIfComplete(userId, attemptId, attempt.kind))) return ok({ status: "complete" as Status });
   return ok({ status });
 }
 
-/**
- * Ends a run that was left in progress (a reload or navigation mid-run): complete when every part its kind
- * needs is stored, otherwise incomplete. Returns the status now held, or null when the attempt isn't the user's.
- * A finished attempt is left as it is.
- */
 export async function settleAttempt(userId: string, attemptId: string): Promise<Status | null> {
   const attempt = await ownAttempt(userId, attemptId);
   if (!attempt) return null;
@@ -386,7 +351,6 @@ export type PartView = {
   audioUrl?: string;
 };
 
-/** An attempt as plain JSON (ids as strings), with playback URLs for its stored parts. */
 export type AttemptView = {
   id: string;
   date: string;
@@ -449,13 +413,11 @@ export type AttemptSummary = {
   date: string;
   kind: Kind;
   status: Status;
-  /** Stored parts, in recording order. */
   parts: Part[];
   durationSec: number;
   aiOverall?: number;
 };
 
-/** Attempts with at least one stored part, newest first. */
 export async function listAttempts(userId: string, filter: { kind?: Kind; limit?: number } = {}): Promise<AttemptSummary[]> {
   if (!isId(userId)) return [];
   await connectDb();
@@ -478,7 +440,6 @@ export async function listAttempts(userId: string, filter: { kind?: Kind; limit?
   });
 }
 
-/** Deletes an attempt, stored or only started: its R2 objects, its mock band entries, then the document. */
 export async function deleteAttempt(userId: string, id: string): Promise<ActionResult> {
   const attempt = await ownAttempt(userId, id);
   if (!attempt) return fail(NOT_FOUND);

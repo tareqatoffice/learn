@@ -1,4 +1,3 @@
-// Chart data for the IELTS history page: bands over time, mock criteria and weekly minutes.
 
 import { connectDb } from "@/lib/db";
 import { IeltsSpeakingAttempt } from "@/models";
@@ -10,7 +9,6 @@ import { localDate } from "@/speaking/schedule";
 
 export type BandPoint = { date: string; source: BandSource; listening?: number; reading?: number; writing?: number; speaking?: number; overall?: number };
 
-/** One point per band entry, oldest first. Official results stay their own source. */
 export async function bandSeries(userId: string): Promise<BandPoint[]> {
   const entries = await listBandEntries(userId);
   return entries.map((e) => ({
@@ -33,7 +31,6 @@ function allCriteria(v: Partial<Record<Criterion, unknown>> | undefined): Record
   return out;
 }
 
-/** Criteria bands of completed mocks, oldest first. Drills are left out. */
 export async function criteriaSeries(userId: string): Promise<CriteriaPoint[]> {
   await connectDb();
   const docs = await IeltsSpeakingAttempt.find({ userId, kind: "mock", status: "complete" })
@@ -52,10 +49,6 @@ export async function criteriaSeries(userId: string): Promise<CriteriaPoint[]> {
 
 export type WeekMinutes = { weekStart: string; target: Record<Skill, number>; done: Record<Skill, number> };
 
-/**
- * Target and done minutes for each plan week that has started, in the learner's time zone, across
- * every plan version: each version covers the weeks from its start until the next version began.
- */
 export async function weeklyMinutes(userId: string, timeZone: string): Promise<WeekMinutes[]> {
   const plans = await planVersionsForChart(userId);
   if (!plans.length) return [];

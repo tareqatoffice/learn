@@ -9,10 +9,8 @@ import { PROFILE_TABS, TAB_LABEL, type ProfileData, type ProfileTab } from "@/pr
 
 const linkClass = "hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 const dateFormat = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-/** Formats a learner-local YYYY-MM-DD string; the data layer has already applied the time zone. */
 const fmt = (date: string) => dateFormat.format(new Date(`${date}T00:00:00Z`));
 
-/** The profile's cards sit directly under the page title, so their headings are h2. */
 function Card(props: Omit<React.ComponentProps<typeof TrackCard>, "heading">) {
   return <TrackCard heading="h2" {...props} />;
 }

@@ -11,7 +11,6 @@ const input = z.object({
   status: z.enum(["none", "learning", "done"]),
 });
 
-/** `error` is set when a prerequisite is not done yet; other failures throw. */
 export async function setNodeStatusAction(
   nodeId: string,
   status: NodeStatus,
@@ -25,7 +24,6 @@ export async function setNodeStatusAction(
     if (e instanceof PrereqNotDoneError) return { error: e.message };
     throw e;
   }
-  // Re-render the page so its cached copy (Back from another page) shows the saved status.
   refresh();
   return {};
 }

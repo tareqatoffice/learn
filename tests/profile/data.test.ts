@@ -116,7 +116,6 @@ describe("getProfileData", () => {
       const n = await seedNote(s, "intro");
       await openNote(user, n);
       await setNoteRead(user, n, true);
-      // 23:00 UTC on the 12th is 03:00 on the 13th in Dubai (UTC+4).
       await NoteProgress.updateOne({ userId: user, noteId: n }, { readAt: new Date("2026-11-12T23:00:00Z") });
 
       const d = await getProfileData(user, who, "Asia/Dubai", new Date("2026-11-13T05:00:00Z"));
@@ -146,7 +145,6 @@ describe("getProfileData", () => {
       await seedQuestions(book, 2);
       const created = await createSession(user, all);
       if (!("sessionId" in created)) throw new Error("expected a session");
-      // The deck is shuffled and cards are answered in deck order.
       const session = await QuizSession.findById(created.sessionId).lean<{ questionIds: unknown[] }>();
       for (const q of session!.questionIds) await recordResult(user, created.sessionId, String(q), "got");
       await finishSession(user, created.sessionId);
@@ -237,7 +235,6 @@ describe("getProfileData", () => {
       const user = newUserId();
       await IeltsSpeakingAttempt.create({ userId: user, date: "2026-11-11", kind: "part1", status: "inProgress", parts: part() });
       await IeltsSpeakingAttempt.create({ userId: user, date: "2026-11-12", kind: "mock", status: "complete", ai: { overall: 6.5 }, parts: part() });
-      // Never recorded anything: not practice (D3).
       await IeltsSpeakingAttempt.create({ userId: user, date: "2026-11-12", kind: "part2", status: "inProgress", parts: part(false) });
 
       const d = await getProfileData(user, who, "UTC", now);

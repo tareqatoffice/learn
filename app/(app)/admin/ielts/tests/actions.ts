@@ -20,7 +20,6 @@ import {
   type TestKind,
 } from "@/admin/ieltsTests";
 
-// Shared by the Reading & Listening pages and the Writing pages.
 
 export async function saveTestAction(kind: TestKind, id: string | null, input: TestInput) {
   await adminContext();

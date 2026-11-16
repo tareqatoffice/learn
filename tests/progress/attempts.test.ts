@@ -91,8 +91,8 @@ describe("quiz attempts", () => {
     const user = newUserId();
     const ids = await seedQuestions(await seedBook("b"), 2);
     const sessionId = await start(user, ids);
-    await start(user, ids); // no attempts: not listed
-    await start(newUserId(), ids); // someone else's
+    await start(user, ids);
+    await start(newUserId(), ids);
     const card = await currentCard(sessionId);
     await recordResult(user, sessionId, card, "review", keep, { answer: "my take", mode: "mixed" });
 

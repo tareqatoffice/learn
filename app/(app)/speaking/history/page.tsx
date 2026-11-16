@@ -18,7 +18,6 @@ const LIMIT = 100;
 export default async function SpeakingHistoryPage({ searchParams }: PageProps<"/speaking/history">) {
   const { task: slug, before: rawBefore } = await searchParams;
   const task = typeof slug === "string" ? taskFromSlug(slug) : null;
-  // Older pages are read with the last shown take's id as the cursor (listTakes checks it).
   const before = typeof rawBefore === "string" ? rawBefore : undefined;
   const user = await requireUser();
   await connectDb();

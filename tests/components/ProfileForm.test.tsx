@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -42,7 +41,6 @@ describe("ProfileForm", () => {
     await user.selectOptions(screen.getByLabelText(/target band/i), "7");
     await user.selectOptions(screen.getByLabelText(/current band/i), "6");
 
-    // Nothing is saved yet.
     expect(screen.queryByRole("button", { name: /save plan/i })).toBeNull();
     await user.click(screen.getByRole("button", { name: /preview plan/i }));
 

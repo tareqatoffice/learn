@@ -1,11 +1,8 @@
-// @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MockRunner, type MockActions, type MockQuestions } from "@/components/ielts/MockRunner";
 import type { RecorderResult, RecorderState } from "@/lib/useRecorder";
 
-// A stateful stand-in for useRecorder: start records, stop (or the cap) yields a result. With
-// `holdAsking`, start waits on the mic prompt; stopping then (or hiding the page) returns to idle.
 const rec = vi.hoisted(() => ({ starts: [] as number[], holdAsking: false }));
 vi.mock("@/lib/useRecorder", async () => {
   const React = await import("react");
@@ -149,7 +146,6 @@ describe("MockRunner", () => {
     await click(/^start/i);
     expect(rec.starts).toEqual([420]);
     await click(/end part 1/i);
-    // Prep: the cue card and a notes box, nothing recording yet.
     expect(screen.getByText("Describe a book you enjoyed")).toBeTruthy();
     expect(screen.getByRole("textbox", { name: /notes/i })).toBeTruthy();
     expect(rec.starts).toEqual([420]);
@@ -240,7 +236,6 @@ describe("MockRunner", () => {
     expect(actions.confirmPart).toHaveBeenCalledWith(ID, "p1", expect.anything());
     await tick(60_000);
     await tick(120_000);
-    // Part 3 runs while Part 2's upload has failed.
     expect(rec.starts).toEqual([420, 150, 420]);
     expect(recording()).toBe(true);
     expect(actions.confirmPart).not.toHaveBeenCalledWith(ID, "p2", expect.anything());
@@ -252,7 +247,6 @@ describe("MockRunner", () => {
 
     await click(/try again/i);
     expect(actions.confirmPart).toHaveBeenCalledWith(ID, "p2", expect.anything());
-    // The retry reuses Part 2's upload URL; Part 1 is never sent again.
     expect(actions.startPart.mock.calls.map(([, input]) => input.part)).toEqual(["p1", "p2", "p3"]);
     expect(upload.uploadTake.mock.calls.map(([url]) => url)).toEqual([
       "https://r2.test/p1",
@@ -277,14 +271,12 @@ describe("MockRunner", () => {
     expect(leave()).toBe(false);
     await click(/^start/i);
     await click(/end part 1/i);
-    // Part 1 is uploading while Part 2 prep runs.
     expect(leave()).toBe(true);
     await act(async () => {
       release();
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(actions.confirmPart).toHaveBeenCalledWith(ID, "p1", expect.anything());
-    // Still preparing Part 2, nothing unsent.
     expect(leave()).toBe(false);
   });
 
@@ -295,7 +287,6 @@ describe("MockRunner", () => {
     vi.stubGlobal("confirm", confirm);
     const link = document.body.appendChild(document.createElement("a"));
     link.href = "/ielts";
-    // Runs after the runner's capture listener; records the outcome and keeps jsdom from navigating.
     const blocked: boolean[] = [];
     const record = (e: MouseEvent) => {
       if (e.target !== link) return;
@@ -303,7 +294,6 @@ describe("MockRunner", () => {
       e.preventDefault();
     };
     document.addEventListener("click", record);
-    // jsdom's history outlives each test; start from an entry without a guard.
     window.history.replaceState(null, "");
     const pushState = vi.spyOn(window.history, "pushState");
     try {
@@ -314,7 +304,6 @@ describe("MockRunner", () => {
 
       await click(/^start/i);
       await click(/end part 1/i);
-      // Part 1 is uploading while Part 2 prep runs.
       expect(pushState).toHaveBeenCalledTimes(1);
       fireEvent.click(link);
       expect(confirm).toHaveBeenLastCalledWith("You have recordings that haven't saved. Leave anyway?");
@@ -323,7 +312,6 @@ describe("MockRunner", () => {
       fireEvent.click(link);
       expect(blocked).toEqual([false, true, false]);
 
-      // Back, declined: the guard entry is pushed again.
       confirm.mockClear();
       act(() => void window.dispatchEvent(new PopStateEvent("popstate", { state: null })));
       expect(confirm).toHaveBeenCalledTimes(1);
@@ -334,7 +322,6 @@ describe("MockRunner", () => {
         await vi.advanceTimersByTimeAsync(0);
       });
       expect(actions.confirmPart).toHaveBeenCalledWith(ID, "p1", expect.anything());
-      // Nothing unsent while Part 2 prep runs: no guard left.
       confirm.mockClear();
       fireEvent.click(link);
       act(() => void window.dispatchEvent(new PopStateEvent("popstate", { state: null })));

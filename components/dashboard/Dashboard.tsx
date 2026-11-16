@@ -11,7 +11,6 @@ type SpeakingToday = Awaited<ReturnType<typeof import("@/speaking/progress").get
 
 const linkClass =
   "hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
-// Quiz dates arrive as the learner's local YYYY-MM-DD, so they are formatted as UTC midnight.
 const dateFormat = new Intl.DateTimeFormat("en", {
   month: "short",
   day: "numeric",
@@ -19,11 +18,6 @@ const dateFormat = new Intl.DateTimeFormat("en", {
 });
 const fmtDay = (date: string) => dateFormat.format(new Date(`${date}T00:00:00Z`));
 
-/**
- * One of the three things to do next, in the band at the top of the page. The page's hierarchy is
- * do (this band) → track (progress) → look back (activity), so these are the only cards with an
- * action in them, and the only ones with a heading at full size.
- */
 function NextUp({
   title,
   children,
@@ -45,7 +39,6 @@ function NextUp({
   );
 }
 
-/** Topic links joined by a middot, used for both "learning now" and "ready next". */
 function TopicLinks({
   topics,
 }: {
@@ -81,11 +74,8 @@ export function Dashboard({
 }) {
   const speakingTasks = TASKS.filter((t) => speaking.settings.enabled[t]);
   const reviewCount = dash.reviewPile.total;
-  // With nothing started and nothing published to start, the band would be three empty boxes;
-  // one line pointing at the three areas is more use than that.
   const nothingToDo =
     reviewCount === 0 && !dash.continueReading && dash.readyNext.length === 0;
-  // Nothing done anywhere yet: a first visit, which "Welcome back" would get wrong.
   const firstVisit =
     nothingToDo && dash.recentQuizzes.length === 0 && dash.learningNow.length === 0 && speaking.best === 0 && !dash.ielts;
 
@@ -133,8 +123,6 @@ export function Dashboard({
             </p>
           </div>
         ) : (
-          // One panel split into columns rather than three separate cards: these belong together,
-          // and the shared surface is what makes the band read as the page's primary row.
           <div className="grid divide-y divide-border rounded-xl border border-border bg-card shadow-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
             <NextUp title="Review pile">
               <p className="text-3xl font-semibold tabular-nums leading-none">

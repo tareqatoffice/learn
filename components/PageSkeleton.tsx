@@ -49,7 +49,6 @@ function ProgressRows({ count = 3 }: { count?: number }) {
   );
 }
 
-/** Dashboard: greeting → Next up band → progress cards. */
 export function DashboardSkeleton() {
   return (
     <Status label="Loading dashboard" className="grid gap-8">
@@ -90,7 +89,6 @@ export function DashboardSkeleton() {
   );
 }
 
-/** Notes / graphs index: title + card grid. */
 export function CardGridSkeleton({ titleWidth = "w-48" }: { titleWidth?: string }) {
   return (
     <Status label="Loading page" className="grid gap-4">
@@ -113,7 +111,6 @@ export function CardGridSkeleton({ titleWidth = "w-48" }: { titleWidth?: string 
   );
 }
 
-/** Interview index: title row + quiz setup + book list cards. */
 export function InterviewIndexSkeleton() {
   return (
     <Status label="Loading page" className="grid gap-4">
@@ -159,7 +156,6 @@ export function InterviewIndexSkeleton() {
   );
 }
 
-/** Book detail: back + title + progress + part question lists. */
 export function BookDetailSkeleton() {
   return (
     <Status label="Loading page" className="grid w-full gap-2">
@@ -196,7 +192,6 @@ function OverlayMenuBar() {
   );
 }
 
-/** Question detail: section sidebar + answer card. */
 export function QuestionDetailSkeleton() {
   return (
     <Status
@@ -232,7 +227,6 @@ export function QuestionDetailSkeleton() {
   );
 }
 
-/** Note series: header + chapters card. */
 export function SeriesDetailSkeleton() {
   return (
     <Status label="Loading page" className="grid gap-6">
@@ -259,7 +253,6 @@ export function SeriesDetailSkeleton() {
   );
 }
 
-/** Chapter: chapter nav + article + TOC. */
 export function ChapterDetailSkeleton() {
   return (
     <Status
@@ -311,7 +304,6 @@ export function ChapterDetailSkeleton() {
   );
 }
 
-/** Quiz session: centered quiz card. */
 export function QuizPageSkeleton() {
   return (
     <Status label="Loading page" className="w-full">
@@ -333,7 +325,6 @@ export function QuizPageSkeleton() {
   );
 }
 
-/** Graph detail: header + canvas + topic panel. */
 export function GraphDetailSkeleton() {
   return (
     <Status label="Loading page" className="grid gap-5">
@@ -376,10 +367,6 @@ export function GraphDetailSkeleton() {
   );
 }
 
-/**
- * Admin content area (nav stays in layout).
- * Tuned for list pages (most admin routes); home is a brief flash of the same shell.
- */
 export function AdminPageSkeleton() {
   return (
     <Status label="Loading admin" className="grid gap-6">
@@ -405,10 +392,8 @@ export function AdminPageSkeleton() {
   );
 }
 
-/** Speaking / IELTS-style stack (also catch-all for signed-in routes). */
 export function NarrowStackSkeleton({
   label = "Loading page",
-  /** IELTS: nav chips share the title row. Speaking: two action buttons. */
   header = "actions",
 }: {
   label?: string;
@@ -457,12 +442,10 @@ export function NarrowStackSkeleton({
   );
 }
 
-/** Generic signed-in fallback. */
 export function AppPageSkeleton() {
   return <NarrowStackSkeleton />;
 }
 
-/** Access / simple centered card. */
 export function SimplePageSkeleton() {
   return (
     <Status label="Loading" className="grid w-full gap-4">

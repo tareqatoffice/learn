@@ -42,7 +42,6 @@ export default async function IeltsReviewPage({ params }: PageProps<"/ielts/spea
 
   const attempt = await getAttempt(user.userId, attemptId);
   if (!attempt) notFound();
-  // Only whether the coach is on reaches the page; the key never does.
   const [ai, settings] = await Promise.all([getAiConfig(), getEffectiveSettings(user.userId)]);
 
   return (

@@ -154,7 +154,6 @@ function TaskReview({ attemptId, index, task, imageUrl }: { attemptId: string; i
   );
 }
 
-/** The submitted answer(s): rate yourself, then ask for the AI estimate, side by side. */
 export function WritingReview({ view, imageUrls = [] }: { view: WritingView; imageUrls?: string[] }) {
   const router = useRouter();
   const del = useAdminAction();

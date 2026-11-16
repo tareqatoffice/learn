@@ -3,10 +3,6 @@
 import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon } from "lucide-react";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
-/**
- * Sonner host for the signed-in app. Theme follows the browser / CSS variables
- * (ThemeToggle writes dataset.theme); no next-themes provider in this app.
- */
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner

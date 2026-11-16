@@ -51,7 +51,6 @@ export type GraphView = {
 const visibleGraphs = () =>
   Graph.find({ status: "published" }, { slug: 1, title: 1 }).sort({ order: 1, title: 1 }).lean<GraphRow[]>();
 
-/** Visible graphs with how many of their visible topics the user has marked done. */
 export async function listGraphsWithProgress(
   userId: string,
 ): Promise<{ slug: string; title: string; done: number; total: number }[]> {
@@ -75,7 +74,6 @@ export async function listGraphsWithProgress(
   });
 }
 
-/** Visible related questions, keyed by id, with links into their books. */
 async function questionLinks(ids: Id[]): Promise<Map<string, RelatedLink & { id: string }>> {
   if (!ids.length) return new Map();
   const rows = await Question.find({ ...(await visibleQuestionFilter()), _id: { $in: ids } }, { question: 1, bookId: 1 }).lean<
@@ -93,7 +91,6 @@ async function questionLinks(ids: Id[]): Promise<Map<string, RelatedLink & { id:
 
 type NoteLinkRow = { slug: string; title: string; series: string; toc: { anchor: string; text: string }[] };
 
-/** Visible related notes, keyed by id. */
 async function noteRows(ids: Id[]): Promise<Map<string, NoteLinkRow>> {
   if (!ids.length) return new Map();
   const notes = await Note.find({ ...(await visibleNoteFilter()), _id: { $in: ids } }, { slug: 1, title: 1, seriesId: 1, toc: 1 }).lean<
@@ -114,7 +111,6 @@ function noteLink(note: NoteLinkRow, anchor: string): RelatedLink {
   };
 }
 
-/** A visible graph with its visible topics (related links resolved, hidden ones dropped) and the user's progress. */
 export async function getGraphView(userId: string, slug: string): Promise<GraphView | null> {
   const graph = await Graph.findOne({ slug, status: "published" }).lean<GraphRow>();
   if (!graph) return null;

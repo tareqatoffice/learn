@@ -12,7 +12,6 @@ export function QuizHistory({
   sessions: Session[];
   timeZone: string;
 }) {
-  // Times in the learner's own zone (from the time-zone cookie), not the server's.
   const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short", timeZone });
 
   return (

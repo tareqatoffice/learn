@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,7 +5,6 @@ import { TopBar } from "@/components/TopBar";
 
 const pathname = vi.hoisted(() => ({ value: "/dashboard" }));
 vi.mock("next/navigation", () => ({ usePathname: () => pathname.value }));
-// The real action pulls in Auth.js and the database, which a component test must not load.
 vi.mock("@/app/actions", () => ({ signOutAction: vi.fn() }));
 
 const user = { name: "Tareq Ahmed", isAdmin: false };
@@ -78,9 +76,9 @@ describe("TopBar", () => {
     render(<TopBar user={user} />);
     await userEvent.click(screen.getByRole("button", { name: "Account menu" }));
     expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
-    await userEvent.tab(); // Profile link
-    await userEvent.tab(); // Sign out
-    await userEvent.tab(); // out of the menu
+    await userEvent.tab();
+    await userEvent.tab();
+    await userEvent.tab();
     expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
   });
 

@@ -1,5 +1,3 @@
-// Admin service for IELTS Reading and Listening tests and Writing prompts.
-// Questions are authored as text (see ielts/practice/format.ts) and stored as structured groups.
 
 import { randomBytes } from "node:crypto";
 import { Types } from "mongoose";
@@ -26,12 +24,10 @@ const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 const NEEDS_IMAGE = "Upload the chart image before publishing a Task 1 prompt. Save it as a draft first.";
 const model = (kind: TestKind) => (kind === "reading" ? IeltsReadingTest : IeltsListeningTest);
 
-// ---- tests ----
 
 export type TestInput = {
   title: string;
   status: PublishStatus;
-  /** `audioKey` is the file the section already has; it travels with the section, not its position. */
   sections: { title: string; passage?: string; script?: string; questions: string; audioKey?: string }[];
 };
 
@@ -65,15 +61,12 @@ const toAdmin = (kind: TestKind, d: TestRow): AdminTest => ({
   })),
 });
 
-/** Validates the input and builds the stored sections; audio is kept from `previous` by position. */
 function build(kind: TestKind, input: TestInput, previous: Section[] = []): { sections: Section[] } | { errors: FieldErrors } {
   const errors: FieldErrors = {};
   if (typeof input?.title !== "string" || !input.title.trim()) errors.title = "Give the test a title.";
   if (!Array.isArray(input?.sections) || !input.sections.length) errors.sections = "Add at least one section.";
   else if (input.sections.length > (kind === "reading" ? 3 : 4)) errors.sections = `A ${kind} test has at most ${kind === "reading" ? 3 : 4} sections.`;
   const sections: Section[] = [];
-  // Audio follows the file the form sends back, never the section's position, so removing or
-  // reordering sections can't attach a recording to the wrong questions.
   const known = new Map(previous.filter((p) => p.audioKey).map((p) => [p.audioKey, p.durationSec ?? 0]));
   (input?.sections ?? []).forEach((s, i) => {
     if (!s.title?.trim()) errors[`sections.${i}.title`] = "Give the section a title.";
@@ -116,11 +109,8 @@ export async function saveTest(kind: TestKind, id: string | null, input: TestInp
   }
   const data = { title: input.title.trim(), status: input.status, sections: built.sections };
   if (id) {
-    // The sections replaced are read in the same write, so a save racing this one can't make the
-    // recordings to remove come from a stale copy.
     const before = await model(kind).findOneAndUpdate({ _id: id }, { $set: data }, { returnDocument: "before" }).lean<TestRow>();
     if (!before) return fail(NOT_FOUND);
-    // Recordings no section references any more.
     const kept = new Set(built.sections.map((s) => s.audioKey));
     const dropped = before.sections.map((s) => s.audioKey).filter((k) => k && !kept.has(k));
     if (dropped.length) await removeFiles(dropped);
@@ -130,11 +120,6 @@ export async function saveTest(kind: TestKind, id: string | null, input: TestInp
   return ok({ id: String(doc._id) });
 }
 
-/**
- * Deletes files no longer used by a test or prompt, except those an attempt still points at: an
- * attempt keeps its own copy of the sections (and Writing tasks their chart), so a learner mid-test
- * or reviewing one would otherwise lose the audio or the image. Those stay as harmless orphans.
- */
 async function removeFiles(keys: string[]): Promise<void> {
   if (!keys.length || !storageConfigured()) return;
   const [audio, images] = await Promise.all([
@@ -147,11 +132,9 @@ async function removeFiles(keys: string[]): Promise<void> {
   try {
     await deleteObjects(free);
   } catch {
-    // Orphaned files are harmless.
   }
 }
 
-/** Why a test can't be published, or null: learners must be able to answer every section. */
 function publishProblem(kind: TestKind, sections: Section[]): string | null {
   if (!sections.some((s) => countOf(s) > 0)) return "Add questions before publishing.";
   if (kind === "listening") {
@@ -197,7 +180,6 @@ export async function getTestAdmin(kind: TestKind, id: string): Promise<AdminTes
   return doc ? toAdmin(kind, doc) : null;
 }
 
-// ---- Listening audio ----
 
 export async function startSectionAudioUpload(id: string, index: number, mime: string, size: number): Promise<ActionResult<{ uploadUrl: string; key: string }>> {
   if (!isId(id) || !Number.isInteger(index) || index < 0) return fail(NOT_FOUND);
@@ -235,7 +217,6 @@ export async function confirmSectionAudio(id: string, index: number, key: string
   return ok();
 }
 
-// ---- Writing prompts ----
 
 export type PromptInput = { task: "task1" | "task2"; title: string; brief: string; imageAlt?: string; status: PublishStatus; tags?: string[] };
 export type AdminPrompt = PromptInput & { id: string; imageKey: string; imageAlt: string; tags: string[]; generated: boolean };
@@ -279,7 +260,6 @@ export async function savePrompt(id: string | null, input: unknown, extra: { gen
     await IeltsWritingPrompt.updateOne({ _id: id }, { $set: { title: data.title, brief: data.brief, imageAlt: data.imageAlt, status: data.status, tags: data.tags } });
     return ok({ id });
   }
-  // A new Task 1 prompt has no image yet (it is uploaded after the first save).
   if (data.status === "published" && data.task === "task1") return fail({ status: NEEDS_IMAGE });
   const doc = await IeltsWritingPrompt.create({ ...data, generated: extra.generated ?? false });
   return ok({ id: String(doc._id) });
@@ -354,7 +334,6 @@ export async function confirmPromptImage(id: string, key: string): Promise<Actio
   return ok();
 }
 
-// ---- AI drafts (always saved as drafts) ----
 
 type Deps = Pick<ChatOptions, "fetch">;
 const TURNED_OFF = "The AI coach is turned off.";
@@ -401,7 +380,6 @@ export function parseTestDraft(kind: TestKind, reply: string): TestInput | null 
   return "errors" in build(kind, input) ? null : input;
 }
 
-/** One metered call: a one-section Reading passage or Listening script with questions, saved as a draft. */
 export async function generateTestDraft(adminUserId: string, kind: TestKind, deps: Deps = {}): Promise<ActionResult<{ id: string }>> {
   if (kind !== "reading" && kind !== "listening") return fail("Unknown test type.");
   const system = `You write IELTS Academic ${kind} practice material in the style of the real test. ${FORMAT_HELP} ${DRAFT_SAFETY}`;
@@ -426,7 +404,6 @@ export function parsePromptDraft(task: "task1" | "task2", reply: string): Prompt
   return parsed.success ? (parsed.data as PromptInput) : null;
 }
 
-/** One metered call: a Writing prompt saved as a draft. Task 1 drafts describe the chart in words; the admin attaches the image. */
 export async function generatePromptDraft(adminUserId: string, task: "task1" | "task2", deps: Deps = {}): Promise<ActionResult<{ id: string }>> {
   if (task !== "task1" && task !== "task2") return fail("Choose Task 1 or Task 2.");
   const system = `You write IELTS Academic Writing prompts in the style of the real test. ${DRAFT_SAFETY}`;

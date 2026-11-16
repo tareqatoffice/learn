@@ -27,16 +27,12 @@ const EDGE_COLOR = {
 
 const TRACK_COLORS = 6;
 
-// Zoom bounds for the canvas. A graph is laid out at its natural size and then scaled to taste;
-// below 35% the node labels stop being readable, above 200% there is nothing left to see.
 const MIN_ZOOM = 0.35;
 const MAX_ZOOM = 2;
 const ZOOM_STEP = 0.2;
 
-// About 20 characters of 13px text fit beside the status icon; longer titles wrap onto a second line.
 const LINE_CHARS = 20;
 
-/** Up to two lines of at most LINE_CHARS each, word-wrapped, ellipsised when the title runs longer. */
 function wrapTitle(title: string): { lines: string[]; cut: boolean } {
   const lines: string[] = [];
   let line = "";
@@ -58,28 +54,19 @@ function wrapTitle(title: string): { lines: string[]; cut: boolean } {
 
 export function GraphView({ data }: { data: GraphData }) {
   const pathname = usePathname();
-  // The URL's ?topic= is the selection, so any link to another topic of this graph (the panel's
-  // prerequisites, links from elsewhere) selects it without a remount.
   const searchParams = useSearchParams();
   const selected = searchParams.get("topic");
-  // ?read=1 opens the selected topic in the full-screen reader, so the back button closes it.
   const readParam = searchParams.get("read") === "1";
   const { graph, nodes } = data;
   const [progress, setProgress] = useState(data.progress);
   const [focus, setFocus] = useState<string | null>(null);
-  // The topic under the mouse or keyboard focus; it previews its chain the way a selection does.
   const [hovered, setHovered] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-  // The canvas scale. Until the user picks one the graph is fitted to the canvas width, which is
-  // what makes a wide graph usable on a phone instead of a horizontal-scroll hunt. Both parts are
-  // state, and the scale is derived from them: a zoom the user chose then survives every resize,
-  // and "Fit" puts the graph back under the canvas's control.
   const [canvasWidth, setCanvasWidth] = useState(0);
   const [chosenZoom, setChosenZoom] = useState<number | null>(null);
-  // Whether this page pushed the reader's history entry, so closing can step back over it.
   const pushedReader = useRef(false);
 
   const layout = useMemo(() => layoutGraph(nodes, graph.tracks), [nodes, graph.tracks]);
@@ -87,7 +74,6 @@ export function GraphView({ data }: { data: GraphData }) {
   const trackName = useMemo(() => new Map(graph.tracks.map((t) => [t.key, t.name])), [graph.tracks]);
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const knownIds = useMemo(() => new Set(byId.keys()), [byId]);
-  // Each topic's dependents: the topics it unlocks.
   const children = useMemo(() => {
     const m = new Map<string, string[]>();
     for (const n of nodes) for (const p of n.prereqIds) m.set(p, [...(m.get(p) ?? []), n.id]);
@@ -99,7 +85,6 @@ export function GraphView({ data }: { data: GraphData }) {
   const current = nodes.find((n) => n.slug === selected) ?? null;
   const upNext = nodes.filter((n) => ready.has(n.id));
   const reading = readParam && current !== null;
-  // Reading order for the reader's previous/next: step by step, left to right.
   const order = useMemo(
     () =>
       nodes.toSorted(
@@ -108,8 +93,6 @@ export function GraphView({ data }: { data: GraphData }) {
     [nodes, layout],
   );
 
-  // Measured, not read off a window resize: the canvas also changes width when the side panel
-  // comes and goes at the lg breakpoint, which a window listener would miss.
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
@@ -118,8 +101,6 @@ export function GraphView({ data }: { data: GraphData }) {
     return () => observer.disconnect();
   }, []);
 
-  // The scale at which the whole graph fits the canvas; never enlarges, so a graph narrower than
-  // the canvas is still drawn at its natural size.
   const fitZoom =
     canvasWidth && layout.width ? Math.min(1, Math.max(MIN_ZOOM, canvasWidth / layout.width)) : 1;
   const zoom = chosenZoom ?? fitZoom;
@@ -127,17 +108,14 @@ export function GraphView({ data }: { data: GraphData }) {
   const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z * 100) / 100));
   const stepZoom = (by: number) => setChosenZoom((current) => clampZoom((current ?? fitZoom) + by));
 
-  // On a canvas narrower than the graph (phones), bring the selected topic, else the first one ready, into view.
   const focusId = current?.id ?? upNext[0]?.id;
   useEffect(() => {
     const el = canvasRef.current;
     const pos = focusId ? layout.positions[focusId] : undefined;
     if (!el || !pos || el.scrollWidth <= el.clientWidth) return;
-    // Positions are layout units; the canvas scrolls in rendered pixels, so they scale with the zoom.
     el.scrollTo({ left: (pos.x + NW / 2) * zoom - el.clientWidth / 2 });
   }, [focusId, layout, zoom]);
 
-  // The palette has TRACK_COLORS track colours (--t-0 …); further tracks reuse them in order.
   const colorOf = (trackKey: string) => `var(--t-${(trackIdx.get(trackKey) ?? 0) % TRACK_COLORS})`;
   const titles = useMemo(() => new Map(nodes.map((n) => [n.id, wrapTitle(n.title)])), [nodes]);
   const stateOf = (id: string): NodeState => {
@@ -145,7 +123,6 @@ export function GraphView({ data }: { data: GraphData }) {
     return s === "none" ? (ready.has(id) ? "ready" : "locked") : s;
   };
 
-  // The highlighted topic's whole prerequisite chain; edges into the chain draw in, edges out of it mark unlocks.
   const active = hovered ?? current?.id ?? null;
   const chain = new Set<string>();
   const stack = active ? [...(byId.get(active)?.prereqIds ?? [])] : [];
@@ -166,7 +143,6 @@ export function GraphView({ data }: { data: GraphData }) {
           const x1 = a.x + NW / 2;
           const y1 = a.y + NH;
           const x2 = b.x + NW / 2;
-          // The line stops short of the node so the arrowhead's tip lands on its top edge.
           const y2 = b.y - 7;
           const dy = Math.max(20, (y2 - y1) / 2);
           return [
@@ -189,14 +165,12 @@ export function GraphView({ data }: { data: GraphData }) {
     return { ...e, kind };
   });
   const unlocks = new Set(edges.filter((e) => e.kind === "unlock").map((e) => e.to));
-  // Highlighted edges paint last so they cross over the rest.
   const lit = (e: (typeof edges)[number]) => e.kind === "chain" || e.kind === "unlock";
   const ordered = [...edges.filter((e) => !lit(e)), ...edges.filter(lit)];
 
   const topicUrl = (slug: string, read: boolean) => `${pathname}?topic=${encodeURIComponent(slug)}${read ? "&read=1" : ""}`;
   const wide = () => window.matchMedia("(min-width: 64rem)").matches;
 
-  // The native history API updates useSearchParams without refetching the page from the server.
   function select(slug: string) {
     setError(null);
     window.history.replaceState(null, "", topicUrl(slug, reading));
@@ -205,7 +179,6 @@ export function GraphView({ data }: { data: GraphData }) {
 
   function openReader(slug: string) {
     setError(null);
-    // Read the live URL, not `reading`: a fast double tap fires twice before the next render.
     if (new URLSearchParams(window.location.search).get("read") === "1") {
       window.history.replaceState(null, "", topicUrl(slug, true));
       return;
@@ -222,21 +195,16 @@ export function GraphView({ data }: { data: GraphData }) {
       return;
     }
     pushedReader.current = false;
-    // Step back over the reader's entry, then keep the topic the reader ended on selected.
     window.addEventListener("popstate", () => window.history.replaceState(null, "", topicUrl(slug, false)), { once: true });
     window.history.back();
   }
 
-  // A link straight to a topic (search, profile, a shared URL) on a narrow screen: the panel is far
-  // below the graph, so bring it into view instead of leaving the learner at the top of the canvas.
   useEffect(() => {
     if (!current || reading || typeof window.matchMedia !== "function" || wide()) return;
     panelRef.current?.scrollIntoView({ block: "start" });
-    // Only for the address the page opened with.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Escape in the panel returns focus to the selected topic in the graph, where it came from.
   function onPanelKey(e: React.KeyboardEvent) {
     if (e.key !== "Escape" || !current) return;
     const node = canvasRef.current?.querySelector<SVGGElement>(`[data-slug="${CSS.escape(current.slug)}"]`);
@@ -245,7 +213,6 @@ export function GraphView({ data }: { data: GraphData }) {
     node.focus();
   }
 
-  // The side panel sits beside the graph on wide screens; on narrow ones it is far below, so open the reader.
   function pick(slug: string) {
     if (wide()) select(slug);
     else openReader(slug);
@@ -255,7 +222,6 @@ export function GraphView({ data }: { data: GraphData }) {
     const before = progress;
     setPending(true);
     setError(null);
-    // Taking a done topic back also clears what depends on it, as the server does.
     const cleared = before[nodeId] === "done" && status !== "done" ? dependentsOf(nodes, nodeId) : [];
     setProgress((p) => {
       const next = { ...p };
@@ -279,7 +245,6 @@ export function GraphView({ data }: { data: GraphData }) {
   }
 
   const relatedTopic = (n: (typeof nodes)[number]) => ({ slug: n.slug, title: n.title, state: stateOf(n.id), color: colorOf(n.trackKey) });
-  // Everything the side panel and the full-screen reader share.
   const topicProps: Omit<TopicPanelProps, "topicHref" | "variant" | "action"> | null = current && {
     node: { ...current, trackName: trackName.get(current.trackKey) ?? "", trackColor: colorOf(current.trackKey) },
     status: statusOf(progress, current.id),
@@ -364,7 +329,6 @@ export function GraphView({ data }: { data: GraphData }) {
               >
                 <Minus aria-hidden />
               </Button>
-              {/* The readout is the control's value, so it is announced when it changes. */}
               <output aria-live="polite" className="w-12 text-center text-xs tabular-nums text-muted-foreground">
                 {Math.round(zoom * 100)}%
               </output>
@@ -396,7 +360,6 @@ export function GraphView({ data }: { data: GraphData }) {
               viewBox={`0 0 ${layout.width} ${layout.height}`}
               role="group"
               aria-label="Prerequisite graph"
-              // Wider than the graph, the SVG centres it at its natural size, and the bands reach the canvas edges.
               preserveAspectRatio="xMidYMin meet"
               className="block min-w-full"
             >
@@ -424,7 +387,6 @@ export function GraphView({ data }: { data: GraphData }) {
                 const color = EDGE_COLOR[e.kind];
                 const chained = e.kind === "chain";
                 return (
-                  // Keyed by the highlighted topic too, so the chain redraws each time the highlight moves.
                   <g key={chained ? `${e.key}@${active}` : e.key}>
                     <path
                       d={e.d}
@@ -458,7 +420,6 @@ export function GraphView({ data }: { data: GraphData }) {
                       : "var(--card)";
                 const stroke = state === "locked" ? `color-mix(in oklch, ${color} 30%, var(--border))` : color;
                 return (
-                  // Positioned by the outer group, so the button's press scale (globals.css) centres on the node.
                   <g key={n.id} transform={`translate(${pos.x},${pos.y})`}>
                     <g
                       role="button"
@@ -474,12 +435,10 @@ export function GraphView({ data }: { data: GraphData }) {
                           pick(n.slug);
                         }
                       }}
-                      // A touch tap fires pointerenter too; only a real hover previews, or every tap would dim the graph.
                       onPointerEnter={(e) => e.pointerType === "mouse" && setHovered(n.id)}
                       onPointerLeave={() => setHovered(null)}
                       onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHovered(n.id)}
                       onBlur={() => setHovered(null)}
-                      // select-none: double-click opens the reader and must not also highlight a word of the title.
                       className="graph-node cursor-pointer outline-none select-none"
                       style={{ opacity }}
                     >
@@ -573,7 +532,6 @@ export function GraphView({ data }: { data: GraphData }) {
           topicKey={current.slug}
           labelledBy={`reader-topic-${current.slug}`}
         >
-          {/* Mounted only while open: no hidden second copy of the topic for assistive tech to find. */}
           {reading && <TopicPanel {...topicProps} variant="full" topicHref={(slug) => topicUrl(slug, true)} />}
         </TopicReader>
       )}

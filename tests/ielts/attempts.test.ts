@@ -95,7 +95,7 @@ describe("ielts speaking attempts", () => {
     expect(res.ok && String(res.questions.part2?.itemId)).toBe(String(card._id));
     expect((await startAttempt(u, { kind: "part2", date: "2020-01-01" })).ok).toBe(false);
     expect((await startAttempt(u, { kind: "nope" as never, date: today })).ok).toBe(false);
-    expect((await startAttempt(u, { kind: "part1", date: today })).ok).toBe(false); // bank has no part1
+    expect((await startAttempt(u, { kind: "part1", date: today })).ok).toBe(false);
     vi.mocked(r2.storageConfigured).mockReturnValue(false);
     expect(await startAttempt(u, { kind: "part2", date: today })).toEqual({
       ok: false,
@@ -156,7 +156,6 @@ describe("ielts speaking attempts", () => {
     await startPart(u, id, { part: "p1", kind: "video", mime: "video/webm", audioMime: "audio/webm", size: 5000, audioSize: 1000 });
     vi.mocked(r2.deleteObjects).mockClear();
     await startPart(u, id, { part: "p1", ...AUDIO });
-    // p1.webm is reused by the new media, so only the old audio-only copy goes.
     expect(r2.deleteObjects).toHaveBeenCalledWith([`ielts/${u}/${id}/p1.audio.webm`]);
     const doc = await IeltsSpeakingAttempt.findById(id).lean<{ parts: { media: { kind: string; audioKey?: string } }[] }>();
     expect(doc!.parts).toHaveLength(1);
@@ -167,7 +166,6 @@ describe("ielts speaking attempts", () => {
     expect(await startPart(u, id, { part: "p1", ...AUDIO })).toEqual({ ok: false, errors: { _: "This part is already saved." } });
   });
 
-  /** Holds the first presign of each of two calls until both have read the attempt, forcing the race. */
   function gatePresign() {
     let arrived = 0;
     let release!: () => void;
@@ -207,10 +205,9 @@ describe("ielts speaking attempts", () => {
   it("a stalled replace never deletes the object a concurrent winner uploaded to the same key", async () => {
     const u = user();
     const id = await start(u);
-    await startPart(u, id, { part: "p1", ...AUDIO }); // old media: p1.webm, not stored
+    await startPart(u, id, { part: "p1", ...AUDIO });
     const key = `ielts/${u}/${id}/p1.webm`;
 
-    // The loser reads the attempt, then stalls in its first presign until the winner is done.
     let reached!: () => void;
     const stalled = new Promise<void>((r) => (reached = r));
     let release!: () => void;
@@ -228,9 +225,9 @@ describe("ielts speaking attempts", () => {
 
     const loser = startPart(u, id, { part: "p1", ...VIDEO_MP4 });
     await stalled;
-    const winner = await startPart(u, id, { part: "p1", ...AUDIO }); // reuses p1.webm
+    const winner = await startPart(u, id, { part: "p1", ...AUDIO });
     expect(winner.ok).toBe(true);
-    const uploaded = vi.mocked(r2.deleteObjects).mock.calls.length; // the winner "uploads" p1.webm now
+    const uploaded = vi.mocked(r2.deleteObjects).mock.calls.length;
     release();
     expect((await loser).ok).toBe(false);
 
@@ -255,7 +252,6 @@ describe("ielts speaking attempts", () => {
     const u = user();
     const id = await start(u, "part2");
     await store(u, id, "p2");
-    // confirmPart's own promote already ran; reset to the stuck state left by a reload mid-run.
     await IeltsSpeakingAttempt.updateOne({ _id: id }, { $set: { status: "inProgress", "parts.0.media.stored": false } });
     expect((await confirmPart(u, id, "p2", { durationSec: 20, markers: [] })).ok).toBe(true);
     expect((await getAttempt(u, id))!.status).toBe("complete");
@@ -295,7 +291,7 @@ describe("ielts speaking attempts", () => {
     expect(res.ok).toBe(false);
     const doc = await IeltsSpeakingAttempt.findById(id).lean<{ parts: { media: { stored: boolean } }[] }>();
     expect(doc!.parts[0].media.stored).toBe(false);
-    expect((await confirmPart(u, id, "p2", { durationSec: 10, markers: [] })).ok).toBe(false); // never started
+    expect((await confirmPart(u, id, "p2", { durationSec: 10, markers: [] })).ok).toBe(false);
   });
 
   it("confirmPart stores markers, caps duration, sets the transcript status and is idempotent", async () => {
@@ -352,14 +348,14 @@ describe("ielts speaking attempts", () => {
       ["p1", "pending", undefined],
       ["p2", "done", "a trip"],
     ]);
-    expect((await transcribePart(u, id, "p2", { transcribe: vi.fn(async () => "x") })).ok).toBe(false); // already done
+    expect((await transcribePart(u, id, "p2", { transcribe: vi.fn(async () => "x") })).ok).toBe(false);
   });
 
   it("transcribePart counts against the shared cap", async () => {
     process.env.STT_DAILY_LIMIT = "1";
     resetEnvCache();
     const u = user();
-    await SpeakingUsage.create({ userId: u, day: today, count: 1 }); // used by Speaking Practice
+    await SpeakingUsage.create({ userId: u, day: today, count: 1 });
     const id = await start(u);
     await store(u, id, "p1");
     const stt = vi.fn(async () => "hello");
@@ -432,12 +428,11 @@ describe("ielts speaking attempts", () => {
     await store(u, mock, "p1");
     const drill = await start(u, "part2");
     await store(u, drill, "p2");
-    await start(u, "part3"); // nothing recorded
+    await start(u, "part3");
     expect((await listAttempts(u, {})).map((a) => a.id)).toEqual([drill, mock]);
     expect((await listAttempts(u, { kind: "mock" })).map((a) => a.id)).toEqual([mock]);
     expect(await listAttempts(u, { limit: 1 })).toHaveLength(1);
     const [row] = await listAttempts(u, { kind: "part2" });
-    // Its only part is stored, so the confirm completed it.
     expect(row).toMatchObject({ id: drill, kind: "part2", status: "complete", parts: ["p2"], durationSec: 30 });
   });
 

@@ -8,8 +8,6 @@ import { pageTitleClass } from "@/lib/ui";
 
 const linkClass =
   "hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
-// Below lg the chapter list and page outline open as overlays above the text, so the chapter itself
-// stays put; from lg they are the side columns.
 const sideClass =
   "hidden text-sm lg:sticky lg:top-20 lg:block lg:max-h-[calc(100dvh-5.5rem)] lg:self-start lg:overflow-y-auto";
 
@@ -18,7 +16,6 @@ type ChapterViewData = NonNullable<Awaited<ReturnType<typeof import("@/content/q
 export function ChapterView({ view }: { view: ChapterViewData }) {
   const position =
     view.series.chapters.findIndex((c) => c.slug === view.chapter.slug) + 1;
-  // Called twice: the overlay and the sidebar each need their own element tree.
   const chapterList = () => (
     <ol className="mt-2 grid gap-1">
       {view.series.chapters.map((c) => (
@@ -128,7 +125,6 @@ export function ChapterView({ view }: { view: ChapterViewData }) {
 
         <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
           <MarkReadButton noteId={view.chapter.id} initialRead={view.read} />
-          {/* On phones prev/next take a full-width row of large targets, the way a reader moves on. */}
           <span className="flex w-full justify-between gap-4 text-sm sm:w-auto sm:justify-end">
             {view.prev && (
               <Link

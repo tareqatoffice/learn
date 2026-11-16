@@ -56,7 +56,6 @@ describe("recording transcription", () => {
     const t = stub();
     const uid = String(legacyUserId);
     await mongoose.connection.collection("speakingtakes").insertOne({ ...legacyTake, transcriptStatus: "pending" });
-    // One call from the IELTS-style path, one from Speaking Practice: same user, same counter.
     expect((await transcribeMedia(uid, media, { transcribe: t })).ok).toBe(true);
     expect((await transcribeTake(uid, String(legacyTakeId), { transcribe: t })).ok).toBe(true);
     const res = await transcribeMedia(uid, media, { transcribe: t });

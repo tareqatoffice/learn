@@ -1,9 +1,5 @@
 import { clock } from "@/components/speaking/format";
 
-/**
- * The clock for one stage of a Speaking part: elapsed against a target (or, with `countdown`, the
- * time left), a bar that fills toward the target, and an optional tick such as Part 2's one-minute mark.
- */
 export function PartTimer({
   label,
   elapsedSec,

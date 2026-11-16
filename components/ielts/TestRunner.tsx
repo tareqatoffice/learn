@@ -20,12 +20,6 @@ function clock(sec: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-/**
- * Plays a Listening section: the recording, or the browser voice reading the script. Both are claimed
- * from the server when Play is pressed (a fresh link, or the script). A full test allows one play,
- * used up only when playback reaches the end, so a reload or a load error can be retried. Every
- * section's player stays mounted for the whole attempt, so switching sections never stops the audio.
- */
 function SectionAudio({ kind, once, attemptId, index, heard }: { kind: SectionAudioKind; once: boolean; attemptId: string; index: number; heard: boolean }) {
   const [state, setState] = useState<"idle" | "playing" | "done">(heard ? "done" : "idle");
   const [src, setSrc] = useState("");
@@ -41,7 +35,6 @@ function SectionAudio({ kind, once, attemptId, index, heard }: { kind: SectionAu
     setError(message);
   };
 
-  // A full test records the play on the server; a drill can simply be played again.
   const finished = () => {
     if (!once) return setState("idle");
     setState("done");
@@ -68,7 +61,6 @@ function SectionAudio({ kind, once, attemptId, index, heard }: { kind: SectionAu
 
   return (
     <div className="grid gap-2">
-      {/* A drill gets a normal player once its link is signed; a full test plays through once, with no controls. */}
       {src && !once && <audio controls autoPlay src={src} onError={loadError} className="w-full" aria-label="Section audio" />}
       {src && once && <audio autoPlay src={src} onEnded={finished} onError={loadError} aria-label="Section audio" />}
       {!(src && !once) && (
@@ -97,7 +89,6 @@ function Answer({ q, group, value, onChange }: { q: PublicQuestion; group: Publi
     return <input className="w-full max-w-xs rounded-md border border-border bg-background px-3 py-1.5 text-sm" value={value} maxLength={200} onChange={(e) => onChange(e.target.value)} aria-label={`Answer to question ${q.n}`} />;
   }
   const picked = choices.indexOf(value);
-  // One tab stop for the group (the chosen answer, else the first), arrows move and choose.
   const onKey = (e: React.KeyboardEvent<HTMLButtonElement>, i: number) => {
     const next = rovingIndex(e.key, i, choices.length);
     if (next === null) return;
@@ -129,7 +120,6 @@ function Answer({ q, group, value, onChange }: { q: PublicQuestion; group: Publi
   );
 }
 
-/** The answer sheet for a Listening or Reading attempt: timer, autosave, submit. Marking happens on the server. */
 export function TestRunner({ view }: { view: RunView }) {
   const [answers, setAnswers] = useState<Record<string, string>>(view.answers);
   const [index, setIndex] = useState(0);
@@ -138,7 +128,6 @@ export function TestRunner({ view }: { view: RunView }) {
   const [retry, setRetry] = useState(0);
   const full = view.scope === "full";
   const deadline = new Date(view.startedAt).getTime() + view.limitSec * 1000;
-  // null until mounted: the server render has no clock to agree with the browser's.
   const [left, setLeft] = useState<number | null>(null);
   const submitting = useRef(false);
   const lastAutoTry = useRef(0);
@@ -149,7 +138,6 @@ export function TestRunner({ view }: { view: RunView }) {
       if (submitting.current) return;
       run(
         async () => {
-          // Set inside the action so a declined confirm never leaves the guard on.
           submitting.current = true;
           try {
             const res = await submitAttemptAction(view.id, { ...answers, ...dirty.current });
@@ -176,7 +164,6 @@ export function TestRunner({ view }: { view: RunView }) {
     };
   }, [deadline]);
 
-  // The full test submits itself at the limit; a failed try is repeated every few seconds.
   useEffect(() => {
     if (!full || left === null || left > 0 || submitting.current) return;
     if (Date.now() - lastAutoTry.current < RETRY_MS) return;
@@ -190,12 +177,10 @@ export function TestRunner({ view }: { view: RunView }) {
     dirty.current = {};
     saveAnswersAction(view.id, batch)
       .then((res) => {
-        // Refused (time is up, already submitted): retrying won't help, so say why instead.
         if (!res.ok) setSaveError(res.errors._ ?? "Your answers aren't being saved. Submit, or reload the page.");
         else setSaveError("");
       })
       .catch(() => {
-        // Keep the answers and try again shortly; a newer value for the same question wins.
         dirty.current = { ...batch, ...dirty.current };
         setTimeout(() => setRetry((n) => n + 1), RETRY_MS);
       });
@@ -207,7 +192,6 @@ export function TestRunner({ view }: { view: RunView }) {
     return () => clearTimeout(t);
   }, [answers, retry, flush]);
 
-  // Best effort when the tab is hidden or closed.
   useEffect(() => {
     const hide = () => {
       if (document.visibilityState === "hidden") flush();
@@ -239,7 +223,6 @@ export function TestRunner({ view }: { view: RunView }) {
         <span role="timer" aria-label="Time left" className={cn("font-mono text-lg", left !== null && left <= 60 && "text-destructive")}>
           {left === null ? "--:--" : left >= 0 ? clock(left) : `-${clock(-left)}`}
         </span>
-        {/* The timer itself is silent; this says it at five minutes and at one. */}
         <span aria-live="polite" className="sr-only">
           {timeWarning(left)}
         </span>

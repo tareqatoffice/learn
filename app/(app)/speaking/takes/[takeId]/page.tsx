@@ -44,7 +44,6 @@ export default async function TakePage({ params }: PageProps<"/speaking/takes/[t
 
   const take = await getTake(user.userId, takeId);
   if (!take) notFound();
-  // Only whether the coach is on reaches the page; the key never does.
   const [ai, settings] = await Promise.all([getAiConfig(), getEffectiveSettings(user.userId)]);
 
   return (

@@ -1,7 +1,6 @@
 import mongoose, { Schema, model } from "mongoose";
 import { VIDEO_DEFAULT } from "@/speaking/tasks";
 
-/** One learner's speaking preferences. Absent target values fall back to the admin defaults. */
 const speakingProfileSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true },

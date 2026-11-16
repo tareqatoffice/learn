@@ -58,7 +58,7 @@ describe("IELTS admin uploads", () => {
     expect(r2.presignPut).toHaveBeenCalledWith(started.key, "audio/mpeg", 1000);
     expect((await startSectionAudioUpload(id, 0, "image/png", 10)).ok).toBe(false);
     expect((await startSectionAudioUpload(id, 0, "audio/mpeg", 81 * 1024 * 1024)).ok).toBe(false);
-    expect((await startSectionAudioUpload(id, 5, "audio/mpeg", 10)).ok).toBe(false); // no such section
+    expect((await startSectionAudioUpload(id, 5, "audio/mpeg", 10)).ok).toBe(false);
     r2.storageConfigured.mockReturnValue(false);
     expect((await startSectionAudioUpload(id, 0, "audio/mpeg", 10)).ok).toBe(false);
   });

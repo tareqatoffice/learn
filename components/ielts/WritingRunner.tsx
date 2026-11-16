@@ -18,7 +18,6 @@ const RETRY_MS = 5000;
 const TIME_SAVE_MS = 30_000;
 const clock = (s: number) => `${Math.floor(Math.abs(s) / 60)}:${String(Math.abs(s) % 60).padStart(2, "0")}`;
 
-/** Writes the task(s): live word count, timers that never cut you off, autosave, then submit. */
 export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrls: string[] }) {
   const router = useRouter();
   const [texts, setTexts] = useState(() => view.tasks.map((t) => t.text));
@@ -38,13 +37,11 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
   }, [active]);
 
   const [retry, setRetry] = useState(0);
-  // Sends every task with unsaved text or time. A failed save keeps the task and tries again shortly.
   const flush = useCallback(() => {
     for (const i of [...dirty.current]) {
       dirty.current.delete(i);
       saveWritingTextAction(view.id, i, latest.current.texts[i], latest.current.secs[i])
         .then((res) => {
-          // Refused (submitted elsewhere, gone): retrying won't help, so say why instead.
           if (!res.ok) setSaveError(res.errors._ ?? "Your text isn't being saved. Reload the page.");
           else setSaveError("");
         })
@@ -61,7 +58,6 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
     return () => clearTimeout(t);
   }, [texts, retry, flush]);
 
-  // Time spent counts towards the plan, so it is saved now and then even while the learner is thinking.
   useEffect(() => {
     const t = setInterval(() => {
       dirty.current.add(active);
@@ -70,7 +66,6 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
     return () => clearInterval(t);
   }, [active]);
 
-  // Best effort when the tab is hidden or closed.
   useEffect(() => {
     const hide = () => {
       if (document.visibilityState === "hidden") flush();

@@ -40,11 +40,9 @@ export const metadata: Metadata = {
   twitter: { card: "summary", title: SITE_NAME, description: SITE_DESCRIPTION },
 };
 
-// Runs before first paint so a saved choice never flashes the wrong theme. Reads the key ThemeToggle writes.
 const themeScript = `try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  // Set by proxy.ts with the page's CSP; absent on paths the proxy skips, which render no page.
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html
@@ -53,11 +51,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${plexSans.variable} ${notoBengali.variable} ${plexMono.variable} h-full antialiased`}
     >
       <head>
-        {/* Browsers hide a nonce from the DOM after load, so the client never sees the server's value. */}
         <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="flex min-h-full min-w-0 flex-col">
-        {/* First tab stop on every page; each page's <main> carries id="main". */}
         <a
           href="#main"
           className="sr-only z-50 rounded-md bg-background px-3 py-2 text-sm font-medium focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-2 focus:outline-ring"

@@ -119,10 +119,8 @@ describe("listening and reading attempts", () => {
     const entry = await IeltsBandEntry.findOne({ userId: u }).lean<{ source: string; bands: { reading: number } }>();
     expect(entry).toMatchObject({ source: "practiceTest", bands: { reading: 7 } });
     const entryId = String((await IeltsBandEntry.findOne({ userId: u }).lean<{ _id: unknown }>())!._id);
-    // Owned by the attempt: not deletable on its own (F22).
     expect((await deleteBandEntry(u, entryId)).ok).toBe(false);
 
-    // Submitting again re-creates a band entry that went missing, without duplicating it (D12).
     await IeltsBandEntry.deleteMany({});
     await submitAttempt(u, started.attemptId, {});
     await submitAttempt(u, started.attemptId, {});
@@ -163,28 +161,26 @@ describe("listening and reading attempts", () => {
     expect(JSON.stringify(got.view)).not.toContain("k/a.mp3");
 
     expect(await claimSection(u, full.attemptId, 0, deps)).toEqual({ ok: true, play: { kind: "voice", script: "The secret is cat." } });
-    // A play cut short (reload, section switch, load error) is not used up until it reaches the end (F1).
     expect((await claimSection(u, full.attemptId, 0, deps)).ok).toBe(true);
     expect(await finishSection(u, full.attemptId, 0)).toEqual({ ok: true });
-    expect((await claimSection(u, full.attemptId, 0, deps)).ok).toBe(false); // one play in a full test
-    expect((await finishSection(user(), full.attemptId, 1)).ok).toBe(false); // someone else's attempt
-    expect((await finishSection(u, full.attemptId, 9)).ok).toBe(false); // no such section
+    expect((await claimSection(u, full.attemptId, 0, deps)).ok).toBe(false);
+    expect((await finishSection(user(), full.attemptId, 1)).ok).toBe(false);
+    expect((await finishSection(u, full.attemptId, 9)).ok).toBe(false);
     const again = await getAttempt(u, full.attemptId);
     expect(again?.state === "run" && again.view.played).toEqual([0]);
-    // A recording is signed only now, for long enough to play through a section.
     expect(await claimSection(u, full.attemptId, 1, deps)).toEqual({ ok: true, play: { kind: "file", url: `https://r2.test/k/a.mp3?ttl=${AUDIO_LINK_SEC}` } });
     await finishSection(u, full.attemptId, 1);
     expect((await claimSection(u, full.attemptId, 1, deps)).ok).toBe(false);
-    expect((await claimSection(u, full.attemptId, 2, deps)).ok).toBe(false); // nothing to play
-    expect((await claimSection(user(), full.attemptId, 0, deps)).ok).toBe(false); // someone else's attempt
+    expect((await claimSection(u, full.attemptId, 2, deps)).ok).toBe(false);
+    expect((await claimSection(user(), full.attemptId, 0, deps)).ok).toBe(false);
 
     const drill = await startTestAttempt(u, { skill: "listening", testId: String(doc._id), scope: 1, date: "2026-11-12" });
     if (!drill.ok) throw new Error("start");
     expect((await claimSection(u, drill.attemptId, 0, deps)).ok).toBe(true);
-    expect((await claimSection(u, drill.attemptId, 0, deps)).ok).toBe(true); // drills can be replayed
-    expect((await finishSection(u, drill.attemptId, 0)).ok).toBe(false); // drills keep no play record
+    expect((await claimSection(u, drill.attemptId, 0, deps)).ok).toBe(true);
+    expect((await finishSection(u, drill.attemptId, 0)).ok).toBe(false);
     await submitAttempt(u, drill.attemptId, {});
-    expect((await claimSection(u, drill.attemptId, 0, deps)).ok).toBe(false); // closed after submit
+    expect((await claimSection(u, drill.attemptId, 0, deps)).ok).toBe(false);
   });
 
   it("reuses the open attempt for the same test and part, but not one whose time ran out (S16)", async () => {

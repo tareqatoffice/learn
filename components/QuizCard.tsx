@@ -18,11 +18,8 @@ type Card = NonNullable<SessionView["current"]>;
 
 export type QuizCardProps = {
   view: SessionView;
-  /** Records the mark (with the learner's answer, if any) and resolves with the session as it now stands. */
   onResult: (result: MarkResult, attempt?: QuizAttempt) => Promise<SessionView>;
-  /** Ends the quiz early; rejects when the end could not be saved. */
   onFinish: () => Promise<void>;
-  /** The AI coach (OpenRouter); without it the card is a plain flashcard. */
   coach?: QuizCoach;
 };
 
@@ -36,7 +33,6 @@ export type QuizCoach = {
 
 const KEYS: Record<string, MarkResult> = { g: "got", r: "review", s: "skip" };
 
-/** Typing, modifier chords and key repeat must never trigger a shortcut. */
 function ignoresShortcut(e: KeyboardEvent): boolean {
   if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || e.repeat) return true;
   const target = e.target as HTMLElement | null;
@@ -44,17 +40,11 @@ function ignoresShortcut(e: KeyboardEvent): boolean {
   return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
-/** Space already activates a focused button, link or summary, so it must not also reveal. */
 const activatesOnSpace = (target: EventTarget | null) =>
   target instanceof HTMLElement && Boolean(target.closest("button, a[href], summary, [role='button']"));
 
 const suggestedRing = "ring-2 ring-ring ring-offset-2 ring-offset-card";
 
-/**
- * The shortcut for a control, printed on the control itself. `aria-hidden` on purpose: the key is a
- * hint for pointer users, and leaving it out of the accessible name keeps that name the plain label.
- * `border-current` takes the button's own text colour, so one chip suits every variant.
- */
 function KeyHint({ children }: { children: React.ReactNode }) {
   return (
     <kbd aria-hidden className="ml-1.5 rounded border border-current px-1 text-[0.6875rem] font-sans leading-4 opacity-60">
@@ -65,7 +55,6 @@ function KeyHint({ children }: { children: React.ReactNode }) {
 
 export function QuizCard({ view, onResult, onFinish, coach }: QuizCardProps) {
   if (view.done || !view.current) return <Done view={view} />;
-  // A new card (or the same question coming back later) starts hidden and enabled.
   return <Live key={`${view.position}:${view.current.id}`} view={view} card={view.current} onResult={onResult} onFinish={onFinish} coach={coach} />;
 }
 
@@ -78,7 +67,6 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const [answer, setAnswer] = useState("");
-  // How the answer was given, saved with the mark: refs, since only `mark` reads them.
   const typed = useRef(false);
   const spoken = useRef(false);
   const answerRef = useRef("");
@@ -87,11 +75,8 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
   const [endFailed, setEndFailed] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
 
-  // After a mark the old card's buttons are gone; put focus on the new question so keyboard and
-  // screen-reader users carry on from it (the first card keeps the page's natural focus).
   useEffect(() => {
     if (view.position > 0) heading.current?.focus();
-    // Only on mount: each card is its own instance.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -117,7 +102,6 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
   }
 
   function changeAnswer(value: string, source: "typed" | "voice") {
-    // Clearing the box starts the answer over, so its mode counts only what is there now.
     if (!value.trim()) typed.current = spoken.current = false;
     else if (source === "voice") spoken.current = true;
     else typed.current = true;
@@ -125,8 +109,6 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
     setAnswer(value);
   }
 
-  // While dictating, the phrase being spoken is not in the answer yet: marking, revealing or checking
-  // then would drop it, so they wait until the recording stops.
   const [recording, setRecording] = useState(false);
   const recordingRef = useRef(false);
   const onRecordingChange = useCallback((on: boolean) => {
@@ -135,7 +117,6 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
   }, []);
   const [checking, setChecking] = useState(false);
   const [coachError, setCoachError] = useState("");
-  // Like `busy`: blocks a second check, and every shortcut, while a check is in flight.
   const checkingRef = useRef(false);
   const feedback = grade?.feedback ?? null;
 
@@ -157,7 +138,6 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
       setChecking(false);
     }
   }
-  // State updates are asynchronous; the ref is what stops a second key press in the same tick.
   const busy = useRef(false);
 
   const mark = useCallback(
@@ -190,7 +170,6 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
       }
       const result = KEYS[e.key.toLowerCase()];
       if (!result) return;
-      // Got it / Review judge an answer, so their keys wait for the reveal; Skip works any time.
       if (result !== "skip" && !revealedRef.current) return;
       e.preventDefault();
       void mark(result);
@@ -222,7 +201,6 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
         </div>
       )}
 
-      {/* With the coach on, the answer box stays after the reveal so the answer can still be checked. */}
       {(!revealed || (coach && !grade)) && (
         <div className="mt-4">
           <AnswerBox
@@ -259,7 +237,6 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
         )}
         {revealed && coach && (
           <FollowUpChat
-            // A new conversation (a grade) starts a fresh chat; the opener is only read on mount.
             key={grade?.conversationId ?? "ungraded"}
             opener={feedback?.followUp || undefined}
             conversationId={grade?.conversationId}

@@ -23,7 +23,6 @@ export type TopicPanelProps = {
     slug: string;
     title: string;
     trackName: string;
-    /** The track's colour, shown as a dot beside its name. */
     trackColor?: string;
     summary: string;
     points: string[];
@@ -37,20 +36,13 @@ export type TopicPanelProps = {
     questions: (RelatedLink & { id: string })[];
     notes: RelatedLink[];
     prereqs: RelatedTopic[];
-    /** Topics this one is a prerequisite of. */
     unlocks?: RelatedTopic[];
   };
-  /** Titles of prerequisites not done yet; while any remain, the topic can't be started or finished. */
   blockedBy?: string[];
-  /** Disables the status chips while a change is being saved. */
   pending?: boolean;
-  /** A failed status save, shown under the status chips. */
   error?: string | null;
-  /** Where a related topic links to (selects it in the same graph). */
   topicHref?: (slug: string) => string;
-  /** "panel" stacks everything in a narrow column; "full" sets the content beside a sidebar for a full-screen read. */
   variant?: "panel" | "full";
-  /** Shown beside the title, e.g. a button that opens the full view. */
   action?: React.ReactNode;
 };
 
@@ -60,10 +52,6 @@ const STATUSES: { value: NodeStatus; label: string }[] = [
   { value: "done", label: "Done" },
 ];
 
-/**
- * A code block whose fence is longer than any backtick run inside the code, so the code can never
- * close it. No language is named: topics hold CSS, shell, SQL and more, not only JavaScript.
- */
 function fencedCode(code: string): string {
   const longest = Math.max(0, ...(code.match(/`+/g) ?? []).map((run) => run.length));
   const fence = "`".repeat(Math.max(3, longest + 1));
@@ -81,7 +69,6 @@ function TopicLinks({ title, items, topicHref }: { title: string; items: Related
       <ul className="grid">
         {items.map((t) => (
           <li key={t.slug}>
-            {/* replace: moving between topics shouldn't stack history entries the back button has to wade through. */}
             <Link href={topicHref(t.slug)} scroll={false} replace className={rowLinkClass}>
               <StatusGlyph state={t.state} color={t.color} />
               <span className="min-w-0 flex-1 truncate">{t.title}</span>
@@ -100,14 +87,12 @@ export function TopicPanel({ node, status, onStatus, related, blockedBy = [], pe
   const full = variant === "full";
   const unlocks = related.unlocks ?? [];
   const locked = blockedBy.length > 0;
-  // The reader and the side panel can both be on the page, so each gets its own heading id.
   const headingId = `${full ? "reader-" : ""}topic-${node.slug}`;
 
   async function quizThese() {
     setStarting(true);
     setQuizMessage(null);
     try {
-      // On success the action redirects into the new quiz; it only returns for an empty deck.
       const result = await startQuizAction({
         questionIds: related.questions.map((q) => q.id),
         mode: "all",
@@ -149,7 +134,6 @@ export function TopicPanel({ node, status, onStatus, related, blockedBy = [], pe
           <Chip
             key={s.value}
             on={status === s.value}
-            // "Not started" stays available so a stale status can always be cleared.
             disabled={pending || (locked && s.value !== "none")}
             onClick={() => onStatus(s.value)}
           >
@@ -266,12 +250,8 @@ export function TopicPanel({ node, status, onStatus, related, blockedBy = [], pe
   );
   const hasRelated = related.prereqs.length > 0 || unlocks.length > 0 || related.questions.length > 0 || related.notes.length > 0;
 
-  // Every grid here uses one minmax(0, 1fr) column: with the default auto column a wide code block would
-  // widen the whole column to its longest line instead of scrolling inside itself.
   if (full)
     return (
-      // Narrow: heading, status, content, related in one column. Wide: heading over content on the left,
-      // status over related in a sidebar, so the status controls sit near the top either way.
       <article
         aria-labelledby={headingId}
         className="grid grid-cols-[minmax(0,1fr)] content-start gap-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-x-12 xl:gap-x-16"

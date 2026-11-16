@@ -101,7 +101,7 @@ describe("admin speaking lessons", () => {
     const c = await make("C");
     expect((await moveLesson(b, "up")).ok).toBe(true);
     expect(await orderOf(b)).toBeLessThan(await orderOf(a));
-    expect((await moveLesson(c, "down")).ok).toBe(true); // already last: no-op
+    expect((await moveLesson(c, "down")).ok).toBe(true);
     expect(await orderOf(c)).toBeGreaterThan(await orderOf(a));
   });
 

@@ -5,7 +5,6 @@ import { type ActionResult, fail, ok } from "@/admin/result";
 import { TOKEN_LIFETIMES, type TokenLifetime, createToken, revokeToken } from "@/admin/tokens";
 import { TOKEN_SCOPES, type TokenScope } from "@/models";
 
-/** Returns the new token once; only its hash is stored. */
 export async function createTokenAction(
   name: string,
   options: { scope?: TokenScope; lifetimeDays?: TokenLifetime } = {},

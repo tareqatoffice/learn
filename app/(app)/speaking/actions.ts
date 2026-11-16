@@ -15,7 +15,6 @@ import { framesInput, objectIdInput, selfRatingInput, shape, takeInput } from "@
 const BAD_REQUEST = "That request isn't valid. Reload the page and try again.";
 import { transcribeTake } from "@/speaking/transcribe";
 
-// Every action signs in first and acts as the session user; ids in the input never pick the user.
 
 async function session(): Promise<string> {
   const user = await requireUser();
@@ -28,7 +27,6 @@ export async function startTakeAction(input: StartTakeInput) {
   const valid = shape(takeInput, input);
   if (!valid) return fail(BAD_REQUEST);
   const { task, lessonId, material, kind, mime, audioMime, size, audioSize } = valid as unknown as StartTakeInput;
-  // The take's day is the learner's local today, worked out here rather than taken from the browser.
   const date = localDate(new Date(), await readTimeZone());
   return startTake(userId, { task, date, lessonId: lessonId ?? null, material, kind, mime, audioMime, size, audioSize });
 }
@@ -75,14 +73,11 @@ export async function deleteTakeAction(takeId: string): Promise<ActionResult> {
   return deleteTake(await session(), takeId);
 }
 
-/** Swaps today's lesson; "today" is the learner's local date, read from the time-zone cookie. */
-/** Freshly signed playback links for one of the user's takes, for a player whose link expired. */
 export async function takeMediaUrlsAction(takeId: string): Promise<{ media: string; audio?: string } | null> {
   const take = await getTake(await session(), takeId);
   return take ? { media: take.mediaUrl, ...(take.audioUrl ? { audio: take.audioUrl } : {}) } : null;
 }
 
-/** Deletes every recording the user made in Speaking practice, files first. */
 export async function deleteAllTakesAction(): Promise<ActionResult<{ deleted: number }>> {
   const userId = await session();
   try {

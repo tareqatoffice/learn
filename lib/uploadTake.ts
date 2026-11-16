@@ -10,12 +10,6 @@ export class UploadError extends Error {
   }
 }
 
-/**
- * PUT a recorded take to its presigned URL, through `putFile` (XHR: progress, a 10-minute timeout,
- * cancel by `signal`). `mime` must be the base type the URL was signed for (no codecs). Safe to call
- * again with the same blob after a failure, so a flaky connection never costs the learner their
- * recording.
- */
 export function uploadTake(
   url: string,
   blob: Blob,

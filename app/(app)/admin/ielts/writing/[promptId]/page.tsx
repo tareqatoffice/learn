@@ -11,7 +11,6 @@ export async function generateMetadata({ params }: { params: Promise<{ promptId:
   return buildMetadata({ title: "IELTS Writing prompt · Admin", description: "Edit an IELTS Writing prompt.", path: `/admin/ielts/writing/${promptId}` });
 }
 
-/** `/admin/ielts/writing/new?task=task1|task2` creates a prompt; any other segment is a prompt id. */
 export default async function AdminIeltsPromptPage({
   params,
   searchParams,

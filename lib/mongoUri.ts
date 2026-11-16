@@ -1,4 +1,3 @@
-/** True when every host of a MongoDB connection string is on this machine. `mongodb+srv` always names a remote cluster. */
 export function isLocalMongoUri(uri: string): boolean {
   const match = uri.trim().match(/^mongodb:\/\/([^/?#]+)/i);
   if (!match) return false;

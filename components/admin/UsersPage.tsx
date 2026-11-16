@@ -108,7 +108,6 @@ export function UsersPage({
     blocked: users.filter((u) => u.status === "blocked").length,
     all: users.length,
   } satisfies Record<Tab, number>;
-  // Open on the review queue while it has anything in it.
   const tab: Tab = TABS.some((t) => t.value === statusParam)
     ? (statusParam as Tab)
     : counts.pending > 0
@@ -119,7 +118,6 @@ export function UsersPage({
   const shown = users
     .filter((u) => tab === "all" || u.status === tab)
     .filter((u) => !needle || u.email.includes(needle) || u.name.toLowerCase().includes(needle));
-  // Oldest request first, so nobody waits longest.
   if (tab === "pending") shown.sort((a, b) => (a.requestedAt?.getTime() ?? 0) - (b.requestedAt?.getTime() ?? 0));
 
   const href = (next: Tab) => `/admin/users?${new URLSearchParams({ status: next, ...(q ? { q } : {}) })}`;

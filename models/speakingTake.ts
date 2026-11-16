@@ -43,7 +43,6 @@ const aiSchema = new Schema(
 const speakingTakeSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    /** Learner-local calendar date, YYYY-MM-DD. */
     date: { type: String, required: true },
     task: { type: String, enum: TASKS, required: true },
     lessonId: { type: Schema.Types.ObjectId, ref: "SpeakingLesson" },
@@ -51,11 +50,8 @@ const speakingTakeSchema = new Schema(
     media: { type: mediaSchema, required: true },
     transcript: String,
     transcriptStatus: { type: String, enum: ["none", "pending", "running", "done", "failed", "unavailable"], default: "none" },
-    /** When the running transcription was claimed; a claim older than a few minutes can be taken over. */
     transcribeStartedAt: Date,
-    /** Transcriptions tried for this take; capped so a failing recording can't be retried forever. */
     transcribeAttempts: { type: Number, default: 0 },
-    /** Set while the take's recordings are being removed, so a late confirm cannot store it. */
     deletingAt: Date,
     self: { type: selfSchema, default: undefined },
     markers: { type: [markerSchema], default: [] },

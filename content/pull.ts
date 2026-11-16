@@ -2,15 +2,12 @@ import type { Types } from "mongoose";
 import { byOrder } from "@/lib/utils";
 import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook } from "@/models";
 
-// Lossless exports in the canonical formats the parsers read back: every item
-// carries its id, so editing a pulled file and importing it updates in place.
 
 type Id = Types.ObjectId;
 const block = (text?: string) => (text?.trim() ? [text.trim(), ""] : []);
 
 export class NotFoundError extends Error {}
 
-/** A question book (every status) as canonical markdown. */
 export async function pullBook(slug: string): Promise<{ fileName: string; content: string }> {
   const book = await QuestionBook.findOne({ slug }).lean<{
     _id: Id;
@@ -39,7 +36,6 @@ export async function pullBook(slug: string): Promise<{ fileName: string; conten
   return { fileName: `${slug}.md`, content: `${lines.join("\n").trimEnd()}\n` };
 }
 
-/** A note series (every status) as one canonical file per chapter, named by order. */
 export async function pullSeries(slug: string): Promise<{ files: { name: string; content: string }[] }> {
   const series = await NoteSeries.findOne({ slug }, { _id: 1 }).lean<{ _id: Id }>();
   if (!series) throw new NotFoundError(`series ${slug} not found`);
@@ -55,7 +51,6 @@ export async function pullSeries(slug: string): Promise<{ files: { name: string;
   };
 }
 
-/** A graph (every status) in the legacy data shape, with `_id` on the graph and on each topic. */
 export async function pullGraph(slug: string): Promise<{ fileName: string; json: object }> {
   const graph = await Graph.findOne({ slug }).lean<{
     _id: Id;

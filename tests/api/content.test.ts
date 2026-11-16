@@ -11,7 +11,6 @@ import { ApiToken, Question, Revision, User } from "@/models";
 import { resetDb } from "../setup/mongo";
 import { seedBook, seedQuestions } from "../progress/seed";
 
-// No browser session at all: only the bearer token may authenticate.
 vi.mock("@/auth", () => ({ auth: () => Promise.resolve(null) }));
 
 beforeAll(connectDb);
@@ -48,7 +47,7 @@ describe("content API tokens", () => {
     const { id, token: t } = await token();
     expect((await listContent(new Request(`${URL_BASE}/api/content`, { headers: auth("learn_nope") }))).status).toBe(401);
     expect(await revokeToken(id)).toBe(true);
-    expect(await revokeToken(id)).toBe(false); // nothing left to revoke (F23)
+    expect(await revokeToken(id)).toBe(false);
     expect((await listContent(new Request(`${URL_BASE}/api/content`, { headers: auth(t) }))).status).toBe(401);
   });
 

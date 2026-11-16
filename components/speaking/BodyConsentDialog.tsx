@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 
-/** The one-time notice before body-language feedback: what leaves the browser and how to withdraw. */
 export function BodyConsentDialog({
   open,
   pending,

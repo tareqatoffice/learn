@@ -27,9 +27,7 @@ export type ImportOptions = {
 type AnyModel = Model<any>;
 type Data = Record<string, unknown>;
 type Row = Data & { _id: Types.ObjectId };
-/** A part, extra or track: container subdocs merged by `key`. */
 type Entry = Data & { key: string };
-/** `seen` is the doc's `updatedAt` when planned; the commit refuses to overwrite a doc edited since. */
 type Write = { model: AnyModel; id: Types.ObjectId | null; data: Data; seen?: unknown; label: string };
 type Ctx = { opts: ImportOptions; report: ImportReport; writes: Write[] };
 type Target = { doc: Row | null; id: Types.ObjectId };
@@ -37,19 +35,11 @@ type Incoming = { id?: string; key: string; title: string };
 type Match<T> = { item: T; doc: Row | null; id: Types.ObjectId };
 type ListSpec = { name: string; type: ItemChange["type"]; fields: string[]; incoming: Entry[] };
 
-/** Where partless questions go when they are new (a fragment pushed without a part heading). */
 const GENERAL_PART: Entry = { key: "general", title: "General", intro: "" };
-/** parseGraph checks these against the incoming JSON alone; the import re-checks them against existing + incoming. */
 const GRAPH_CONTEXT_ERRORS = [/^tracks: need /, /: unknown track /, /: unknown prerequisite /, /^cycle: /];
 const MAX_TRACKS = 6;
-/** Same rule the admin editors apply, so imported slugs and keys stay editable there. */
 const SLUG_RULE = "must be lowercase letters and digits joined by single dashes";
 
-/**
- * Imports a book, note series or graph. Plans a diff against the DB first (reads only); when not a
- * dry run and the plan has no errors, applies it in one transaction. Never deletes or archives,
- * and never changes the status of existing items. `dryRun` defaults to true.
- */
 export async function runImport(opts: ImportOptions): Promise<ImportReport> {
   const report: ImportReport = {
     target: opts.target,
@@ -78,7 +68,6 @@ export async function runImport(opts: ImportOptions): Promise<ImportReport> {
   try {
     await inTransaction(async (session) => {
       for (const w of ctx.writes) {
-        // The plan was read outside the transaction; an edit made since would be silently overwritten.
         if (w.id && !(await w.model.exists({ _id: w.id, updatedAt: w.seen ?? null }).session(session))) {
           throw new Error(`${w.label} was edited since this import was planned; preview again`);
         }
@@ -100,7 +89,6 @@ async function planBook(ctx: Ctx, markdown: string): Promise<void> {
 
   const docs = target.doc ? await Question.find({ bookId: target.id }).lean<Row[]>() : [];
   const items = parsed.questions.map((q) => ({ ...q, key: q.importKey, title: q.question }));
-  // importKey is unique across all books, so a key another book holds can't be created here.
   const foreign = await Question.find({ importKey: { $in: items.map((i) => i.key) }, bookId: { $ne: target.id } })
     .select("importKey")
     .lean<Row[]>();
@@ -117,15 +105,12 @@ async function planBook(ctx: Ctx, markdown: string): Promise<void> {
     { name: "extras", type: "extra", fields: ["title", "body"], incoming: parsed.extras },
   ]);
 
-  // Legacy books name a question's part by title (parts with the same title were merged by the parser);
-  // canonical books give its key, since two parts may share a title.
   const partKeyByTitle = new Map<string, string>();
   for (const p of parsed.parts) if (!partKeyByTitle.has(p.title)) partKeyByTitle.set(p.title, p.key);
   const nextOrder = orderAfter(docs);
   for (const m of matches) {
     const q = m.item;
     const next: Data = { question: q.question, prompt: q.prompt, answer: q.answer };
-    // A matched question keeps its part unless the source names one.
     const partKey = q.partKey ?? (q.part ? partKeyByTitle.get(q.part) : m.doc ? undefined : GENERAL_PART.key);
     if (partKey) next.partKey = partKey;
     await planItem(ctx, Question, "question", m, next, { bookId: target.id, importKey: q.key }, container.subjects, nextOrder);
@@ -150,7 +135,7 @@ async function planSeries(ctx: Ctx, files: { name: string; content: string }[]):
 
   const nextOrder = orderAfter(docs);
   for (const [i, m] of matches.entries()) {
-    const { title, body, slug } = chapters[i]; // `title` unlabelled: a chapter without an H1 fails validation
+    const { title, body, slug } = chapters[i];
     const next: Data = { title, body, toc: extractToc(body), readMinutes: readMinutes(body) };
     await planItem(ctx, Note, "note", m, next, { seriesId: target.id, slug }, container.subjects, nextOrder);
   }
@@ -175,7 +160,6 @@ async function planGraph(ctx: Ctx, json: unknown): Promise<void> {
   const trackKeys = (container.lists.tracks ?? []).map((t) => t.key);
   if (trackKeys.length < 2 || trackKeys.length > MAX_TRACKS) report.errors.push(`tracks: need 2..${MAX_TRACKS}`);
 
-  // Second pass: prerequisite slugs resolve to existing or incoming nodes; cycles are checked over both.
   const idBySlug = new Map(docs.map((d) => [String(d.slug), d._id]));
   for (const m of matches) idBySlug.set(m.item.slug, m.id);
   const slugById = new Map(docs.map((d) => [String(d._id), String(d.slug)]));
@@ -214,7 +198,6 @@ async function planGraph(ctx: Ctx, json: unknown): Promise<void> {
   }
 }
 
-/** The target container, or null (with an error) when it is missing and no title allows creating it. */
 async function loadContainer(ctx: Ctx, model: AnyModel, sourceId?: string): Promise<Target | null> {
   const { target, title } = ctx.opts;
   const doc = await model.findOne({ slug: target.slug }).lean<Row | null>();
@@ -228,7 +211,6 @@ async function loadContainer(ctx: Ctx, model: AnyModel, sourceId?: string): Prom
   return { doc, id: doc?._id ?? new Types.ObjectId() };
 }
 
-/** Plans the container create or update; scalars and list entries change only when given a non-empty value. */
 async function planContainer(
   ctx: Ctx,
   model: AnyModel,
@@ -282,7 +264,6 @@ async function planContainer(
   return { subjects: (target.doc.subjects as string[] | undefined) ?? [], lists: merged };
 }
 
-/** Appends new entries (after the max `order`) and updates the given fields of existing ones. */
 function mergeByKey(existing: Entry[], spec: ListSpec, items: ItemChange[]): { list: Entry[]; changed: boolean } {
   const list = existing.map((e) => ({ ...e }));
   let order = Math.max(0, ...list.map((e) => Number(e.order) || 0));
@@ -305,7 +286,6 @@ function mergeByKey(existing: Entry[], spec: ListSpec, items: ItemChange[]): { l
   return { list, changed };
 }
 
-/** Matches each incoming item by canonical id within the container, then by key; otherwise it is new. */
 function matchItems<T extends Incoming>(
   ctx: Ctx,
   type: ItemChange["type"],
@@ -332,7 +312,6 @@ function matchItems<T extends Incoming>(
   });
 }
 
-/** Plans one child: an update of the fields that differ, nothing when unchanged, or a create. */
 async function planItem(
   ctx: Ctx,
   model: AnyModel,
@@ -351,7 +330,6 @@ async function planItem(
     await queue(ctx, model, null, stamped(opts, data), { ...base, action: "create" });
     return;
   }
-  // Slugs name the page a link points at; an import keeps the stored one, so say so when they differ.
   if (typeof createData.slug === "string" && m.doc.slug !== undefined && m.doc.slug !== createData.slug) {
     report.warnings.push(`${type} "${m.item.title}": slug change to "${createData.slug}" ignored (kept "${String(m.doc.slug)}"); rename it in Admin`);
   }
@@ -365,7 +343,6 @@ async function planItem(
   await queue(ctx, model, m.doc, stamped(opts, pick(next, fields)), { ...base, action: "update", fields });
 }
 
-/** Records a write and its report line; schema validation runs now so a bad item blocks the whole import. */
 async function queue(ctx: Ctx, model: AnyModel, doc: Row | null, data: Data, change: ItemChange): Promise<void> {
   const probe = doc ? model.hydrate(doc) : new model(data);
   if (doc) probe.set(data);

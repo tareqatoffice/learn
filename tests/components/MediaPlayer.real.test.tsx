@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-// Uses the real react-player (no mock) to check the wiring our player depends on.
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MediaPlayer } from "@/components/MediaPlayer";

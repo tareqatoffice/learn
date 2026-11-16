@@ -43,7 +43,6 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
   const [pending, startTransition] = useTransition();
 
   const single = bookIds.length === 1 ? books.find((b) => b.id === bookIds[0]) : undefined;
-  // The deck the current choices would start, so the button never promises more than it has.
   const [count, setCount] = useState<{ key: string; n: number } | null>(null);
   const key = JSON.stringify([bookIds, single ? partKeys : [], mode, size]);
   useEffect(() => {
@@ -54,7 +53,6 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
     return () => {
       live = false;
     };
-    // `key` covers every input of the count.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   const known = count?.key === key ? count.n : null;
@@ -71,7 +69,6 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
     setFailed(false);
     startTransition(async () => {
       try {
-        // A successful start redirects, so only the empty result ever comes back here.
         const result = await startQuizAction({ bookIds, partKeys: single ? partKeys : [], mode, size });
         if (result?.empty) setEmpty(true);
       } catch (error) {

@@ -1,10 +1,3 @@
-/**
- * Loads a small published fixture set (2 books, 1 graph with related links, 1 note series) into the
- * local database through the real import pipeline, so pages can be checked before the legacy import.
- * Safe to re-run: existing items are matched by key and left unchanged. Refuses to run in production.
- *
- *   npm run seed:dev
- */
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -177,9 +170,7 @@ const JOBS: Job[] = [
 
 export { isLocalMongoUri };
 
-/** Imports every job; stops at the first one with errors. The reports say what happened. */
 export async function seedDev(): Promise<ImportReport[]> {
-  // tsx leaves NODE_ENV unset, so the database address is the check that actually protects a real DB.
   if (process.env.NODE_ENV === "production") throw new Error("seed-dev refuses to run when NODE_ENV=production");
   if (!isLocalMongoUri(getEnv().MONGODB_URI)) {
     throw new Error("seed-dev refuses to run: MONGODB_URI does not point at a local database (localhost, 127.0.0.1, [::1] or *.localhost)");
@@ -199,10 +190,6 @@ export async function seedDev(): Promise<ImportReport[]> {
 
 type Id = { _id: unknown };
 
-/**
- * runImport cannot set a graph node's `related` links (they point at other collections), so they
- * are written directly: "Closures" -> two questions and a note section, "async / await" -> a question.
- */
 async function linkRelated(): Promise<void> {
   const book = await QuestionBook.findOne({ slug: "seed-javascript" }).lean<Id | null>();
   const series = await NoteSeries.findOne({ slug: "seed-docker" }).lean<Id | null>();

@@ -1,6 +1,3 @@
-// Data for the profile page: lifetime totals and history per area, plus a daily activity count.
-// Every date handed to the page is a learner-local YYYY-MM-DD string, so the page never has to
-// know about time zones and a late-night activity lands on the day the learner lived it.
 
 import { isValidObjectId, Types } from "mongoose";
 import { listBooksWithProgress, listGraphsWithProgress, listSeriesWithProgress } from "@/content/queries";
@@ -48,7 +45,6 @@ const ACTIVITY_DAYS = 84;
 
 export type ActivityDay = { date: string; count: number };
 
-/** The last `days` days ending at `today`, oldest first, with the count for each (0 when none). */
 export function fillActivity(counts: Map<string, number>, today: string, days = ACTIVITY_DAYS): ActivityDay[] {
   return Array.from({ length: days }, (_, i) => {
     const date = addDays(today, -(days - 1 - i));
@@ -56,7 +52,6 @@ export function fillActivity(counts: Map<string, number>, today: string, days = 
   });
 }
 
-/** Current streak: consecutive active days ending today, or yesterday if today has none yet. */
 export function streakOf(activity: ActivityDay[]): number {
   let i = activity.length - 1;
   if (i >= 0 && activity[i].count === 0) i -= 1;
@@ -65,7 +60,6 @@ export function streakOf(activity: ActivityDay[]): number {
   return streak;
 }
 
-/** The same rule over every day ever counted, so a streak longer than the heatmap is not cut short. */
 export function activityStreak(counts: Map<string, number>, today: string): number {
   let day = (counts.get(today) ?? 0) > 0 ? today : addDays(today, -1);
   let streak = 0;
@@ -85,10 +79,8 @@ export type AttemptHistoryItem = {
   id: string;
   date: string;
   area: IeltsArea;
-  /** The speaking kind (mock, part1…), the test scope or the writing kind. */
   kind: string;
   done: boolean;
-  /** AI overall for speaking, the band for a full test or full writing attempt. */
   band?: number;
   href: string;
 };
@@ -98,9 +90,7 @@ export type BandHistoryItem = { date: string; source: string; overall?: number; 
 export type ProfileData = {
   name: string;
   image?: string;
-  /** The day the account was created, in the learner's time zone. */
   joined: string | null;
-  /** Consecutive days with any activity, over the whole history (the heatmap shows the last 12 weeks). */
   streak: number;
   activity: ActivityDay[];
   notes: { series: { slug: string; title: string; read: number; total: number }[]; read: number; total: number; history: NotesHistoryItem[] };
@@ -114,9 +104,7 @@ export type ProfileData = {
   graphs: { graphs: { slug: string; title: string; done: number; total: number }[]; done: number; total: number; history: TopicHistoryItem[] };
   speaking: { takes: number; byTask: { task: string; count: number }[]; history: TakeHistoryItem[] };
   ielts: {
-    /** Speaking attempts with at least one saved recording, and how many of them are complete. */
     speaking: { attempts: number; completed: number };
-    /** Submitted Listening and Reading attempts, and Writing attempts. */
     tests: number;
     writing: number;
     studyMinutes: number;
@@ -134,23 +122,14 @@ function addDayRows(counts: Map<string, number>, rows: DayRow[]) {
   for (const r of rows) counts.set(r._id, (counts.get(r._id) ?? 0) + r.n);
 }
 
-/** $group stage that counts documents per learner-local day of a timestamp field. */
 const perLocalDay = (field: string, timeZone: string) => ({
   $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: `$${field}`, timezone: timeZone } }, n: { $sum: 1 } },
 });
 
-/**
- * Per-day counts of documents that store their own local-date string. Day rows are counted over the
- * whole history: there is at most one per active day, and the streak needs them all.
- */
 async function dayCountsOfDateField(model: typeof SpeakingTake, match: Record<string, unknown>): Promise<DayRow[]> {
   return model.aggregate<DayRow>([{ $match: match }, { $group: { _id: "$date", n: { $sum: 1 } } }]);
 }
 
-/**
- * Chapters marked read, in one pass over the user's progress: per-day counts for the heatmap and the
- * newest rows for the history. Chapters an admin has since unpublished are left out of both.
- */
 async function notesArea(userId: Id, w: Window) {
   const [series, [facets]] = await Promise.all([
     listSeriesWithProgress(String(userId)),
@@ -193,10 +172,6 @@ async function notesArea(userId: Id, w: Window) {
   };
 }
 
-/**
- * Quizzes count towards the heatmap on each day the learner answered cards in them (once per quiz
- * and day), finished or not, whatever happened to the books since.
- */
 async function interviewArea(userId: Id, w: Window) {
   const finished = { userId, finishedAt: { $ne: null } };
   const [books, quizzes, days, shown] = await Promise.all([
@@ -212,7 +187,6 @@ async function interviewArea(userId: Id, w: Window) {
       },
       { $group: { _id: "$_id.day", n: { $sum: 1 } } },
     ]),
-    // The same quizzes as the history page and Dashboard, without answers or coach chats.
     QuizSession.find(quizHistoryFilter(userId), SUMMARY_PROJECTION)
       .sort({ startedAt: -1, _id: -1 })
       .limit(HISTORY_MAX)
@@ -241,7 +215,6 @@ async function interviewArea(userId: Id, w: Window) {
   };
 }
 
-/** Topics marked done, counted on the day they were finished; hidden topics are left out. */
 async function graphsArea(userId: Id, w: Window) {
   const [graphs, [facets]] = await Promise.all([
     listGraphsWithProgress(String(userId)),
@@ -277,7 +250,6 @@ async function graphsArea(userId: Id, w: Window) {
   };
 }
 
-/** Stored takes only: a recording that never finished uploading is not practice. */
 async function speakingArea(userId: Id, w: Window) {
   const stored = { userId, "media.stored": true };
   const [takes, byTask, days, recent] = await Promise.all([
@@ -300,10 +272,6 @@ async function speakingArea(userId: Id, w: Window) {
 type Dated = { _id: Id; date: string; createdAt?: Date };
 const newestFirst = (a: { date: string; at: number }, b: { date: string; at: number }) => (a.date === b.date ? b.at - a.at : a.date < b.date ? 1 : -1);
 
-/**
- * Every IELTS practice area: Speaking attempts with a saved recording, submitted Listening, Reading
- * and Writing attempts, and logged study time. Each counts on its own local date.
- */
 async function ieltsArea(userId: Id, w: Window) {
   const spoken = { userId, "parts.media.stored": true };
   const submitted = { userId, status: "submitted" };

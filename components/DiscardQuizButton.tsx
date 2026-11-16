@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { discardQuizAction } from "@/app/(app)/interview/actions";
 import { confirm } from "@/components/ConfirmDialog";
 
-/** Takes an unfinished quiz off the list after a confirm; its answers stay in history. */
 export function DiscardQuizButton({ sessionId, label }: { sessionId: string; label: string }) {
   const [pending, startTransition] = useTransition();
   const [failed, setFailed] = useState(false);

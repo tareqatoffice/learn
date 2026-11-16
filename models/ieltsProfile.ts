@@ -15,7 +15,6 @@ const bandsSchema = (overallRequired: boolean) =>
 const ieltsProfileSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true },
-    /** YYYY-MM-DD. */
     testDate: { type: String, required: true },
     target: { type: bandsSchema(true), required: true },
     current: { type: bandsSchema(false), default: () => ({}) },
@@ -25,7 +24,6 @@ const ieltsProfileSchema = new Schema(
     examinerVoice: { type: Boolean, default: true },
     mockVideo: { type: Boolean, default: true },
     drillVideo: { type: Boolean, default: false },
-    /** Learner-local date of the last suggestion check, YYYY-MM-DD. */
     lastCheckDate: String,
   },
   { timestamps: true },

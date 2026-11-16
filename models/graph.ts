@@ -18,7 +18,6 @@ const graphSchema = new Schema(
     footer: { type: String, default: "" },
     subjects: { type: [String], default: [] },
     tracks: { type: [trackSchema], default: [] },
-    /** Bumped by every topic save, so two topic saves checking prerequisite cycles at once conflict. */
     prereqVersion: { type: Number, default: 0 },
     order: { type: Number, default: 0 },
     status: { type: String, enum: STATUSES, default: "draft" },

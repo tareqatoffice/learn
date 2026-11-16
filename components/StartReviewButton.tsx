@@ -5,7 +5,6 @@ import { startQuizAction } from "@/app/(app)/interview/actions";
 import { Button } from "@/components/ui/button";
 import { isNavigationError, START_FAILED } from "@/lib/navigationError";
 
-/** Starts a 20-card quiz from the review pile across every book; the action redirects into it. */
 export function StartReviewButton({ disabled }: { disabled?: boolean }) {
   const [starting, setStarting] = useState(false);
   const [empty, setEmpty] = useState(false);

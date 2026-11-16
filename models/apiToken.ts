@@ -10,9 +10,7 @@ const apiTokenSchema = new Schema(
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     lastUsedAt: Date,
     revokedAt: Date,
-    /** "read" lists and pulls; "write" may also import. Tokens made before scopes existed can write. */
     scope: { type: String, enum: TOKEN_SCOPES, default: "write" },
-    /** After this the token stops working; unset means it never expires. */
     expiresAt: Date,
   },
   { timestamps: true },

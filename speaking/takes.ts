@@ -16,10 +16,8 @@ const MAX_LABEL = 60;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 const isId = (id: string) => typeof id === "string" && Types.ObjectId.isValid(id);
-/** Takes started but not yet confirmed. Older ones count as abandoned and are swept, so they never block. */
 export const MAX_OPEN_TAKES = 3;
 export const OPEN_TAKE_MS = 60 * 60 * 1000;
-/** Takes started in any rolling 24 hours, stored or not: bounds what one account can upload. */
 export const MAX_TAKES_PER_DAY = 40;
 
 export type StartTakeInput = {
@@ -30,17 +28,10 @@ export type StartTakeInput = {
   kind: "audio" | "video";
   mime: string;
   audioMime?: string;
-  /** Byte size of the recorded blob; it is signed into the upload URL, so only that size uploads. */
   size: number;
-  /** Byte size of the audio-only blob (video takes). */
   audioSize?: number;
 };
 
-/**
- * Removes the user's takes whose upload never finished within OPEN_TAKE_MS: their R2 objects (any
- * that reached it), then the documents. Best effort, run on each new take; a failure leaves them for
- * the next sweep.
- */
 export async function sweepAbandonedTakes(userId: string, now: Date = new Date()): Promise<number> {
   if (!isId(userId)) return 0;
   await connectDb();
@@ -89,9 +80,6 @@ export async function startTake(
   if (open >= MAX_OPEN_TAKES) return fail("You have recordings that haven't finished uploading. Wait a moment, or reload the page, then try again.");
   if (recent >= MAX_TAKES_PER_DAY) return fail(`You've made ${MAX_TAKES_PER_DAY} recordings in the last day, the most allowed. Try again tomorrow.`);
 
-  // The take keeps a copy of its material, so a lesson unpublished or deleted mid-session (or a bad
-  // id) only drops the link; the recording still saves. The shadowing clip length, which sets the
-  // cap, comes from the lesson rather than the browser.
   const lesson =
     input.lessonId && isId(input.lessonId)
       ? await SpeakingLesson.findOne({ _id: input.lessonId, status: "published" }).select("shadow.durationSec").lean<{ _id: Types.ObjectId; shadow?: { durationSec?: number } }>()
@@ -99,8 +87,6 @@ export async function startTake(
   const lessonId = lesson ? lesson._id : null;
   const capSec = takeCapSec(input.task, input.task === "shadowing" ? lesson?.shadow?.durationSec : undefined);
 
-  // The take id is minted before its document so the upload keys can include it; the document is
-  // only written once the recording itself passes validation.
   const _id = new Types.ObjectId();
   const takeId = String(_id);
   const upload = await prepareUpload({
@@ -149,7 +135,6 @@ type TakeDoc = {
   };
 };
 
-/** The caller's own take, or null for a bad id or someone else's take. */
 async function ownTake(userId: string, takeId: string): Promise<TakeDoc | null> {
   if (!isId(takeId) || !isId(userId)) return null;
   await connectDb();
@@ -165,8 +150,6 @@ export async function confirmTake(userId: string, takeId: string, durationSec: n
 
   const { media } = take;
   if (media.stored) return ok();
-  // A rejected take keeps its document (the client uploads again to the same URLs and retries);
-  // verifyUpload removes whatever reached R2.
   const main = await verifyUpload(media);
   if (!main.ok) return fail(main.error);
 
@@ -239,7 +222,6 @@ export async function getTake(userId: string, takeId: string): Promise<TakeView 
     capSec: media.capSec,
     size: media.size,
     transcript: take.transcript,
-    // Saved while speech-to-text was off: once it is set up, the page offers (and starts) a transcript.
     transcriptStatus: take.transcriptStatus === "unavailable" && sttConfigured() ? "pending" : (take.transcriptStatus ?? "none"),
     self: take.self ? { ...take.self } : undefined,
     markers: (take.markers ?? []).map((m) => ({ atSec: m.atSec, label: m.label })),
@@ -311,10 +293,6 @@ export async function saveSelfRating(
   return ok();
 }
 
-/**
- * Deletes a take, stored or only started: marks it as deleting (so a confirm racing this one
- * cannot store it), removes its R2 objects (missing ones are fine), then the document.
- */
 export async function deleteTake(userId: string, takeId: string): Promise<ActionResult> {
   const take = await ownTake(userId, takeId);
   if (!take) return fail("Recording not found.");
@@ -329,7 +307,6 @@ export async function deleteTake(userId: string, takeId: string): Promise<Action
   return ok();
 }
 
-/** Every take of the user, objects first. Throws on an R2 failure, before any document is removed. */
 export async function deleteAllTakes(userId: string): Promise<number> {
   if (!isId(userId)) return 0;
   await connectDb();
@@ -358,7 +335,6 @@ export type TakeSummary = {
   ai?: { fluency?: number };
 };
 
-/** Stored takes, newest first. `before` is a take id: only older takes are returned. */
 export async function listTakes(
   userId: string,
   filter: { task?: TaskKey; limit?: number; before?: string },

@@ -19,6 +19,5 @@ export async function setNoteReadAction(
   const parsed = input.parse({ noteId, read });
   await connectDb();
   await setNoteRead(user.userId, parsed.noteId, parsed.read);
-  // The chapter list beside the reader is server-rendered: re-render it so the tick shows.
   refresh();
 }

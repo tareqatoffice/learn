@@ -2,10 +2,6 @@ import { findLiveToken, type LiveToken } from "@/admin/tokens";
 import { connectDb } from "@/lib/db";
 import type { TokenScope } from "@/models";
 
-/**
- * Bearer-token check for the content API. Throws a 401 Response for a missing, unknown, revoked or
- * expired token, and a 403 when the token's scope does not cover `need`; route handlers return it.
- */
 export async function requireToken(req: Request, need: TokenScope = "read"): Promise<LiveToken> {
   const header = req.headers.get("authorization") ?? "";
   const match = header.match(/^Bearer\s+(\S+)$/i);
@@ -21,7 +17,6 @@ export async function requireToken(req: Request, need: TokenScope = "read"): Pro
 
 const unauthorized = () => Response.json({ error: "Missing, unknown, revoked or expired API token" }, { status: 401 });
 
-/** Runs a token-authenticated handler, turning a thrown Response (the 401 or 403) into the reply. */
 export async function withToken(
   req: Request,
   handler: (token: LiveToken) => Promise<Response>,

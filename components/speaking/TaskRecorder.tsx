@@ -33,15 +33,12 @@ type Save =
   | { phase: "failed"; error: string }
   | { phase: "saved" };
 
-/** Takes shorter than this ask before they are uploaded. */
 const SHORT_TAKE_SEC = 3;
 
-// Presigned upload URLs live 10 minutes; past this a retry starts a fresh take for new URLs.
 const REUSE_MS = 8 * 60 * 1000;
 const CLIP_FAILED = "The clip didn't start. Tap Start again.";
 const MB = 1024 * 1024;
 
-/** The learner's local calendar date now (YYYY-MM-DD), so a take started before midnight keeps its day. */
 function todayHere(fallback: string): string {
   try {
     return localDate(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -50,7 +47,6 @@ function todayHere(fallback: string): string {
   }
 }
 
-// Shadowing: one pass of the clip is one take, so recording stops shortly after the clip ends.
 const AFTER_CLIP_MS = 1500;
 
 function MaterialView({ task, material }: { task: TaskKey; material: Material }) {
@@ -64,10 +60,6 @@ function MaterialView({ task, material }: { task: TaskKey; material: Material })
   );
 }
 
-/**
- * The recorder for one task: the material on screen, a video toggle, the headphones check for
- * shadowing, then record → upload (retryable) → confirm → transcribe in the background → review.
- */
 export function TaskRecorder({
   task,
   date,
@@ -88,9 +80,7 @@ export function TaskRecorder({
   clipSec?: number;
   videoDefault: boolean;
   storage: boolean;
-  /** Whether the AI coach can write material; without it the button is not offered. */
   aiOn?: boolean;
-  /** False when no lesson is published at all, as opposed to today's lesson lacking this task. */
   hasLesson?: boolean;
 }) {
   const router = useRouter();
@@ -112,19 +102,16 @@ export function TaskRecorder({
   const audioRef = useRef<HTMLAudioElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
   const started = useRef<Started | null>(null);
-  // Aborts the upload in flight ("Cancel upload"); the recording stays on the page for a retry.
   const uploadAbort = useRef<AbortController | null>(null);
   const savedFor = useRef<RecorderResult | null>(null);
   const clipTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const clipPlaying = useRef(false);
   const takeDate = useRef(date);
 
-  // Live camera preview while recording video.
   useEffect(() => {
     if (previewRef.current) previewRef.current.srcObject = rec.stream;
   }, [rec.stream]);
 
-  // The clip was primed inside the Start tap (iOS needs the gesture); it plays once recording runs.
   useEffect(() => {
     const audio = audioRef.current;
     if (!shadowing || !audio) return;
@@ -134,14 +121,11 @@ export function TaskRecorder({
       audio.muted = false;
       audio.currentTime = 0;
       void audio.play()?.catch(() => {
-        // Without the clip there is nothing to shadow: drop this take rather than save silence.
         clipPlaying.current = false;
         setClipError(CLIP_FAILED);
         resetRecorder();
       });
     } else if (rec.state !== "asking") {
-      // Leave the primed clip alone while the permission prompt is open (pausing it aborts the
-      // iOS unlock); reset it once recording has finished or failed.
       clipPlaying.current = false;
       audio.pause();
       audio.muted = false;
@@ -160,7 +144,6 @@ export function TaskRecorder({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [unsaved]);
-  // In-app links and Back don't fire beforeunload, so they ask too.
   useLeaveGuard(unsaved, "Your recording hasn't been saved. Leave anyway?", "speakingLeaveGuard");
 
   const persist = useCallback(
@@ -173,7 +156,6 @@ export function TaskRecorder({
       try {
         let s = started.current;
         if (s && Date.now() - s.at > REUSE_MS) {
-          // Its upload URLs have expired: remove the unconfirmed take before starting a new one.
           const old = s.takeId;
           started.current = s = null;
           await deleteTakeAction(old).catch(() => undefined);
@@ -187,7 +169,6 @@ export function TaskRecorder({
             kind: result.mime.startsWith("video/") ? "video" : "audio",
             mime: result.mime,
             audioMime: result.audioMime,
-            // Signed into the upload URLs; the server refuses a take over its byte limit here.
             size: result.blob.size,
             audioSize: result.audioBlob?.size,
           });
@@ -236,13 +217,11 @@ export function TaskRecorder({
         });
         const confirmed = await confirmTakeAction(s.takeId, result.durationSec);
         if (!confirmed.ok) {
-          // The stored objects didn't check out: upload again on retry.
           s.main = false;
           s.audio = false;
           return fail(firstError(confirmed.errors) ?? "Couldn't save the recording. Try again.");
         }
         setSave({ phase: "saved" });
-        // Navigate first: the review page starts transcription, so nothing here waits on it.
         router.push(`/speaking/takes/${s.takeId}`);
       } catch (e) {
         fail(e instanceof UploadError ? e.message : "Couldn't save the recording. Check your connection and try again.");
@@ -255,8 +234,6 @@ export function TaskRecorder({
     if (!rec.result || savedFor.current === rec.result) return;
     savedFor.current = rec.result;
     started.current = null;
-    // A slip of a take (a second or two) waits for the learner to keep or discard it.
-    // persist() is the upload itself (an external system); its first status update is intended.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (rec.result.durationSec >= SHORT_TAKE_SEC) void persist(rec.result);
   }, [rec.result, persist]);
@@ -264,8 +241,6 @@ export function TaskRecorder({
   function begin() {
     const audio = audioRef.current;
     if (shadowing && audio) {
-      // Unlock playback inside this tap with a muted play; the effect above unmutes it and plays
-      // from the top once recording starts.
       clipPlaying.current = false;
       audio.muted = true;
       audio.currentTime = 0;
@@ -281,7 +256,6 @@ export function TaskRecorder({
 
   async function discard() {
     if (!(await confirm({ description: "Discard this recording? It hasn't been saved.", destructive: true }))) return;
-    // Remove the started (unconfirmed) take and anything it uploaded; best effort.
     const takeId = started.current?.takeId;
     if (takeId) void deleteTakeAction(takeId).catch(() => undefined);
     started.current = null;
@@ -321,7 +295,6 @@ export function TaskRecorder({
   }
 
   const idle = rec.state === "idle" || rec.state === "error";
-  // Without material the learner can still record freely (shadowing always has its clip by now).
   const canStart = idle && (material !== null || !shadowing) && (!shadowing || headphones) && save.phase === "idle";
 
   return (
@@ -361,7 +334,6 @@ export function TaskRecorder({
           preload="auto"
           playsInline
           onEnded={() => {
-            // A primed clip can end during the permission prompt; only a playing pass ends the take.
             if (!clipPlaying.current) return;
             clearTimeout(clipTimer.current);
             clipTimer.current = setTimeout(() => rec.stop(), AFTER_CLIP_MS);
@@ -429,7 +401,6 @@ export function TaskRecorder({
         {rec.state === "error" && <Notice>{rec.error}</Notice>}
         {clipError && <Notice>{clipError}</Notice>}
 
-        {/* A take this short is more likely a slip than practice: keep or discard it first. */}
         {rec.result && rec.result.durationSec < SHORT_TAKE_SEC && save.phase === "idle" && (
           <div className="grid gap-3">
             <p className="text-sm">That take is only {clock(rec.result?.durationSec ?? 0)} long. Keep it?</p>

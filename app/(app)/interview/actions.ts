@@ -30,7 +30,6 @@ const filterSchema = z.object({
   questionIds: z.array(objectId).max(5000).optional(),
 });
 
-/** Starts a quiz and redirects into it; an empty deck creates nothing and comes back as `{ empty: true }`. */
 export async function startQuizAction(
   filter: QuizFilter,
 ): Promise<{ empty: true }> {
@@ -42,7 +41,6 @@ export async function startQuizAction(
   redirect(`/interview/quiz/${result.sessionId}`);
 }
 
-/** How many questions the setup's current choices would put in a deck (the size limit applied). */
 export async function countDeckAction(filter: QuizFilter): Promise<number> {
   const parsed = filterSchema.parse(filter);
   const user = await requireUser();
@@ -82,12 +80,10 @@ export async function recordResultAction(
     Math.random,
     input.attempt,
   );
-  // Keep the page's cached copy current, so Back from another page resumes at the right card.
   refresh();
   return view;
 }
 
-/** Clears the user's question progress for the given books (empty list = every book). */
 export async function clearProgressAction(bookIds: string[]): Promise<{ cleared: number }> {
   const ids = z.array(objectId).max(100).parse(bookIds);
   const user = await requireUser();
@@ -95,7 +91,6 @@ export async function clearProgressAction(bookIds: string[]): Promise<{ cleared:
   return { cleared: await clearQuestionProgress(user.userId, ids) };
 }
 
-/** Removes an unfinished quiz from the resume list (see discardSession). */
 export async function discardQuizAction(sessionId: string): Promise<void> {
   const id = objectId.parse(sessionId);
   const user = await requireUser();
@@ -112,7 +107,6 @@ export async function finishQuizAction(sessionId: string): Promise<void> {
   refresh();
 }
 
-/** Runs an AI call, turning failures into a message (thrown errors are masked in production). */
 async function aiCall<T>(work: (userId: string) => Promise<T>): Promise<AiResult<T>> {
   const user = await requireUser();
   try {
@@ -125,7 +119,6 @@ async function aiCall<T>(work: (userId: string) => Promise<T>): Promise<AiResult
   }
 }
 
-/** The message for the first invalid field, so the learner fixes the right thing. */
 function inputError(error: z.ZodError, messages: Record<string, string>): string {
   const field = String(error.issues[0]?.path[0] ?? "");
   return messages[field] ?? "This quiz is out of date. Reload the page and try again.";

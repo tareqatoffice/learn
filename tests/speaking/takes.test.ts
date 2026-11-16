@@ -128,7 +128,7 @@ describe("speaking takes", () => {
     expect(refused.ok).toBe(false);
     await SpeakingTake.collection.updateMany({}, { $set: { createdAt: new Date(Date.now() - OPEN_TAKE_MS - 1000) } });
     expect((await startTake(u, base)).ok).toBe(true);
-    expect((await startTake(user(), base)).ok).toBe(true); // another user is unaffected
+    expect((await startTake(user(), base)).ok).toBe(true);
   });
 
   it("sweeps a user's takes left unconfirmed for over an hour, files first (D5)", async () => {
@@ -142,7 +142,7 @@ describe("speaking takes", () => {
     expect(r2.deleteObjects).toHaveBeenCalledWith([`takes/${u}/${old.takeId}.webm`]);
     expect(await SpeakingTake.exists({ _id: old.takeId })).toBeNull();
     expect(await SpeakingTake.exists({ _id: fresh.takeId })).toBeTruthy();
-    expect(await SpeakingTake.exists({ _id: kept.takeId })).toBeTruthy(); // someone else's
+    expect(await SpeakingTake.exists({ _id: kept.takeId })).toBeTruthy();
   });
 
   it("keeps abandoned takes when R2 fails, and a take being deleted cannot be confirmed (D5)", async () => {
@@ -178,7 +178,6 @@ describe("speaking takes", () => {
     const res = await confirmTake(u, takeId, 30);
     expect(res.ok).toBe(false);
     expect((await SpeakingTake.findById(takeId).lean<{ media: { stored: boolean } }>())!.media.stored).toBe(false);
-    // Any partial upload is removed; the take stays so the client can upload again and retry.
     expect(vi.mocked(r2.deleteObjects)).toHaveBeenCalledWith([`takes/${u}/${takeId}.webm`]);
   });
 
@@ -358,7 +357,7 @@ describe("speaking takes", () => {
     const u = user();
     const a = await start(u);
     const b = await start(u, { task: "recordReview" });
-    await start(u); // unstored
+    await start(u);
     await confirmTake(u, a.takeId, 10);
     await confirmTake(u, b.takeId, 20);
     const all = await listTakes(u, {});

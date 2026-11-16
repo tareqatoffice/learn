@@ -153,7 +153,6 @@ describe("transcribeTake", () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const usageUpdate = vi.spyOn(SpeakingUsage, "updateOne").mockRejectedValueOnce(new Error("db down"));
     const id = await makeTake(user);
-    // The first update is the claim; the one after the failure marks the take failed.
     const realUpdate = SpeakingTake.updateOne.bind(SpeakingTake);
     const takeUpdate = vi
       .spyOn(SpeakingTake, "updateOne")

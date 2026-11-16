@@ -31,7 +31,6 @@ export const KIND_NAME = { mock: "Full mock", part1: "Part 1 drill", part2: "Par
 const card = "grid gap-3 rounded-xl border border-border bg-card p-5";
 const DATE = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" });
 
-/** A saved self-rating has a number for every criterion. */
 function asSelf(raw: Record<string, unknown> | undefined): SelfBands | null {
   if (!raw || !CRITERIA.every((c) => typeof raw[c] === "number")) return null;
   return raw as SelfBands;
@@ -39,11 +38,6 @@ function asSelf(raw: Record<string, unknown> | undefined): SelfBands | null {
 
 type TranscriptState = { status: string; text?: string };
 
-/**
- * One part's transcript. The runner starts transcription in the background after each part is stored. If a
- * part is still "pending" when this page opens (that request didn't finish or failed), this starts it once;
- * a repeat for a part that is already done is refused or refunded server-side.
- */
 function PartTranscript({
   attemptId,
   part,
@@ -243,14 +237,9 @@ function EstimateDetails({ ai }: { ai: AiEstimate }) {
 
 type BusyKind = "estimate" | "body" | "consent" | null;
 
-/**
- * One attempt, in a fixed order: playback with transcripts, your own bands, then the AI estimate.
- * The AI section stays hidden until your bands are saved.
- */
 export function AttemptReview({ attempt, aiOn, bodyConsent: initialConsent }: { attempt: AttemptView; aiOn: boolean; bodyConsent: boolean }) {
   const router = useRouter();
   const stored = KIND_PARTS[attempt.kind].flatMap((p) => attempt.parts.filter((v) => v.part === p && v.stored && v.mediaUrl));
-  // Refreshes (after transcription) bring new presigned URLs; keep the first so playback isn't reset.
   const [urls] = useState(() => Object.fromEntries(stored.map((v) => [v.part, v.mediaUrl!])) as Partial<Record<Part, string>>);
   const [transcripts, setTranscripts] = useState<Partial<Record<Part, TranscriptState>>>(() =>
     Object.fromEntries(stored.map((v) => [v.part, { status: v.transcriptStatus, text: v.transcript }])),

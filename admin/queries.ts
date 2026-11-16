@@ -3,7 +3,6 @@ import { effectiveStatus } from "@/lib/access";
 import { isAdminEmail } from "@/lib/authz";
 import { byOrder, escapeRegex } from "@/lib/utils";
 
-/** `{ updatedAt }` as ISO when the doc has one: the version an editor sends back with its save. */
 const iso = (updatedAt: Date | undefined): { updatedAt?: string } => (updatedAt ? { updatedAt: updatedAt.toISOString() } : {});
 import {
   Graph,
@@ -22,7 +21,6 @@ import {
   type Status,
 } from "@/models";
 
-// Admin reads: every status, unlike the user-facing queries.
 
 type Id = Types.ObjectId;
 
@@ -50,7 +48,6 @@ export type AdminBook = {
   status: Status;
   parts: { key: string; title: string; intro: string }[];
   extras: { key: string; title: string; body: string }[];
-  /** ISO time of the last save; sent back with an edit so a stale one is refused. */
   updatedAt?: string;
 };
 
@@ -138,7 +135,6 @@ export async function getQuestionAdmin(id: string): Promise<{
   };
 }
 
-// ---------- graphs ----------
 
 export type AdminGraph = {
   id: string;
@@ -281,7 +277,6 @@ export async function getNodeAdmin(id: string): Promise<{ node: AdminNode; relat
   };
 }
 
-/** Questions whose text matches, limited to the given subjects when any; for the related picker. */
 export async function searchQuestions(query: string, subjectSlugs: string[]): Promise<{ id: string; title: string }[]> {
   const term = query.trim();
   const rows = await Question.find(
@@ -293,7 +288,6 @@ export async function searchQuestions(query: string, subjectSlugs: string[]): Pr
   return rows.map((q) => ({ id: String(q._id), title: q.question }));
 }
 
-/** Chapters whose title matches, with their headings; for the related picker. */
 export async function searchNotes(query: string): Promise<{ id: string; title: string; toc: { anchor: string; text: string }[] }[]> {
   const term = query.trim();
   const rows = await Note.find(term ? { title: new RegExp(escapeRegex(term), "i") } : {}, { title: 1, toc: 1 })
@@ -302,7 +296,6 @@ export async function searchNotes(query: string): Promise<{ id: string; title: s
   return rows.map((n) => ({ id: String(n._id), title: n.title, toc: (n.toc ?? []).map(({ anchor, text }) => ({ anchor, text })) }));
 }
 
-// ---------- notes ----------
 
 export type AdminSeries = { id: string; slug: string; title: string; description: string; subjects: string[]; status: Status; updatedAt?: string };
 export type AdminNote = { id: string; seriesId: string; slug: string; title: string; body: string; subjects: string[]; status: Status; updatedAt?: string };
@@ -340,11 +333,9 @@ export async function getNoteAdmin(id: string): Promise<AdminNote | null> {
     : null;
 }
 
-// ---------- system ----------
 
 export type RevisionRow = { id: string; entityType: string; entityId: string; editedBy: string; editedAt: Date; snapshot: Record<string, unknown> };
 
-/** Newest revisions across all content, or of one entity when given. */
 export async function listRevisionsAdmin(filter: { entityType?: string; entityId?: string } = {}, limit = 100): Promise<RevisionRow[]> {
   const query: Record<string, unknown> = {};
   if (filter.entityType) query.entityType = filter.entityType;
@@ -371,7 +362,6 @@ export interface AdminUserRow {
   email: string;
   name: string;
   image?: string;
-  /** From ADMIN_EMAILS, not the stored role: admins can't be reviewed or blocked. */
   isAdmin: boolean;
   status: AccessStatus;
   requestedAt?: Date;

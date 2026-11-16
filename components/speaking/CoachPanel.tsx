@@ -9,7 +9,6 @@ import type { BodyFeedback, SpeechFeedback } from "@/speaking/coach";
 import { BodyConsentDialog } from "./BodyConsentDialog";
 import type { SelfRating } from "./SelfRatingForm";
 
-/** `model` is the AI model that wrote the last stored feedback. */
 export type CoachAi = { speech?: Partial<SpeechFeedback>; body?: Partial<BodyFeedback>; model?: string };
 
 function List({ title, items }: { title: string; items?: string[] }) {
@@ -26,7 +25,6 @@ function List({ title, items }: { title: string; items?: string[] }) {
   );
 }
 
-/** Self vs AI, criterion by criterion; a dash where one side has no score. */
 function Scores({ self, ai, video }: { self?: SelfRating; ai: CoachAi; video: boolean }) {
   const rows: [string, number | undefined, number | undefined][] = [
     ["Fluency", self?.fluency, ai.speech?.fluency],
@@ -63,10 +61,6 @@ function Scores({ self, ai, video }: { self?: SelfRating; ai: CoachAi; video: bo
   );
 }
 
-/**
- * AI feedback on a take, after the learner's own rating: speech from the transcript, and for video
- * body language from a few stills (after a one-time consent).
- */
 export function CoachPanel({
   takeId,
   kind,

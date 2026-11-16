@@ -41,14 +41,12 @@ const CRITERION_SERIES: LineSeries<CriteriaPoint>[] = (Object.keys(CRITERION_LAB
   { key: `self-${c}`, label: `${CRITERION_LABEL[c]} (you)`, color: CRITERION_COLOR[c], pick: (p: CriteriaPoint) => p.self[c] },
   {
     key: `ai-${c}`,
-    // The AI hears no audio, so its pronunciation band comes from the transcript alone.
     label: c === "pronunciation" ? `${CRITERION_LABEL[c]} (AI estimate, transcript only)` : `${CRITERION_LABEL[c]} (AI estimate)`,
     color: CRITERION_COLOR[c], dash: "4 3", pick: (p: CriteriaPoint) => p.ai?.[c] },
 ]);
 
 const sum = (r: Record<string, number>) => Object.values(r).reduce((a, b) => a + b, 0);
 
-/** Bands over time, mock criteria and weekly minutes against the plan. */
 export function BandCharts({
   bands,
   criteria,
@@ -62,7 +60,6 @@ export function BandCharts({
   target?: number;
   testDate?: string;
 }) {
-  // The test date is a point on the axis of its own when it is still ahead of the last entry.
   const last = bands[bands.length - 1]?.date;
   const withTest: BandRow[] = testDate && last && testDate > last ? [...bands, { date: testDate }] : bands;
   const values = bands.flatMap((b) => [b.overall, b.listening, b.reading, b.writing, b.speaking]).filter((v): v is number => typeof v === "number");

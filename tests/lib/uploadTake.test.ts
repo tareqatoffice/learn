@@ -13,7 +13,6 @@ type Fake = {
   upload: { onprogress?: (e: { lengthComputable: boolean; loaded: number; total: number }) => void };
 };
 
-/** Each send runs the next behaviour; the instances are kept for assertions. */
 function fakeXhr(...behaviours: ((x: Fake) => void)[]) {
   const made: Fake[] = [];
   class FakeXhr implements Fake {

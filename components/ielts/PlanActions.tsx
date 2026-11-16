@@ -8,7 +8,6 @@ import { confirm } from "@/components/ConfirmDialog";
 import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 
-/** Runs an action, refreshes the page on success and shows its error otherwise. */
 function useAction(onDone?: (router: ReturnType<typeof useRouter>) => void) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +89,6 @@ export function DeleteIeltsDataButton() {
   );
 }
 
-/** Removes one standing change from the plan (a new plan version). */
 export function RemoveAdjustmentButton({ id, label }: { id: string; label: string }) {
   const { run, error, pending } = useAction();
   return (

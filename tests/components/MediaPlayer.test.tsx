@@ -1,8 +1,6 @@
-// @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// ReactPlayer's `playing` prop drives the media element; the mock exposes it and the event props.
 vi.mock("react-player", () => ({
   default: ({ playing, onDurationChange, onTimeUpdate, onError, ref, src }: Record<string, unknown>) => {
     const el = { currentTime: 0, duration: 125 };

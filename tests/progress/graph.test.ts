@@ -119,7 +119,6 @@ describe("graph progress", () => {
     await setNodeStatus(user, a, "done");
     await setNodeStatus(user, b, "done");
     expect(await NodeProgress.countDocuments({ userId: user, nodeId: b, status: "done" })).toBe(1);
-    // Clearing is always allowed.
     await setNodeStatus(user, a, "none");
     await setNodeStatus(user, b, "none");
   });
@@ -137,7 +136,6 @@ describe("graph progress", () => {
     await setNodeStatus(user, a, "learning");
     expect(await getGraphProgress(user, graphId)).toEqual({ [a]: "learning", [other]: "done" });
 
-    // Not touching a done topic's own state leaves dependents alone.
     await setNodeStatus(user, a, "done");
     await setNodeStatus(user, b, "done");
     await setNodeStatus(user, a, "done");
@@ -162,7 +160,6 @@ describe("graph progress", () => {
     expect(await setNodeStatusAction(b, "done")).toEqual({ error: "Finish first: a title" });
     expect(refresh).not.toHaveBeenCalled();
     expect(await setNodeStatusAction(a, "done")).toEqual({});
-    // A saved status re-renders the page, so Back from elsewhere shows it (D2).
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(await setNodeStatusAction(b, "done")).toEqual({});
   });

@@ -17,12 +17,10 @@ type BookRow = {
 };
 type Status = "got" | "review" | null;
 
-/** Visible books, in display order. */
 async function visibleBooks(): Promise<BookRow[]> {
   return QuestionBook.find({ status: "published" }).sort({ order: 1, title: 1 }).lean<BookRow[]>();
 }
 
-/** Status of the user's progress per question, for the given question ids (got/review only). */
 async function statusByQuestion(userId: string, questionIds: Id[]): Promise<Map<string, Status>> {
   if (!isValidObjectId(userId) || !questionIds.length) return new Map();
   const rows = await QuestionProgress.find(
@@ -32,7 +30,6 @@ async function statusByQuestion(userId: string, questionIds: Id[]): Promise<Map<
   return new Map(rows.map((row) => [String(row.questionId), row.status]));
 }
 
-/** Visible books with how many of their visible questions the user has mastered or put in the review pile. */
 export async function listBooksWithProgress(userId: string): Promise<
   {
     id: string;
@@ -70,7 +67,6 @@ export async function listBooksWithProgress(userId: string): Promise<
   }));
 }
 
-/** A visible book with per-part progress and its visible questions in reading order; null when not visible. */
 export async function getBookView(
   userId: string,
   slug: string,
@@ -119,7 +115,6 @@ export async function getBookView(
   };
 }
 
-/** A neighboring question in reading order, with the section it belongs to. */
 export type QuestionStep = {
   id: string;
   question: string;
@@ -127,10 +122,6 @@ export type QuestionStep = {
   partTitle: string;
 };
 
-/**
- * Reading order: section order, then `order` inside the section, then id.
- * A question whose part is not one of `parts` sorts after every real section.
- */
 function inPartOrder<T extends { _id: Id; partKey: string; order?: number }>(parts: { key: string }[], rows: T[]): T[] {
   const rank = new Map(parts.map((part, index) => [part.key, index]));
   return rows.toSorted((a, b) => {
@@ -144,11 +135,6 @@ function inPartOrder<T extends { _id: Id; partKey: string; order?: number }>(par
   });
 }
 
-/**
- * One visible question of the given book, with the first visible graph topic that lists it,
- * the book's sections, and the previous and next question in reading order (crossing into the
- * next section when this one ends). Null when not visible.
- */
 export async function getQuestionView(
   bookSlug: string,
   questionId: string,
@@ -184,7 +170,6 @@ export async function getQuestionView(
   const partKeys = new Set(parts.map((part) => part.key));
   const rows = await Question.find(await visibleQuestionFilter([String(book._id)]), { question: 1, partKey: 1, order: 1 })
     .lean<{ _id: Id; question: string; partKey: string; order?: number }[]>();
-  // The book page only lists questions that belong to a section, so prev/next follows that list.
   const ordered = inPartOrder(
     parts,
     rows.filter((row) => partKeys.has(row.partKey)),
@@ -228,7 +213,6 @@ export async function getQuestionView(
 
 export type QuestionTopic = { graphSlug: string; nodeSlug: string; title: string };
 
-/** The first visible graph topic (by order) that lists the question; undefined when none does. */
 export async function topicForQuestion(questionId: Id): Promise<QuestionTopic | undefined> {
   const node = await GraphNode.findOne(
     { ...(await visibleNodeFilter()), "related.questionIds": questionId },

@@ -12,10 +12,6 @@ const LOGGED: Skill[] = ["listening", "reading", "writing"];
 const NAME: Record<Skill, string> = { listening: "Listening", reading: "Reading", writing: "Writing", speaking: "Speaking" };
 const DAY = new Intl.DateTimeFormat("en", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
 
-/**
- * Study done away from the app (a book, a class, a podcast), for any skill but Speaking, on today or
- * a recent day; with the latest entries so a mistake can be deleted.
- */
 export function StudyLog({ today, minDate, entries }: { today: string; minDate: string; entries: StudyLogEntry[] }) {
   const [skill, setSkill] = useState<Skill>("reading");
   const [minutes, setMinutes] = useState("30");

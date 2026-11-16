@@ -5,13 +5,13 @@ const revisionSchema = new Schema(
     entityType: { type: String, required: true },
     entityId: { type: Schema.Types.ObjectId, required: true },
     snapshot: { type: Schema.Types.Mixed, required: true },
-    editedBy: { type: String }, // user email or "token:<name>"
+    editedBy: { type: String },
     editedAt: { type: Date, default: Date.now },
   },
   { timestamps: true },
 );
 
 revisionSchema.index({ entityType: 1, entityId: 1, editedAt: -1 });
-revisionSchema.index({ editedAt: -1 }); // admin "recent edits" list
+revisionSchema.index({ editedAt: -1 });
 
 export const Revision = mongoose.models.Revision || model("Revision", revisionSchema);

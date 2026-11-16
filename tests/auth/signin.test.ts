@@ -133,7 +133,7 @@ describe("sign-in", () => {
       expect(await emailTakenByAnother({ sub: "g-1", email: "Two@X.com" })).toBe(true);
       expect(await emailTakenByAnother({ sub: "g-1", email: "one@x.com" })).toBe(false);
       expect(await emailTakenByAnother({ sub: "g-1", email: "new@x.com" })).toBe(false);
-      expect(await emailTakenByAnother({ sub: "g-new", email: "two@x.com" })).toBe(false); // first Google login links by email
+      expect(await emailTakenByAnother({ sub: "g-new", email: "two@x.com" })).toBe(false);
     });
   });
 

@@ -5,8 +5,6 @@ vi.mock("@/auth", () => ({
   auth: () => Promise.resolve({ user: { id: "64b000000000000000000001", email: "someone@example.test", name: "Someone" } }),
 }));
 
-// Every admin Server Action file; the sweep grows as later tasks add actions.
-// "(app)" is a glob group, so match the route-group folder with a wildcard.
 const modules = import.meta.glob("../../app/*/admin/**/actions.ts", { eager: true }) as Record<string, Record<string, unknown>>;
 const actions = Object.entries(modules).flatMap(([file, mod]) =>
   Object.entries(mod)

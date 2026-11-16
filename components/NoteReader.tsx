@@ -5,7 +5,6 @@ import { setNoteReadAction } from "@/app/(app)/notes/actions";
 import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 
-/** Toggles the chapter's read state; the label flips to "Read ✓" once saved optimistically. */
 export function MarkReadButton({ noteId, initialRead }: { noteId: string; initialRead: boolean }) {
   const [read, setRead] = useState(initialRead);
   const [pending, setPending] = useState(false);

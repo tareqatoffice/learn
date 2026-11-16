@@ -6,7 +6,6 @@ import { firstError } from "@/admin/result";
 import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
 
-/** Publishes or unpublishes one row of the IELTS Speaking list. */
 export function IeltsItemStatusButton({ id, status, label }: { id: string; status: ItemStatus; label: string }) {
   const { run, pending, errors } = useAdminAction();
   const error = firstError(errors);

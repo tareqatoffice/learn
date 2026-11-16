@@ -7,7 +7,6 @@ import { allow, LIMITS, RATE_LIMIT_MESSAGE } from "@/lib/rateLimit";
 
 export type NoteState = { ok: boolean; message: string } | null;
 
-/** For useActionState: saves the pending user's note and reports what happened in words. */
 export async function sendRequestNoteAction(_prev: NoteState, formData: FormData): Promise<NoteState> {
   const session = await auth();
   const user = session?.user;
@@ -19,7 +18,6 @@ export async function sendRequestNoteAction(_prev: NoteState, formData: FormData
   return { ok: true, message: "Note sent. The admin will see it with your request." };
 }
 
-/** Re-reads the status: an approved user goes straight in, anyone else back to the page with a notice. */
 export async function checkAccessAction(): Promise<void> {
   const session = await auth();
   const user = session?.user;

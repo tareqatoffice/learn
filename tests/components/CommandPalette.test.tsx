@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -10,7 +9,6 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { openSearch } from "@/lib/searchBus";
 
 beforeAll(() => {
-  // jsdom has no <dialog> methods.
   HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
     this.open = true;
   };

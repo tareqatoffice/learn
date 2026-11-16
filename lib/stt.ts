@@ -3,7 +3,6 @@ import { getEnv } from "@/lib/env";
 const MODEL = "@cf/openai/whisper-large-v3-turbo";
 
 export class SttError extends Error {
-  /** True once the service answered (an error status or a bad body): the call may have been billed. */
   readonly reached: boolean;
   constructor(message: string, reached = true) {
     super(message);

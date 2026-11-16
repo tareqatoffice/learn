@@ -29,7 +29,6 @@ import type { AiResult } from "@/progress/quizAi";
 import { localDate } from "@/speaking/schedule";
 import { readTimeZone } from "@/speaking/timezone";
 
-// Every action signs in first and acts as the session user; ids in the input never pick the user.
 
 async function session(): Promise<string> {
   const user = await requireUser();
@@ -39,7 +38,6 @@ async function session(): Promise<string> {
 
 const today = async () => localDate(new Date(), await readTimeZone());
 
-// ---- Listening and Reading ----
 
 export async function startTestAction(skill: TestSkill, testId: string, scope: "full" | number): Promise<ActionResult<{ attemptId: string }>> {
   const userId = await session();
@@ -66,7 +64,6 @@ export async function deleteTestAttemptAction(attemptId: string): Promise<Action
   return deleteTestAttempt(await session(), attemptId);
 }
 
-// ---- Writing ----
 
 export async function startWritingAction(kind: WritingKind): Promise<ActionResult<{ attemptId: string }>> {
   const userId = await session();

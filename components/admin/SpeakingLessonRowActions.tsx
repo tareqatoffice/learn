@@ -5,7 +5,6 @@ import { firstError } from "@/admin/result";
 import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
 
-/** Up/down for one row of the speaking lessons list. */
 export function SpeakingLessonRowActions({ id, label }: { id: string; label: string }) {
   const { run, pending, errors } = useAdminAction();
   const error = firstError(errors);

@@ -4,11 +4,6 @@ import { isAdminEmail } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 import { BodyError, IMPORT_BODY_MAX, readJsonBody } from "@/lib/jsonBody";
 
-/**
- * The admin import form posts here rather than to a Server Action, so only this route accepts a body
- * as large as a whole book; Server Actions keep a small limit (next.config.ts). Body:
- * `{ input, dryRun }`. Signed-in admins only (the proxy checks too).
- */
 export async function POST(req: Request): Promise<Response> {
   const session = await auth();
   const email = session?.user?.email;

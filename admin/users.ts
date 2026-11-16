@@ -18,8 +18,6 @@ import {
 } from "@/models";
 import { deleteAllTakes } from "@/speaking/takes";
 
-// Admin review of sign-in requests: approve lets a user in, block keeps (or puts) them out.
-// Admins come from ADMIN_EMAILS and can be neither approved nor blocked here.
 
 const input = z.object({
   id: z.string().refine((v) => isValidObjectId(v), "Invalid user id"),
@@ -31,11 +29,6 @@ const input = z.object({
     .optional(),
 });
 
-/**
- * Deletes a (non-admin) user and everything they own: recordings in storage first (Speaking takes,
- * IELTS Speaking parts), then their progress, attempts, coach chats, usage counters and the account.
- * A storage failure stops before any document is removed, so the delete can simply be retried.
- */
 export async function deleteUser(id: string): Promise<Result> {
   if (!isValidObjectId(id)) return { ok: false, errors: { _: "Invalid user id" } };
   const user = await User.findById(id, { email: 1 }).lean<{ email: string }>();
@@ -71,7 +64,6 @@ export async function setUserAccess(
   }
 
   const reviewed = { status, reviewedAt: new Date(), reviewedBy: adminEmail };
-  // A block keeps the reason (if any) for the user's blocked screen; approving clears it.
   const blockReason = status === "blocked" && reason ? { blockReason: reason } : null;
   await User.updateOne(
     { _id: id },

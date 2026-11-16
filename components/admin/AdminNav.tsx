@@ -13,18 +13,12 @@ const sidebarLink = (active: boolean) =>
     active ? "bg-muted font-medium text-foreground" : "text-foreground",
   );
 
-/**
- * Admin section navigation. Below md it is one "Admin menu" button naming the current section, which
- * opens the grouped list, so a phone sees the page first instead of a long strip of pills; from md
- * up it is the grouped sidebar, sticky under the app header. The current section is marked in both.
- */
 export function AdminNav({ groups }: { groups: AdminNavGroup[] }) {
   const pathname = usePathname();
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const current = pathname === "/admin" ? "Admin" : (groups.flatMap((g) => g.links).find((l) => isActive(l.href))?.label ?? "Admin");
   const [open, setOpen] = useState(false);
 
-  // A new page closes the phone menu.
   const [shownPath, setShownPath] = useState(pathname);
   if (shownPath !== pathname) {
     setShownPath(pathname);

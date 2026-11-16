@@ -84,7 +84,6 @@ type PlanDoc = {
   adjustments?: Adjustment[];
 };
 
-/** Only the bands that are set, so Mongoose's undefined fields never leak out. */
 function pickBands(b: Bands | undefined): Bands {
   const out: Bands = {};
   for (const k of ["overall", ...SKILLS] as const) if (typeof b?.[k] === "number") out[k] = b[k];
@@ -120,7 +119,6 @@ function planView(doc: PlanDoc): PlanView {
   };
 }
 
-/** Plan inputs from a profile (validated input or stored view). */
 export function toPlanInputs(
   data: Pick<z.output<typeof profileInput>, "testDate" | "target" | "current" | "minutesPerDay" | "studyDays">,
   today: string,
@@ -151,7 +149,6 @@ function validate(input: ProfileInput, today: string): { data: z.output<typeof p
 
 export type TestDayStatus = "upcoming" | "today" | "passed";
 
-/** Where local `today` sits against the test date: the test day itself is not yet passed. */
 export function testDayStatus(today: string, testDate: string): TestDayStatus {
   if (today < testDate) return "upcoming";
   return today === testDate ? "today" : "passed";
@@ -181,14 +178,12 @@ async function latestPlanDoc(userId: string): Promise<PlanDoc | null> {
   return IeltsPlan.findOne({ userId }).sort({ version: -1 }).lean<PlanDoc>();
 }
 
-/** Every plan version oldest first, with the day it took over, for charts that span plan changes. */
 export async function planVersionsForChart(userId: string): Promise<(Pick<PlanView, "weeks"> & { startDate: string })[]> {
   await connectDb();
   const docs = await IeltsPlan.find({ userId })
     .sort({ version: 1 })
     .select("version startDate weeks phases hours reason createdAt")
     .lean<(PlanDoc & { startDate?: string })[]>();
-  // A later version made the same day replaces the earlier one for that day on.
   return docs.map((d) => ({ weeks: planView(d).weeks, startDate: d.startDate ?? d.weeks[0]?.start ?? "" }));
 }
 
@@ -200,7 +195,6 @@ export async function currentPlan(userId: string): Promise<PlanView | null> {
 
 export type PlanVersionSummary = { version: number; reason: string; createdAt: string };
 
-/** Every stored plan version, newest first: "changed on …, because …". */
 export async function planHistory(userId: string): Promise<PlanVersionSummary[]> {
   await connectDb();
   const docs = await IeltsPlan.find({ userId }).sort({ version: -1 }).select("version reason createdAt").lean<
@@ -234,7 +228,6 @@ async function buildPreview(
   return { before: prev ? planView(prev) : null, after, dropped: plan.dropped };
 }
 
-/** What the next version would look like, against the current one. Writes nothing. */
 export async function previewPlan(
   userId: string,
   inputs: PlanInputs,
@@ -254,7 +247,6 @@ export async function previewProfile(userId: string, input: ProfileInput, today:
   return ok(await buildPreview(prev, toPlanInputs(v.data, today), prev?.adjustments ?? [], CHANGED_REASON, {}));
 }
 
-/** Generates a plan from `inputs` and stores it as the next version (inside `ctx.session` when given). Returns the new version number. */
 export async function writePlanVersion(
   userId: string,
   inputs: PlanInputs,
@@ -290,7 +282,6 @@ export async function writePlanVersion(
   });
 }
 
-/** Whether two plans' inputs would schedule the same study: test date, bands, minutes and days (not the day it was made). */
 export function samePlanInputs(a: PlanInputs | undefined, b: PlanInputs): boolean {
   if (!a) return false;
   const days = (d: number[]) => [...d].sort((x, y) => x - y).join(",");
@@ -304,10 +295,6 @@ export function samePlanInputs(a: PlanInputs | undefined, b: PlanInputs): boolea
   );
 }
 
-/**
- * Saves the profile and, only when the plan's inputs changed (or the plan had ended), a new plan
- * version, both in one transaction. Preference changes (voice, video) keep the current plan.
- */
 export async function saveProfile(userId: string, input: ProfileInput, today: string): Promise<ActionResult<{ version: number }>> {
   const v = validate(input, today);
   if ("errors" in v) return v.errors as ActionResult<never>;

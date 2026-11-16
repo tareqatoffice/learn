@@ -8,7 +8,6 @@ import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
 import type { Status } from "@/models/status";
 
-/** Up/down and a status select for one row of an admin list. */
 export function RowActions({ kind, id, status, label }: { kind: OrderedKind; id: string; status?: Status; label: string }) {
   const { run, pending, errors } = useAdminAction();
   const error = firstError(errors);
@@ -28,7 +27,6 @@ export function RowActions({ kind, id, status, label }: { kind: OrderedKind; id:
           disabled={pending}
           onChange={(e) => {
             const next = e.target.value as Status;
-            // Unpublishing takes the item away from learners at once, so it asks first.
             const confirm = status === "published" && next !== "published" ? `Unpublish "${label}"? Learners stop seeing it.` : undefined;
             run(() => setStatusAction(kind as StatusKind, id, next), { confirm });
           }}
@@ -51,7 +49,6 @@ export function RowActions({ kind, id, status, label }: { kind: OrderedKind; id:
   );
 }
 
-/** Revision.entityType is the Mongoose model name. */
 const MODEL_OF: Record<OrderedKind, string> = {
   book: "QuestionBook",
   question: "Question",

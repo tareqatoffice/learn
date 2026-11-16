@@ -17,10 +17,6 @@ export interface SignInProfile {
   picture?: string;
 }
 
-/**
- * Creates or updates the user document and records the login time and role. A first sign-in is an
- * access request: the new user starts "pending" until an admin approves it (admins start approved).
- */
 export async function upsertUserOnSignIn(
   profile: SignInProfile,
 ): Promise<{ userId: string; role: "user" | "admin" }> {
@@ -35,8 +31,6 @@ export async function upsertUserOnSignIn(
     role,
     lastLoginAt: new Date(),
   };
-  // Match the Google subject first, then fall back to the email (first login after a dev login).
-  // Two first sign-ins racing on the unique email: the loser's retry updates the winner's doc.
   const doc =
     (await User.findOneAndUpdate({ googleId: profile.sub }, { $set: fields }, { returnDocument: "after" })) ??
     (await retryOnDuplicateKey(() =>
@@ -49,14 +43,8 @@ export async function upsertUserOnSignIn(
   return { userId: String(doc._id), role };
 }
 
-/** Shown on the sign-in page when a Google account's email already belongs to another Learn account. */
 export const EMAIL_IN_USE_ERROR = "email-in-use";
 
-/**
- * True when this Google account is already linked to a Learn user but its (changed) email belongs to
- * a different Learn user: saving it would break the unique email, so the sign-in is stopped with a
- * clear message instead of a crash.
- */
 export async function emailTakenByAnother(profile: { sub?: string; email?: string }): Promise<boolean> {
   if (!profile.sub || !profile.email) return false;
   await connectDb();
@@ -68,7 +56,6 @@ export async function emailTakenByAnother(profile: { sub?: string; email?: strin
   return Boolean(linked && owner && String(linked._id) !== String(owner._id));
 }
 
-/** Email drives admin rights and account linking, so Google must vouch for it. */
 export function isSignInAllowed({
   account,
   profile,
@@ -86,8 +73,6 @@ export function getProviders(): Provider[] {
   const providers: Provider[] = [
     Google({ clientId: env.AUTH_GOOGLE_ID, clientSecret: env.AUTH_GOOGLE_SECRET }),
   ];
-  // Local testing only: never in production builds, and never against a remote database, where a
-  // dev login with a real email would overwrite that user's googleId and name.
   if (process.env.NODE_ENV === "development" && env.AUTH_DEV_LOGIN && isLocalMongoUri(env.MONGODB_URI)) {
     providers.push(
       Credentials({
@@ -106,7 +91,6 @@ export function getProviders(): Provider[] {
   return providers;
 }
 
-// Lazy config: getEnv() must not run at import time (e.g. during `next build`).
 export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
   providers: getProviders(),
   session: { strategy: "jwt" as const },
@@ -136,7 +120,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
       return token;
     },
     session({ session, token }) {
-      // Admin status is recomputed on every request, not stored in the 30-day JWT.
       session.user = {
         ...session.user,
         id: (token.userId as string | undefined) ?? "",

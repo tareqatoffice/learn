@@ -26,7 +26,6 @@ export default async function IeltsSpeakingPage({ searchParams }: PageProps<"/ie
   const { start } = await searchParams;
   const user = await requireUser();
   await connectDb();
-  // Only whether the coach is on reaches the page; the key never does.
   const [ai, recent, picks] = await Promise.all([
     getAiConfig(),
     listAttempts(user.userId, { limit: 10 }),

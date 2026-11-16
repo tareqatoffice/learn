@@ -227,7 +227,6 @@ describe("quiz coach", () => {
   it("keeps the graded answer with the mark when the page lost the typed one (F13)", async () => {
     const { user, sessionId, questionId } = await setup();
     await gradeAnswer(user, sessionId, questionId, "It keeps scope", { fetch: vi.fn(async () => reply(JSON.stringify(FEEDBACK))) });
-    // A reload empties the answer box, so the mark arrives without an attempt.
     await recordResult(user, sessionId, questionId, "got");
     const s = await QuizSession.findById(sessionId).lean<{ results: { answer?: string; answerMode?: string }[] }>();
     expect(s?.results[0]).toMatchObject({ answer: "It keeps scope", answerMode: "typed" });

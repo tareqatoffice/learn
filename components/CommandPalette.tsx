@@ -9,9 +9,7 @@ import { lockPageScroll } from "@/lib/scrollLock";
 import { SEARCH_EVENT } from "@/lib/searchBus";
 import { cn } from "@/lib/utils";
 
-/** Matches SEARCH_MIN in content/queries/search.ts; below it the server has nothing to match on. */
 const MIN_CHARS = 2;
-/** Long enough that a fast typist sends one request per word, short enough to feel immediate. */
 const DEBOUNCE_MS = 180;
 
 const KIND = {
@@ -23,11 +21,6 @@ const KIND = {
   chapter: { icon: BookOpen, label: "Chapter" },
 } as const;
 
-/**
- * Search across every content type, on ⌘K / Ctrl+K or the header's search button. Mounted once by
- * the (app) layout — a native <dialog> so the browser traps focus, makes the page inert and gives
- * focus back to whatever opened it, the same way the topic reader does.
- */
 export function CommandPalette() {
   const router = useRouter();
   const ref = useRef<HTMLDialogElement>(null);
@@ -35,27 +28,20 @@ export function CommandPalette() {
   const listId = useId();
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
-  // Results carry the term they answer. Everything the list shows is then derived from whether
-  // that term is still the one in the box, so results for "clo" can never be shown — or opened
-  // with Enter — while the box says "closure", and no effect has to clear them.
   const [result, setResult] = useState<{ term: string; hits: SearchHit[]; failed: boolean }>({
     term: "",
     hits: [],
     failed: false,
   });
   const [at, setAt] = useState(0);
-  // Bumped by "Try again" after a failed search, to send the same term once more.
   const [retry, setRetry] = useState(0);
   const trimmed = term.trim();
   const short = trimmed.length < MIN_CHARS;
   const answered = result.term === trimmed;
   const shown = !short && answered ? result.hits : [];
   const busy = !short && !answered;
-  // The term can shrink the list under a selection made against a longer one.
   const active = Math.min(at, Math.max(0, shown.length - 1));
 
-  // Closing is what resets the palette, so the next opening always starts clean without an effect
-  // writing state on the way in.
   const close = useCallback(() => {
     setOpen(false);
     setTerm("");
@@ -63,8 +49,6 @@ export function CommandPalette() {
     setAt(0);
   }, []);
 
-  // ⌘K from anywhere, plus the header button's event. Re-subscribed per open state so the handler
-  // closes through `close()` (which resets) rather than flipping a flag.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== "k" || !(e.metaKey || e.ctrlKey) || e.defaultPrevented) return;
@@ -93,8 +77,6 @@ export function CommandPalette() {
     return lockPageScroll();
   }, [open]);
 
-  // One request per settled term; an earlier one still in flight is abandoned, so a slow
-  // response for "clo" can never overwrite the results for "closure".
   useEffect(() => {
     if (!open || short) return;
     const controller = new AbortController();
@@ -109,7 +91,6 @@ export function CommandPalette() {
         setAt(0);
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
-        // Recorded against this term too, so the list stops saying it is still searching.
         setResult({ term: trimmed, hits: [], failed: true });
         toast.error("Search is not answering. Try again in a moment.");
       }
@@ -120,7 +101,6 @@ export function CommandPalette() {
     };
   }, [trimmed, open, short, retry]);
 
-  // Arrow keys can move the selection past the visible part of a long list.
   useEffect(() => {
     if (!shown.length) return;
     document.getElementById(`${listId}-option-${active}`)?.scrollIntoView?.({ block: "nearest" });
@@ -135,7 +115,6 @@ export function CommandPalette() {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       if (!shown.length) return;
-      // Steps from the visible selection, not the raw index, which a shorter list may have clamped.
       setAt((active + (e.key === "ArrowDown" ? 1 : -1) + shown.length) % shown.length);
       return;
     }
@@ -155,7 +134,6 @@ export function CommandPalette() {
         e.preventDefault();
         close();
       }}
-      // A click on the backdrop (the dialog itself, outside the panel) closes it.
       onClick={(e) => {
         if (e.target === ref.current) close();
       }}
@@ -178,14 +156,12 @@ export function CommandPalette() {
           value={term}
           onChange={(e) => setTerm(e.target.value)}
           onKeyDown={onInputKey}
-          // The dialog itself is the focus context, so the field skips the global field ring.
           data-chrome="bare"
           className="h-12 w-full border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
       </div>
 
       <div className="max-h-[60vh] overflow-y-auto overscroll-contain p-2">
-        {/* One live region for every outcome, so a screen reader hears the count change as it types. */}
         <p role="status" className="sr-only">
           {short ? "" : busy ? "Searching" : `${shown.length} results`}
         </p>
@@ -216,7 +192,6 @@ export function CommandPalette() {
             )}
           </div>
         ) : null}
-        {/* Always in the page, empty or not, so the input's aria-controls points at something. */}
         <ul id={listId} role="listbox" aria-label="Results" className="grid gap-0.5 empty:hidden">
             {shown.map((hit, i) => {
               const { icon: Icon, label } = KIND[hit.kind];

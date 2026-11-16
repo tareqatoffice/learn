@@ -140,7 +140,6 @@ describe("ielts speaking score", () => {
     const fetch = vi.fn(async () => reply(ESTIMATE));
     const res = await aiEstimate(u, id, TODAY, { fetch });
     expect(res).toMatchObject({ ok: true, value: { overall: 6.5, bands: ESTIMATE.bands } });
-    // 6/6/6/7 means 6.25, which rounds to 6.5; the model's 9 is ignored.
     const saved = await IeltsSpeakingAttempt.findById(id).lean<{ ai: Record<string, unknown> }>();
     expect(saved?.ai).toMatchObject({ overall: 6.5, bands: ESTIMATE.bands, strengths: ESTIMATE.strengths, nextBand: ESTIMATE.nextBand });
     expect(saved?.ai.model).toBeTruthy();
@@ -213,7 +212,6 @@ describe("ielts speaking score", () => {
 
     const second = await attempt(u, { date: addDays(TODAY, -1) });
     await saveSelfBands(u, second, { fluency: 7, lexical: 7, grammar: 7, pronunciation: 7 }, TODAY);
-    // Self 6.5 and 7, no AI yet: mean 6.75 rounds to 7.
     const [s] = await IeltsPlanSuggestion.find({ userId: u }).lean<{ kind: string; proposal: unknown }[]>();
     expect(s).toMatchObject({ kind: "currentBand", proposal: { inputs: { current: { speaking: 7 } } } });
   });

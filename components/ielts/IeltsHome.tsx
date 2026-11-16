@@ -38,7 +38,6 @@ const TOOLS = [
   ["/ielts/profile", "Profile"],
 ] as const;
 
-/** The IELTS sections; without a profile only practice and the calculator, which need no plan. */
 function IeltsNav({ withPlan }: { withPlan: boolean }) {
   const links = withPlan ? [...PRACTICE, ...PLAN, ...TOOLS] : [...PRACTICE, TOOLS[0]];
   return (

@@ -4,11 +4,6 @@ export const UPLOAD_CANCELLED = "The upload was cancelled.";
 
 const TIMEOUT_MS = 10 * 60_000;
 
-/**
- * PUT a file or blob to a presigned URL with progress (fetch can't report upload progress, XHR can).
- * `contentType` defaults to the blob's own type. A request that never gets a response is almost
- * always the bucket's CORS policy refusing this site's origin, so the error says so.
- */
 export function putFile(
   url: string,
   file: Blob,

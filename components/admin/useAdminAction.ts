@@ -6,19 +6,11 @@ import type { ActionResult, FieldErrors } from "@/admin/result";
 import { confirm } from "@/components/ConfirmDialog";
 
 type Options<R> = {
-  /** Runs after a successful result, before the refresh. */
   onSuccess?: (result: R) => void;
-  /** Re-render the server page with the new data (default true). */
   refresh?: boolean;
-  /** Asked first via AlertDialog; the action does not run unless the admin agrees. */
   confirm?: string;
 };
 
-/**
- * The client half of the admin update standard: runs a Server Action that returns an
- * ActionResult, tracks pending / saved / errors, and refreshes the page on success.
- * Pair it with <ActionStatus> (or <SaveBar>, which includes it) to show the outcome.
- */
 export function useAdminAction() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -57,9 +49,7 @@ export function useAdminAction() {
     [router],
   );
 
-  /** Call when the form changes, so an old "Saved." does not linger. */
   const touch = useCallback(() => setSaved(false), []);
 
-  // The refresh after a save runs inside the same transition, so wait for it before saying "Saved.".
   return { run, pending, errors, setErrors, saved: saved && !pending, touch };
 }

@@ -19,22 +19,14 @@ export type Dashboard = {
   graphs: { slug: string; title: string; done: number; total: number }[];
   books: { slug: string; title: string; mastered: number; total: number }[];
   series: { slug: string; title: string; read: number; total: number }[];
-  /** `date` is the learner-local day it was finished (or last played, while unfinished). */
   recentQuizzes: { id: string; label: string; got: number; review: number; finished: boolean; date: string }[];
-  /** Only with an active IELTS profile. */
   ielts?: { daysLeft: number; testDay: TestDayStatus; done: number; total: number };
 };
 
 const READY_NEXT_MAX = 3;
 const RECENT_QUIZZES = 5;
 
-/**
- * Where to pick up reading: the most recently opened chapter that is still visible or, when that one
- * is already read, the next unread chapter of its series (wrapping to an earlier one), with the
- * series' read count. A fully read series keeps the last opened chapter.
- */
 async function continueReading(userId: string, series: Dashboard["series"]): Promise<Dashboard["continueReading"]> {
-  // Walks the user's opened chapters newest first and stops at the first visible one.
   const [note] = await NoteProgress.aggregate<{ slug: string; title: string; seriesId: Id; noteId: Id; read?: boolean }>([
     { $match: { userId: new Types.ObjectId(userId), lastOpenedAt: { $ne: null } } },
     { $sort: { lastOpenedAt: -1 } },
@@ -71,10 +63,6 @@ async function continueReading(userId: string, series: Dashboard["series"]): Pro
   };
 }
 
-/**
- * Every visible graph with its done count, then, for graphs the user has started, the topics marked
- * learning and up to three ready topics. One read of the visible topics serves all three.
- */
 async function graphActivity(userId: string): Promise<Pick<Dashboard, "graphs" | "learningNow" | "readyNext">> {
   const nodeFilter = await visibleNodeFilter();
   const [graphs, nodes] = await Promise.all([
@@ -107,7 +95,6 @@ async function graphActivity(userId: string): Promise<Pick<Dashboard, "graphs" |
   return { graphs: shelf, learningNow, readyNext: readyNext.slice(0, READY_NEXT_MAX) };
 }
 
-/** Visible questions in the user's review pile, counted per book in book order. */
 async function reviewPile(userId: string): Promise<Dashboard["reviewPile"]> {
   const rows = await QuestionProgress.aggregate<{ _id: Id; count: number }>([
     { $match: { userId: new Types.ObjectId(userId), status: "review" } },
@@ -152,7 +139,6 @@ async function recentQuizzes(userId: string, timeZone: string): Promise<Dashboar
   });
 }
 
-/** Days from local today to the test date, and how much of today's list is done. */
 async function ieltsCard(userId: string, timeZone: string, now: Date): Promise<Dashboard["ielts"]> {
   const profile = await getProfile(userId);
   if (!profile || profile.status !== "active") return undefined;

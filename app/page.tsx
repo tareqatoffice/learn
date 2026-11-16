@@ -20,7 +20,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const session = await auth();
   const user = session?.user;
   if (user?.id && user.email) {
-    // A stale session (user record gone) stays here to sign in again instead of bouncing back.
     const status = await accessStatusFor({ userId: user.id, email: user.email });
     if (status === "approved") redirect(next ?? "/dashboard");
     if (status) redirect(ACCESS_PATH);

@@ -6,7 +6,6 @@ import { ActionStatus } from "@/components/admin/SaveBar";
 import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
 
-/** "Discard attempt" for a running test: deletes it after a confirm and goes back to `back`. */
 export function DiscardAttempt({ discard, back }: { discard: () => Promise<ActionResult>; back: string }) {
   const router = useRouter();
   const { run, pending, errors } = useAdminAction();

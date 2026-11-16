@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -168,7 +167,7 @@ describe("TestRunner", () => {
     await waitFor(() => expect(container.querySelector("audio")).not.toBeNull());
     const audio = container.querySelector("audio")!;
     await userEvent.click(screen.getByRole("tab", { name: "Part 2" }));
-    expect(container.querySelector("audio")).toBe(audio); // same element, still mounted
+    expect(container.querySelector("audio")).toBe(audio);
     expect(finishSectionAction).not.toHaveBeenCalled();
     audio.dispatchEvent(new Event("ended"));
     await waitFor(() => expect(finishSectionAction).toHaveBeenCalledWith("a1", 0));

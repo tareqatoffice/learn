@@ -5,7 +5,6 @@ const FULL = new Intl.DateTimeFormat("en", { weekday: "long", month: "short", da
 
 const pct = (fraction: number) => Math.round(Math.min(1, Math.max(0, fraction)) * 100);
 
-/** Seven bars, Sunday first: each fills with the share of that day's target minutes, today outlined. */
 export function WeekStrip({ week, today }: { week: { date: string; fraction: number }[]; today: string }) {
   return (
     <ol aria-label="This week" className="grid grid-cols-7 gap-2">

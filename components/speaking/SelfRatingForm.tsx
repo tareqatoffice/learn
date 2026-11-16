@@ -64,10 +64,6 @@ function ScoreGroup({
   );
 }
 
-/**
- * The learner's own 1–5 rating of a take, before any AI feedback: fluency and confidence always,
- * eye contact and gestures for video, a note, and moments marked at the player's current time.
- */
 export function SelfRatingForm({
   takeId,
   kind,

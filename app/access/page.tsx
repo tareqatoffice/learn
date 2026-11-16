@@ -11,13 +11,11 @@ export const metadata = buildMetadata({
   noindex: true,
 });
 
-/** Where pending and blocked users land: says why they can't get in yet and what happens next. */
 export default async function AccessRoute({ searchParams }: PageProps<"/access">) {
   const session = await auth();
   const user = session?.user;
   if (!user?.email) redirect("/");
   const record = await accessRecordFor({ userId: user.id, email: user.email });
-  // No record means a stale session; the sign-in page lets them start over.
   if (!record) redirect("/");
   if (record.status === "approved") redirect("/dashboard");
   const { checked } = await searchParams;

@@ -29,7 +29,6 @@ describe("searchContent (F17)", () => {
   it("ranks a title starting with the term ahead of others before the per-kind limit", async () => {
     const book = await seedBook("js");
     const ids = await seedQuestions(book, 12);
-    // Every question contains "closure"; only the last one starts with it.
     await Promise.all(ids.map((id, i) => Question.updateOne({ _id: id }, { $set: { question: i === 11 ? "Closure basics" : `What is a closure ${i}` } })));
     const hits = (await searchContent("closure")).filter((h) => h.kind === "question");
     expect(hits).toHaveLength(6);

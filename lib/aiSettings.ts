@@ -8,28 +8,19 @@ import { AiSettings } from "@/models";
 
 const KEY_PURPOSE = "openrouter-api-key";
 
-/** Where the OpenRouter key in effect comes from. */
 export type AiKeySource = "settings" | "env" | "none";
 
 export type AiSettingsView = {
-  /** An OpenRouter key is in effect (saved in Admin → AI coach, or OPENROUTER_API_KEY). */
   keyConfigured: boolean;
   keySource: AiKeySource;
-  /** The last characters of the saved key, when it comes from the settings. */
   keyHint?: string;
   keyUpdatedAt?: Date;
-  /** A key is saved but cannot be decrypted (AUTH_SECRET changed); it must be entered again. */
   keyUnreadable: boolean;
-  /** The admin switch. */
   enabled: boolean;
-  /** The coach is offered to learners: a key is in effect and the admin switch is on. */
   active: boolean;
   primaryModel: string;
-  /** "" for none. */
   fallbackModel: string;
-  /** Model that reads images; "" = use the primary chain. */
   visionModel: string;
-  /** Calls per user per UTC day; 0 means no limit. */
   dailyLimit: number;
 };
 
@@ -44,10 +35,6 @@ type Row = {
   apiKeyUpdatedAt?: Date;
 };
 
-/**
- * The settings in effect (the admin's choices over the environment defaults) and the OpenRouter key.
- * The key stays on the server: pass `settings` to pages, never `apiKey`.
- */
 export async function getAiConfig(): Promise<{ settings: AiSettingsView; apiKey: string }> {
   const env = getEnv();
   const row = await AiSettings.findById("ai").lean<Row>();
@@ -77,7 +64,6 @@ export async function getAiSettings(): Promise<AiSettingsView> {
   return (await getAiConfig()).settings;
 }
 
-/** Models to try, in order. */
 export const modelChain = (s: Pick<AiSettingsView, "primaryModel" | "fallbackModel">) =>
   [s.primaryModel, s.fallbackModel].filter(Boolean);
 
@@ -123,10 +109,6 @@ const apiKeyInput = z
 
 export type SaveKeyResult = ActionResult<{ verified: Exclude<KeyCheck, { status: "rejected" }> }>;
 
-/**
- * Checks a key with OpenRouter and stores it encrypted; it then overrides OPENROUTER_API_KEY.
- * A key OpenRouter rejects is not saved. When OpenRouter cannot be reached the key is saved unverified.
- */
 export async function saveAiKey(
   key: string,
   userId: string,
@@ -155,7 +137,6 @@ export async function saveAiKey(
   return ok({ verified });
 }
 
-/** Forgets the saved key; OPENROUTER_API_KEY (if any) applies again. */
 export async function clearAiKey(userId: string): Promise<void> {
   await AiSettings.updateOne(
     { _id: "ai" },

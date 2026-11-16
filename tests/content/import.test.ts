@@ -418,7 +418,6 @@ describe("runImport", () => {
   it("refuses to commit over an item edited after the plan was made", async () => {
     await commitBook();
     const changed = BOOK.replace("X is a thing.", "X is a changed thing.");
-    // The edit lands between planning (reads) and the commit transaction.
     const startSession = mongoose.startSession.bind(mongoose);
     const spy = vi.spyOn(mongoose, "startSession").mockImplementationOnce(async (...args) => {
       await Question.updateOne({ question: "What is X?" }, { $set: { answer: "Edited by an admin." } });

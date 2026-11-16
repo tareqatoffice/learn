@@ -63,7 +63,7 @@ describe("revisions", () => {
     const listed = await listRevisions("Question", id);
     expect(listed).toHaveLength(2);
     expect(listed[0].editedAt.getTime()).toBeGreaterThanOrEqual(listed[1].editedAt.getTime());
-    const oldest = listed[1]; // holds "first"
+    const oldest = listed[1];
 
     await restoreRevision(oldest.id, editor2);
 
@@ -78,7 +78,7 @@ describe("revisions", () => {
   it("restores editor fields only, keeping the current status, order, subjects and importKey (D6)", async () => {
     const id = await seedQuestion("first");
     await saveWithRevision(Question, id, { question: "second", status: "draft", order: 5, subjects: ["js"], importKey: "k2" }, editor);
-    const [rev] = await listRevisions("Question", id); // holds "first", published, no subjects
+    const [rev] = await listRevisions("Question", id);
     await restoreRevision(rev.id, editor);
     const now = await Question.findById(id).lean<{ question: string; status: string; order: number; subjects: string[]; importKey: string }>();
     expect(now).toMatchObject({ question: "first", status: "draft", order: 5, subjects: ["js"], importKey: "k2" });

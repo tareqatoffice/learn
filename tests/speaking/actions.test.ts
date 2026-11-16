@@ -49,14 +49,12 @@ describe("speaking actions", () => {
     const other = id();
     session.userId = me;
 
-    // A smuggled userId in the input is ignored.
     const started = await actions.startTakeAction({ ...input, userId: other } as never);
     if (!started.ok) throw new Error(JSON.stringify(started.errors));
     const take = await SpeakingTake.findById(started.takeId).lean<{ userId: Types.ObjectId }>();
     expect(String(take?.userId)).toBe(me);
     expect(started.uploadUrl).toContain(`takes/${me}/`);
 
-    // Someone else's take can't be touched.
     const theirs = await SpeakingTake.create({
       userId: other,
       date: today,
@@ -69,7 +67,6 @@ describe("speaking actions", () => {
     expect((await actions.deleteTakeAction(String(theirs._id))).ok).toBe(false);
     expect(await SpeakingTake.exists({ _id: theirs._id })).toBeTruthy();
 
-    // Settings land on the session user's profile.
     expect((await actions.saveProfileAction({ targets: { readAloud: 9 } })).ok).toBe(true);
     expect((await actions.setBodyConsentAction(true)).ok).toBe(true);
     const profile = await SpeakingProfile.findOne({ userId: me }).lean<{ targets: { readAloud: number }; bodyConsentAt?: Date }>();
@@ -77,7 +74,6 @@ describe("speaking actions", () => {
     expect(profile?.bodyConsentAt).toBeInstanceOf(Date);
     expect(await SpeakingProfile.exists({ userId: other })).toBeNull();
 
-    // Swapping uses the session user and their local date.
     const lesson = await SpeakingLesson.create({ title: "L1", order: 1, status: "published", passage: "p", prompt: "q" });
     expect((await actions.swapLessonAction(String(lesson._id))).ok).toBe(true);
     const day = await SpeakingDay.findOne({ userId: me }).lean<{ lessonId: Types.ObjectId }>();

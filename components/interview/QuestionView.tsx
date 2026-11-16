@@ -7,8 +7,6 @@ import { cn } from "@/lib/utils";
 
 const linkClass =
   "hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
-// Below lg the section list is an overlay above the question, matching the notes chapter list.
-// The desktop column scrolls on its own so a long list stays reachable under the sticky header.
 const sideClass =
   "hidden text-sm lg:sticky lg:top-20 lg:block lg:max-h-[calc(100dvh-5.5rem)] lg:self-start lg:overflow-y-auto";
 
@@ -63,7 +61,6 @@ function QuestionStepLink({
 export function QuestionView({ view }: { view: QuestionViewData }) {
   const { question, book, topic, part } = view;
   const position = view.parts.findIndex((item) => item.key === part.key) + 1;
-  // Called twice: the overlay and the sidebar each need their own element tree.
   const sectionList = () => (
     <ol className="mt-2 grid gap-1">
       {view.parts.map((item) => {

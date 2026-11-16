@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { act, cleanup, render, renderHook, screen } from "@testing-library/react";

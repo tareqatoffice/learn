@@ -39,7 +39,6 @@ function Side({ title, plan }: { title: string; plan: PlanView | null }) {
   );
 }
 
-/** A before/after comparison of two plan versions, plus the standing changes the new one drops. */
 export function PlanPreview({ before, after, dropped }: { before: PlanView | null; after: PlanView; dropped: Pick<Adjustment, "id" | "kind" | "criterion" | "share" | "minutes">[] }) {
   return (
     <div className="grid gap-3">

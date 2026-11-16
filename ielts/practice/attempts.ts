@@ -1,4 +1,3 @@
-// Listening and Reading attempts: start, autosave, submit (marked here, never in the browser), review.
 
 import { type ClientSession, Types } from "mongoose";
 import { type ActionResult, fail, ok } from "@/admin/result";
@@ -13,12 +12,10 @@ export const TEST_SKILLS: TestSkill[] = ["listening", "reading"];
 const isId = (id: unknown): id is string => typeof id === "string" && Types.ObjectId.isValid(id);
 const NOT_FOUND = "That attempt doesn't exist.";
 const MAX_ANSWER = 200;
-/** Allowed overrun when an attempt is submitted (clock drift, slow network). */
 const GRACE_SEC = 60;
 
 const model = (skill: TestSkill) => (skill === "listening" ? IeltsListeningTest : IeltsReadingTest);
 
-/** Seconds: a full test, or one section. */
 export function limitFor(skill: TestSkill, full: boolean): number {
   if (skill === "reading") return (full ? 60 : 20) * 60;
   return (full ? 40 : 10) * 60;
@@ -53,8 +50,6 @@ export async function startTestAttempt(
   await connectDb();
   const test = await model(skill).findOne({ _id: testId, status: "published" }).lean<TestRow>();
   if (!test) return fail("That test is no longer available.");
-  // The same test and part already open (a second click, another tab): carry on with it rather than
-  // starting another. A full test whose time has run out is left for the learner to submit.
   const open = await IeltsTestAttempt.findOne({ userId, skill, testId, scope: String(scope), status: "in_progress" })
     .sort({ createdAt: -1 })
     .select("scope startedAt limitSec")
@@ -86,14 +81,9 @@ export async function startTestAttempt(
 
 export const TIME_UP_MESSAGE = "Time is up for this test, so new answers aren't saved. Submit to see your score.";
 
-/** A full test stops taking answers this long after its time limit (the browser submits at the limit). */
 const deadlineOf = (a: { scope: string; startedAt: Date; limitSec: number }): number | null =>
   a.scope === "full" ? new Date(a.startedAt).getTime() + (a.limitSec + GRACE_SEC) * 1000 : null;
 
-/**
- * Merges the learner's answers into an unsubmitted attempt. Unknown question numbers are ignored. A
- * full test past its deadline takes no more answers; submitting it then scores what was saved.
- */
 export async function saveAnswers(
   userId: string,
   attemptId: string,
@@ -135,7 +125,6 @@ type SubmitRow = {
 
 const plainAnswers = (m: SubmitRow["answers"]): Record<string, string> => (m instanceof Map ? Object.fromEntries(m) : { ...(m ?? {}) });
 
-/** Upserts the practice band of a submitted full test (idempotent, so it also repairs a missing one). */
 async function syncPracticeBand(
   userId: string,
   attemptId: string,
@@ -157,7 +146,6 @@ export async function submitAttempt(
   now: Date = new Date(),
 ): Promise<ActionResult<SubmitResult>> {
   if (!isId(attemptId) || !isId(userId)) return fail(NOT_FOUND);
-  // Past a full test's deadline this saves nothing, so only answers given in time are scored.
   await saveAnswers(userId, attemptId, answers, now);
   await connectDb();
   const attempt = await IeltsTestAttempt.findOne({ _id: attemptId, userId }).lean<SubmitRow>();
@@ -170,8 +158,6 @@ export async function submitAttempt(
   const score = scoreSections(attempt.skill, attempt.sections, plainAnswers(attempt.answers));
   const elapsed = Math.round((now.getTime() - new Date(attempt.startedAt).getTime()) / 1000);
   const timeSec = Math.max(0, Math.min(elapsed, attempt.limitSec + GRACE_SEC));
-  // Only the first submit wins; a second tab loses the race and reads the stored score. The submit
-  // and its band entry are written together.
   const won = await inTransaction(async (session) => {
     const res = await IeltsTestAttempt.updateOne(
       { _id: attemptId, userId, status: "in_progress" },
@@ -205,12 +191,7 @@ export type RunView = {
   startedAt: string;
   answers: Record<string, string>;
   sections: PublicSection[];
-  /**
-   * Per section: "file" (a recording), "voice" (the browser reads the script) or "none". Neither the
-   * audio link nor the script is in the page: both come from `claimSection` when Play is pressed.
-   */
   audio: SectionAudioKind[];
-  /** Full test only: sections already heard to the end, which cannot be played again. */
   played: number[];
 };
 
@@ -275,18 +256,10 @@ export async function getAttempt(
   };
 }
 
-/** Long enough for any section to play through, signed only when Play is pressed. */
 export const AUDIO_LINK_SEC = 30 * 60;
 
 export type SectionPlay = { kind: "file"; url: string } | { kind: "voice"; script: string };
 
-/**
- * What a Listening section plays, handed out when Play is pressed: a freshly signed link to its
- * recording, or the script for the browser voice (the script holds the answers). Only while the
- * attempt is open. A full test plays each section once, but the play is only used up when it
- * reaches the end (`finishSection`): a reload, a section switch or a load error mid-play does not
- * cost the learner the section.
- */
 export async function claimSection(
   userId: string,
   attemptId: string,
@@ -307,7 +280,6 @@ export async function claimSection(
   return ok({ play: { kind: "voice", script: section.script } });
 }
 
-/** Records that a full-test section played to the end, so it cannot be claimed again. Drills ignore it. */
 export async function finishSection(userId: string, attemptId: string, index: number): Promise<ActionResult> {
   if (!isId(attemptId) || !isId(userId) || !Number.isInteger(index) || index < 0) return fail(NOT_FOUND);
   await connectDb();

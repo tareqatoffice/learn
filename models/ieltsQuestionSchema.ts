@@ -22,7 +22,6 @@ const groupSchema = new Schema(
   { _id: false },
 );
 
-/** A Reading passage or a Listening part, with its question groups. */
 export const sectionSchema = new Schema(
   {
     title: { type: String, required: true },

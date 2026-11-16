@@ -44,7 +44,6 @@ export function Landing({
 }) {
   return (
     <>
-      {/* Same shell as the signed-in TopBar and (app) layout, so the page lines up with the rest of the app. */}
       <AppHeader>
         <ThemeToggle className="ml-auto" />
       </AppHeader>

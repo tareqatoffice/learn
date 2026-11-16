@@ -44,7 +44,6 @@ export async function saveDefaults(targets: Record<TaskKey, number>): Promise<Ac
   for (const task of TASKS) if (targets[task] === undefined && !errors[task]) errors[task] = `${TASK_LABEL[task]} target is required.`;
   if (Object.keys(errors).length) return fail(errors);
   await connectDb();
-  // Only the known tasks are stored, whatever other keys the caller sent.
   const clean = Object.fromEntries(TASKS.map((t) => [t, targets[t]]));
   await SpeakingSettings.updateOne({ key: "default" }, { $set: { targets: clean } }, { upsert: true });
   return ok();

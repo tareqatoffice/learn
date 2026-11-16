@@ -80,7 +80,6 @@ function SectionAudio({ testId, index, audioKey, onDone }: { testId: string; ind
   );
 }
 
-/** Create or edit a Reading or Listening test: sections, each with its text and questions in the plain-text format. */
 export function IeltsTestForm({ kind, test }: { kind: TestKind; test?: AdminTest }) {
   const router = useRouter();
   const [id] = useState(test?.id ?? "");
@@ -91,7 +90,6 @@ export function IeltsTestForm({ kind, test }: { kind: TestKind; test?: AdminTest
       { title: kind === "reading" ? "Passage 1" : "Section 1", passage: "", script: "", questions: "", audioKey: "" },
     ],
   );
-  // Uploads go to a saved section by position, so once a section has been removed here, save before uploading.
   const [removed, setRemoved] = useState(false);
   const { run, pending, errors, saved, touch } = useAdminAction();
   const del = useAdminAction();
@@ -108,7 +106,6 @@ export function IeltsTestForm({ kind, test }: { kind: TestKind; test?: AdminTest
       status,
       sections: sections.map((s) => ({ title: s.title, passage: s.passage, script: s.script, questions: s.questions, audioKey: s.audioKey })),
     };
-    // Once saved, the server's sections match these again (the page refreshes), so uploads reopen.
     if (id) run(() => saveTestAction(kind, id, input), { onSuccess: () => setRemoved(false) });
     else run(() => saveTestAction(kind, null, input), { refresh: false, onSuccess: (r) => router.push(`${BACK}/${kind}/${r.id}`) });
   };

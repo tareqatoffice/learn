@@ -13,7 +13,6 @@ import type { AttemptSummary } from "@/ielts/speaking/attempts";
 import type { Kind } from "@/ielts/speaking/questions";
 import { cn } from "@/lib/utils";
 
-/** `missing`: the bank can't fill a part this needs, so only AI-written questions can start it. */
 export type HubOption = { kind: Kind; title: string; blurb: string; exhausted: boolean; missing: boolean };
 
 const DATE = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" });
@@ -96,7 +95,6 @@ function Option({ option, aiOn, storage, highlight }: { option: HubOption; aiOn:
   );
 }
 
-/** Start a full mock or drill one part, and open earlier attempts. */
 export function SpeakingHub({
   options,
   recent,

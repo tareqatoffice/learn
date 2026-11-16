@@ -16,7 +16,6 @@ export default function ExportPage() {
       description="Downloads all content as one JSON file: subjects, question books and questions, graphs and topics, note series and chapters, speaking lessons and settings, and the IELTS question bank, practice tests, writing prompts and settings. Users, progress, attempts and edit history are not included."
     >
       <AdminCard>
-        {/* A plain link: the route streams a file download, which client-side navigation would not handle. */}
         <a href="/api/admin/export" className={buttonVariants({ className: "justify-self-start" })} download>
           Download content export
         </a>
