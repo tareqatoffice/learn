@@ -108,7 +108,8 @@ export function IeltsTestForm({ kind, test }: { kind: TestKind; test?: AdminTest
       status,
       sections: sections.map((s) => ({ title: s.title, passage: s.passage, script: s.script, questions: s.questions, audioKey: s.audioKey })),
     };
-    if (id) run(() => saveTestAction(kind, id, input));
+    // Once saved, the server's sections match these again (the page refreshes), so uploads reopen.
+    if (id) run(() => saveTestAction(kind, id, input), { onSuccess: () => setRemoved(false) });
     else run(() => saveTestAction(kind, null, input), { refresh: false, onSuccess: (r) => router.push(`${BACK}/${kind}/${r.id}`) });
   };
 
