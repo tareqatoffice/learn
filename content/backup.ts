@@ -4,18 +4,25 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import mongoose, { type Model } from "mongoose";
 import {
+  AiConversation,
   AiSettings,
+  AiUsage,
   ApiToken,
   Graph,
   GraphNode,
   IeltsBandEntry,
+  IeltsListeningTest,
   IeltsPlan,
   IeltsPlanSuggestion,
   IeltsProfile,
+  IeltsReadingTest,
   IeltsSettings,
   IeltsSpeakingAttempt,
   IeltsSpeakingItem,
   IeltsStudyLog,
+  IeltsTestAttempt,
+  IeltsWritingAttempt,
+  IeltsWritingPrompt,
   NodeProgress,
   Note,
   NoteProgress,
@@ -30,6 +37,7 @@ import {
   SpeakingProfile,
   SpeakingSettings,
   SpeakingTake,
+  SpeakingUsage,
   Subject,
   User,
 } from "@/models";
@@ -49,6 +57,9 @@ export const CONTENT_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["speakingsettings", SpeakingSettings],
   ["ieltsspeakingitems", IeltsSpeakingItem],
   ["ieltssettings", IeltsSettings],
+  ["ieltsreadingtests", IeltsReadingTest],
+  ["ieltslisteningtests", IeltsListeningTest],
+  ["ieltswritingprompts", IeltsWritingPrompt],
 ];
 
 const ejson = (value: unknown) => EJSON.stringify(value, { relaxed: false });
@@ -71,7 +82,10 @@ export async function* exportContent(collections = CONTENT_COLLECTIONS): AsyncIt
   yield "}}";
 }
 
-/** Everything: content plus users, progress, quiz sessions, revisions and API token hashes. */
+/**
+ * Everything: content plus users, progress, attempts, usage counters, revisions and API token hashes.
+ * A test checks every model in `@/models` is listed here, so a new model cannot be left out.
+ */
 export const ALL_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ...CONTENT_COLLECTIONS,
   ["users", User],
@@ -91,6 +105,11 @@ export const ALL_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["ieltsstudylogs", IeltsStudyLog],
   ["ieltsbandentries", IeltsBandEntry],
   ["ieltsspeakingattempts", IeltsSpeakingAttempt],
+  ["ieltstestattempts", IeltsTestAttempt],
+  ["ieltswritingattempts", IeltsWritingAttempt],
+  ["aiusages", AiUsage],
+  ["aiconversations", AiConversation],
+  ["speakingusages", SpeakingUsage],
 ];
 
 const countsOf = async (collections: typeof ALL_COLLECTIONS) =>
