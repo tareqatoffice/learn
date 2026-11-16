@@ -10,6 +10,7 @@ import type { Kind } from "@/ielts/speaking/questions";
 import type { StartPartInput } from "@/ielts/speaking/attempts";
 import { KIND_PARTS, P2_MARK_SEC, P2_PREP_SEC, P2_TALK_SEC, PART_CAP_SEC, PART_SOFT_SEC, type Part } from "@/ielts/speaking/timing";
 import { useExaminer } from "@/lib/useExaminer";
+import { useLeaveGuard } from "@/lib/useLeaveGuard";
 import { UploadError, uploadTake } from "@/lib/uploadTake";
 import { type RecorderResult, useRecorder } from "@/lib/useRecorder";
 import { PartTimer } from "./PartTimer";
@@ -396,33 +397,7 @@ export function MockRunner({
   }, [unsent]);
 
   // In-app navigation never fires beforeunload, so same-origin link clicks and Back ask too (R26).
-  useEffect(() => {
-    if (!unsent) return;
-    const leave = () => window.confirm(LEAVE_PROMPT);
-    const onClick = (e: MouseEvent) => {
-      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      const a = e.target instanceof Element ? e.target.closest("a[href]") : null;
-      if (!(a instanceof HTMLAnchorElement) || a.hasAttribute("download") || (a.target && a.target !== "_self")) return;
-      if (new URL(a.href, window.location.href).origin !== window.location.origin) return;
-      if (!leave()) e.preventDefault();
-    };
-    // A guard entry on top of this page, so Back lands on it first and can be undone when declined.
-    if (!window.history.state?.[GUARD_KEY]) window.history.pushState({ [GUARD_KEY]: true }, "");
-    const onPopState = () => {
-      if (leave()) {
-        window.removeEventListener("popstate", onPopState);
-        window.history.back();
-      } else {
-        window.history.pushState({ [GUARD_KEY]: true }, "");
-      }
-    };
-    document.addEventListener("click", onClick, true);
-    window.addEventListener("popstate", onPopState);
-    return () => {
-      document.removeEventListener("click", onClick, true);
-      window.removeEventListener("popstate", onPopState);
-    };
-  }, [unsent]);
+  useLeaveGuard(unsent, LEAVE_PROMPT, GUARD_KEY);
 
   // ---- view ----
 

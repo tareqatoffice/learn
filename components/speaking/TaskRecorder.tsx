@@ -9,6 +9,7 @@ import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { UploadError, uploadTake } from "@/lib/uploadTake";
 import { type RecorderResult, useRecorder } from "@/lib/useRecorder";
+import { useLeaveGuard } from "@/lib/useLeaveGuard";
 import { localDate, takeCapSec } from "@/speaking/schedule";
 import type { TaskKey } from "@/speaking/tasks";
 import { clock } from "./format";
@@ -153,6 +154,8 @@ export function TaskRecorder({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [unsaved]);
+  // In-app links and Back don't fire beforeunload, so they ask too.
+  useLeaveGuard(unsaved, "Your recording hasn't been saved. Leave anyway?", "speakingLeaveGuard");
 
   const persist = useCallback(
     async (result: RecorderResult) => {

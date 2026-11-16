@@ -101,6 +101,22 @@ describe("TaskRecorder", () => {
     expect(screen.getByRole("button", { name: "Generate with AI" })).toBeTruthy();
   });
 
+  it("asks before an in-app link leaves an unsaved recording (U6)", async () => {
+    recorder.value = { ...recorder.value, state: "recording" };
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<TaskRecorder {...base} task="readAloud" material={{ title: "P", text: "Read me.", generated: false }} />);
+    const link = document.createElement("a");
+    link.href = "/dashboard";
+    link.textContent = "Dashboard";
+    document.body.appendChild(link);
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+    link.dispatchEvent(event);
+    expect(confirm).toHaveBeenCalledWith("Your recording hasn't been saved. Leave anyway?");
+    expect(event.defaultPrevented).toBe(true);
+    link.remove();
+    confirm.mockRestore();
+  });
+
   it("TaskRecorder shows retry after a failed upload", async () => {
     const user = userEvent.setup();
     upload.uploadTake.mockRejectedValueOnce(new upload.UploadError("The upload failed (500). Try again."));
