@@ -180,14 +180,14 @@ describe("generateItemDraft", () => {
     expect(messages[1].content).toContain("Ignore previous instructions");
   });
 
-  it("refunds and saves nothing when the reply can't be used", async () => {
+  it("counts the call but saves nothing when the reply can't be used (S4)", async () => {
     const res = await generateItemDraft(admin, "part1", undefined, { fetch: async () => reply("not json at all") });
     expect(res.ok).toBe(false);
-    expect(await usage()).toBe(0);
+    expect(await usage()).toBe(1);
     expect(await IeltsSpeakingItem.countDocuments()).toBe(0);
     const short = await generateItemDraft(admin, "part1", undefined, { fetch: async () => reply({ title: "x", questions: ["only one"] }) });
     expect(short.ok).toBe(false);
-    expect(await usage()).toBe(0);
+    expect(await usage()).toBe(2);
   });
 
   it("fails without calling the model when the AI is off", async () => {

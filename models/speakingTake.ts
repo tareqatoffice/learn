@@ -50,7 +50,11 @@ const speakingTakeSchema = new Schema(
     material: { type: materialSchema, default: () => ({}) },
     media: { type: mediaSchema, required: true },
     transcript: String,
-    transcriptStatus: { type: String, enum: ["none", "pending", "done", "failed", "unavailable"], default: "none" },
+    transcriptStatus: { type: String, enum: ["none", "pending", "running", "done", "failed", "unavailable"], default: "none" },
+    /** When the running transcription was claimed; a claim older than a few minutes can be taken over. */
+    transcribeStartedAt: Date,
+    /** Transcriptions tried for this take; capped so a failing recording can't be retried forever. */
+    transcribeAttempts: { type: Number, default: 0 },
     self: { type: selfSchema, default: undefined },
     markers: { type: [markerSchema], default: [] },
     ai: { type: aiSchema, default: undefined },

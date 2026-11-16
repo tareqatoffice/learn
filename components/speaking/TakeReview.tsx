@@ -78,6 +78,17 @@ export function TakeTranscript({ takeId, status, transcript }: { takeId: string;
         </Button>
       </div>
     );
+  } else if (state === "running" && !busy) {
+    body = (
+      <div className="grid gap-2">
+        <p role="status" className="text-sm text-muted-foreground">
+          This recording is being transcribed (perhaps in another tab). Reload in a minute to see it.
+        </p>
+        <Button variant="outline" size="sm" className="justify-self-start" onClick={() => router.refresh()}>
+          Check again
+        </Button>
+      </div>
+    );
   } else if (state === "failed") {
     body = (
       <div className="grid gap-2">

@@ -5,7 +5,7 @@ import { deleteObjects, storageConfigured } from "@/lib/r2";
 import { type transcribe, sttConfigured } from "@/lib/stt";
 import { IeltsBandEntry, IeltsSpeakingAttempt } from "@/models";
 import { type MediaDoc, keysOf } from "@/recording/mediaCore";
-import { transcribeMedia } from "@/recording/transcribe";
+import { MAX_TRANSCRIBE_ATTEMPTS, TRANSCRIBE_ATTEMPTS_MESSAGE, transcribeMedia } from "@/recording/transcribe";
 import { playbackUrls, prepareUpload, removeMedia, verifyUpload } from "@/recording/upload";
 import { type Kind, type QuestionSet, pickQuestions } from "./questions";
 
@@ -26,7 +26,7 @@ const MAX_LIMIT = 200;
 const NOT_FOUND = "Recording not found.";
 const isId = (id: unknown): id is string => typeof id === "string" && Types.ObjectId.isValid(id);
 
-type PartDoc = { part: Part; media: MediaDoc; uploadId?: string; transcript?: string; transcriptStatus?: string; markers?: Marker[] };
+type PartDoc = { part: Part; media: MediaDoc; uploadId?: string; transcript?: string; transcriptStatus?: string; transcribeAttempts?: number; markers?: Marker[] };
 type AttemptDoc = {
   _id: Types.ObjectId;
   date: string;
@@ -160,7 +160,7 @@ export async function startPart(
     const res = await IeltsSpeakingAttempt.updateOne(
       { _id: attemptId, userId, parts: { $elemMatch: { part, "media.stored": false, uploadId: existing.uploadId ?? null } } },
       {
-        $set: { "parts.$.media": media, "parts.$.uploadId": uploadId, "parts.$.transcriptStatus": "none", "parts.$.markers": [], ...video },
+        $set: { "parts.$.media": media, "parts.$.uploadId": uploadId, "parts.$.transcriptStatus": "none", "parts.$.transcribeAttempts": 0, "parts.$.markers": [], ...video },
         $unset: { "parts.$.transcript": 1 },
       },
     );
@@ -283,6 +283,7 @@ export async function transcribePart(
   const row = attempt?.parts.find((p) => p.part === part);
   if (!attempt || !row || !row.media.stored) return fail(NOT_FOUND);
   if (!["pending", "failed", "running"].includes(row.transcriptStatus ?? "")) return fail("This recording can't be transcribed.");
+  if ((row.transcribeAttempts ?? 0) >= MAX_TRANSCRIBE_ATTEMPTS) return fail(TRANSCRIBE_ATTEMPTS_MESSAGE);
 
   // Claim the part first, so two requests (a retry, a second tab) can't both spend the daily cap and
   // both pay for speech-to-text. A claim left by a crashed request can be taken over after a while.
@@ -295,6 +296,7 @@ export async function transcribePart(
         $elemMatch: {
           part,
           "media.stored": true,
+          transcribeAttempts: { $not: { $gte: MAX_TRANSCRIBE_ATTEMPTS } },
           $or: [
             { transcriptStatus: { $in: ["pending", "failed"] } },
             { transcriptStatus: "running", transcribeStartedAt: { $lt: new Date(now.getTime() - STALE_CLAIM_MS) } },
@@ -302,7 +304,7 @@ export async function transcribePart(
         },
       },
     },
-    { $set: { "parts.$.transcriptStatus": "running", "parts.$.transcribeStartedAt": now } },
+    { $set: { "parts.$.transcriptStatus": "running", "parts.$.transcribeStartedAt": now }, $inc: { "parts.$.transcribeAttempts": 1 } },
   );
   if (!claim.matchedCount) return fail("This recording is already being transcribed. Reload the page in a minute.");
 
@@ -322,8 +324,8 @@ export async function transcribePart(
       await IeltsSpeakingAttempt.updateOne(ours, { $set: { "parts.$.transcriptStatus": "failed" } });
     },
   });
-  // Refused before the call (daily cap, missing object): release the claim as it was.
-  if (!res.ok) await IeltsSpeakingAttempt.updateOne(ours, { $set: { "parts.$.transcriptStatus": before } });
+  // Refused before the call (daily cap, missing object): release the claim and the attempt.
+  if (!res.ok) await IeltsSpeakingAttempt.updateOne(ours, { $set: { "parts.$.transcriptStatus": before }, $inc: { "parts.$.transcribeAttempts": -1 } });
   return res;
 }
 

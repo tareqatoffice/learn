@@ -52,6 +52,8 @@ const partSchema = new Schema(
     transcriptStatus: { type: String, enum: ["none", "pending", "running", "done", "failed", "unavailable"], default: "none" },
     /** When the running transcription was claimed; a claim older than a few minutes can be taken over. */
     transcribeStartedAt: Date,
+    /** Transcriptions tried for this part; capped so a failing recording can't be retried forever. */
+    transcribeAttempts: { type: Number, default: 0 },
     markers: { type: [markerSchema], default: [] },
   },
   { _id: false },

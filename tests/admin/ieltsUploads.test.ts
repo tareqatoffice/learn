@@ -118,12 +118,12 @@ describe("IELTS admin AI drafts", () => {
     expect((await AiUsage.findOne({ userId: u }).lean<{ count: number }>())?.count).toBe(1);
   });
 
-  it("refunds the call and saves nothing when the reply is unusable", async () => {
+  it("counts the call but saves nothing when the reply is unusable (S4)", async () => {
     const u = admin();
     const fetch = vi.fn().mockImplementation(async () => reply({ title: "x", sectionTitle: "y", text: "t", questions: "not questions" }));
     const res = await generateTestDraft(u, "listening", { fetch });
     expect(res.ok).toBe(false);
-    expect((await AiUsage.findOne({ userId: u }).lean<{ count: number }>())?.count ?? 0).toBe(0);
+    expect((await AiUsage.findOne({ userId: u }).lean<{ count: number }>())?.count ?? 0).toBe(1);
   });
 
   it("saves a generated Task 1 prompt with the chart description as its alt text", async () => {

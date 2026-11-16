@@ -13,6 +13,8 @@ export class AiError extends Error {
   constructor(
     message: string,
     readonly detail?: string,
+    /** True when a model answered (an error status or a reply): the call may have been billed. */
+    readonly reached = false,
   ) {
     super(message);
   }
@@ -43,6 +45,8 @@ class AttemptError extends Error {
     message: string,
     readonly final = false,
     readonly detail?: string,
+    /** False only when no response arrived (network error, timeout). */
+    readonly reached = true,
   ) {
     super(message);
   }
@@ -92,7 +96,7 @@ async function attempt(model: string, messages: ChatMessage[], options: ChatOpti
   } catch (error) {
     console.error(`OpenRouter request to ${model} failed`, error);
     const timedOut = error instanceof Error && error.name === "TimeoutError";
-    throw new AttemptError("The AI coach could not be reached. Try again.", false, timedOut ? "Timed out" : "Network error");
+    throw new AttemptError("The AI coach could not be reached. Try again.", false, timedOut ? "Timed out" : "Network error", false);
   }
 
   if (!response.ok) {
@@ -138,16 +142,18 @@ export async function chatCompletion(messages: ChatMessage[], options: ChatOptio
   if (!models.length) throw new AiError("No AI model is selected.");
 
   let last: AttemptError | undefined;
+  let reached = false;
   for (const model of models) {
     try {
       return { text: await attempt(model, messages, options, key), model };
     } catch (error) {
       if (!(error instanceof AttemptError)) throw error;
       last = error;
+      reached ||= error.reached;
       if (error.final) break;
     }
   }
-  throw new AiError(last?.message ?? "The AI coach failed. Try again.", last?.detail);
+  throw new AiError(last?.message ?? "The AI coach failed. Try again.", last?.detail, reached);
 }
 
 /** The first JSON object in a reply, tolerating code fences and surrounding prose. */

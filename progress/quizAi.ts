@@ -56,8 +56,8 @@ export async function loadCoachCard(userId: string, sessionId: string, questionI
 export const usageDay = (now: Date) => now.toISOString().slice(0, 10);
 
 /**
- * Counts one AI call against the user's daily limit and returns a refund for when the call fails,
- * so outages and unreadable replies do not use up the learner's quota. Throws once the limit is used up.
+ * Counts one AI call against the user's daily limit and returns a refund for when the call never
+ * reached a model, so outages do not use up the learner's quota. Throws once the limit is used up.
  */
 export async function consumeAiCall(userId: string, limit: number, now = new Date()): Promise<() => Promise<void>> {
   if (limit === 0) return async () => {};
@@ -77,13 +77,17 @@ export async function consumeAiCall(userId: string, limit: number, now = new Dat
   return refund;
 }
 
-/** Runs one model call under the daily limit, refunding it when the call fails. */
+/**
+ * Runs one model call under the daily limit. A failure is refunded only when no model answered
+ * (network error, timeout, not configured): once a model has replied, even with an error or an
+ * unreadable reply, the call counts, so retrying can't run past the limit.
+ */
 export async function metered<T>(userId: string, settings: AiSettingsView, call: () => Promise<T>): Promise<T> {
   const refund = await consumeAiCall(userId, settings.dailyLimit);
   try {
     return await call();
   } catch (error) {
-    await refund();
+    if (!(error instanceof AiError && error.reached)) await refund();
     throw error;
   }
 }

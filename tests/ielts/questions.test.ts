@@ -232,10 +232,10 @@ describe("generateQuestions", () => {
     expect(JSON.stringify(body.messages)).toContain("<card>");
   });
 
-  it("refunds an unusable reply", async () => {
+  it("counts an unusable reply, since the model answered (S4)", async () => {
     const res = await generateQuestions(userId, "part1", undefined, { fetch: async () => reply("not json") });
     expect(res.ok).toBe(false);
-    expect(await usage()).toBe(0);
+    expect(await usage()).toBe(1);
     const short = await generateQuestions(userId, "mock", undefined, { fetch: async () => reply({ part1: [] }) });
     expect(short.ok).toBe(false);
   });

@@ -240,7 +240,7 @@ describe("quiz coach", () => {
     expect(await usageCount(user)).toBe(1);
   });
 
-  it("refunds the quota when every model fails", async () => {
+  it("counts a call a model answered, even badly, and refunds one no model received (S4)", async () => {
     const { user, sessionId, questionId } = await setup();
     await expect(gradeAnswer(user, sessionId, questionId, "x", { fetch: async () => reply("hmm") })).rejects.toThrow(
       /unreadable/,
@@ -248,7 +248,15 @@ describe("quiz coach", () => {
     await expect(
       gradeAnswer(user, sessionId, questionId, "x", { fetch: async () => new Response("", { status: 503 }) }),
     ).rejects.toThrow(AiError);
-    expect(await usageCount(user)).toBe(0);
+    expect(await usageCount(user)).toBe(2);
+    await expect(
+      gradeAnswer(user, sessionId, questionId, "x", {
+        fetch: async () => {
+          throw new TypeError("fetch failed");
+        },
+      }),
+    ).rejects.toThrow(/could not be reached/);
+    expect(await usageCount(user)).toBe(2);
   });
 
   it("refuses blank answers, foreign sessions and a disabled coach without calling the model", async () => {

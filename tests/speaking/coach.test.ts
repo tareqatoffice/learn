@@ -72,13 +72,13 @@ describe("speaking coach", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("speechFeedback rejects a null, empty or false score and refunds the call", async () => {
+  it("speechFeedback rejects a null, empty or false score; the answered call still counts (S4)", async () => {
     for (const bad of [null, "", false]) {
       await resetDb();
       const id = await makeTake(user);
       const result = await speechFeedback(user, id, { fetch: async () => reply({ ...SPEECH, fluency: bad }) });
       expect(result.ok).toBe(false);
-      expect(await usage(user)).toBe(0);
+      expect(await usage(user)).toBe(1);
       expect((await SpeakingTake.findById(id).lean<{ ai?: unknown }>())?.ai).toBeUndefined();
     }
   });
@@ -123,11 +123,11 @@ describe("speaking coach", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("speechFeedback refunds the AI call on unreadable JSON", async () => {
+  it("speechFeedback counts the AI call on unreadable JSON and saves nothing (S4)", async () => {
     const id = await makeTake(user);
     const result = await speechFeedback(user, id, { fetch: async () => reply("sounds good!") });
     expect(result.ok).toBe(false);
-    expect(await usage(user)).toBe(0);
+    expect(await usage(user)).toBe(1);
     expect((await SpeakingTake.findById(id).lean<{ ai?: unknown }>())?.ai).toBeUndefined();
   });
 
@@ -196,7 +196,7 @@ describe("speaking coach", () => {
       ok: false,
       error: "The AI model can't read images. Ask your admin to set a vision model.",
     });
-    expect(await usage(user)).toBe(0);
+    expect(await usage(user)).toBe(1);
   });
 
   it("generateMaterial returns a passage for readAloud", async () => {
@@ -214,10 +214,10 @@ describe("speaking coach", () => {
     if (result.ok) expect(result.value.prompt).toContain("Describe your ideal weekend.\n- Where\n- Who\n- Why");
   });
 
-  it("generateMaterial refunds an unusable passage", async () => {
+  it("generateMaterial counts an unusable passage (S4)", async () => {
     const result = await generateMaterial(user, "readAloud", { fetch: async () => reply({ title: "x", text: "too short" }) });
     expect(result.ok).toBe(false);
-    expect(await usage(user)).toBe(0);
+    expect(await usage(user)).toBe(1);
   });
 
   it("AI off: all three return ok false", async () => {
