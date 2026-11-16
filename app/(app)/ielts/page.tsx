@@ -29,6 +29,35 @@ export const metadata = buildMetadata({
 const linkClass =
   "rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
+const PRACTICE = [
+  ["/ielts/speaking", "Speaking"],
+  ["/ielts/listening", "Listening"],
+  ["/ielts/reading", "Reading"],
+  ["/ielts/writing", "Writing"],
+] as const;
+const PLAN = [
+  ["/ielts/plan", "Plan"],
+  ["/ielts/history", "History"],
+] as const;
+const TOOLS = [
+  ["/ielts/calculator", "Calculator"],
+  ["/ielts/profile", "Profile"],
+] as const;
+
+/** The IELTS sections; without a profile only practice and the calculator, which need no plan. */
+function IeltsNav({ withPlan }: { withPlan: boolean }) {
+  const links = withPlan ? [...PRACTICE, ...PLAN, ...TOOLS] : [...PRACTICE, TOOLS[0]];
+  return (
+    <nav aria-label="IELTS" className="flex flex-wrap gap-2">
+      {links.map(([href, label]) => (
+        <Link key={href} href={href} className={linkClass}>
+          {label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 export default async function IeltsPage() {
   const user = await requireUser();
   await connectDb();
@@ -41,13 +70,10 @@ export default async function IeltsPage() {
       <div className="mx-auto grid w-full max-w-3xl gap-4">
         <TimeZoneCookie current={timeZone} />
         <h1 className={pageTitleClass}>Set up your IELTS plan</h1>
+        <IeltsNav withPlan={false} />
         <p className="text-sm text-muted-foreground">
-          Tell us when your test is and what band you want. You will see a preview of the plan before anything is saved. Just want to
-          convert a practice score?{" "}
-          <Link href="/ielts/calculator" className="underline underline-offset-2">
-            Use the band calculator
-          </Link>
-          .
+          Tell us when your test is and what band you want. You will see a preview of the plan before anything is saved. You can
+          also practise any skill or use the band calculator without a plan.
         </p>
         <div className="rounded-xl border border-border bg-card p-5">
           <ProfileForm today={today} />
@@ -61,32 +87,7 @@ export default async function IeltsPage() {
       <TimeZoneCookie current={timeZone} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>IELTS</h1>
-        <nav aria-label="IELTS" className="flex flex-wrap gap-2">
-          <Link href="/ielts/speaking" className={linkClass}>
-            Speaking
-          </Link>
-          <Link href="/ielts/listening" className={linkClass}>
-            Listening
-          </Link>
-          <Link href="/ielts/reading" className={linkClass}>
-            Reading
-          </Link>
-          <Link href="/ielts/writing" className={linkClass}>
-            Writing
-          </Link>
-          <Link href="/ielts/plan" className={linkClass}>
-            Plan
-          </Link>
-          <Link href="/ielts/history" className={linkClass}>
-            History
-          </Link>
-          <Link href="/ielts/calculator" className={linkClass}>
-            Calculator
-          </Link>
-          <Link href="/ielts/profile" className={linkClass}>
-            Profile
-          </Link>
-        </nav>
+        <IeltsNav withPlan />
       </div>
     </>
   );
