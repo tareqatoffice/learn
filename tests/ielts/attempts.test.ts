@@ -5,7 +5,7 @@ vi.mock("@/lib/r2", () => ({
   storageConfigured: vi.fn(() => true),
   presignPut: vi.fn(async (key: string) => `https://r2.test/put/${key}`),
   presignGet: vi.fn(async (key: string) => `https://r2.test/get/${key}`),
-  headObject: vi.fn(async () => ({ size: 1000, contentType: "audio/webm" })),
+  headObject: vi.fn(async () => ({ size: 1000, contentType: "" })),
   getObjectBytes: vi.fn(async () => new Uint8Array([1, 2, 3])),
   deleteObjects: vi.fn(async () => undefined),
 }));
@@ -75,7 +75,7 @@ describe("ielts speaking attempts", () => {
     vi.clearAllMocks();
     vi.mocked(r2.storageConfigured).mockReturnValue(true);
     vi.mocked(r2.presignPut).mockImplementation(async (key: string) => `https://r2.test/put/${key}`);
-    vi.mocked(r2.headObject).mockResolvedValue({ size: 1000, contentType: "audio/webm" });
+    vi.mocked(r2.headObject).mockResolvedValue({ size: 1000, contentType: "" });
   });
   afterEach(() => {
     delete process.env.STT_DAILY_LIMIT;

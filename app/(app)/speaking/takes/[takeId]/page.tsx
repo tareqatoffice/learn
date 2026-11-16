@@ -11,7 +11,7 @@ import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
 import { getEffectiveSettings } from "@/speaking/settings";
 import { getTake } from "@/speaking/takes";
-import { TASK_LABEL } from "@/speaking/tasks";
+import { TASK_LABEL, TASK_SLUG } from "@/speaking/tasks";
 
 export async function generateMetadata({ params }: PageProps<"/speaking/takes/[takeId]">): Promise<Metadata> {
   const { takeId } = await params;
@@ -50,9 +50,17 @@ export default async function TakePage({ params }: PageProps<"/speaking/takes/[t
   return (
     <div className="mx-auto grid w-full max-w-5xl gap-4">
       <div>
-        <Link href="/speaking/history" className="text-sm text-muted-foreground hover:underline">
-          ← All takes
-        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link href="/speaking/history" className="text-sm text-muted-foreground hover:underline">
+            ← All takes
+          </Link>
+          <Link
+            href={`/speaking/${TASK_SLUG[take.task]}`}
+            className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            Record another
+          </Link>
+        </div>
         <h1 className={pageTitleClass}>{take.material.title?.trim() || TASK_LABEL[take.task]}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {TASK_LABEL[take.task]} · {DATE.format(new Date(`${take.date}T00:00:00Z`))} · {clock(take.durationSec)} ·{" "}

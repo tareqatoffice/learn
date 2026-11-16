@@ -76,11 +76,15 @@ export async function verifyUpload(media: MediaDoc): Promise<{ ok: true; size: n
     }
     return { ok: false as const, error: UPLOAD_FAILED };
   };
+  // The stored type must be the one the URL was signed for (an empty one from storage is let through).
+  const wrongType = (stored: string, expected: string | undefined) => Boolean(stored) && baseMime(stored) !== baseMime(expected ?? "");
   const main = await headObject(media.key);
   if (!main || main.size <= 0 || main.size > capBytes(media.capSec, media.kind === "video")) return reject();
+  if (wrongType(main.contentType, media.mime)) return reject();
   if (media.audioKey) {
     const audio = await headObject(media.audioKey);
     if (!audio || audio.size <= 0 || audio.size > capBytes(media.capSec, false)) return reject();
+    if (wrongType(audio.contentType, media.audioMime)) return reject();
   }
   return { ok: true, size: main.size };
 }

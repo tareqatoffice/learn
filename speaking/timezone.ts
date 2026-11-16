@@ -20,6 +20,12 @@ export async function readTimeZone(): Promise<string> {
   return isTimeZone(decoded) ? decoded : "UTC";
 }
 
+/** Whether the browser has told us its zone yet (the first page view has no cookie). */
+export async function hasTimeZoneCookie(): Promise<boolean> {
+  const value = (await cookies()).get(TZ_COOKIE)?.value;
+  return isTimeZone(value ? safeDecode(value) : undefined);
+}
+
 function safeDecode(value: string): string | undefined {
   try {
     return decodeURIComponent(value);

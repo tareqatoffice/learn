@@ -61,6 +61,7 @@ export async function todaysLesson(
   userId: string,
   date: string,
   enabled: Record<TaskKey, boolean>,
+  opts: { assign?: boolean } = {},
 ): Promise<LessonView | null> {
   await connectDb();
   const day = await SpeakingDay.findOne({ userId, date }).lean<{ lessonId: unknown }>();
@@ -82,7 +83,8 @@ export async function todaysLesson(
   // Everything finished: no assignment, so the UI can offer generated material.
   const pick = lessons.find((l) => !finished(l));
   if (!pick) return null;
-  await assign(userId, date, pick.id);
+  // Without a known time zone `date` may be the wrong day, so the pick is shown but not kept.
+  if (opts.assign !== false) await assign(userId, date, pick.id);
   return pick;
 }
 

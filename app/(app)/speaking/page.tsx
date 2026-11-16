@@ -9,7 +9,7 @@ import { pageTitleClass } from "@/lib/ui";
 import { lessonHasPart, listPublishedLessons } from "@/speaking/lessons";
 import { getToday } from "@/speaking/progress";
 import { TASKS } from "@/speaking/tasks";
-import { readTimeZone } from "@/speaking/timezone";
+import { hasTimeZoneCookie, readTimeZone } from "@/speaking/timezone";
 
 export const metadata = buildMetadata({
   title: "Speaking practice",
@@ -26,7 +26,7 @@ export default async function SpeakingPage() {
   const user = await requireUser();
   await connectDb();
   const timeZone = await readTimeZone();
-  const [today, lessons] = await Promise.all([getToday(user.userId, timeZone), listPublishedLessons()]);
+  const [today, lessons] = await Promise.all([getToday(user.userId, timeZone, new Date(), { assignLesson: await hasTimeZoneCookie() }), listPublishedLessons()]);
 
   const tasks: TodayTask[] = TASKS.filter((t) => today.settings.enabled[t]).map((task) => ({
     task,

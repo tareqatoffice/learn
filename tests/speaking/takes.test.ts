@@ -5,7 +5,7 @@ vi.mock("@/lib/r2", () => ({
   storageConfigured: vi.fn(() => true),
   presignPut: vi.fn(async (key: string) => `https://r2.test/put/${key}`),
   presignGet: vi.fn(async (key: string) => `https://r2.test/get/${key}`),
-  headObject: vi.fn(async () => ({ size: 1000, contentType: "audio/webm" })),
+  headObject: vi.fn(async () => ({ size: 1000, contentType: "" })),
   deleteObjects: vi.fn(async () => undefined),
 }));
 vi.mock("@/lib/stt", () => ({ sttConfigured: vi.fn(() => true) }));
@@ -44,7 +44,7 @@ describe("speaking takes", () => {
     vi.clearAllMocks();
     vi.mocked(r2.storageConfigured).mockReturnValue(true);
     vi.mocked(stt.sttConfigured).mockReturnValue(true);
-    vi.mocked(r2.headObject).mockResolvedValue({ size: 1000, contentType: "audio/webm" });
+    vi.mocked(r2.headObject).mockResolvedValue({ size: 1000, contentType: "" });
   });
   afterAll(() => mongoose.disconnect());
 
@@ -231,6 +231,15 @@ describe("speaking takes", () => {
     const doc = await SpeakingTake.findById(takeId).lean<{ media: { durationSec: number }; transcriptStatus: string }>();
     expect(doc!.media.durationSec).toBe(10);
     expect(doc!.transcriptStatus).toBe("done");
+  });
+
+  it("confirmTake rejects an upload stored with another content type (F24)", async () => {
+    const u = user();
+    const { takeId } = await start(u);
+    vi.mocked(r2.headObject).mockResolvedValueOnce({ size: 1000, contentType: "text/html" });
+    expect((await confirmTake(u, takeId, 5)).ok).toBe(false);
+    vi.mocked(r2.headObject).mockResolvedValueOnce({ size: 1000, contentType: "audio/webm;codecs=opus" });
+    expect((await confirmTake(u, takeId, 5)).ok).toBe(true);
   });
 
   it("confirmTake heads the audio key for video takes", async () => {

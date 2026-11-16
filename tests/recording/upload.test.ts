@@ -59,7 +59,7 @@ describe("recording upload", () => {
       if (cmd instanceof HeadObjectCommand) {
         const size = heads[cmd.input.Key!];
         if (size === undefined || size === null) throw Object.assign(new Error("nf"), { name: "NotFound" });
-        return { ContentLength: size, ContentType: "video/webm" };
+        return { ContentLength: size, ContentType: cmd.input.Key!.includes(".audio.") ? "audio/webm" : "video/webm" };
       }
       if (cmd instanceof DeleteObjectsCommand) return { Errors: [] };
       throw new Error("unexpected command");

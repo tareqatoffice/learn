@@ -14,7 +14,7 @@ import { pageTitleClass } from "@/lib/ui";
 import { lessonHasPart } from "@/speaking/lessons";
 import { getToday } from "@/speaking/progress";
 import { TASK_LABEL, TASK_SLUG, taskFromSlug } from "@/speaking/tasks";
-import { readTimeZone } from "@/speaking/timezone";
+import { hasTimeZoneCookie, readTimeZone } from "@/speaking/timezone";
 
 const HINT = {
   shadowing: "Play the clip and speak along with it. One pass of the clip is one take.",
@@ -39,7 +39,7 @@ export default async function TaskPage({ params }: PageProps<"/speaking/[task]">
   const user = await requireUser();
   await connectDb();
   const timeZone = await readTimeZone();
-  const [today, ai] = await Promise.all([getToday(user.userId, timeZone), getAiConfig()]);
+  const [today, ai] = await Promise.all([getToday(user.userId, timeZone, new Date(), { assignLesson: await hasTimeZoneCookie() }), getAiConfig()]);
   const lesson = today.lesson && lessonHasPart(today.lesson, task) ? today.lesson : null;
 
   let material: Material | null = null;

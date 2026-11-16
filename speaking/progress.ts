@@ -25,6 +25,8 @@ export async function getToday(
   userId: string,
   timeZone: string,
   now: Date = new Date(),
+  /** False while the browser's time zone is unknown: today's lesson is shown but not fixed to the day. */
+  opts: { assignLesson?: boolean } = {},
 ): Promise<{
   date: string;
   settings: EffectiveSettings;
@@ -39,7 +41,7 @@ export async function getToday(
   await connectDb();
   const date = localDate(now, timeZone);
   const settings = await getEffectiveSettings(userId);
-  const lesson = await todaysLesson(userId, date, settings.enabled);
+  const lesson = await todaysLesson(userId, date, settings.enabled, { assign: opts.assignLesson });
 
   const days = weekDates(date);
   const [weekRows, practisedRows] = await Promise.all([

@@ -8,7 +8,7 @@ import { mins } from "@/components/speaking/format";
 import { TimeZoneCookie } from "@/components/speaking/TimeZoneCookie";
 import { getToday } from "@/speaking/progress";
 import { TASKS, TASK_LABEL, TASK_SLUG } from "@/speaking/tasks";
-import { readTimeZone } from "@/speaking/timezone";
+import { hasTimeZoneCookie, readTimeZone } from "@/speaking/timezone";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
 
@@ -83,7 +83,7 @@ export default async function DashboardPage() {
   const timeZone = await readTimeZone();
   const [dash, speaking] = await Promise.all([
     getDashboard(user.userId, timeZone),
-    getToday(user.userId, timeZone),
+    getToday(user.userId, timeZone, new Date(), { assignLesson: await hasTimeZoneCookie() }),
   ]);
   const speakingTasks = TASKS.filter((t) => speaking.settings.enabled[t]);
   // requireUser falls back to the email when the Google profile has no name; never greet with an address.
