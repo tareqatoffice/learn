@@ -95,16 +95,20 @@ export default async function DashboardPage() {
   // one line pointing at the three areas is more use than that.
   const nothingToDo =
     reviewCount === 0 && !dash.continueReading && dash.readyNext.length === 0;
+  // Nothing done anywhere yet: a first visit, which "Welcome back" would get wrong.
+  const firstVisit =
+    nothingToDo && dash.recentQuizzes.length === 0 && dash.learningNow.length === 0 && speaking.best === 0 && !dash.ielts;
 
   return (
     <div className="grid gap-8">
       <TimeZoneCookie current={timeZone} />
       <header>
         <h1 className={pageTitleClass}>
-          Welcome back{firstName ? `, ${firstName}` : ""}
+          {firstVisit ? "Welcome" : "Welcome back"}
+          {firstName ? `, ${firstName}` : ""}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Pick up where you left off.
+          {firstVisit ? "Choose where to start; your progress shows up here as you go." : "Pick up where you left off."}
         </p>
       </header>
 
@@ -123,9 +127,17 @@ export default async function DashboardPage() {
               <Link href="/graphs" className={`underline ${linkClass}`}>
                 Graphs
               </Link>
-              , or open a chapter in{" "}
+              , open a chapter in{" "}
               <Link href="/notes" className={`underline ${linkClass}`}>
                 Notes
+              </Link>
+              , record a take in{" "}
+              <Link href="/speaking" className={`underline ${linkClass}`}>
+                Speaking
+              </Link>
+              , or set up a study plan in{" "}
+              <Link href="/ielts" className={`underline ${linkClass}`}>
+                IELTS
               </Link>
               .
             </p>
@@ -245,6 +257,18 @@ export default async function DashboardPage() {
               empty="Every speaking task is turned off."
             />
           </Card>
+
+          {!dash.ielts && (
+            <Card title="IELTS">
+              <p className="text-sm text-muted-foreground">
+                Preparing for IELTS?{" "}
+                <Link href="/ielts" className={`font-medium text-foreground underline ${linkClass}`}>
+                  Set up a study plan
+                </Link>{" "}
+                from your test date and target band, or practise any skill without one.
+              </p>
+            </Card>
+          )}
 
           {dash.ielts && (
             <Card title="IELTS">

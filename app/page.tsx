@@ -1,4 +1,4 @@
-import { BookOpen, MessagesSquare, Network } from "lucide-react";
+import { BookOpen, GraduationCap, MessagesSquare, Mic, Network } from "lucide-react";
 import { redirect } from "next/navigation";
 import { signInDev, signInWithGoogle } from "@/app/actions";
 import { auth, getProviders } from "@/auth";
@@ -29,6 +29,16 @@ const FEATURES = [
     icon: BookOpen,
     title: "Notes",
     text: "Chaptered study notes that remember where you stopped.",
+  },
+  {
+    icon: Mic,
+    title: "Speaking",
+    text: "Daily shadowing, reading aloud and recorded answers, with transcripts and feedback.",
+  },
+  {
+    icon: GraduationCap,
+    title: "IELTS",
+    text: "A study plan to your test date, with practice tests for all four skills.",
   },
 ];
 
