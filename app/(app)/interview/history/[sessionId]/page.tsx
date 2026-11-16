@@ -39,9 +39,16 @@ export default async function SessionHistoryPage({ params }: PageProps<"/intervi
             {log.counts.skip} skipped
           </p>
         </div>
-        <a href={`/interview/history/export?session=${log.id}`} download className={buttonVariants()}>
-          Download (.md)
-        </a>
+        <span className="flex flex-wrap gap-2">
+          {!log.finishedAt && (
+            <Link href={`/interview/quiz/${log.id}`} className={buttonVariants({ variant: "outline" })}>
+              Resume quiz
+            </Link>
+          )}
+          <a href={`/interview/history/export?session=${log.id}`} download className={buttonVariants()}>
+            Download (.md)
+          </a>
+        </span>
       </div>
 
       {log.items.length === 0 && <p className="text-sm text-muted-foreground">No cards marked in this quiz yet.</p>}
@@ -69,14 +76,40 @@ export default async function SessionHistoryPage({ params }: PageProps<"/intervi
                   {item.coach.score !== undefined && ` · ${item.coach.score} / 100`}
                 </p>
                 {item.coach.summary && <p className="mt-1">{item.coach.summary}</p>}
+                {item.coach.strengths && item.coach.strengths.length > 0 && (
+                  <>
+                    <p className="mt-2 text-muted-foreground">What you got right</p>
+                    <ul className="mt-1 list-disc pl-5">
+                      {item.coach.strengths.map((m, j) => (
+                        <li key={j}>{m}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
                 {item.coach.missing && item.coach.missing.length > 0 && (
-                  <ul className="mt-2 list-disc pl-5">
-                    {item.coach.missing.map((m, j) => (
-                      <li key={j}>{m}</li>
-                    ))}
-                  </ul>
+                  <>
+                    <p className="mt-2 text-muted-foreground">Missing</p>
+                    <ul className="mt-1 list-disc pl-5">
+                      {item.coach.missing.map((m, j) => (
+                        <li key={j}>{m}</li>
+                      ))}
+                    </ul>
+                  </>
                 )}
               </div>
+            )}
+            {item.coach?.chat && item.coach.chat.length > 0 && (
+              <details className="mt-3 rounded-lg border border-border p-3 text-sm">
+                <summary className="cursor-pointer text-muted-foreground">Follow-up with the coach</summary>
+                <ol className="mt-2 grid gap-2">
+                  {item.coach.chat.map((m, j) => (
+                    <li key={j}>
+                      <span className="font-medium">{m.role === "user" ? "You" : "Coach"}:</span>{" "}
+                      <span className="whitespace-pre-wrap">{m.content}</span>
+                    </li>
+                  ))}
+                </ol>
+              </details>
             )}
             {item.question && (
               <details className="mt-3">

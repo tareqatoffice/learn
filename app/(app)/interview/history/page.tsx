@@ -5,6 +5,7 @@ import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
 import { HISTORY_LIMIT, listAttemptSessions, plural } from "@/progress/attempts";
+import { readTimeZone } from "@/speaking/timezone";
 
 export const metadata = buildMetadata({
   title: "Quiz answers",
@@ -12,12 +13,12 @@ export const metadata = buildMetadata({
   path: "/interview/history",
 });
 
-const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
-
 export default async function HistoryPage() {
   const user = await requireUser();
   await connectDb();
-  const sessions = await listAttemptSessions(user.userId);
+  const [sessions, timeZone] = await Promise.all([listAttemptSessions(user.userId), readTimeZone()]);
+  // Times in the learner's own zone (from the time-zone cookie), not the server's.
+  const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short", timeZone });
 
   return (
     <div className="mx-auto grid w-full max-w-3xl gap-4">
@@ -57,7 +58,7 @@ export default async function HistoryPage() {
                     {s.label}
                   </Link>
                   <span className="text-xs text-muted-foreground">
-                    {dateFormat.format(s.startedAt)} UTC · {plural(s.attempts, "attempt")} · {s.answered} answered ·{" "}
+                    {dateFormat.format(s.startedAt)} · {plural(s.attempts, "attempt")} · {s.answered} answered ·{" "}
                     {s.counts.got} got · {s.counts.review} review{s.finishedAt ? "" : " · unfinished"}
                   </span>
                 </span>
