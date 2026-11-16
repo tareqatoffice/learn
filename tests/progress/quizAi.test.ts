@@ -5,8 +5,8 @@ import { clearAiKey, getAiConfig, getAiSettings, saveAiKey, saveAiSettings } fro
 import { connectDb } from "@/lib/db";
 import { DEFAULT_OPENROUTER_MODEL, resetEnvCache } from "@/lib/env";
 import { AiError } from "@/lib/openrouter";
-import { AiConversation, AiSettings, AiUsage, Question } from "@/models";
-import { createSession } from "@/progress/quiz";
+import { AiConversation, AiSettings, AiUsage, Question, QuizSession } from "@/models";
+import { createSession, recordResult } from "@/progress/quiz";
 import { askFollowUp, consumeAiCall, gradeAnswer, loadCoachCard, parseFeedback } from "@/progress/quizAi";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedBook, seedQuestions } from "./seed";
@@ -211,6 +211,15 @@ describe("quiz coach", () => {
     expect(await loadCoachCard(user, "bad", questionId)).toBeNull();
     await Question.updateOne({ _id: questionId }, { status: "draft" });
     expect(await loadCoachCard(user, sessionId, questionId)).toBeNull();
+  });
+
+  it("keeps the graded answer with the mark when the page lost the typed one (F13)", async () => {
+    const { user, sessionId, questionId } = await setup();
+    await gradeAnswer(user, sessionId, questionId, "It keeps scope", { fetch: vi.fn(async () => reply(JSON.stringify(FEEDBACK))) });
+    // A reload empties the answer box, so the mark arrives without an attempt.
+    await recordResult(user, sessionId, questionId, "got");
+    const s = await QuizSession.findById(sessionId).lean<{ results: { answer?: string; answerMode?: string }[] }>();
+    expect(s?.results[0]).toMatchObject({ answer: "It keeps scope", answerMode: "typed" });
   });
 
   it("grades an answer and opens a conversation with the follow-up question", async () => {

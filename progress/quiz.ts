@@ -221,6 +221,7 @@ export async function getSessionView(userId: string, sessionId: string): Promise
 }
 
 type CoachRow = {
+  answer?: string;
   messages: { role: "user" | "assistant"; content: string }[];
   feedback?: { verdict: string; score: number; summary: string; strengths: string[]; missing: string[]; model: string };
 };
@@ -233,14 +234,19 @@ async function coachSnapshot(userId: string, session: SessionRow, questionId: Id
   const since = session.results.at(-1)?.at ?? session.startedAt;
   const row = await AiConversation.findOne(
     { userId, sessionId: session._id, questionId, updatedAt: { $gte: since } },
-    { messages: 1, feedback: 1 },
+    { answer: 1, messages: 1, feedback: 1 },
   )
     .sort({ updatedAt: -1, _id: -1 })
     .lean<CoachRow>();
-  if (!row || (!row.feedback && !row.messages.length)) return null;
+  // The answer the coach graded, for when the page was reloaded and the box came back empty.
+  const answer = row?.answer?.trim() || undefined;
+  if (!row || (!row.feedback && !row.messages.length)) return { coach: null, answer };
   return {
-    ...(row.feedback ?? {}),
-    ...(row.messages.length ? { chat: row.messages.map(({ role, content }) => ({ role, content })) } : {}),
+    coach: {
+      ...(row.feedback ?? {}),
+      ...(row.messages.length ? { chat: row.messages.map(({ role, content }) => ({ role, content })) } : {}),
+    },
+    answer,
   };
 }
 
@@ -271,13 +277,14 @@ export async function recordResult(
     questionIds,
     ...(cursor >= questionIds.length ? { finishedAt: new Date() } : {}),
   };
-  const answer = attempt?.answer.trim().slice(0, AI_ANSWER_MAX);
-  const coach = await coachSnapshot(userId, session, current);
+  const { coach, answer: graded } = await coachSnapshot(userId, session, current);
+  const typed = attempt?.answer.trim();
+  const answer = (typed || graded)?.slice(0, AI_ANSWER_MAX);
   const entry = {
     questionId: current,
     result,
     at: new Date(),
-    ...(answer && attempt ? { answer, answerMode: attempt.mode } : {}),
+    ...(answer ? { answer, answerMode: typed && attempt ? attempt.mode : "typed" } : {}),
     ...(coach ? { coach } : {}),
   };
   // The card's result and the question's progress land together or not at all.
