@@ -43,6 +43,15 @@ async function saved(input: ReturnType<typeof node>) {
   return r.id;
 }
 
+describe("saveNode prerequisites (F3)", () => {
+  it("stores a prerequisite picked twice once", async () => {
+    const g = await graph();
+    const a = await saved(node(g, "a"));
+    const b = await saved(node(g, "b", { prereqIds: [a, a] }));
+    expect((await GraphNode.findById(b).lean<{ prereqIds: unknown[] }>())?.prereqIds.map(String)).toEqual([a]);
+  });
+});
+
 describe("saveNode concurrency (D14)", () => {
   it("never lets two saves at once close a prerequisite loop", async () => {
     const g = await graph();

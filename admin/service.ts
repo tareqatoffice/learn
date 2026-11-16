@@ -345,7 +345,10 @@ const nodeSchema = z.object({
   slug,
   trackKey: z.string(),
   title: z.string().trim(),
-  prereqIds: z.array(objectId).max(50),
+  prereqIds: z
+    .array(objectId)
+    .max(50)
+    .transform((ids) => [...new Set(ids)]),
   summary: z.string(),
   // One point per line in the editor; blank lines carry no meaning.
   points: z

@@ -29,7 +29,8 @@ async function requirePrereqsDone(
   titles: Map<string, string>,
   session: ClientSession,
 ): Promise<void> {
-  const needed = topic.prereqIds.filter((p) => known.has(p));
+  // Distinct ids: a prerequisite listed twice is one row, which matchedCount would otherwise fall short of.
+  const needed = [...new Set(topic.prereqIds.filter((p) => known.has(p)))];
   if (!needed.length) return;
   const touched = await NodeProgress.updateMany(
     { userId, nodeId: { $in: needed }, status: "done" },

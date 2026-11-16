@@ -79,6 +79,15 @@ describe("graph progress", () => {
     expect(await NodeProgress.countDocuments()).toBe(1);
   });
 
+  it("lets a topic start when a prerequisite is listed twice and done (F3)", async () => {
+    const user = newUserId();
+    const graphId = await seedGraph("g");
+    const a = await seedNode(graphId, "a");
+    const b = await seedNode(graphId, "b", { prereqIds: [a, a] });
+    await setNodeStatus(user, a, "done");
+    await expect(setNodeStatus(user, b, "learning")).resolves.not.toThrow();
+  });
+
   it("rejects nodes that are not visible", async () => {
     const user = newUserId();
     const graphId = await seedGraph("g");

@@ -184,7 +184,7 @@ async function planGraph(ctx: Ctx, json: unknown): Promise<void> {
   const prereqs = matches.map((m) => {
     const n = m.item;
     if (!trackKeys.includes(n.trackKey)) report.errors.push(`node ${n.slug}: unknown track ${n.trackKey}`);
-    const ids = n.prereqSlugs.flatMap((slug) => {
+    const ids = [...new Set(n.prereqSlugs)].flatMap((slug) => {
       const id = idBySlug.get(slug);
       if (!id) report.errors.push(`node ${n.slug}: unknown prerequisite ${slug}`);
       return id ? [id] : [];
