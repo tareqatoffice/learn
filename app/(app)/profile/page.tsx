@@ -131,12 +131,17 @@ function InterviewTab({ d }: { d: ProfileData["interview"] }) {
           rows={d.books.map((b) => ({ key: b.slug, href: `/interview/${b.slug}`, label: b.title, value: b.mastered, max: b.total }))}
         />
       </Card>
-      <Card title="Finished quizzes">
+      <Card title="Recent quizzes">
         <History
-          empty="No finished quizzes yet."
+          empty="No quizzes yet."
           rows={d.history.map((q) => ({
             key: q.id,
-            main: q.label,
+            main: (
+              <Link href={`/interview/history/${q.id}`} className={linkClass}>
+                {q.label}
+                {!q.finished && <span className="text-muted-foreground"> · in progress</span>}
+              </Link>
+            ),
             meta: `${q.got} got · ${q.review} review · ${fmt(q.date)}`,
           }))}
         />

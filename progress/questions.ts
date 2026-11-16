@@ -1,4 +1,4 @@
-import { isValidObjectId, type Types } from "mongoose";
+import { isValidObjectId, type ClientSession, type Types } from "mongoose";
 import { retryOnDuplicateKey } from "@/lib/db";
 import { Question, QuestionProgress } from "@/models";
 
@@ -9,9 +9,14 @@ export type MarkResult = "got" | "review" | "skip";
  * status, a skip keeps the previous status (null for a new doc). Two first marks racing
  * on the unique {userId, questionId} index can fail with E11000; the retry then updates.
  */
-export async function markQuestion(userId: string, questionId: string, result: MarkResult): Promise<void> {
+export async function markQuestion(
+  userId: string,
+  questionId: string,
+  result: MarkResult,
+  opts: { session?: ClientSession } = {},
+): Promise<void> {
   const question = isValidObjectId(questionId)
-    ? await Question.findById(questionId, { bookId: 1 }).lean<{ bookId: Types.ObjectId }>()
+    ? await Question.findById(questionId, { bookId: 1 }, { session: opts.session }).lean<{ bookId: Types.ObjectId }>()
     : null;
   if (!question) throw new Error(`question ${questionId} not found`);
 
@@ -21,7 +26,7 @@ export async function markQuestion(userId: string, questionId: string, result: M
     $set: { lastSeenAt: new Date(), ...(skip ? {} : { status: result }) },
     $setOnInsert: { bookId: question.bookId, ...(skip ? { status: null } : {}) },
   };
-  await retryOnDuplicateKey(() => QuestionProgress.updateOne({ userId, questionId }, update, { upsert: true }));
+  await retryOnDuplicateKey(() => QuestionProgress.updateOne({ userId, questionId }, update, { upsert: true, session: opts.session }));
 }
 
 /**

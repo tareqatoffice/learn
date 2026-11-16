@@ -3,6 +3,7 @@ import { type QuestionTopic, topicForQuestion } from "@/content/queries/books";
 import { visibleQuestionFilter } from "@/content/visibility";
 import { AI_ANSWER_MAX } from "@/lib/ai-limits";
 import { ForbiddenError } from "@/lib/authz";
+import { inTransaction } from "@/lib/db";
 import type { QuizAttempt } from "@/lib/quiz-answer";
 import { AiConversation, Question, QuestionBook, QuestionProgress, QuizSession } from "@/models";
 import { markQuestion, type MarkResult } from "./questions";
@@ -262,11 +263,15 @@ export async function recordResult(
     ...(answer && attempt ? { answer, answerMode: attempt.mode } : {}),
     ...(coach ? { coach } : {}),
   };
-  const applied = await QuizSession.updateOne(
-    { _id: session._id, userId, cursor: session.cursor, finishedAt: null },
-    { $push: { results: entry }, $set: set },
-  );
-  if (applied.matchedCount) await markQuestion(userId, questionId, result);
+  // The card's result and the question's progress land together or not at all.
+  await inTransaction(async (txn) => {
+    const applied = await QuizSession.updateOne(
+      { _id: session._id, userId, cursor: session.cursor, finishedAt: null },
+      { $push: { results: entry }, $set: set },
+      { session: txn },
+    );
+    if (applied.matchedCount) await markQuestion(userId, questionId, result, { session: txn });
+  });
 
   const view = await getSessionView(userId, sessionId);
   if (!view) throw new ForbiddenError("Quiz session not available");
@@ -279,12 +284,25 @@ export async function finishSession(userId: string, sessionId: string): Promise<
   await QuizSession.updateOne({ _id: sessionId, userId, finishedAt: null }, { $set: { finishedAt: new Date() } });
 }
 
+/**
+ * The quizzes every history list shows (the history page, Dashboard, Profile): any session with at
+ * least one marked card, finished or not, so the lists agree.
+ */
+export const quizHistoryFilter = (userId: string | Types.ObjectId) => ({ userId, "results.0": { $exists: true } });
+
+/** Leaves out the answers and coach chats, which only a quiz's full log needs. */
+export const SUMMARY_PROJECTION = { "results.answer": 0, "results.coach": 0 };
+
+/** When a listed quiz happened: when it was finished, else its last marked card. */
+export const quizDate = (s: { finishedAt?: Date | null; startedAt?: Date; results: { at: Date }[] }): Date =>
+  s.finishedAt ?? s.results.at(-1)?.at ?? s.startedAt ?? new Date(0);
+
 /** Resumable sessions, newest first. */
 export async function listUnfinished(
   userId: string,
 ): Promise<{ id: string; label: string; position: number; total: number; startedAt: Date }[]> {
   if (!isValidObjectId(userId)) return [];
-  const sessions = await QuizSession.find({ userId, finishedAt: null })
+  const sessions = await QuizSession.find({ userId, finishedAt: null }, SUMMARY_PROJECTION)
     .sort({ startedAt: -1, _id: -1 })
     .lean<SessionRow[]>();
   const labels = await labelSessions(sessions);

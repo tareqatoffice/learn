@@ -20,10 +20,13 @@ export const metadata = buildMetadata({
 
 const linkClass =
   "hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+// Quiz dates arrive as the learner's local YYYY-MM-DD, so they are formatted as UTC midnight.
 const dateFormat = new Intl.DateTimeFormat("en", {
   month: "short",
   day: "numeric",
+  timeZone: "UTC",
 });
+const fmtDay = (date: string) => dateFormat.format(new Date(`${date}T00:00:00Z`));
 
 /**
  * One of the three things to do next, in the band at the top of the page. The page's hierarchy is
@@ -316,10 +319,12 @@ export default async function DashboardPage() {
                       key={q.id}
                       className="flex items-baseline justify-between gap-3"
                     >
-                      <span className="truncate">{q.label}</span>
+                      <Link href={`/interview/history/${q.id}`} className={`truncate ${linkClass}`}>
+                        {q.label}
+                        {!q.finished && <span className="text-muted-foreground"> · in progress</span>}
+                      </Link>
                       <span className="shrink-0 text-xs text-muted-foreground">
-                        {q.got} got · {q.review} review ·{" "}
-                        {dateFormat.format(q.finishedAt)}
+                        {q.got} got · {q.review} review · {fmtDay(q.date)}
                       </span>
                     </li>
                   ))}

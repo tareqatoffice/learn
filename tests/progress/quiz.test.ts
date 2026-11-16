@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ForbiddenError } from "@/lib/authz";
 import { connectDb } from "@/lib/db";
 import { Question, QuestionProgress, QuizSession } from "@/models";
@@ -56,6 +56,26 @@ describe("quiz sessions", () => {
       expect(sessionLabel(["CSS", "HTML"])).toBe("CSS · HTML");
       expect(sessionLabel(["CSS", "HTML", "JS"])).toBe("Mixed");
       expect(sessionLabel(["CSS"], "Selectors")).toBe("CSS · Selectors");
+    });
+  });
+
+  describe("recordResult atomicity (D9)", () => {
+    it("keeps the session unchanged when the progress write fails", async () => {
+      const user = newUserId();
+      const book = await seedBook("js");
+      await seedQuestions(book, 2);
+      const id = await start(user, all());
+      const [first] = await deckOf(id);
+      const spy = vi.spyOn(QuestionProgress, "updateOne").mockRejectedValueOnce(new Error("db down"));
+      await expect(recordResult(user, id, first, "got")).rejects.toThrow("db down");
+      spy.mockRestore();
+      const after = await loadSession(id);
+      expect(after.cursor).toBe(0);
+      expect(after.results).toHaveLength(0);
+      // Marking again then works and writes both.
+      await recordResult(user, id, first, "got");
+      expect((await loadSession(id)).results).toHaveLength(1);
+      expect(await QuestionProgress.countDocuments({ userId: user })).toBe(1);
     });
   });
 

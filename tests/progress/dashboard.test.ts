@@ -89,7 +89,7 @@ describe("getDashboard", () => {
     expect(dash.series).toEqual([{ slug: "docker", title: "docker title", read: 1, total: 2 }]);
     expect(dash.recentQuizzes).toHaveLength(1);
     expect(dash.recentQuizzes[0]).toMatchObject({ label: "js title", got: 1, review: 0 });
-    expect(dash.recentQuizzes[0].finishedAt).toBeInstanceOf(Date);
+    expect(dash.recentQuizzes[0]).toMatchObject({ finished: true, date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
   });
 
   it("drops archived and draft content from every section", async () => {

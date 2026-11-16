@@ -21,7 +21,7 @@ import {
   SpeakingTake,
   User,
 } from "@/models";
-import { labelSessions, sessionCounts } from "@/progress/quiz";
+import { labelSessions, quizDate, quizHistoryFilter, sessionCounts, SUMMARY_PROJECTION } from "@/progress/quiz";
 import { addDays, localDate } from "@/speaking/schedule";
 import { TASK_LABEL, type TaskKey } from "@/speaking/tasks";
 
@@ -77,7 +77,7 @@ export function activityStreak(counts: Map<string, number>, today: string): numb
 }
 
 export type NotesHistoryItem = { chapter: string; series: string; seriesSlug: string; chapterSlug: string; date: string };
-export type QuizHistoryItem = { id: string; label: string; got: number; review: number; date: string };
+export type QuizHistoryItem = { id: string; label: string; got: number; review: number; finished: boolean; date: string };
 export type TopicHistoryItem = { topic: string; topicSlug: string; graph: string; graphSlug: string; date: string };
 export type TakeHistoryItem = { id: string; date: string; task: string };
 export type IeltsArea = "speaking" | "listening" | "reading" | "writing";
@@ -212,18 +212,18 @@ async function interviewArea(userId: Id, w: Window) {
       },
       { $group: { _id: "$_id.day", n: { $sum: 1 } } },
     ]),
-    // Full results (answers, coach chat) are read only for the rows shown.
-    QuizSession.find(finished)
-      .sort({ finishedAt: -1, _id: -1 })
+    // The same quizzes as the history page and Dashboard, without answers or coach chats.
+    QuizSession.find(quizHistoryFilter(userId), SUMMARY_PROJECTION)
+      .sort({ startedAt: -1, _id: -1 })
       .limit(HISTORY_MAX)
-      .select("filter questionIds results finishedAt")
       .lean<
         {
           _id: Id;
           filter: { bookIds: Id[]; partKeys: string[]; mode: "unseen" | "review" | "all"; questionIds?: Id[] };
           questionIds: Id[];
           results: { questionId: Id; result: "got" | "review" | "skip"; at: Date }[];
-          finishedAt: Date;
+          startedAt: Date;
+          finishedAt?: Date | null;
         }[]
       >(),
   ]);
@@ -236,7 +236,7 @@ async function interviewArea(userId: Id, w: Window) {
     quizzes,
     history: shown.map((s, i) => {
       const c = sessionCounts(s);
-      return { id: String(s._id), label: labels[i] || "Quiz", got: c.got, review: c.review, date: localDate(s.finishedAt, w.timeZone) };
+      return { id: String(s._id), label: labels[i] || "Quiz", got: c.got, review: c.review, finished: Boolean(s.finishedAt), date: localDate(quizDate(s), w.timeZone) };
     }),
   };
 }

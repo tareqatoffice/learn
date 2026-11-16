@@ -3,7 +3,7 @@ import { visibleQuestionFilter } from "@/content/visibility";
 import { ANSWER_MODE_LABEL, type AnswerMode } from "@/lib/quiz-answer";
 import { Question, QuestionBook, QuizSession } from "@/models";
 import type { MarkResult } from "./questions";
-import { labelSessions, sessionCounts } from "./quiz";
+import { labelSessions, quizHistoryFilter, sessionCounts, SUMMARY_PROJECTION } from "./quiz";
 
 type Id = Types.ObjectId;
 
@@ -78,12 +78,10 @@ const summarize = (s: SessionRow, label: string): AttemptSessionSummary => ({
   counts: sessionCounts(s),
 });
 
-/** Leaves out the answers and coach chats, which only the full log needs. */
-const SUMMARY_PROJECTION = { "results.answer": 0, "results.coach": 0 };
 
 async function ownedSessions(userId: string, sessionId?: string, projection?: object): Promise<SessionRow[]> {
   if (!isValidObjectId(userId) || (sessionId !== undefined && !isValidObjectId(sessionId))) return [];
-  const query = sessionId ? { _id: sessionId, userId } : { userId, "results.0": { $exists: true } };
+  const query = sessionId ? { _id: sessionId, userId } : quizHistoryFilter(userId);
   return QuizSession.find(query, projection).sort({ startedAt: -1, _id: -1 }).limit(HISTORY_LIMIT).lean<SessionRow[]>();
 }
 

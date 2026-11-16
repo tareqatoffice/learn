@@ -6,7 +6,7 @@ import { Graph, GraphNode, Note, NodeProgress, NoteProgress, NoteSeries, Questio
 import { getProfile, testDayStatus, type TestDayStatus } from "@/ielts/profile";
 import { todayList } from "@/ielts/progress";
 import { localDate } from "@/speaking/schedule";
-import { labelSessions, sessionCounts } from "./quiz";
+import { labelSessions, quizDate, quizHistoryFilter, sessionCounts, SUMMARY_PROJECTION } from "./quiz";
 import type { MarkResult } from "./questions";
 
 type Id = Types.ObjectId;
@@ -19,7 +19,8 @@ export type Dashboard = {
   graphs: { slug: string; title: string; done: number; total: number }[];
   books: { slug: string; title: string; mastered: number; total: number }[];
   series: { slug: string; title: string; read: number; total: number }[];
-  recentQuizzes: { id: string; label: string; got: number; review: number; finishedAt: Date }[];
+  /** `date` is the learner-local day it was finished (or last played, while unfinished). */
+  recentQuizzes: { id: string; label: string; got: number; review: number; finished: boolean; date: string }[];
   /** Only with an active IELTS profile. */
   ielts?: { daysLeft: number; testDay: TestDayStatus; done: number; total: number };
 };
@@ -105,9 +106,9 @@ async function reviewPile(userId: string): Promise<Dashboard["reviewPile"]> {
   return { total: byBook.reduce((sum, b) => sum + b.count, 0), byBook };
 }
 
-async function recentQuizzes(userId: string): Promise<Dashboard["recentQuizzes"]> {
-  const sessions = await QuizSession.find({ userId, finishedAt: { $ne: null } })
-    .sort({ finishedAt: -1, _id: -1 })
+async function recentQuizzes(userId: string, timeZone: string): Promise<Dashboard["recentQuizzes"]> {
+  const sessions = await QuizSession.find(quizHistoryFilter(userId), SUMMARY_PROJECTION)
+    .sort({ startedAt: -1, _id: -1 })
     .limit(RECENT_QUIZZES)
     .lean<
       {
@@ -115,13 +116,21 @@ async function recentQuizzes(userId: string): Promise<Dashboard["recentQuizzes"]
         filter: { bookIds: Id[]; partKeys: string[]; mode: "unseen" | "review" | "all"; questionIds?: Id[] };
         questionIds: Id[];
         results: { questionId: Id; result: MarkResult; at: Date }[];
-        finishedAt: Date;
+        startedAt: Date;
+        finishedAt?: Date | null;
       }[]
     >();
   const labels = await labelSessions(sessions);
   return sessions.map((s, i) => {
     const counts = sessionCounts(s);
-    return { id: String(s._id), label: labels[i] || "Quiz", got: counts.got, review: counts.review, finishedAt: s.finishedAt };
+    return {
+      id: String(s._id),
+      label: labels[i] || "Quiz",
+      got: counts.got,
+      review: counts.review,
+      finished: Boolean(s.finishedAt),
+      date: localDate(quizDate(s), timeZone),
+    };
   });
 }
 
@@ -154,7 +163,7 @@ export async function getDashboard(userId: string, timeZone = "UTC", now = new D
   const [reading, pile, quizzes, ielts] = await Promise.all([
     continueReading(userId, series),
     reviewPile(userId),
-    recentQuizzes(userId),
+    recentQuizzes(userId, timeZone),
     ieltsCard(userId, timeZone, now),
   ]);
   return { continueReading: reading, reviewPile: pile, recentQuizzes: quizzes, ...(ielts ? { ielts } : {}), ...shelf };
