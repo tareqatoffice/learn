@@ -74,12 +74,30 @@ export async function startTestAttempt(
   return ok({ attemptId: String(doc._id) });
 }
 
-/** Merges the learner's answers into an unsubmitted attempt. Unknown question numbers are ignored. */
-export async function saveAnswers(userId: string, attemptId: string, answers: Record<string, string>): Promise<ActionResult> {
+export const TIME_UP_MESSAGE = "Time is up for this test, so new answers aren't saved. Submit to see your score.";
+
+/** A full test stops taking answers this long after its time limit (the browser submits at the limit). */
+const deadlineOf = (a: { scope: string; startedAt: Date; limitSec: number }): number | null =>
+  a.scope === "full" ? new Date(a.startedAt).getTime() + (a.limitSec + GRACE_SEC) * 1000 : null;
+
+/**
+ * Merges the learner's answers into an unsubmitted attempt. Unknown question numbers are ignored. A
+ * full test past its deadline takes no more answers; submitting it then scores what was saved.
+ */
+export async function saveAnswers(
+  userId: string,
+  attemptId: string,
+  answers: Record<string, string>,
+  now: Date = new Date(),
+): Promise<ActionResult> {
   if (!isId(attemptId) || !isId(userId)) return fail(NOT_FOUND);
   await connectDb();
-  const attempt = await IeltsTestAttempt.findOne({ _id: attemptId, userId, status: "in_progress" }).select("sections").lean<{ sections: Section[] }>();
+  const attempt = await IeltsTestAttempt.findOne({ _id: attemptId, userId, status: "in_progress" })
+    .select("sections scope startedAt limitSec")
+    .lean<{ sections: Section[]; scope: string; startedAt: Date; limitSec: number }>();
   if (!attempt) return fail("This attempt was already submitted or doesn't exist.");
+  const deadline = deadlineOf(attempt);
+  if (deadline !== null && now.getTime() > deadline) return fail(TIME_UP_MESSAGE);
   const valid = new Set(attempt.sections.flatMap((s) => s.groups.flatMap((g) => g.questions.map((q) => String(q.n)))));
   const set: Record<string, string> = {};
   for (const [n, v] of Object.entries(answers ?? {})) {
@@ -114,7 +132,8 @@ export async function submitAttempt(
   now: Date = new Date(),
 ): Promise<ActionResult<SubmitResult>> {
   if (!isId(attemptId) || !isId(userId)) return fail(NOT_FOUND);
-  await saveAnswers(userId, attemptId, answers);
+  // Past a full test's deadline this saves nothing, so only answers given in time are scored.
+  await saveAnswers(userId, attemptId, answers, now);
   await connectDb();
   const attempt = await IeltsTestAttempt.findOne({ _id: attemptId, userId }).lean<SubmitRow>();
   if (!attempt) return fail(NOT_FOUND);

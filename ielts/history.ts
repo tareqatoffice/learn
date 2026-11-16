@@ -4,7 +4,7 @@ import { connectDb } from "@/lib/db";
 import { IeltsSpeakingAttempt } from "@/models";
 import { CRITERIA, type Criterion, SKILLS, type Skill } from "@/ielts/bands";
 import { listBandEntries, type BandSource } from "@/ielts/bandHistory";
-import { currentPlan } from "@/ielts/profile";
+import { planVersionsForChart } from "@/ielts/profile";
 import { weekProgress } from "@/ielts/progress";
 import { localDate } from "@/speaking/schedule";
 
@@ -52,13 +52,21 @@ export async function criteriaSeries(userId: string): Promise<CriteriaPoint[]> {
 
 export type WeekMinutes = { weekStart: string; target: Record<Skill, number>; done: Record<Skill, number> };
 
-/** Target and done minutes for each plan week that has started, in the learner's time zone. */
+/**
+ * Target and done minutes for each plan week that has started, in the learner's time zone, across
+ * every plan version: each version covers the weeks from its start until the next version began.
+ */
 export async function weeklyMinutes(userId: string, timeZone: string): Promise<WeekMinutes[]> {
-  const plan = await currentPlan(userId);
-  if (!plan) return [];
+  const plans = await planVersionsForChart(userId);
+  if (!plans.length) return [];
   const today = localDate(new Date(), timeZone);
-  const started = plan.weeks.map((w, i) => ({ w, i })).filter(({ w }) => w.start <= today);
-  const progress = await Promise.all(started.map(({ i }) => weekProgress(userId, plan, i, timeZone)));
+  const started = plans.flatMap((plan, v) => {
+    const until = plans[v + 1]?.startDate;
+    return plan.weeks
+      .map((w, i) => ({ plan, w, i }))
+      .filter(({ w }) => w.start <= today && w.start >= plan.startDate && (until === undefined || w.start < until));
+  });
+  const progress = await Promise.all(started.map(({ plan, i }) => weekProgress(userId, plan, i, timeZone)));
   return started.map(({ w }, k) => ({
     weekStart: w.start,
     target: Object.fromEntries(SKILLS.map((s) => [s, w.minutes[s]])) as Record<Skill, number>,

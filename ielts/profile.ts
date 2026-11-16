@@ -1,6 +1,6 @@
 import type { ClientSession } from "mongoose";
 import { z } from "zod";
-import { connectDb, retryOnDuplicateKey } from "@/lib/db";
+import { connectDb, inTransaction, retryOnDuplicateKey } from "@/lib/db";
 import { IeltsPlan, IeltsProfile } from "@/models";
 import { type ActionResult, fail, ok } from "@/admin/result";
 import { isHalfBand, SKILLS, type Criterion } from "@/ielts/bands";
@@ -75,6 +75,7 @@ export type PlanView = {
 
 type PlanDoc = {
   version: number;
+  inputs?: PlanInputs;
   reason: string;
   createdAt: Date;
   phases: Phase[];
@@ -180,6 +181,17 @@ async function latestPlanDoc(userId: string): Promise<PlanDoc | null> {
   return IeltsPlan.findOne({ userId }).sort({ version: -1 }).lean<PlanDoc>();
 }
 
+/** Every plan version oldest first, with the day it took over, for charts that span plan changes. */
+export async function planVersionsForChart(userId: string): Promise<(Pick<PlanView, "weeks"> & { startDate: string })[]> {
+  await connectDb();
+  const docs = await IeltsPlan.find({ userId })
+    .sort({ version: 1 })
+    .select("version startDate weeks phases hours reason createdAt")
+    .lean<(PlanDoc & { startDate?: string })[]>();
+  // A later version made the same day replaces the earlier one for that day on.
+  return docs.map((d) => ({ weeks: planView(d).weeks, startDate: d.startDate ?? d.weeks[0]?.start ?? "" }));
+}
+
 export async function currentPlan(userId: string): Promise<PlanView | null> {
   await connectDb();
   const doc = await latestPlanDoc(userId);
@@ -278,30 +290,55 @@ export async function writePlanVersion(
   });
 }
 
+/** Whether two plans' inputs would schedule the same study: test date, bands, minutes and days (not the day it was made). */
+export function samePlanInputs(a: PlanInputs | undefined, b: PlanInputs): boolean {
+  if (!a) return false;
+  const days = (d: number[]) => [...d].sort((x, y) => x - y).join(",");
+  const bands = (x: Partial<BandSet> | undefined) => JSON.stringify(pickBands(x as Bands));
+  return (
+    a.testDate === b.testDate &&
+    a.minutesPerDay === b.minutesPerDay &&
+    days(a.studyDays ?? []) === days(b.studyDays) &&
+    bands(a.target) === bands(b.target) &&
+    bands(a.current) === bands(b.current)
+  );
+}
+
+/**
+ * Saves the profile and, only when the plan's inputs changed (or the plan had ended), a new plan
+ * version, both in one transaction. Preference changes (voice, video) keep the current plan.
+ */
 export async function saveProfile(userId: string, input: ProfileInput, today: string): Promise<ActionResult<{ version: number }>> {
   const v = validate(input, today);
   if ("errors" in v) return v.errors as ActionResult<never>;
   const { data } = v;
   await connectDb();
-  const prev = await latestPlanDoc(userId);
-  await IeltsProfile.updateOne(
-    { userId },
-    {
-      $set: {
-        testDate: data.testDate,
-        target: pickBands(data.target),
-        current: pickBands(data.current),
-        minutesPerDay: data.minutesPerDay,
-        studyDays: data.studyDays,
-        status: "active",
-        ...(data.examinerVoice !== undefined ? { examinerVoice: data.examinerVoice } : {}),
-        ...(data.mockVideo !== undefined ? { mockVideo: data.mockVideo } : {}),
-        ...(data.drillVideo !== undefined ? { drillVideo: data.drillVideo } : {}),
+  const [prev, profile] = await Promise.all([
+    latestPlanDoc(userId),
+    IeltsProfile.findOne({ userId }).select("status").lean<{ status?: string }>(),
+  ]);
+  const inputs = toPlanInputs(data, today);
+  const replan = !prev || profile?.status !== "active" || !samePlanInputs(prev.inputs, inputs);
+  const version = await inTransaction(async (session) => {
+    await IeltsProfile.updateOne(
+      { userId },
+      {
+        $set: {
+          testDate: data.testDate,
+          target: pickBands(data.target),
+          current: pickBands(data.current),
+          minutesPerDay: data.minutesPerDay,
+          studyDays: data.studyDays,
+          status: "active",
+          ...(data.examinerVoice !== undefined ? { examinerVoice: data.examinerVoice } : {}),
+          ...(data.mockVideo !== undefined ? { mockVideo: data.mockVideo } : {}),
+          ...(data.drillVideo !== undefined ? { drillVideo: data.drillVideo } : {}),
+        },
       },
-    },
-    { upsert: true },
-  );
-  const version = await writePlanVersion(userId, toPlanInputs(data, today), prev?.adjustments ?? [], CHANGED_REASON);
+      { upsert: true, session },
+    );
+    return replan || !prev ? writePlanVersion(userId, inputs, prev?.adjustments ?? [], CHANGED_REASON, { session }) : prev.version;
+  });
   return ok({ version });
 }
 

@@ -1,8 +1,8 @@
 import mongoose, { Types } from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectDb } from "@/lib/db";
-import { IeltsBandEntry, IeltsListeningTest, IeltsReadingTest } from "@/models";
-import { AUDIO_LINK_SEC, claimSection, deleteTestAttempt, finishSection, getAttempt, listTestAttempts, listTests, saveAnswers, startTestAttempt, submitAttempt } from "@/ielts/practice/attempts";
+import { IeltsBandEntry, IeltsListeningTest, IeltsReadingTest, IeltsTestAttempt } from "@/models";
+import { AUDIO_LINK_SEC, claimSection, deleteTestAttempt, finishSection, getAttempt, listTestAttempts, listTests, saveAnswers, startTestAttempt, submitAttempt, TIME_UP_MESSAGE } from "@/ielts/practice/attempts";
 import { parseQuestions } from "@/ielts/practice/format";
 import { resetDb } from "../setup/mongo";
 
@@ -86,6 +86,20 @@ describe("listening and reading attempts", () => {
       expect(review.view.sections[0].groups[0].questions[0].explanation).toBe("because");
     }
     expect(await IeltsBandEntry.countDocuments({})).toBe(0);
+  });
+
+  it("takes no answers after a full test's deadline and scores only what was saved in time (D8)", async () => {
+    const u = user();
+    const testId = await publishedTest(1);
+    const started = await startTestAttempt(u, { skill: "reading", testId, scope: "full", date: "2026-11-12" });
+    if (!started.ok) throw new Error("start");
+    const id = started.attemptId;
+    await saveAnswers(u, id, { "1": "TRUE" });
+    const doc = await IeltsTestAttempt.findById(id).lean<{ startedAt: Date; limitSec: number }>();
+    const late = new Date(doc!.startedAt.getTime() + (doc!.limitSec + 61) * 1000);
+    expect(await saveAnswers(u, id, { "3": "The cat" }, late)).toEqual({ ok: false, errors: { _: TIME_UP_MESSAGE } });
+    const res = await submitAttempt(u, id, { "3": "The cat" }, late);
+    expect(res).toEqual({ ok: true, raw: 1, total: 3 });
   });
 
   it("writes a practice band entry only for a full 40-question test", async () => {
