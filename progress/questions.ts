@@ -19,12 +19,13 @@ export async function markQuestion(
     ? await Question.findById(questionId, { bookId: 1 }, { session: opts.session }).lean<{ bookId: Types.ObjectId }>()
     : null;
   if (!question) throw new Error(`question ${questionId} not found`);
+  // A skip is not a look at the answer: the question stays unseen (or keeps its last mark and date).
+  if (result === "skip") return;
 
-  const skip = result === "skip";
   const update = {
     $inc: { seenCount: 1 },
-    $set: { lastSeenAt: new Date(), ...(skip ? {} : { status: result }) },
-    $setOnInsert: { bookId: question.bookId, ...(skip ? { status: null } : {}) },
+    $set: { lastSeenAt: new Date(), status: result },
+    $setOnInsert: { bookId: question.bookId },
   };
   await retryOnDuplicateKey(() => QuestionProgress.updateOne({ userId, questionId }, update, { upsert: true, session: opts.session }));
 }

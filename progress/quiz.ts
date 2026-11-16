@@ -82,21 +82,33 @@ async function deckQuery(userId: string, filter: QuizFilter) {
     if (filter.bookIds.length === 1 && filter.partKeys.length) and.push({ partKey: { $in: filter.partKeys } });
   }
   if (filter.mode !== "all") {
-    const progress = filter.mode === "review" ? { userId, status: "review" } : { userId };
+    // Rows with no status come from skips before skips stopped counting; they are still unseen.
+    const progress = filter.mode === "review" ? { userId, status: "review" } : { userId, status: { $ne: null } };
     const seen = await QuestionProgress.distinct("questionId", progress);
     and.push({ _id: filter.mode === "review" ? { $in: seen } : { $nin: seen } });
   }
   return { $and: and };
 }
 
-/** Samples a shuffled deck. An empty deck creates nothing. */
+/**
+ * Samples a shuffled deck. A review deck is spaced: the questions seen longest ago come first (ties
+ * shuffled), so a size limit takes the most overdue ones. An empty deck creates nothing.
+ */
 export async function createSession(
   userId: string,
   filter: QuizFilter,
   rand: () => number = Math.random,
 ): Promise<{ sessionId: string } | { empty: true }> {
   const rows = await Question.find(await deckQuery(userId, filter), { _id: 1 }).sort({ _id: 1 }).lean<{ _id: Id }[]>();
-  const deck = shuffle(rows.map((row) => row._id), rand);
+  let deck = shuffle(rows.map((row) => row._id), rand);
+  if (filter.mode === "review" && deck.length) {
+    const seen = await QuestionProgress.find({ userId, questionId: { $in: deck } }, { questionId: 1, lastSeenAt: 1 }).lean<
+      { questionId: Id; lastSeenAt?: Date }[]
+    >();
+    const at = new Map(seen.map((p) => [String(p.questionId), p.lastSeenAt?.getTime() ?? 0]));
+    // Array sort is stable, so equal dates keep their shuffled order.
+    deck = deck.slice().sort((a, b) => (at.get(String(a)) ?? 0) - (at.get(String(b)) ?? 0));
+  }
   const questionIds = filter.size ? deck.slice(0, filter.size) : deck;
   if (!questionIds.length) return { empty: true };
 

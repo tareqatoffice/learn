@@ -99,10 +99,31 @@ describe("quiz sessions", () => {
     it("Review Focus 3: unseen with everything seen returns empty", async () => {
       const user = newUserId();
       const ids = await seedQuestions(await seedBook("b"), 2);
-      for (const id of ids) await markQuestion(user, id, "skip");
+      for (const id of ids) await markQuestion(user, id, "got");
 
       expect(await createSession(user, all({ mode: "unseen" }))).toEqual({ empty: true });
       expect(await QuizSession.countDocuments()).toBe(0);
+    });
+
+    it("keeps skipped questions, including old skip rows with no status, in the unseen deck (F2)", async () => {
+      const user = newUserId();
+      const ids = await seedQuestions(await seedBook("b"), 2);
+      await markQuestion(user, ids[0], "skip");
+      await QuestionProgress.create({ userId: user, questionId: ids[1], bookId: (await Question.findById(ids[1]).lean<{ bookId: unknown }>())!.bookId, status: null, seenCount: 1 });
+      const id = await start(user, all({ mode: "unseen" }));
+      expect((await deckOf(id)).sort()).toEqual([...ids].sort());
+    });
+
+    it("orders a review deck by when each question was last seen, oldest first (F2)", async () => {
+      const user = newUserId();
+      const ids = await seedQuestions(await seedBook("b"), 3);
+      for (const id of ids) await markQuestion(user, id, "review");
+      const day = (n: number) => new Date(Date.UTC(2026, 0, n));
+      await QuestionProgress.updateOne({ userId: user, questionId: ids[0] }, { $set: { lastSeenAt: day(3) } });
+      await QuestionProgress.updateOne({ userId: user, questionId: ids[1] }, { $set: { lastSeenAt: day(1) } });
+      await QuestionProgress.updateOne({ userId: user, questionId: ids[2] }, { $set: { lastSeenAt: day(2) } });
+      const id = await start(user, all({ mode: "review", size: 10 }));
+      expect(await deckOf(id)).toEqual([ids[1], ids[2], ids[0]]);
     });
 
     it("stores a shuffled deck of visible questions with cursor 0 and no results", async () => {
@@ -300,10 +321,8 @@ describe("quiz sessions", () => {
       const view = await recordResult(user, sessionId, deck[0], "skip");
       expect(view).toMatchObject({ position: 1, total: 3, done: false, counts: { got: 0, review: 0, skip: 1 } });
       expect(view.current!.id).toBe(deck[1]);
-      expect(await QuestionProgress.findOne({ userId: user, questionId: deck[0] }).lean()).toMatchObject({
-        status: null,
-        seenCount: 1,
-      });
+      // A skip leaves the question unseen (F2).
+      expect(await QuestionProgress.findOne({ userId: user, questionId: deck[0] }).lean()).toBeNull();
     });
 
     it("requeue: review at cursor 0 of a 10-card deck reinserts the id at index 5", async () => {
