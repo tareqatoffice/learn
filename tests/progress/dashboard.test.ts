@@ -17,7 +17,6 @@ afterAll(() => mongoose.disconnect());
 
 const zero = () => 0;
 
-/** One user with progress across every section. */
 async function fixtures() {
   const user = newUserId();
   const js = await seedBook("js");
@@ -89,7 +88,7 @@ describe("getDashboard", () => {
     expect(dash.series).toEqual([{ slug: "docker", title: "docker title", read: 1, total: 2 }]);
     expect(dash.recentQuizzes).toHaveLength(1);
     expect(dash.recentQuizzes[0]).toMatchObject({ label: "js title", got: 1, review: 0 });
-    expect(dash.recentQuizzes[0].finishedAt).toBeInstanceOf(Date);
+    expect(dash.recentQuizzes[0]).toMatchObject({ finished: true, date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
   });
 
   it("drops archived and draft content from every section", async () => {
@@ -105,6 +104,16 @@ describe("getDashboard", () => {
     expect(dash.learningNow).toEqual([]);
     expect(dash.readyNext).toEqual([]);
     expect(dash.continueReading).toMatchObject({ chapterSlug: "intro", read: 1, total: 1 });
+  });
+
+  it("points Continue reading at the next unread chapter when the last opened one is read (F18)", async () => {
+    const { user, n2, s } = await fixtures();
+    const n3 = await seedNote(s, "vol");
+    await Note.updateOne({ _id: n3 }, { order: 2 });
+    await setNoteRead(user, n2, true);
+    expect((await getDashboard(user)).continueReading).toMatchObject({ chapterSlug: "vol", read: 2, total: 3 });
+    await setNoteRead(user, n3, true);
+    expect((await getDashboard(user)).continueReading).toMatchObject({ chapterSlug: "net" });
   });
 
   it("falls back to null when no opened chapter is visible", async () => {
@@ -136,7 +145,6 @@ describe("getDashboard", () => {
       "2026-11-11",
     );
     expect(res.ok).toBe(true);
-    // 23:30 UTC is already 12 Nov in Auckland, so one day fewer remains there.
     const utc = (await getDashboard(user, "UTC", now)).ielts;
     expect(utc).toMatchObject({ daysLeft: 30, done: 0 });
     expect(utc!.total).toBeGreaterThan(0);

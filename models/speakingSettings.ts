@@ -1,7 +1,6 @@
 import mongoose, { Schema, model } from "mongoose";
 import { DEFAULT_TARGET_MIN } from "@/speaking/tasks";
 
-/** Singleton: the default daily targets in minutes. */
 const speakingSettingsSchema = new Schema(
   {
     key: { type: String, default: "default", unique: true },

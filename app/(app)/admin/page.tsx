@@ -24,13 +24,11 @@ export default async function AdminHome() {
     Note.countDocuments(),
     Subject.countDocuments(),
     User.countDocuments(),
-    // Admins are always approved whatever their stored status, as on the users page.
     User.countDocuments({ status: "pending", email: { $nin: getEnv().ADMIN_EMAILS } }),
     ApiToken.countDocuments({ revokedAt: null }),
     getAiSettings(),
   ]);
 
-  // Live detail per section; sections without one show their description.
   const detail: Record<string, string> = {
     "/admin/books": `${books} books · ${questions} questions`,
     "/admin/graphs": `${graphs} graphs · ${topics} topics`,

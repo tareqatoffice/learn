@@ -1,12 +1,9 @@
-// Browser media helpers: container choice, file extensions and video frame grabbing.
-// Pure and DOM-light so they can be tested without a real camera.
 
 const PREFERRED: Record<"audio" | "video", string[]> = {
   audio: ["audio/webm;codecs=opus", "audio/mp4"],
   video: ["video/webm;codecs=vp9,opus", "video/webm", "video/mp4"],
 };
 
-/** First container the browser can record, in preference order (Chrome: webm; iOS Safari: mp4). */
 export function pickMime(
   kind: "audio" | "video",
   isSupported: (m: string) => boolean,
@@ -14,12 +11,10 @@ export function pickMime(
   return PREFERRED[kind].find((m) => isSupported(m)) ?? null;
 }
 
-/** Mime type without parameters, e.g. "audio/webm;codecs=opus" -> "audio/webm". */
 export function baseMime(mime: string): string {
   return mime.split(";")[0].trim().toLowerCase();
 }
 
-/** File extension for a recorded mime type; accepts the full recorder string or the base type. */
 export function extFor(mime: string): "webm" | "mp4" | "m4a" {
   const base = baseMime(mime);
   if (base === "audio/mp4" || base === "audio/x-m4a" || base === "audio/aac")
@@ -44,22 +39,15 @@ function once(
   });
 }
 
-/**
- * Evenly spaced JPEG snapshots (data URLs, quality 0.7, at most `maxWidth` wide) of a loaded
- * video, for the vision coach. Seeks the element, so pass a playback copy of the take.
- */
 export async function grabFrames(
   video: HTMLVideoElement,
   count: number,
   maxWidth = 512,
 ): Promise<string[]> {
   if (count <= 0) return [];
-  // The video must be same-origin or a blob: URL, or drawing it taints the canvas and toDataURL throws.
   if (video.readyState < 1) await once(video, "loadedmetadata");
-  // Drawing needs a decoded frame, not just metadata.
   if (video.readyState < 2) await once(video, "loadeddata");
 
-  // MediaRecorder webm files report an infinite duration until the end has been seeked to.
   if (!Number.isFinite(video.duration)) {
     const known = once(video, "durationchange");
     const atEnd = once(video, "seeked", 1000);
@@ -98,7 +86,6 @@ export async function grabFrames(
 
 const FRAME_COUNT = 5;
 
-/** Five evenly spaced stills of a recording, read from a same-origin blob copy so the canvas isn't tainted. */
 export async function framesOf(mediaUrl: string): Promise<string[]> {
   const res = await fetch(mediaUrl);
   if (!res.ok) throw new Error(`fetch ${res.status}`);

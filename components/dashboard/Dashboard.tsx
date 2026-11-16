@@ -1,0 +1,341 @@
+import Link from "next/link";
+import { Card, ProgressRows } from "@/components/TrackCard";
+import { StartReviewButton } from "@/components/StartReviewButton";
+import { mins } from "@/components/speaking/format";
+import { TimeZoneCookie } from "@/components/speaking/TimeZoneCookie";
+import type { Dashboard as DashboardData } from "@/progress/dashboard";
+import { TASKS, TASK_LABEL, TASK_SLUG } from "@/speaking/tasks";
+import { pageTitleClass } from "@/lib/ui";
+
+type SpeakingToday = Awaited<ReturnType<typeof import("@/speaking/progress").getToday>>;
+
+const linkClass =
+  "hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+const dateFormat = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+const fmtDay = (date: string) => dateFormat.format(new Date(`${date}T00:00:00Z`));
+
+function NextUp({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  const id = `next-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
+  return (
+    <section
+      aria-labelledby={id}
+      className="grid min-w-0 content-start gap-2 p-4 sm:p-5"
+    >
+      <h3 id={id} className="text-sm font-semibold">
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+function TopicLinks({
+  topics,
+}: {
+  topics: { graphSlug: string; slug: string; title: string }[];
+}) {
+  return (
+    <>
+      {topics.map((t, i) => (
+        <span key={`${t.graphSlug}/${t.slug}`}>
+          {i > 0 && " · "}
+          <Link
+            href={`/graphs/${t.graphSlug}?topic=${encodeURIComponent(t.slug)}`}
+            className={`font-medium ${linkClass}`}
+          >
+            {t.title}
+          </Link>
+        </span>
+      ))}
+    </>
+  );
+}
+
+export function Dashboard({
+  dash,
+  speaking,
+  firstName,
+  timeZone,
+}: {
+  dash: DashboardData;
+  speaking: SpeakingToday;
+  firstName?: string;
+  timeZone: string;
+}) {
+  const speakingTasks = TASKS.filter((t) => speaking.settings.enabled[t]);
+  const reviewCount = dash.reviewPile.total;
+  const nothingToDo =
+    reviewCount === 0 && !dash.continueReading && dash.readyNext.length === 0;
+  const firstVisit =
+    nothingToDo && dash.recentQuizzes.length === 0 && dash.learningNow.length === 0 && speaking.best === 0 && !dash.ielts;
+
+  return (
+    <div className="grid gap-8">
+      <TimeZoneCookie current={timeZone} />
+      <header>
+        <h1 className={pageTitleClass}>
+          {firstVisit ? "Welcome" : "Welcome back"}
+          {firstName ? `, ${firstName}` : ""}
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {firstVisit ? "Choose where to start; your progress shows up here as you go." : "Pick up where you left off."}
+        </p>
+      </header>
+
+      <section aria-labelledby="next-up" className="grid gap-3">
+        <h2 id="next-up" className="text-sm font-semibold text-muted-foreground">
+          Next up
+        </h2>
+        {nothingToDo ? (
+          <div className="rounded-xl border border-border bg-card p-5">
+            <p className="text-sm text-muted-foreground">
+              Nothing queued yet. Start a quiz in{" "}
+              <Link href="/interview" className={`underline ${linkClass}`}>
+                Interview
+              </Link>
+              , pick a topic in{" "}
+              <Link href="/graphs" className={`underline ${linkClass}`}>
+                Graphs
+              </Link>
+              , open a chapter in{" "}
+              <Link href="/notes" className={`underline ${linkClass}`}>
+                Notes
+              </Link>
+              , record a take in{" "}
+              <Link href="/speaking" className={`underline ${linkClass}`}>
+                Speaking
+              </Link>
+              , or set up a study plan in{" "}
+              <Link href="/ielts" className={`underline ${linkClass}`}>
+                IELTS
+              </Link>
+              .
+            </p>
+          </div>
+        ) : (
+          <div className="grid divide-y divide-border rounded-xl border border-border bg-card shadow-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            <NextUp title="Review pile">
+              <p className="text-3xl font-semibold tabular-nums leading-none">
+                {reviewCount}
+              </p>
+              <p className="min-w-0 break-words text-sm text-muted-foreground">
+                {reviewCount === 1 ? "question waiting" : "questions waiting"}
+                {dash.reviewPile.byBook.length > 0 &&
+                  ` · ${dash.reviewPile.byBook.map((b) => `${b.title} ${b.count}`).join(" · ")}`}
+              </p>
+              <div className="mt-1">
+                <StartReviewButton disabled={reviewCount === 0} />
+              </div>
+            </NextUp>
+
+            <NextUp title="Continue reading">
+              {dash.continueReading ? (
+                <>
+                  <Link
+                    href={`/notes/${dash.continueReading.seriesSlug}/${dash.continueReading.chapterSlug}`}
+                    className={`font-medium pointer-coarse:py-1.5 ${linkClass}`}
+                  >
+                    {dash.continueReading.chapterTitle}
+                  </Link>
+                  <p className="text-sm text-muted-foreground">
+                    {dash.continueReading.seriesTitle} ·{" "}
+                    {dash.continueReading.read} of {dash.continueReading.total}{" "}
+                    chapters read
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Open a chapter in{" "}
+                  <Link href="/notes" className={`underline ${linkClass}`}>
+                    Notes
+                  </Link>{" "}
+                  and it shows up here.
+                </p>
+              )}
+            </NextUp>
+
+            <NextUp title="Ready to learn">
+              {dash.readyNext.length > 0 ? (
+                <p className="text-sm">
+                  <TopicLinks topics={dash.readyNext} />
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Mark a topic done in{" "}
+                  <Link href="/graphs" className={`underline ${linkClass}`}>
+                    Graphs
+                  </Link>{" "}
+                  to unlock the next one.
+                </p>
+              )}
+            </NextUp>
+          </div>
+        )}
+      </section>
+
+      <section aria-labelledby="progress" className="grid gap-3">
+        <h2 id="progress" className="text-sm font-semibold text-muted-foreground">
+          Your progress
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Card title="Graphs">
+            <ProgressRows
+              rows={dash.graphs.map((g) => ({
+                key: g.slug,
+                href: `/graphs/${g.slug}`,
+                label: g.title,
+                value: g.done,
+                max: g.total,
+              }))}
+              empty="No graphs published yet."
+            />
+          </Card>
+
+          <Card title="Interview books (mastered)">
+            <ProgressRows
+              rows={dash.books.map((b) => ({
+                key: b.slug,
+                href: `/interview/${b.slug}`,
+                label: b.title,
+                value: b.mastered,
+                max: b.total,
+              }))}
+              empty="No books published yet."
+            />
+          </Card>
+
+          <Card title="Speaking today">
+            <p className="text-sm">
+              <Link href="/speaking" className={`font-medium ${linkClass}`}>
+                Speaking streak: {speaking.streak} {speaking.streak === 1 ? "day" : "days"}
+              </Link>
+              <span className="text-muted-foreground">
+                {" "}
+                · best {speaking.best}
+              </span>
+            </p>
+            <ProgressRows
+              rows={speakingTasks.map((t) => ({
+                key: t,
+                href: `/speaking/${TASK_SLUG[t]}`,
+                label: `${speaking.done[t] ? "✓ " : ""}${TASK_LABEL[t]}`,
+                value: Number(mins(speaking.minutes[t] ?? 0)),
+                max: speaking.settings.targets[t],
+              }))}
+              empty="Every speaking task is turned off."
+            />
+          </Card>
+
+          {!dash.ielts && (
+            <Card title="IELTS">
+              <p className="text-sm text-muted-foreground">
+                Preparing for IELTS?{" "}
+                <Link href="/ielts" className={`font-medium text-foreground underline ${linkClass}`}>
+                  Set up a study plan
+                </Link>{" "}
+                from your test date and target band, or practise any skill without one.
+              </p>
+            </Card>
+          )}
+
+          {dash.ielts && (
+            <Card title="IELTS">
+              <p className="text-sm">
+                <Link href="/ielts" className={`font-medium ${linkClass}`}>
+                  {dash.ielts.testDay === "passed"
+                    ? "Enter your result"
+                    : dash.ielts.testDay === "today"
+                      ? "Your test is today"
+                      : `${dash.ielts.daysLeft} ${dash.ielts.daysLeft === 1 ? "day" : "days"} to your test`}
+                </Link>
+              </p>
+              {dash.ielts.testDay === "upcoming" && (
+                <p className="text-sm text-muted-foreground">
+                  {dash.ielts.total === 0
+                    ? "Nothing planned for today."
+                    : `${dash.ielts.done} of ${dash.ielts.total} done today`}
+                </p>
+              )}
+            </Card>
+          )}
+
+          <Card title="Notes">
+            <ProgressRows
+              rows={dash.series.map((s) => ({
+                key: s.slug,
+                href: `/notes/${s.slug}`,
+                label: s.title,
+                value: s.read,
+                max: s.total,
+              }))}
+              empty="No notes published yet."
+            />
+          </Card>
+        </div>
+      </section>
+
+      {(dash.learningNow.length > 0 || dash.recentQuizzes.length > 0) && (
+        <section aria-labelledby="activity" className="grid gap-3">
+          <h2
+            id="activity"
+            className="text-sm font-semibold text-muted-foreground"
+          >
+            Recent activity
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {dash.learningNow.length > 0 && (
+              <Card title="Learning now">
+                <ul className="grid gap-2 text-sm">
+                  {dash.learningNow.map((g) => (
+                    <li key={g.graphSlug}>
+                      <span className="text-muted-foreground">
+                        {g.graphTitle}:{" "}
+                      </span>
+                      <TopicLinks
+                        topics={g.topics.map((t) => ({
+                          ...t,
+                          graphSlug: g.graphSlug,
+                        }))}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+
+            {dash.recentQuizzes.length > 0 && (
+              <Card title="Recent quizzes">
+                <ul className="grid min-w-0 gap-2 text-sm">
+                  {dash.recentQuizzes.map((q) => (
+                    <li
+                      key={q.id}
+                      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3"
+                    >
+                      <Link href={`/interview/history/${q.id}`} className={`truncate ${linkClass}`}>
+                        {q.label}
+                        {!q.finished && <span className="text-muted-foreground"> · in progress</span>}
+                      </Link>
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {q.got} got · {q.review} review · {fmtDay(q.date)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}

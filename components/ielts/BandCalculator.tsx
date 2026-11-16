@@ -15,7 +15,6 @@ const WRITING_BANDS = Array.from({ length: 19 }, (_, i) => i / 2);
 const fieldClass =
   "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-invalid:border-destructive";
 
-/** A whole number 0–40, or undefined when the field is empty or not valid. */
 function parseRaw(s: string): number | undefined {
   if (!/^\d{1,2}$/.test(s.trim())) return undefined;
   const n = Number(s);
@@ -33,11 +32,6 @@ function Result({ id, label, value }: { id: string; label: string; value?: numbe
   );
 }
 
-/**
- * Raw Listening and Reading scores (out of 40) become bands from the approximate Academic tables;
- * Writing and Speaking bands are picked. The overall band shows once all four are in. Works without
- * a profile. `source` locks where a saved result comes from (the post-test prompt uses "official").
- */
 export function BandCalculator({ today, source: lockedSource }: { today: string; source?: Source }) {
   const router = useRouter();
   const [listening, setListening] = useState("");

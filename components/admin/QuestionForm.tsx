@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { ActionStatus } from "@/components/admin/SaveBar";
+import { useAdminAction } from "@/components/admin/useAdminAction";
 import { saveQuestionAction, searchTopicsAction, setQuestionTopicLinkAction } from "@/app/(app)/admin/books/actions";
 import type { AdminQuestion } from "@/admin/queries";
 import { Field, StatusField, SubjectsField, TextField } from "@/components/admin/fields";
 import { inputClass, SaveBar } from "@/components/admin/SaveBar";
 import { useSaveForm, withoutEmptyId } from "@/components/admin/useSaveForm";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 type Topic = { id: string; title: string; graphTitle: string };
@@ -22,7 +25,7 @@ export function QuestionForm({
   subjects: { slug: string; name: string }[];
   topics?: Topic[];
 }) {
-  const { draft, set, errors, setErrors, saved, pending, submit } = useSaveForm(
+  const { draft, set, errors, saved, pending, submit } = useSaveForm(
     question,
     (d) => saveQuestionAction(withoutEmptyId(d)),
     (id) => `/admin/books/${question.bookId}/questions/${id}`,
@@ -34,11 +37,11 @@ export function QuestionForm({
 
   const searchTopics = () => startTransition(async () => setResults(await searchTopicsAction(search, draft.subjects)));
 
+  const linking = useAdminAction();
   function link(topic: Topic, linked: boolean) {
-    startTransition(async () => {
-      const result = await setQuestionTopicLinkAction(draft.id, topic.id, linked);
-      if (!result.ok) return setErrors(result.errors);
-      setTopics((t) => (linked ? [...t.filter((x) => x.id !== topic.id), topic] : t.filter((x) => x.id !== topic.id)));
+    linking.run(() => setQuestionTopicLinkAction(draft.id, topic.id, linked), {
+      refresh: false,
+      onSuccess: () => setTopics((t) => (linked ? [...t.filter((x) => x.id !== topic.id), topic] : t.filter((x) => x.id !== topic.id))),
     });
   }
 
@@ -70,16 +73,19 @@ export function QuestionForm({
           {topics.length === 0 && <p className="text-sm text-muted-foreground">Not linked to any topic.</p>}
           <ul className="flex flex-wrap gap-2">
             {topics.map((t) => (
-              <li key={t.id} className="flex items-center gap-1 rounded-full border border-border px-3 py-1 text-sm">
-                {t.graphTitle} › {t.title}
-                <button
-                  type="button"
-                  aria-label={`Unlink ${t.title}`}
-                  className="ml-1 inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground pointer-coarse:size-9"
-                  onClick={() => link(t, false)}
-                >
-                  ×
-                </button>
+              <li key={t.id}>
+                <Badge variant="default" size="md" className="gap-1 pr-1">
+                  {t.graphTitle} › {t.title}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`Unlink ${t.title}`}
+                    onClick={() => link(t, false)}
+                  >
+                    ×
+                  </Button>
+                </Badge>
               </li>
             ))}
           </ul>
@@ -91,7 +97,6 @@ export function QuestionForm({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
-                // Enter would submit (save) the question form; here it runs the search instead.
                 if (e.key !== "Enter") return;
                 e.preventDefault();
                 searchTopics();
@@ -101,6 +106,7 @@ export function QuestionForm({
               Search
             </Button>
           </div>
+          <ActionStatus saved={false} errors={linking.errors} />
           {results && (
             <ul className="grid gap-1 text-sm">
               {results.length === 0 && <li className="text-muted-foreground">No topics found in these subjects.</li>}

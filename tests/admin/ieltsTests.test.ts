@@ -73,12 +73,10 @@ describe("admin IELTS tests", () => {
       { _id: res.id },
       { $set: { "sections.0.audioKey": "k/0.mp3", "sections.1.audioKey": "k/1.mp3", "sections.2.audioKey": "k/2.mp3", "sections.1.durationSec": 61 } },
     );
-    // Remove section One: Two and Three keep their own files and the file of the removed section is dropped.
     const removed = await saveTest("listening", res.id, input({ sections: [section("Two", "k/1.mp3"), section("Three", "k/2.mp3")] }));
     expect(removed.ok).toBe(true);
     const got = await getTestAdmin("listening", res.id);
     expect(got?.sections.map((s) => [s.title, s.audioKey, s.durationSec])).toEqual([["Two", "k/1.mp3", 61], ["Three", "k/2.mp3", 0]]);
-    // An unknown key (for example from another test) is ignored rather than trusted.
     const forged = await saveTest("listening", res.id, input({ sections: [section("Two", "k/other.mp3"), section("Three", "k/2.mp3")] }));
     expect(forged.ok).toBe(true);
     expect((await getTestAdmin("listening", res.id))?.sections.map((s) => s.audioKey)).toEqual(["", "k/2.mp3"]);

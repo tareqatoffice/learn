@@ -1,22 +1,3 @@
-// The authoring text for a section's questions, so an admin edits one text box instead of a nested form.
-//
-//   ## tfng | Do the statements agree with the passage?
-//   The earth is flat. => FALSE ~ optional explanation
-//
-//   ## mcq | Choose the correct letter.
-//   What is the main idea? => B
-//     A. one
-//     B. two
-//
-//   ## matching | Match each person with an opinion.
-//   > A. Opinion one
-//   > B. Opinion two
-//   Anna => B
-//
-//   ## completion | Write NO MORE THAN TWO WORDS.
-//   The ___ is large. => big | huge ~ optional explanation
-//
-// Pure: no mongoose or server imports.
 
 import { type Group, QUESTION_KINDS, type Question, type QuestionKind, letter } from "./marking";
 
@@ -113,7 +94,6 @@ export function parseQuestions(text: string): ParseResult {
   return errors.length ? { ok: false, errors } : { ok: true, groups };
 }
 
-/** The inverse of `parseQuestions`, for editing a saved section. */
 export function formatQuestions(groups: Group[]): string {
   return groups
     .map((g) => {

@@ -7,12 +7,12 @@ import { firstError } from "@/admin/result";
 import { generateQuestionsAction, startAttemptAction } from "@/app/(app)/ielts/speaking/actions";
 import { Notice } from "@/components/Notice";
 import { clock } from "@/components/speaking/format";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { AttemptSummary } from "@/ielts/speaking/attempts";
 import type { Kind } from "@/ielts/speaking/questions";
 import { cn } from "@/lib/utils";
 
-/** `missing`: the bank can't fill a part this needs, so only AI-written questions can start it. */
 export type HubOption = { kind: Kind; title: string; blurb: string; exhausted: boolean; missing: boolean };
 
 const DATE = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" });
@@ -53,7 +53,11 @@ function Option({ option, aiOn, storage, highlight }: { option: HubOption; aiOn:
       <div className="grid gap-1">
         <h3 className="font-semibold">
           {option.title}
-          {highlight && <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">On today&apos;s list</span>}
+          {highlight && (
+            <Badge variant="primary" className="ml-2">
+              On today&apos;s list
+            </Badge>
+          )}
         </h3>
         <p className="text-sm text-muted-foreground">{option.blurb}</p>
       </div>
@@ -91,7 +95,6 @@ function Option({ option, aiOn, storage, highlight }: { option: HubOption; aiOn:
   );
 }
 
-/** Start a full mock or drill one part, and open earlier attempts. */
 export function SpeakingHub({
   options,
   recent,

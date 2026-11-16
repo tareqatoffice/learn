@@ -13,16 +13,15 @@ export default function ExportPage() {
     <AdminPage
       title="Export content"
       width="narrow"
-      description="Downloads every book, question, graph, topic, note series, chapter and subject as one JSON file. Users, progress and edit history are not included."
+      description="Downloads all content as one JSON file: subjects, question books and questions, graphs and topics, note series and chapters, speaking lessons and settings, and the IELTS question bank, practice tests, writing prompts and settings. Users, progress, attempts and edit history are not included."
     >
       <AdminCard>
-        {/* A plain link: the route streams a file download, which client-side navigation would not handle. */}
         <a href="/api/admin/export" className={buttonVariants({ className: "justify-self-start" })} download>
           Download content export
         </a>
         <p className="text-sm text-muted-foreground">
           For a full backup that also keeps users, progress, history and settings, run{" "}
-          <code>npm run backup -- &lt;file&gt;</code> from the <code>web/</code> folder.
+          <code>npm run backup -- &lt;file&gt;</code> from the project folder.
         </p>
       </AdminCard>
     </AdminPage>

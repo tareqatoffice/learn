@@ -60,4 +60,15 @@ describe("ielts history", () => {
     expect(weeks[0].target.speaking).toBeGreaterThan(0);
     expect(await weeklyMinutes(user(), "UTC")).toEqual([]);
   });
+
+  it("weeklyMinutes keeps the weeks of earlier plan versions (D8)", async () => {
+    const u = user();
+    const today = localDate(new Date(), "UTC");
+    const start = addDays(today, -14);
+    const base = { target: { overall: 7 }, current: { overall: 6 }, minutesPerDay: 60, studyDays: [0, 1, 2, 3, 4, 5, 6] };
+    await saveProfile(u, { ...base, testDate: addDays(today, 30) }, start);
+    await saveProfile(u, { ...base, testDate: addDays(today, 40) }, today);
+    const weeks = await weeklyMinutes(u, "UTC");
+    expect(weeks.map((w) => w.weekStart)).toEqual([start, addDays(start, 7), today]);
+  });
 });

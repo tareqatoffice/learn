@@ -1,8 +1,7 @@
-// Listening and Reading attempts: start, autosave, submit (marked here, never in the browser), review.
 
-import { Types } from "mongoose";
+import { type ClientSession, Types } from "mongoose";
 import { type ActionResult, fail, ok } from "@/admin/result";
-import { connectDb } from "@/lib/db";
+import { connectDb, inTransaction } from "@/lib/db";
 import { presignGet, storageConfigured } from "@/lib/r2";
 import { IeltsBandEntry, IeltsListeningTest, IeltsReadingTest, IeltsTestAttempt } from "@/models";
 import { numberSections, scoreSections, toPublic, type PublicSection, type Score, type Section } from "./marking";
@@ -13,12 +12,10 @@ export const TEST_SKILLS: TestSkill[] = ["listening", "reading"];
 const isId = (id: unknown): id is string => typeof id === "string" && Types.ObjectId.isValid(id);
 const NOT_FOUND = "That attempt doesn't exist.";
 const MAX_ANSWER = 200;
-/** Allowed overrun when an attempt is submitted (clock drift, slow network). */
 const GRACE_SEC = 60;
 
 const model = (skill: TestSkill) => (skill === "listening" ? IeltsListeningTest : IeltsReadingTest);
 
-/** Seconds: a full test, or one section. */
 export function limitFor(skill: TestSkill, full: boolean): number {
   if (skill === "reading") return (full ? 60 : 20) * 60;
   return (full ? 40 : 10) * 60;
@@ -53,6 +50,14 @@ export async function startTestAttempt(
   await connectDb();
   const test = await model(skill).findOne({ _id: testId, status: "published" }).lean<TestRow>();
   if (!test) return fail("That test is no longer available.");
+  const open = await IeltsTestAttempt.findOne({ userId, skill, testId, scope: String(scope), status: "in_progress" })
+    .sort({ createdAt: -1 })
+    .select("scope startedAt limitSec")
+    .lean<{ _id: Types.ObjectId; scope: string; startedAt: Date; limitSec: number }>();
+  if (open) {
+    const deadline = deadlineOf(open);
+    if (deadline === null || now.getTime() <= deadline) return ok({ attemptId: String(open._id) });
+  }
   let sections: Section[];
   if (scope === "full") sections = test.sections;
   else if (Number.isInteger(scope) && test.sections[scope as number]) sections = [test.sections[scope as number]];
@@ -74,12 +79,25 @@ export async function startTestAttempt(
   return ok({ attemptId: String(doc._id) });
 }
 
-/** Merges the learner's answers into an unsubmitted attempt. Unknown question numbers are ignored. */
-export async function saveAnswers(userId: string, attemptId: string, answers: Record<string, string>): Promise<ActionResult> {
+export const TIME_UP_MESSAGE = "Time is up for this test, so new answers aren't saved. Submit to see your score.";
+
+const deadlineOf = (a: { scope: string; startedAt: Date; limitSec: number }): number | null =>
+  a.scope === "full" ? new Date(a.startedAt).getTime() + (a.limitSec + GRACE_SEC) * 1000 : null;
+
+export async function saveAnswers(
+  userId: string,
+  attemptId: string,
+  answers: Record<string, string>,
+  now: Date = new Date(),
+): Promise<ActionResult> {
   if (!isId(attemptId) || !isId(userId)) return fail(NOT_FOUND);
   await connectDb();
-  const attempt = await IeltsTestAttempt.findOne({ _id: attemptId, userId, status: "in_progress" }).select("sections").lean<{ sections: Section[] }>();
+  const attempt = await IeltsTestAttempt.findOne({ _id: attemptId, userId, status: "in_progress" })
+    .select("sections scope startedAt limitSec")
+    .lean<{ sections: Section[]; scope: string; startedAt: Date; limitSec: number }>();
   if (!attempt) return fail("This attempt was already submitted or doesn't exist.");
+  const deadline = deadlineOf(attempt);
+  if (deadline !== null && now.getTime() > deadline) return fail(TIME_UP_MESSAGE);
   const valid = new Set(attempt.sections.flatMap((s) => s.groups.flatMap((g) => g.questions.map((q) => String(q.n)))));
   const set: Record<string, string> = {};
   for (const [n, v] of Object.entries(answers ?? {})) {
@@ -107,6 +125,20 @@ type SubmitRow = {
 
 const plainAnswers = (m: SubmitRow["answers"]): Record<string, string> => (m instanceof Map ? Object.fromEntries(m) : { ...(m ?? {}) });
 
+async function syncPracticeBand(
+  userId: string,
+  attemptId: string,
+  a: { scope: string; date: string; skill: TestSkill; score?: { band?: number } },
+  session?: ClientSession,
+): Promise<void> {
+  if (a.scope !== "full" || a.score?.band === undefined) return;
+  await IeltsBandEntry.updateOne(
+    { userId, attemptId, source: "practiceTest" },
+    { $set: { date: a.date, bands: { [a.skill]: a.score.band } } },
+    { upsert: true, session },
+  );
+}
+
 export async function submitAttempt(
   userId: string,
   attemptId: string,
@@ -114,37 +146,38 @@ export async function submitAttempt(
   now: Date = new Date(),
 ): Promise<ActionResult<SubmitResult>> {
   if (!isId(attemptId) || !isId(userId)) return fail(NOT_FOUND);
-  await saveAnswers(userId, attemptId, answers);
+  await saveAnswers(userId, attemptId, answers, now);
   await connectDb();
   const attempt = await IeltsTestAttempt.findOne({ _id: attemptId, userId }).lean<SubmitRow>();
   if (!attempt) return fail(NOT_FOUND);
-  if (attempt.status === "submitted") return ok(summary(attempt.score as SubmitResult));
+  if (attempt.status === "submitted") {
+    await syncPracticeBand(userId, attemptId, attempt);
+    return ok(summary(attempt.score as SubmitResult));
+  }
 
   const score = scoreSections(attempt.skill, attempt.sections, plainAnswers(attempt.answers));
   const elapsed = Math.round((now.getTime() - new Date(attempt.startedAt).getTime()) / 1000);
   const timeSec = Math.max(0, Math.min(elapsed, attempt.limitSec + GRACE_SEC));
-  // Only the first submit wins; a second tab loses the race and reads the stored score.
-  const res = await IeltsTestAttempt.updateOne(
-    { _id: attemptId, userId, status: "in_progress" },
-    {
-      $set: {
-        status: "submitted",
-        submittedAt: now,
-        timeSec,
-        score: { raw: score.raw, total: score.total, ...(score.band !== undefined ? { band: score.band } : {}), results: score.results },
+  const won = await inTransaction(async (session) => {
+    const res = await IeltsTestAttempt.updateOne(
+      { _id: attemptId, userId, status: "in_progress" },
+      {
+        $set: {
+          status: "submitted",
+          submittedAt: now,
+          timeSec,
+          score: { raw: score.raw, total: score.total, ...(score.band !== undefined ? { band: score.band } : {}), results: score.results },
+        },
       },
-    },
-  );
-  if (!res.matchedCount) {
-    const again = await IeltsTestAttempt.findOne({ _id: attemptId, userId }).select("score").lean<{ score?: SubmitResult }>();
-    return ok(summary(again?.score as SubmitResult));
-  }
-  if (attempt.scope === "full" && score.band !== undefined) {
-    await IeltsBandEntry.updateOne(
-      { userId, attemptId, source: "practice" },
-      { $set: { date: attempt.date, bands: { [attempt.skill]: score.band } } },
-      { upsert: true },
+      { session },
     );
+    if (res.matchedCount) await syncPracticeBand(userId, attemptId, { ...attempt, score }, session);
+    return res.matchedCount > 0;
+  });
+  if (!won) {
+    const again = await IeltsTestAttempt.findOne({ _id: attemptId, userId }).select("score scope date skill").lean<SubmitRow>();
+    if (again) await syncPracticeBand(userId, attemptId, again);
+    return ok(summary(again?.score as SubmitResult));
   }
   return ok({ raw: score.raw, total: score.total, ...(score.band !== undefined ? { band: score.band } : {}) });
 }
@@ -158,11 +191,8 @@ export type RunView = {
   startedAt: string;
   answers: Record<string, string>;
   sections: PublicSection[];
-  /**
-   * Per section: "file" (a recording), "voice" (the browser reads the script) or "none". Neither the
-   * audio link nor the script is in the page: both come from `claimSection` when Play is pressed.
-   */
   audio: SectionAudioKind[];
+  played: number[];
 };
 
 export type SectionAudioKind = "file" | "voice" | "none";
@@ -221,20 +251,15 @@ export async function getAttempt(
       answers: plainAnswers(a.answers),
       sections: toPublic(a.sections),
       audio: a.sections.map((s): SectionAudioKind => (s.audioKey ? "file" : s.script ? "voice" : "none")),
+      played: a.scope === "full" ? ((a as { played?: number[] }).played ?? []) : [],
     },
   };
 }
 
-/** Long enough for any section to play through, signed only when Play is pressed. */
 export const AUDIO_LINK_SEC = 30 * 60;
 
 export type SectionPlay = { kind: "file"; url: string } | { kind: "voice"; script: string };
 
-/**
- * What a Listening section plays, handed out when Play is pressed: a freshly signed link to its
- * recording, or the script for the browser voice (the script holds the answers). Only while the
- * attempt is open, and in a full test only once per section, recorded here rather than in the browser.
- */
 export async function claimSection(
   userId: string,
   attemptId: string,
@@ -245,20 +270,24 @@ export async function claimSection(
   if (!isId(attemptId) || !isId(userId) || !Number.isInteger(index) || index < 0) return fail(NOT_FOUND);
   await connectDb();
   const a = await IeltsTestAttempt.findOne({ _id: attemptId, userId, status: "in_progress" })
-    .select("skill scope sections")
-    .lean<{ skill: TestSkill; scope: string; sections: Section[] }>();
+    .select("skill scope sections played")
+    .lean<{ skill: TestSkill; scope: string; sections: Section[]; played?: number[] }>();
   const section = a?.sections[index];
   if (!a || a.skill !== "listening" || !section || (!section.audioKey && !section.script)) return fail("There is no audio for this section.");
   if (section.audioKey && !storage()) return fail("Audio storage isn't set up.");
-  if (a.scope === "full") {
-    const claimed = await IeltsTestAttempt.updateOne(
-      { _id: attemptId, userId, status: "in_progress", played: { $ne: index } },
-      { $addToSet: { played: index } },
-    );
-    if (!claimed.matchedCount) return fail("This section has already been played. A full test plays it once.");
-  }
+  if (a.scope === "full" && a.played?.includes(index)) return fail("This section has already been played. A full test plays it once.");
   if (section.audioKey) return ok({ play: { kind: "file", url: await sign(section.audioKey, AUDIO_LINK_SEC) } });
   return ok({ play: { kind: "voice", script: section.script } });
+}
+
+export async function finishSection(userId: string, attemptId: string, index: number): Promise<ActionResult> {
+  if (!isId(attemptId) || !isId(userId) || !Number.isInteger(index) || index < 0) return fail(NOT_FOUND);
+  await connectDb();
+  const res = await IeltsTestAttempt.updateOne(
+    { _id: attemptId, userId, status: "in_progress", skill: "listening", scope: "full", [`sections.${index}`]: { $exists: true } },
+    { $addToSet: { played: index } },
+  );
+  return res.matchedCount ? ok() : fail(NOT_FOUND);
 }
 
 export type AttemptListItem = {

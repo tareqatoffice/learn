@@ -10,7 +10,6 @@ import type { AttemptListItem, TestSkill, TestSummary } from "@/ielts/practice/a
 
 const NAME: Record<TestSkill, string> = { listening: "Listening", reading: "Reading" };
 
-/** Lists published tests with a full-test button and one button per section, plus recent attempts. */
 export function TestHub({ skill, tests, recent }: { skill: TestSkill; tests: TestSummary[]; recent: AttemptListItem[] }) {
   const router = useRouter();
   const { run, pending, errors } = useAdminAction();

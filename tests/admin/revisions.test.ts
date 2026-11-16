@@ -36,7 +36,7 @@ describe("restoreRevisionAction", () => {
 
     const [, oldest] = await listRevisions("Question", q);
     const result = await restoreRevisionAction(oldest.id);
-    expect(result).toEqual({ ok: true, id: q });
+    expect(result).toMatchObject({ ok: true, id: q });
     expect((await Question.findById(q).lean<{ answer: string }>())?.answer).toBe("answer 0");
     const after = await listRevisions("Question", q);
     expect(after).toHaveLength(3);

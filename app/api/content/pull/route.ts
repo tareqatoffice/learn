@@ -2,7 +2,6 @@ import { NotFoundError, pullBook, pullGraph, pullSeries } from "@/content/pull";
 import { SLUG_PATTERN } from "@/lib/ids";
 import { withToken } from "@/lib/tokenAuth";
 
-/** GET ?kind=book|series|graph&slug=… — the item in its canonical, re-importable format. */
 export function GET(req: Request): Promise<Response> {
   return withToken(req, async () => {
     const params = new URL(req.url).searchParams;

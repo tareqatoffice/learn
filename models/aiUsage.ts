@@ -1,6 +1,5 @@
 import mongoose, { Schema, model } from "mongoose";
 
-/** AI calls per user per UTC day, for the daily limit. Rows expire after a few days. */
 const aiUsageSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-// The Web Speech API is not in TypeScript's DOM lib yet; this is the part the quiz uses.
 type RecognitionResult = { isFinal: boolean; 0: { transcript: string } };
 type RecognitionEvent = { resultIndex: number; results: ArrayLike<RecognitionResult> };
 type RecognitionErrorEvent = { error: string };
@@ -32,11 +31,6 @@ const ERRORS: Record<string, string> = {
   network: "Voice input needs a network connection.",
 };
 
-/**
- * Dictation through the browser's speech recognition (Chrome, Edge and Safari; the browser's
- * speech service does the transcription). Each finished phrase goes to `onFinal`; the phrase still
- * being spoken is `interim`. `supported` is false until mount, so server and client render alike.
- */
 export function useSpeechInput(onFinal: (text: string) => void, lang?: string) {
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
@@ -50,7 +44,6 @@ export function useSpeechInput(onFinal: (text: string) => void, lang?: string) {
   }, [onFinal]);
 
   useEffect(() => {
-    // Feature detection must wait for the browser; the first render matches the server's.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSupported(recognitionCtor() !== null);
     return () => recognition.current?.abort();
@@ -77,7 +70,6 @@ export function useSpeechInput(onFinal: (text: string) => void, lang?: string) {
       setInterim(pending);
     };
     r.onerror = (e) => {
-      // "no-speech" and "aborted" just end the take; the learner can press the mic again.
       if (e.error !== "no-speech" && e.error !== "aborted") setError(ERRORS[e.error] ?? "Voice input stopped. Try again.");
     };
     r.onend = () => {

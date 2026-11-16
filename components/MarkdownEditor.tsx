@@ -3,7 +3,6 @@
 import { useId } from "react";
 import { Markdown } from "@/lib/markdown/Markdown";
 
-/** Markdown textarea with a live preview through the same renderer readers see. */
 export function MarkdownEditor({
   label,
   value,

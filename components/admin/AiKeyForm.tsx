@@ -9,10 +9,6 @@ import type { AiKeySource } from "@/lib/aiSettings";
 
 const API_KEY_MAX = 300;
 
-/**
- * Sets or removes the OpenRouter key. The key is write-only: the server only ever tells the page
- * where the key in effect comes from and its last four characters.
- */
 export function AiKeyForm({
   source,
   hint,

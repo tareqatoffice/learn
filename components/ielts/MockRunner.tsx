@@ -4,26 +4,26 @@ import { Circle, Pause, Play, Square } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { type ActionResult, firstError } from "@/admin/result";
+import { confirm } from "@/components/ConfirmDialog";
 import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import type { Kind } from "@/ielts/speaking/questions";
 import type { StartPartInput } from "@/ielts/speaking/attempts";
 import { KIND_PARTS, P2_MARK_SEC, P2_PREP_SEC, P2_TALK_SEC, PART_CAP_SEC, PART_SOFT_SEC, type Part } from "@/ielts/speaking/timing";
 import { useExaminer } from "@/lib/useExaminer";
+import { useLeaveGuard } from "@/lib/useLeaveGuard";
 import { UploadError, uploadTake } from "@/lib/uploadTake";
 import { type RecorderResult, useRecorder } from "@/lib/useRecorder";
 import { PartTimer } from "./PartTimer";
 
 type Marker = { atSec: number; label: string };
 
-/** The questions a runner reads: the plain form of an attempt's question set. */
 export type MockQuestions = {
   part1?: { frames: { title: string; questions: string[] }[] };
   part2?: { cue: { topic: string; bullets: string[]; explain: string; roundOff: string[] } };
   part3?: { questions: string[] };
 };
 
-/** The attempt's Server Actions, as props so tests can stub them. */
 export type MockActions = {
   startPart(
     attemptId: string,
@@ -39,12 +39,10 @@ export type MockActions = {
 
 type Prompt = { label: string; heading?: string; text: string; say: string };
 type Started = { uploadUrl: string; audioUploadUrl?: string; maxBytes: number; at: number; main: boolean; audio: boolean };
-/** A recorded part kept in memory until the server confirms it. */
 type Take = { result: RecorderResult; markers: Marker[]; started?: Started };
 type Upload = { status: "sending" | "failed" | "saved"; error?: string };
 type Stage = "ready" | "prep" | "live" | "between" | "finishing";
 
-// Presigned upload URLs live 10 minutes; past this a retry asks for fresh ones.
 const REUSE_MS = 8 * 60 * 1000;
 const MB = 1024 * 1024;
 const NAME: Record<Part, string> = { p1: "Part 1", p2: "Part 2", p3: "Part 3" };
@@ -74,16 +72,9 @@ function promptsFor(part: Part, q: MockQuestions, mock: boolean): Prompt[] {
   return [];
 }
 
-/** A part has something to ask: Part 1 and 3 need a question, Part 2 a cue card. */
 const hasContent = (part: Part, q: MockQuestions) =>
   part === "p2" ? !!q.part2 : promptsFor(part, q, false).length > 0;
 
-/**
- * Runs a Speaking mock or drill: Part 1 questions → Part 2 prep (60 s, notes) and talk (marker at
- * 60 s, stops at 120 s) → Part 3 questions. Each part is one recording. When a part ends it uploads in
- * the background while the next part runs; its recording stays in memory until the server confirms it,
- * a failed upload can be retried, and leaving the page with an unsent part warns first.
- */
 export function MockRunner({
   attemptId,
   kind,
@@ -100,7 +91,6 @@ export function MockRunner({
   actions: MockActions;
 }) {
   const router = useRouter();
-  // R21: a spoken question leaks into the recording, so the voice needs headphones or is switched off for this run.
   const [voice, setVoice] = useState(examinerVoice);
   const [headphones, setHeadphones] = useState(false);
   const examiner = useExaminer({ enabled: voice });
@@ -156,7 +146,6 @@ export function MockRunner({
     if (previewRef.current) previewRef.current.srcObject = rec.stream;
   }, [rec.stream]);
 
-  // ---- uploads ----
 
   async function send(p: Part) {
     const take = takes.current.get(p);
@@ -204,13 +193,11 @@ export function MockRunner({
       }
       const confirmed = await actions.confirmPart(attemptId, p, { durationSec: result.durationSec, markers: take.markers });
       if (!confirmed.ok) {
-        // The stored objects didn't check out: start this part's upload over on retry.
         take.started = undefined;
         return fail(firstError(confirmed.errors) ?? `Couldn't save ${NAME[p]}. Try again.`);
       }
       takes.current.delete(p);
       set({ status: "saved" });
-      // The review page shows the transcript when it's ready; nothing here waits on it.
       void actions.transcribePart(attemptId, p).catch(() => undefined);
     } catch (e) {
       fail(e instanceof UploadError ? e.message : `Couldn't save ${NAME[p]}. Check your connection and try again.`);
@@ -219,7 +206,6 @@ export function MockRunner({
     }
   }
 
-  // ---- stages ----
 
   function record(p: Part) {
     const first = prompts[p][0];
@@ -231,7 +217,6 @@ export function MockRunner({
     setPromptIdx(0);
     setStopped(null);
     setStage("live");
-    // Recording and the first question come from the same tap where there is one (iOS).
     void recs[p].start();
     void examiner.speak(p === "p2" ? TALK_START : (first?.say ?? ""));
   }
@@ -264,7 +249,6 @@ export function MockRunner({
     if (mock) void examiner.speak(THE_END);
   }
 
-  /** Stop the current part on purpose; the runner moves on when its recording arrives. */
   function endPart() {
     ending.current = true;
     rec.stop();
@@ -291,7 +275,6 @@ export function MockRunner({
     void examiner.speak(q.say);
   }
 
-  // A part's recording arrived (stopped by the runner, the cap, a pause or the page being hidden).
   const onPartEnded = useEffectEvent((p: Part, result: RecorderResult) => {
     takes.current.set(p, { result, markers: [...markers.current] });
     void send(p);
@@ -318,7 +301,6 @@ export function MockRunner({
     }
   }, [r1, r2, r3]);
 
-  // Part 2: the talk ends at 120 s; with a round-off question the recording runs on for the answer.
   const p2 = recs.p2;
   const talkOver = stage === "live" && part === "p2" && p2.state === "recording" && p2.elapsedSec >= P2_TALK_SEC;
   const onTalkOver = useEffectEvent(() => {
@@ -332,12 +314,10 @@ export function MockRunner({
     if (talkOver) onTalkOver();
   }, [talkOver]);
 
-  // A locked phone mid-prep pauses the countdown, so the talk never starts recording on a hidden page.
   const onHidden = useEffectEvent(() => {
     if (document.visibilityState !== "hidden") return;
     if (stage === "prep" && prep.pausedLeftMs === null) pause();
     else if (stage === "live") {
-      // useRecorder stops the part itself; count it as a pause, like prep.
       setPaused(true);
       pausing.current = true;
     }
@@ -348,7 +328,6 @@ export function MockRunner({
     return () => document.removeEventListener("visibilitychange", listener);
   }, []);
 
-  // ---- finishing ----
 
   async function complete() {
     if (finishing.current) return;
@@ -359,7 +338,6 @@ export function MockRunner({
         finishing.current = false;
         return setFinishError(firstError(res.errors) ?? "Couldn't finish the test. Try again.");
       }
-      // Transcripts may still be running; the review page picks them up.
       router.push(`/ielts/speaking/${attemptId}/review`);
     } catch {
       finishing.current = false;
@@ -375,11 +353,18 @@ export function MockRunner({
     return () => clearTimeout(t);
   }, [stage, allSaved]);
 
-  function finishWithout() {
+  async function finishWithout() {
     const failed = (Object.keys(uploads) as Part[]).filter((p) => uploads[p]?.status === "failed");
     const names = failed.map((p) => NAME[p]).join(" and ");
     const many = failed.length > 1;
-    if (!window.confirm(`${names} ${many ? "haven't" : "hasn't"} saved. Finish without ${many ? "them" : "it"}?`)) return;
+    if (
+      !(await confirm({
+        description: `${names} ${many ? "haven't" : "hasn't"} saved. Finish without ${many ? "them" : "it"}?`,
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     for (const p of failed) takes.current.delete(p);
     setUploads((all) => Object.fromEntries(Object.entries(all).filter(([p]) => !failed.includes(p as Part))));
   }
@@ -395,42 +380,13 @@ export function MockRunner({
     return () => window.removeEventListener("beforeunload", warn);
   }, [unsent]);
 
-  // In-app navigation never fires beforeunload, so same-origin link clicks and Back ask too (R26).
-  useEffect(() => {
-    if (!unsent) return;
-    const leave = () => window.confirm(LEAVE_PROMPT);
-    const onClick = (e: MouseEvent) => {
-      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      const a = e.target instanceof Element ? e.target.closest("a[href]") : null;
-      if (!(a instanceof HTMLAnchorElement) || a.hasAttribute("download") || (a.target && a.target !== "_self")) return;
-      if (new URL(a.href, window.location.href).origin !== window.location.origin) return;
-      if (!leave()) e.preventDefault();
-    };
-    // A guard entry on top of this page, so Back lands on it first and can be undone when declined.
-    if (!window.history.state?.[GUARD_KEY]) window.history.pushState({ [GUARD_KEY]: true }, "");
-    const onPopState = () => {
-      if (leave()) {
-        window.removeEventListener("popstate", onPopState);
-        window.history.back();
-      } else {
-        window.history.pushState({ [GUARD_KEY]: true }, "");
-      }
-    };
-    document.addEventListener("click", onClick, true);
-    window.addEventListener("popstate", onPopState);
-    return () => {
-      document.removeEventListener("click", onClick, true);
-      window.removeEventListener("popstate", onPopState);
-    };
-  }, [unsent]);
+  useLeaveGuard(unsent, LEAVE_PROMPT, GUARD_KEY);
 
-  // ---- view ----
 
   if (parts.length === 0) return <Notice>This practice has no questions. Start a new one.</Notice>;
 
   const voiceOff = voice && (!examiner.supported || examiner.failed);
   const needHeadphones = voice && examiner.supported && !examiner.failed;
-  // Idle in a live part means the start never got going (the page hid during the mic prompt).
   const notStarted = rec.state === "error" || rec.state === "idle";
   const prompt = prompts[part][promptIdx];
   const recording = rec.state === "recording";

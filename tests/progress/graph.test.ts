@@ -2,9 +2,10 @@ import mongoose from "mongoose";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 const session = vi.hoisted(() => ({ userId: null as string | null }));
 vi.mock("@/auth", () => ({
-  auth: () =>
-    Promise.resolve(session.userId ? { user: { id: session.userId, email: "learner@example.test", name: "Learner" } } : null),
+  auth: async () => (await import("../setup/session")).approvedSession(session.userId),
 }));
+const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock("next/cache", () => ({ refresh }));
 
 import { setNodeStatusAction } from "@/app/(app)/graphs/actions";
 import { ForbiddenError } from "@/lib/authz";
@@ -78,6 +79,15 @@ describe("graph progress", () => {
     expect(await NodeProgress.countDocuments()).toBe(1);
   });
 
+  it("lets a topic start when a prerequisite is listed twice and done (F3)", async () => {
+    const user = newUserId();
+    const graphId = await seedGraph("g");
+    const a = await seedNode(graphId, "a");
+    const b = await seedNode(graphId, "b", { prereqIds: [a, a] });
+    await setNodeStatus(user, a, "done");
+    await expect(setNodeStatus(user, b, "learning")).resolves.not.toThrow();
+  });
+
   it("rejects nodes that are not visible", async () => {
     const user = newUserId();
     const graphId = await seedGraph("g");
@@ -109,7 +119,6 @@ describe("graph progress", () => {
     await setNodeStatus(user, a, "done");
     await setNodeStatus(user, b, "done");
     expect(await NodeProgress.countDocuments({ userId: user, nodeId: b, status: "done" })).toBe(1);
-    // Clearing is always allowed.
     await setNodeStatus(user, a, "none");
     await setNodeStatus(user, b, "none");
   });
@@ -127,7 +136,6 @@ describe("graph progress", () => {
     await setNodeStatus(user, a, "learning");
     expect(await getGraphProgress(user, graphId)).toEqual({ [a]: "learning", [other]: "done" });
 
-    // Not touching a done topic's own state leaves dependents alone.
     await setNodeStatus(user, a, "done");
     await setNodeStatus(user, b, "done");
     await setNodeStatus(user, a, "done");
@@ -150,7 +158,9 @@ describe("graph progress", () => {
     const b = await seedNode(graphId, "b", { prereqIds: [a] });
 
     expect(await setNodeStatusAction(b, "done")).toEqual({ error: "Finish first: a title" });
+    expect(refresh).not.toHaveBeenCalled();
     expect(await setNodeStatusAction(a, "done")).toEqual({});
+    expect(refresh).toHaveBeenCalledTimes(1);
     expect(await setNodeStatusAction(b, "done")).toEqual({});
   });
 

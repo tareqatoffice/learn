@@ -9,7 +9,6 @@ export default function Error({
   error: unknown;
   retry: () => void;
 }) {
-  // Layout failures under (app) bubble here; keep Dashboard as the primary recovery path.
   return (
     <RouteError
       error={error}

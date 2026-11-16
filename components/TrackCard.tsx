@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 const linkClass =
   "hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-/** A tracking card: a quiet title and a list of numbers. Never carries an action. */
 export function Card({
   title,
   children,
@@ -15,7 +14,6 @@ export function Card({
   title: string;
   children: React.ReactNode;
   className?: string;
-  /** The heading level; pick the one that follows the page's own headings. */
   heading?: "h2" | "h3";
 }) {
   const id = `card-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
@@ -23,7 +21,7 @@ export function Card({
     <section
       aria-labelledby={id}
       className={cn(
-        "card-interactive grid content-start gap-2 rounded-xl border border-border bg-card p-4",
+        "card-interactive grid min-w-0 content-start gap-2 overflow-hidden rounded-xl border border-border bg-card p-4",
         className,
       )}
     >
@@ -38,7 +36,6 @@ export function Card({
   );
 }
 
-/** Rows of a linked label, a value/max count and a thin bar. */
 export function ProgressRows({
   rows,
   empty,

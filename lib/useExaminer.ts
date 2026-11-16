@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 const SPEAK_TIMEOUT_MS = 15_000;
-// Errors from our own cancel(), not a broken voice.
 const CANCELLED = new Set(["interrupted", "canceled"]);
 
 const synth = (): SpeechSynthesis | null =>
@@ -13,17 +12,11 @@ const synth = (): SpeechSynthesis | null =>
 
 const noSubscribe = () => () => {};
 
-/** First en-GB voice, then any English voice (some browsers write `en_GB`). */
 function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
   const lang = (v: SpeechSynthesisVoice) => v.lang.replace("_", "-").toLowerCase();
   return voices.find((v) => lang(v) === "en-gb") ?? voices.find((v) => lang(v).startsWith("en-")) ?? null;
 }
 
-/**
- * The examiner's voice via speechSynthesis. `speak` resolves on end, on error or after 15 s, whichever
- * comes first. After one error the voice counts as failed and later calls resolve at once, so the
- * runner carries on with the questions as text. On iOS the first `speak` must run inside a tap.
- */
 export function useExaminer({ enabled }: { enabled: boolean }) {
   const supported = useSyncExternalStore(
     noSubscribe,
@@ -61,7 +54,6 @@ export function useExaminer({ enabled }: { enabled: boolean }) {
             }
             done();
           });
-          // One question at a time: cut off the previous one rather than queue behind it.
           if (s.speaking || s.pending) s.cancel();
           s.speak(u);
         } catch {
@@ -74,7 +66,6 @@ export function useExaminer({ enabled }: { enabled: boolean }) {
     [enabled],
   );
 
-  // Some browsers (Chrome) load voices after the page: keep the list once it arrives.
   useEffect(() => {
     const s = synth();
     if (!s) return;

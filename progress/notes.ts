@@ -21,7 +21,6 @@ async function upsertNoteProgress(userId: string, noteId: string, update: Record
   );
 }
 
-/** Records that the user opened a chapter (drives "continue reading"). */
 export async function openNote(userId: string, noteId: string): Promise<void> {
   await upsertNoteProgress(userId, noteId, { $set: { lastOpenedAt: new Date() } });
 }
@@ -31,10 +30,6 @@ export async function setNoteRead(userId: string, noteId: string, read: boolean)
   await upsertNoteProgress(userId, noteId, update);
 }
 
-/**
- * Read state per visible chapter of the series that the user has touched (noteId -> { read }). A caller
- * that already holds the series' visible chapter ids passes them as `visibleIds` to skip reading them again.
- */
 export async function getSeriesProgress(
   userId: string,
   seriesId: string,

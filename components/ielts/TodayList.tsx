@@ -58,7 +58,6 @@ function LogMinutes({ item }: { item: TodayItem }) {
   );
 }
 
-/** Today's items from this week's targets. Speaking items link to the practice screens; the other skills are logged by hand. */
 export function TodayList({ items }: { items: TodayItem[] }) {
   const doneCount = items.filter((i) => i.done).length;
   return (

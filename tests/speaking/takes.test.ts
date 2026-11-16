@@ -5,14 +5,14 @@ vi.mock("@/lib/r2", () => ({
   storageConfigured: vi.fn(() => true),
   presignPut: vi.fn(async (key: string) => `https://r2.test/put/${key}`),
   presignGet: vi.fn(async (key: string) => `https://r2.test/get/${key}`),
-  headObject: vi.fn(async () => ({ size: 1000, contentType: "audio/webm" })),
+  headObject: vi.fn(async () => ({ size: 1000, contentType: "" })),
   deleteObjects: vi.fn(async () => undefined),
 }));
 vi.mock("@/lib/stt", () => ({ sttConfigured: vi.fn(() => true) }));
 
 import { connectDb } from "@/lib/db";
 import { SpeakingLesson, SpeakingTake } from "@/models";
-import { deleteAllTakes, deleteTake, confirmTake, getTake, listTakes, saveSelfRating, startTake } from "@/speaking/takes";
+import { MAX_OPEN_TAKES, MAX_TAKES_PER_DAY, OPEN_TAKE_MS, sweepAbandonedTakes, deleteAllTakes, deleteTake, confirmTake, getTake, listTakes, saveSelfRating, startTake } from "@/speaking/takes";
 import * as r2 from "@/lib/r2";
 import * as stt from "@/lib/stt";
 import { resetDb } from "../setup/mongo";
@@ -44,7 +44,7 @@ describe("speaking takes", () => {
     vi.clearAllMocks();
     vi.mocked(r2.storageConfigured).mockReturnValue(true);
     vi.mocked(stt.sttConfigured).mockReturnValue(true);
-    vi.mocked(r2.headObject).mockResolvedValue({ size: 1000, contentType: "audio/webm" });
+    vi.mocked(r2.headObject).mockResolvedValue({ size: 1000, contentType: "" });
   });
   afterAll(() => mongoose.disconnect());
 
@@ -112,10 +112,63 @@ describe("speaking takes", () => {
     expect((await startTake("bad", base)).ok).toBe(false);
   });
 
-  it("startTake caps shadowing at twice the clip length", async () => {
-    const res = await start(user(), { task: "shadowing", clipSec: 90 });
+  it("startTake caps shadowing at twice the lesson's clip length, ignoring a client clipSec (S3)", async () => {
+    const lesson = await SpeakingLesson.create({ title: "L", order: 1, status: "published", shadow: { durationSec: 90 } });
+    const res = await start(user(), { task: "shadowing", lessonId: String(lesson._id), clipSec: 900 });
     expect(res.capSec).toBe(180);
     expect(res.maxBytes).toBe(1_440_000);
+    const noLesson = await start(user(), { task: "shadowing", clipSec: 900 });
+    expect(noLesson.capSec).toBe(600);
+  });
+
+  it("startTake refuses a fourth unconfirmed take, but not once older ones count as abandoned (S3)", async () => {
+    const u = user();
+    for (let i = 0; i < MAX_OPEN_TAKES; i++) await start(u);
+    const refused = await startTake(u, base);
+    expect(refused.ok).toBe(false);
+    await SpeakingTake.collection.updateMany({}, { $set: { createdAt: new Date(Date.now() - OPEN_TAKE_MS - 1000) } });
+    expect((await startTake(u, base)).ok).toBe(true);
+    expect((await startTake(user(), base)).ok).toBe(true);
+  });
+
+  it("sweeps a user's takes left unconfirmed for over an hour, files first (D5)", async () => {
+    const u = user();
+    const old = await start(u);
+    const fresh = await start(u);
+    const kept = await start(user());
+    await SpeakingTake.collection.updateMany({ _id: { $in: [new Types.ObjectId(old.takeId), new Types.ObjectId(kept.takeId)] } }, { $set: { createdAt: new Date(Date.now() - OPEN_TAKE_MS - 1000) } });
+    vi.mocked(r2.deleteObjects).mockClear();
+    expect(await sweepAbandonedTakes(u)).toBe(1);
+    expect(r2.deleteObjects).toHaveBeenCalledWith([`takes/${u}/${old.takeId}.webm`]);
+    expect(await SpeakingTake.exists({ _id: old.takeId })).toBeNull();
+    expect(await SpeakingTake.exists({ _id: fresh.takeId })).toBeTruthy();
+    expect(await SpeakingTake.exists({ _id: kept.takeId })).toBeTruthy();
+  });
+
+  it("keeps abandoned takes when R2 fails, and a take being deleted cannot be confirmed (D5)", async () => {
+    const u = user();
+    const t = await start(u);
+    await SpeakingTake.collection.updateOne({ _id: new Types.ObjectId(t.takeId) }, { $set: { createdAt: new Date(Date.now() - OPEN_TAKE_MS - 1000) } });
+    vi.mocked(r2.deleteObjects).mockRejectedValueOnce(new Error("r2 down"));
+    expect(await sweepAbandonedTakes(u)).toBe(0);
+    expect(await SpeakingTake.exists({ _id: t.takeId, deletingAt: null })).toBeTruthy();
+    await SpeakingTake.updateOne({ _id: t.takeId }, { $set: { deletingAt: new Date() } });
+    expect((await confirmTake(u, t.takeId, 3)).ok).toBe(false);
+  });
+
+  it("startTake refuses past the daily limit (S3)", async () => {
+    const u = user();
+    const day = Array.from({ length: MAX_TAKES_PER_DAY }, () => ({
+      userId: new Types.ObjectId(u),
+      date: base.date,
+      task: "readAloud",
+      media: { kind: "audio", key: "k", mime: "audio/webm", stored: true, capSec: 600 },
+      createdAt: new Date(Date.now() - 60_000),
+    }));
+    await SpeakingTake.collection.insertMany(day);
+    const refused = await startTake(u, base);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.errors._).toMatch(/last day/);
   });
 
   it("confirmTake rejects missing object", async () => {
@@ -125,7 +178,6 @@ describe("speaking takes", () => {
     const res = await confirmTake(u, takeId, 30);
     expect(res.ok).toBe(false);
     expect((await SpeakingTake.findById(takeId).lean<{ media: { stored: boolean } }>())!.media.stored).toBe(false);
-    // Any partial upload is removed; the take stays so the client can upload again and retry.
     expect(vi.mocked(r2.deleteObjects)).toHaveBeenCalledWith([`takes/${u}/${takeId}.webm`]);
   });
 
@@ -178,6 +230,15 @@ describe("speaking takes", () => {
     const doc = await SpeakingTake.findById(takeId).lean<{ media: { durationSec: number }; transcriptStatus: string }>();
     expect(doc!.media.durationSec).toBe(10);
     expect(doc!.transcriptStatus).toBe("done");
+  });
+
+  it("confirmTake rejects an upload stored with another content type (F24)", async () => {
+    const u = user();
+    const { takeId } = await start(u);
+    vi.mocked(r2.headObject).mockResolvedValueOnce({ size: 1000, contentType: "text/html" });
+    expect((await confirmTake(u, takeId, 5)).ok).toBe(false);
+    vi.mocked(r2.headObject).mockResolvedValueOnce({ size: 1000, contentType: "audio/webm;codecs=opus" });
+    expect((await confirmTake(u, takeId, 5)).ok).toBe(true);
   });
 
   it("confirmTake heads the audio key for video takes", async () => {
@@ -296,7 +357,7 @@ describe("speaking takes", () => {
     const u = user();
     const a = await start(u);
     const b = await start(u, { task: "recordReview" });
-    await start(u); // unstored
+    await start(u);
     await confirmTake(u, a.takeId, 10);
     await confirmTake(u, b.takeId, 20);
     const all = await listTakes(u, {});

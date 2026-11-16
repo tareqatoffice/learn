@@ -28,7 +28,6 @@ function Bar({ label, done, target, note }: { label: string; done: number; targe
   );
 }
 
-/** The plan page body: phase timeline, this week against its targets, the weeks ahead, standing changes and versions. */
 export function PlanTimeline({
   plan,
   today,

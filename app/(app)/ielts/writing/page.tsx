@@ -24,7 +24,7 @@ export default async function IeltsWritingPage() {
   ]);
   const missing: Record<WritingKind, boolean> = { task1: !t1, task2: !t2, full: !t1 || !t2 };
   return (
-    <div className="mx-auto grid w-full max-w-4xl gap-4">
+    <div className="grid w-full gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>Writing practice</h1>
         <Link href="/ielts" className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">

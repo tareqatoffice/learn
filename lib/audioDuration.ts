@@ -1,4 +1,3 @@
-/** Reads an audio file's length in seconds in the browser; 0 when it can't be decoded. Client only. */
 export function audioDuration(file: File): Promise<number> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);

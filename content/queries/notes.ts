@@ -13,14 +13,12 @@ const visibleSeries = (slug?: string) =>
     .sort({ order: 1, title: 1 })
     .lean<SeriesRow[]>();
 
-/** Visible chapters of a series in reading order. */
 async function chaptersOf(seriesId: Id): Promise<ChapterRow[]> {
   return Note.find(await visibleNoteFilter(String(seriesId)), { slug: 1, title: 1, readMinutes: 1 })
     .sort({ order: 1, _id: 1 })
     .lean<ChapterRow[]>();
 }
 
-/** Visible series with how many of their visible chapters the user has marked read. */
 export async function listSeriesWithProgress(
   userId: string,
 ): Promise<{ slug: string; title: string; read: number; total: number }[]> {
@@ -39,7 +37,6 @@ export async function listSeriesWithProgress(
   });
 }
 
-/** A visible series with its visible chapters and the user's read state; null when not visible. */
 export async function getSeriesView(
   userId: string,
   slug: string,
@@ -62,7 +59,6 @@ export async function getSeriesView(
   };
 }
 
-/** Visible topics that link the note, with their graph slugs. */
 async function topicsLinking(noteId: Id): Promise<{ graphSlug: string; nodeSlug: string; title: string }[]> {
   const nodes = await GraphNode.find({ ...(await visibleNodeFilter()), "related.notes.noteId": noteId }, { graphId: 1, slug: 1, title: 1 })
     .sort({ order: 1, _id: 1 })
@@ -72,7 +68,6 @@ async function topicsLinking(noteId: Id): Promise<{ graphSlug: string; nodeSlug:
   return nodes.map((n) => ({ graphSlug: slugOf.get(String(n.graphId)) ?? "", nodeSlug: n.slug, title: n.title }));
 }
 
-/** One visible chapter with its neighbours, table of contents, read state and linking topics; null when not visible. */
 export async function getChapterView(
   userId: string,
   seriesSlug: string,

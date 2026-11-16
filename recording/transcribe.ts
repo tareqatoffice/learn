@@ -1,18 +1,17 @@
 import { retryOnDuplicateKey } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { getObjectBytes, headObject } from "@/lib/r2";
-import { transcribe } from "@/lib/stt";
+import { SttError, transcribe } from "@/lib/stt";
 import { SpeakingUsage } from "@/models";
 import { type ActionResult, fail, ok } from "@/admin/result";
 import type { MediaDoc } from "./mediaCore";
 
 const MAX_BYTES = 25 * 1024 * 1024;
+export const MAX_TRANSCRIBE_ATTEMPTS = 3;
+export const STALE_TRANSCRIBE_MS = 5 * 60 * 1000;
+export const TRANSCRIBE_ATTEMPTS_MESSAGE = "This recording couldn't be transcribed after several tries. Record it again to get a transcript.";
 export const TRANSCRIBE_LIMIT_MESSAGE = "You've reached today's transcription limit. It resets at midnight UTC.";
 
-/**
- * Counts one transcription against the user's shared daily limit (`STT_DAILY_LIMIT`, any module);
- * returns a refund, or null when the limit is used up.
- */
 export async function consumeTranscription(userId: string, now: Date = new Date()): Promise<(() => Promise<void>) | null> {
   const limit = getEnv().STT_DAILY_LIMIT;
   if (limit === 0) return async () => {};
@@ -32,12 +31,6 @@ export async function consumeTranscription(userId: string, now: Date = new Date(
   return refund;
 }
 
-/**
- * Transcribes a stored recording's audio: size check, daily cap, fetch, STT, refund on failure.
- * Writes nothing itself; callers persist through the optional hooks, which run inside the job:
- * `save` returns false when the transcript can't be stored (the count is refunded), `onError` runs
- * after a failed transcription (e.g. to mark the record failed).
- */
 export async function transcribeMedia(
   userId: string,
   media: MediaDoc,
@@ -45,7 +38,6 @@ export async function transcribeMedia(
     transcribe?: typeof transcribe;
     save?: (transcript: string) => Promise<boolean>;
     onError?: () => Promise<void>;
-    /** Names the recording in server logs, e.g. `take 123`. */
     label?: string;
   } = {},
 ): Promise<ActionResult<{ transcript: string }>> {
@@ -67,11 +59,10 @@ export async function transcribeMedia(
     }
     return ok({ transcript });
   } catch (error) {
-    // Only the label and the error message: never the audio bytes or the STT credentials.
     console.error(`Transcription failed for ${label}: ${error instanceof Error ? error.message : String(error)}`);
-    // Each step on its own, so a failed refund still marks the record failed (and neither can throw).
+    const answered = error instanceof SttError && error.reached;
     for (const [what, step] of [
-      ["refund the transcription", refund],
+      ["refund the transcription", answered ? async () => {} : refund],
       ["mark the recording failed", deps.onError ?? (async () => {})],
     ] as const) {
       try {

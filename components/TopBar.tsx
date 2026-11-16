@@ -22,20 +22,17 @@ const LINKS = [
   { href: "/notes", label: "Notes" },
 ];
 const ADMIN_LINK = { href: "/admin", label: "Admin" };
+const PROFILE_LINK = { href: "/profile", label: "Profile" };
 
 const linkClass = (active: boolean) =>
   cn(
-    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+    "rounded-md px-2 py-1.5 text-sm font-medium transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring lg:px-3",
     active ? "bg-muted text-foreground" : "text-muted-foreground",
   );
 
-// Desktop only: an accent bar on the header's bottom border, under the link, that grows on hover and
-// stays for the current page. It is a sibling of the link (positioned against the full-height wrapper),
-// not the link's ::after: the press scale on the link would make the link its containing block and
-// pull the bar up under the text for the length of the click.
 const barClass = (active: boolean) =>
   cn(
-    "pointer-events-none absolute inset-x-3 -bottom-px h-0.5 origin-left rounded-full bg-ring transition-transform duration-300 ease-out peer-hover:scale-x-100",
+    "pointer-events-none absolute inset-x-2 -bottom-px h-0.5 origin-left rounded-full bg-ring transition-transform duration-300 ease-out peer-hover:scale-x-100 lg:inset-x-3",
     active ? "scale-x-100" : "scale-x-0",
   );
 
@@ -49,8 +46,9 @@ export function TopBar({ user }: { user: TopBarUser }) {
   const accountRef = useRef<HTMLDivElement>(null);
   const accountButtonRef = useRef<HTMLButtonElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileNavRef = useRef<HTMLElement>(null);
+  const mobileLinks = [...links, PROFILE_LINK];
 
-  // A new page closes both menus (the account menu has no links, but a back/forward navigation can happen with it open).
   const [shownPath, setShownPath] = useState(pathname);
   if (shownPath !== pathname) {
     setShownPath(pathname);
@@ -58,15 +56,21 @@ export function TopBar({ user }: { user: TopBarUser }) {
     setAccountOpen(false);
   }
 
-  // The mobile menu lays a backdrop over the rest of the viewport; the page behind it must not scroll.
   useEffect(() => {
     if (!menuOpen) return;
     return lockPageScroll();
   }, [menuOpen]);
 
-  // The menu, its backdrop and the hamburger are all md:hidden, so widening past md would leave the
-  // page locked with nothing left on screen to release it. The menu can only be opened below md
-  // (the hamburger is its only trigger), so watching for the change is enough.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const main = document.getElementById("main");
+    if (main) main.inert = true;
+    mobileNavRef.current?.querySelector<HTMLElement>("a")?.focus();
+    return () => {
+      if (main) main.inert = false;
+    };
+  }, [menuOpen]);
+
   useEffect(() => {
     if (!menuOpen || typeof window.matchMedia !== "function") return;
     const wide = window.matchMedia("(min-width: 48rem)");
@@ -77,8 +81,6 @@ export function TopBar({ user }: { user: TopBarUser }) {
     return () => wide.removeEventListener("change", onChange);
   }, [menuOpen]);
 
-  // Escape closes whichever menu is open and puts focus back on its button, so it is not lost with the
-  // unmounted menu; a tap or click outside the account menu closes it.
   useEffect(() => {
     if (!menuOpen && !accountOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -103,8 +105,6 @@ export function TopBar({ user }: { user: TopBarUser }) {
     <AppHeader
       logoHref="/dashboard"
       below={
-        // Overlays the page instead of pushing it down: absolute under the sticky header, with a
-        // backdrop over the rest of the viewport that closes the menu on tap.
         menuOpen && (
           <>
             <div
@@ -113,12 +113,13 @@ export function TopBar({ user }: { user: TopBarUser }) {
               className="fixed inset-x-0 bottom-0 top-14 bg-black/40 animate-in fade-in-0 duration-200 md:hidden"
             />
             <nav
+              ref={mobileNavRef}
               id="mobile-nav"
               aria-label="Mobile"
               className="absolute inset-x-0 top-full border-y border-border bg-card px-4 py-2 shadow-lg sm:px-6 animate-in fade-in-0 slide-in-from-top-2 duration-200 md:hidden"
             >
               <ul className="grid gap-1">
-                {links.map(({ href, label }) => (
+                {mobileLinks.map(({ href, label }) => (
                   <li key={href}>
                     <Link
                       href={href}
@@ -136,9 +137,12 @@ export function TopBar({ user }: { user: TopBarUser }) {
         )
       }
     >
-      <nav aria-label="Main" className="hidden gap-1 self-stretch md:flex">
+      <nav
+        aria-label="Main"
+        className="hidden min-w-0 flex-1 gap-1 self-stretch overflow-x-auto overflow-y-hidden md:flex"
+      >
         {links.map(({ href, label }) => (
-          <div key={href} className="relative flex items-center">
+          <div key={href} className="relative flex shrink-0 items-center">
             <Link
               href={href}
               aria-current={isActive(href) ? "page" : undefined}
@@ -151,27 +155,33 @@ export function TopBar({ user }: { user: TopBarUser }) {
         ))}
       </nav>
 
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex shrink-0 items-center gap-1">
         <button
           type="button"
           onClick={openSearch}
           aria-label="Search"
           aria-keyshortcuts="Control+K Meta+K"
-          className="inline-flex h-9 items-center gap-2 rounded-md px-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:border sm:border-border sm:bg-background sm:pr-1.5 sm:pl-2.5 pointer-coarse:h-10"
+          className="inline-flex h-9 items-center gap-2 rounded-md px-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring lg:border lg:border-border lg:bg-background lg:pr-1.5 lg:pl-2.5 pointer-coarse:h-10"
         >
           <Search className="size-4 shrink-0" aria-hidden />
-          <span aria-hidden className="hidden text-sm sm:inline">
+          <span aria-hidden className="hidden text-sm lg:inline">
             Search
           </span>
           <kbd
             aria-hidden
-            className="ml-6 hidden rounded border border-border px-1.5 py-0.5 text-[0.6875rem] font-sans tabular-nums lg:inline"
+            className="ml-3 hidden rounded border border-border px-1.5 py-0.5 text-[0.6875rem] font-sans tabular-nums xl:inline"
           >
             ⌘K
           </kbd>
         </button>
         <ThemeToggle />
-        <div ref={accountRef} className="relative">
+        <div
+          ref={accountRef}
+          className="relative"
+          onBlur={(e) => {
+            if (accountOpen && !e.currentTarget.contains(e.relatedTarget as Node | null)) setAccountOpen(false);
+          }}
+        >
           <button
             ref={accountButtonRef}
             type="button"

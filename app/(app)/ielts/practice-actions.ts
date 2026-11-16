@@ -3,6 +3,7 @@
 import { type ActionResult } from "@/admin/result";
 import {
   claimSection,
+  finishSection,
   deleteTestAttempt,
   saveAnswers,
   startTestAttempt,
@@ -28,7 +29,6 @@ import type { AiResult } from "@/progress/quizAi";
 import { localDate } from "@/speaking/schedule";
 import { readTimeZone } from "@/speaking/timezone";
 
-// Every action signs in first and acts as the session user; ids in the input never pick the user.
 
 async function session(): Promise<string> {
   const user = await requireUser();
@@ -38,7 +38,6 @@ async function session(): Promise<string> {
 
 const today = async () => localDate(new Date(), await readTimeZone());
 
-// ---- Listening and Reading ----
 
 export async function startTestAction(skill: TestSkill, testId: string, scope: "full" | number): Promise<ActionResult<{ attemptId: string }>> {
   const userId = await session();
@@ -47,6 +46,10 @@ export async function startTestAction(skill: TestSkill, testId: string, scope: "
 
 export async function claimSectionAction(attemptId: string, index: number): Promise<ActionResult<{ play: SectionPlay }>> {
   return claimSection(await session(), attemptId, index);
+}
+
+export async function finishSectionAction(attemptId: string, index: number): Promise<ActionResult> {
+  return finishSection(await session(), attemptId, index);
 }
 
 export async function saveAnswersAction(attemptId: string, answers: Record<string, string>): Promise<ActionResult> {
@@ -61,7 +64,6 @@ export async function deleteTestAttemptAction(attemptId: string): Promise<Action
   return deleteTestAttempt(await session(), attemptId);
 }
 
-// ---- Writing ----
 
 export async function startWritingAction(kind: WritingKind): Promise<ActionResult<{ attemptId: string }>> {
   const userId = await session();

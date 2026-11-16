@@ -1,13 +1,16 @@
-// Data for the profile page: lifetime totals and history per area, plus a daily activity count.
-// Every date handed to the page is a learner-local YYYY-MM-DD string, so the page never has to
-// know about time zones and a late-night activity lands on the day the learner lived it.
 
 import { isValidObjectId, Types } from "mongoose";
-import { listBooksWithProgress, listSeriesWithProgress } from "@/content/queries";
-import { filterUnder, visibleNoteFilter } from "@/content/visibility";
+import { listBooksWithProgress, listGraphsWithProgress, listSeriesWithProgress } from "@/content/queries";
+import { filterUnder, visibleNodeFilter, visibleNoteFilter } from "@/content/visibility";
 import {
+  Graph,
+  GraphNode,
   IeltsBandEntry,
   IeltsSpeakingAttempt,
+  IeltsStudyLog,
+  IeltsTestAttempt,
+  IeltsWritingAttempt,
+  NodeProgress,
   Note,
   NoteProgress,
   NoteSeries,
@@ -15,19 +18,20 @@ import {
   SpeakingTake,
   User,
 } from "@/models";
-import { labelSessions, sessionCounts } from "@/progress/quiz";
+import { labelSessions, quizDate, quizHistoryFilter, sessionCounts, SUMMARY_PROJECTION } from "@/progress/quiz";
 import { addDays, localDate } from "@/speaking/schedule";
 import { TASK_LABEL, type TaskKey } from "@/speaking/tasks";
 
 type Id = Types.ObjectId;
 
-export const PROFILE_TABS = ["overview", "notes", "interview", "speaking", "ielts"] as const;
+export const PROFILE_TABS = ["overview", "notes", "interview", "graphs", "speaking", "ielts"] as const;
 export type ProfileTab = (typeof PROFILE_TABS)[number];
 
 export const TAB_LABEL: Record<ProfileTab, string> = {
   overview: "Overview",
   notes: "Notes",
   interview: "Interview",
+  graphs: "Graphs",
   speaking: "Speaking",
   ielts: "IELTS",
 };
@@ -38,12 +42,9 @@ export function parseTab(value: string | undefined): ProfileTab {
 
 const HISTORY_MAX = 15;
 const ACTIVITY_DAYS = 84;
-/** The widest UTC offset is 14 hours; a timestamp bound this far back never cuts a local day short. */
-const MAX_OFFSET_MS = 14 * 3_600_000;
 
 export type ActivityDay = { date: string; count: number };
 
-/** The last `days` days ending at `today`, oldest first, with the count for each (0 when none). */
 export function fillActivity(counts: Map<string, number>, today: string, days = ACTIVITY_DAYS): ActivityDay[] {
   return Array.from({ length: days }, (_, i) => {
     const date = addDays(today, -(days - 1 - i));
@@ -51,7 +52,6 @@ export function fillActivity(counts: Map<string, number>, today: string, days = 
   });
 }
 
-/** Current streak: consecutive active days ending today, or yesterday if today has none yet. */
 export function streakOf(activity: ActivityDay[]): number {
   let i = activity.length - 1;
   if (i >= 0 && activity[i].count === 0) i -= 1;
@@ -60,16 +60,36 @@ export function streakOf(activity: ActivityDay[]): number {
   return streak;
 }
 
+export function activityStreak(counts: Map<string, number>, today: string): number {
+  let day = (counts.get(today) ?? 0) > 0 ? today : addDays(today, -1);
+  let streak = 0;
+  while ((counts.get(day) ?? 0) > 0) {
+    streak += 1;
+    day = addDays(day, -1);
+  }
+  return streak;
+}
+
 export type NotesHistoryItem = { chapter: string; series: string; seriesSlug: string; chapterSlug: string; date: string };
-export type QuizHistoryItem = { id: string; label: string; got: number; review: number; date: string };
+export type QuizHistoryItem = { id: string; label: string; got: number; review: number; finished: boolean; date: string };
+export type TopicHistoryItem = { topic: string; topicSlug: string; graph: string; graphSlug: string; date: string };
 export type TakeHistoryItem = { id: string; date: string; task: string };
-export type AttemptHistoryItem = { id: string; date: string; kind: string; status: string; overall?: number };
-export type BandHistoryItem = { date: string; source: string; overall?: number };
+export type IeltsArea = "speaking" | "listening" | "reading" | "writing";
+export type AttemptHistoryItem = {
+  id: string;
+  date: string;
+  area: IeltsArea;
+  kind: string;
+  done: boolean;
+  band?: number;
+  href: string;
+};
+export type Bands = { listening?: number; reading?: number; writing?: number; speaking?: number };
+export type BandHistoryItem = { date: string; source: string; overall?: number; bands: Bands };
 
 export type ProfileData = {
   name: string;
   image?: string;
-  /** The day the account was created, in the learner's time zone. */
   joined: string | null;
   streak: number;
   activity: ActivityDay[];
@@ -81,11 +101,19 @@ export type ProfileData = {
     quizzes: number;
     history: QuizHistoryItem[];
   };
+  graphs: { graphs: { slug: string; title: string; done: number; total: number }[]; done: number; total: number; history: TopicHistoryItem[] };
   speaking: { takes: number; byTask: { task: string; count: number }[]; history: TakeHistoryItem[] };
-  ielts: { attempts: number; completed: number; history: AttemptHistoryItem[]; bands: BandHistoryItem[] };
+  ielts: {
+    speaking: { attempts: number; completed: number };
+    tests: number;
+    writing: number;
+    studyMinutes: number;
+    history: AttemptHistoryItem[];
+    bands: BandHistoryItem[];
+  };
 };
 
-type Window = { today: string; timeZone: string; counts: Map<string, number>; since: string; sinceInstant: Date };
+type Window = { timeZone: string; counts: Map<string, number> };
 type DayRow = { _id: string; n: number };
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
@@ -94,27 +122,14 @@ function addDayRows(counts: Map<string, number>, rows: DayRow[]) {
   for (const r of rows) counts.set(r._id, (counts.get(r._id) ?? 0) + r.n);
 }
 
-/** $group stage that counts documents per learner-local day of a timestamp field. */
 const perLocalDay = (field: string, timeZone: string) => ({
   $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: `$${field}`, timezone: timeZone } }, n: { $sum: 1 } },
 });
 
-/** Per-day counts of documents that store their own local-date string, limited to the window. */
-async function dayCountsOfDateField(
-  model: typeof SpeakingTake | typeof IeltsSpeakingAttempt,
-  userId: Id,
-  w: Window,
-): Promise<DayRow[]> {
-  return model.aggregate<DayRow>([
-    { $match: { userId, date: { $gte: w.since } } },
-    { $group: { _id: "$date", n: { $sum: 1 } } },
-  ]);
+async function dayCountsOfDateField(model: typeof SpeakingTake, match: Record<string, unknown>): Promise<DayRow[]> {
+  return model.aggregate<DayRow>([{ $match: match }, { $group: { _id: "$date", n: { $sum: 1 } } }]);
 }
 
-/**
- * Chapters marked read, in one pass over the user's progress: per-day counts for the heatmap and the
- * newest rows for the history. Chapters an admin has since unpublished are left out of both.
- */
 async function notesArea(userId: Id, w: Window) {
   const [series, [facets]] = await Promise.all([
     listSeriesWithProgress(String(userId)),
@@ -128,7 +143,7 @@ async function notesArea(userId: Id, w: Window) {
       { $match: filterUnder("note", await visibleNoteFilter()) },
       {
         $facet: {
-          days: [{ $match: { readAt: { $gte: w.sinceInstant } } }, perLocalDay("readAt", w.timeZone)],
+          days: [perLocalDay("readAt", w.timeZone)],
           history: [
             { $sort: { readAt: -1 } },
             { $limit: HISTORY_MAX },
@@ -157,25 +172,32 @@ async function notesArea(userId: Id, w: Window) {
   };
 }
 
-/** Finished quizzes count towards the heatmap on the day they were finished, whatever happened to the books since. */
 async function interviewArea(userId: Id, w: Window) {
   const finished = { userId, finishedAt: { $ne: null } };
   const [books, quizzes, days, shown] = await Promise.all([
     listBooksWithProgress(String(userId)),
     QuizSession.countDocuments(finished),
-    QuizSession.aggregate<DayRow>([{ $match: { ...finished, finishedAt: { $gte: w.sinceInstant } } }, perLocalDay("finishedAt", w.timeZone)]),
-    // Full results (answers, coach chat) are read only for the rows shown.
-    QuizSession.find(finished)
-      .sort({ finishedAt: -1, _id: -1 })
+    QuizSession.aggregate<DayRow>([
+      { $match: { userId, "results.0": { $exists: true } } },
+      { $unwind: "$results" },
+      {
+        $group: {
+          _id: { s: "$_id", day: { $dateToString: { format: "%Y-%m-%d", date: "$results.at", timezone: w.timeZone } } },
+        },
+      },
+      { $group: { _id: "$_id.day", n: { $sum: 1 } } },
+    ]),
+    QuizSession.find(quizHistoryFilter(userId), SUMMARY_PROJECTION)
+      .sort({ startedAt: -1, _id: -1 })
       .limit(HISTORY_MAX)
-      .select("filter questionIds results finishedAt")
       .lean<
         {
           _id: Id;
           filter: { bookIds: Id[]; partKeys: string[]; mode: "unseen" | "review" | "all"; questionIds?: Id[] };
           questionIds: Id[];
           results: { questionId: Id; result: "got" | "review" | "skip"; at: Date }[];
-          finishedAt: Date;
+          startedAt: Date;
+          finishedAt?: Date | null;
         }[]
       >(),
   ]);
@@ -188,17 +210,53 @@ async function interviewArea(userId: Id, w: Window) {
     quizzes,
     history: shown.map((s, i) => {
       const c = sessionCounts(s);
-      return { id: String(s._id), label: labels[i] || "Quiz", got: c.got, review: c.review, date: localDate(s.finishedAt, w.timeZone) };
+      return { id: String(s._id), label: labels[i] || "Quiz", got: c.got, review: c.review, finished: Boolean(s.finishedAt), date: localDate(quizDate(s), w.timeZone) };
+    }),
+  };
+}
+
+async function graphsArea(userId: Id, w: Window) {
+  const [graphs, [facets]] = await Promise.all([
+    listGraphsWithProgress(String(userId)),
+    NodeProgress.aggregate<{ days: DayRow[]; history: { topic: string; topicSlug: string; graphId: Id; doneAt: Date }[] }>([
+      { $match: { userId, status: "done", doneAt: { $ne: null } } },
+      { $lookup: { from: GraphNode.collection.name, localField: "nodeId", foreignField: "_id", as: "node" } },
+      { $unwind: "$node" },
+      { $match: filterUnder("node", await visibleNodeFilter()) },
+      {
+        $facet: {
+          days: [perLocalDay("doneAt", w.timeZone)],
+          history: [
+            { $sort: { doneAt: -1 } },
+            { $limit: HISTORY_MAX },
+            { $project: { _id: 0, doneAt: 1, graphId: "$node.graphId", topic: "$node.title", topicSlug: "$node.slug" } },
+          ],
+        },
+      },
+    ]),
+  ]);
+  addDayRows(w.counts, facets?.days ?? []);
+  const history = facets?.history ?? [];
+  const parents = await Graph.find({ _id: { $in: history.map((h) => h.graphId) } }, { slug: 1, title: 1 }).lean<{ _id: Id; slug: string; title: string }[]>();
+  const parent = new Map(parents.map((p) => [String(p._id), p]));
+  return {
+    graphs,
+    done: sum(graphs.map((g) => g.done)),
+    total: sum(graphs.map((g) => g.total)),
+    history: history.flatMap((h) => {
+      const p = parent.get(String(h.graphId));
+      return p ? [{ topic: h.topic, topicSlug: h.topicSlug, graph: p.title, graphSlug: p.slug, date: localDate(h.doneAt, w.timeZone) }] : [];
     }),
   };
 }
 
 async function speakingArea(userId: Id, w: Window) {
+  const stored = { userId, "media.stored": true };
   const [takes, byTask, days, recent] = await Promise.all([
-    SpeakingTake.countDocuments({ userId }),
-    SpeakingTake.aggregate<{ _id: TaskKey; n: number }>([{ $match: { userId } }, { $group: { _id: "$task", n: { $sum: 1 } } }]),
-    dayCountsOfDateField(SpeakingTake, userId, w),
-    SpeakingTake.find({ userId }, { date: 1, task: 1 })
+    SpeakingTake.countDocuments(stored),
+    SpeakingTake.aggregate<{ _id: TaskKey; n: number }>([{ $match: stored }, { $group: { _id: "$task", n: { $sum: 1 } } }]),
+    dayCountsOfDateField(SpeakingTake, stored),
+    SpeakingTake.find(stored, { date: 1, task: 1 })
       .sort({ date: -1, _id: -1 })
       .limit(HISTORY_MAX)
       .lean<{ _id: Id; date: string; task: TaskKey }[]>(),
@@ -211,32 +269,90 @@ async function speakingArea(userId: Id, w: Window) {
   };
 }
 
+type Dated = { _id: Id; date: string; createdAt?: Date };
+const newestFirst = (a: { date: string; at: number }, b: { date: string; at: number }) => (a.date === b.date ? b.at - a.at : a.date < b.date ? 1 : -1);
+
 async function ieltsArea(userId: Id, w: Window) {
-  const [attempts, completed, days, recent, bands] = await Promise.all([
-    IeltsSpeakingAttempt.countDocuments({ userId }),
-    IeltsSpeakingAttempt.countDocuments({ userId, status: "complete" }),
-    dayCountsOfDateField(IeltsSpeakingAttempt, userId, w),
-    IeltsSpeakingAttempt.find({ userId }, { date: 1, kind: 1, status: 1, "ai.overall": 1 })
-      .sort({ date: -1, _id: -1 })
-      .limit(HISTORY_MAX)
-      .lean<{ _id: Id; date: string; kind: string; status: string; ai?: { overall?: number } }[]>(),
-    IeltsBandEntry.find({ userId }, { date: 1, source: 1, overall: 1 })
-      .sort({ date: -1, _id: -1 })
-      .limit(HISTORY_MAX)
-      .lean<{ date: string; source: string; overall?: number }[]>(),
+  const spoken = { userId, "parts.media.stored": true };
+  const submitted = { userId, status: "submitted" };
+  const [attempts, completed, tests, writing, minutes, ...dayRows] = await Promise.all([
+    IeltsSpeakingAttempt.countDocuments(spoken),
+    IeltsSpeakingAttempt.countDocuments({ ...spoken, status: "complete" }),
+    IeltsTestAttempt.countDocuments(submitted),
+    IeltsWritingAttempt.countDocuments(submitted),
+    IeltsStudyLog.aggregate<{ _id: null; n: number }>([{ $match: { userId } }, { $group: { _id: null, n: { $sum: "$minutes" } } }]),
+    dayCountsOfDateField(IeltsSpeakingAttempt as typeof SpeakingTake, spoken),
+    dayCountsOfDateField(IeltsTestAttempt as typeof SpeakingTake, submitted),
+    dayCountsOfDateField(IeltsWritingAttempt as typeof SpeakingTake, submitted),
+    dayCountsOfDateField(IeltsStudyLog as typeof SpeakingTake, { userId }),
   ]);
-  addDayRows(w.counts, days);
-  return {
-    attempts,
-    completed,
-    history: recent.map((a) => ({
+  for (const rows of dayRows) addDayRows(w.counts, rows);
+
+  const recent = { sort: { date: -1 as const, _id: -1 as const }, limit: HISTORY_MAX };
+  const [speakingRows, testRows, writingRows, bands] = await Promise.all([
+    IeltsSpeakingAttempt.find(spoken, { date: 1, kind: 1, status: 1, "ai.overall": 1, createdAt: 1 })
+      .sort(recent.sort)
+      .limit(recent.limit)
+      .lean<(Dated & { kind: string; status: string; ai?: { overall?: number } })[]>(),
+    IeltsTestAttempt.find({ userId }, { date: 1, skill: 1, scope: 1, status: 1, "score.band": 1, createdAt: 1 })
+      .sort(recent.sort)
+      .limit(recent.limit)
+      .lean<(Dated & { skill: "listening" | "reading"; scope: string; status: string; score?: { band?: number } })[]>(),
+    IeltsWritingAttempt.find({ userId }, { date: 1, kind: 1, status: 1, "ai.overall": 1, createdAt: 1 })
+      .sort(recent.sort)
+      .limit(recent.limit)
+      .lean<(Dated & { kind: string; status: string; ai?: { overall?: number } })[]>(),
+    IeltsBandEntry.find({ userId }, { date: 1, source: 1, overall: 1, bands: 1 })
+      .sort({ date: -1, _id: -1 })
+      .limit(HISTORY_MAX)
+      .lean<{ date: string; source: string; overall?: number; bands?: Bands }[]>(),
+  ]);
+
+  const at = (r: Dated) => r.createdAt?.getTime() ?? r._id.getTimestamp().getTime();
+  const band = (value: number | undefined) => (value !== undefined ? { band: value } : {});
+  const history: (AttemptHistoryItem & { at: number })[] = [
+    ...speakingRows.map((a) => ({
       id: String(a._id),
       date: a.date,
+      at: at(a),
+      area: "speaking" as const,
       kind: a.kind,
-      status: a.status,
-      ...(a.ai?.overall !== undefined ? { overall: a.ai.overall } : {}),
+      done: a.status === "complete",
+      ...band(a.ai?.overall),
+      href: a.status === "complete" ? `/ielts/speaking/${a._id}/review` : `/ielts/speaking/${a._id}`,
     })),
-    bands: bands.map((b) => ({ date: b.date, source: b.source, ...(b.overall !== undefined ? { overall: b.overall } : {}) })),
+    ...testRows.map((a) => ({
+      id: String(a._id),
+      date: a.date,
+      at: at(a),
+      area: a.skill,
+      kind: a.scope === "full" ? "Full test" : `Section ${Number(a.scope) + 1} drill`,
+      done: a.status === "submitted",
+      ...band(a.score?.band),
+      href: `/ielts/test/${a._id}`,
+    })),
+    ...writingRows.map((a) => ({
+      id: String(a._id),
+      date: a.date,
+      at: at(a),
+      area: "writing" as const,
+      kind: a.kind === "full" ? "Full test" : a.kind === "task1" ? "Task 1" : "Task 2",
+      done: a.status === "submitted",
+      ...band(a.ai?.overall),
+      href: `/ielts/writing/${a._id}`,
+    })),
+  ];
+
+  return {
+    speaking: { attempts, completed },
+    tests,
+    writing,
+    studyMinutes: minutes[0]?.n ?? 0,
+    history: history
+      .sort(newestFirst)
+      .slice(0, HISTORY_MAX)
+      .map((item): AttemptHistoryItem => ({ id: item.id, date: item.date, area: item.area, kind: item.kind, done: item.done, href: item.href, ...(item.band !== undefined ? { band: item.band } : {}) })),
+    bands: bands.map((b) => ({ date: b.date, source: b.source, bands: b.bands ?? {}, ...(b.overall !== undefined ? { overall: b.overall } : {}) })),
   };
 }
 
@@ -256,28 +372,29 @@ export async function getProfileData(
       activity: fillActivity(counts, today),
       notes: { series: [], read: 0, total: 0, history: [] },
       interview: { books: [], mastered: 0, total: 0, quizzes: 0, history: [] },
+      graphs: { graphs: [], done: 0, total: 0, history: [] },
       speaking: { takes: 0, byTask: [], history: [] },
-      ielts: { attempts: 0, completed: 0, history: [], bands: [] },
+      ielts: { speaking: { attempts: 0, completed: 0 }, tests: 0, writing: 0, studyMinutes: 0, history: [], bands: [] },
     };
   }
   const uid = new Types.ObjectId(userId);
-  const since = addDays(today, -(ACTIVITY_DAYS - 1));
-  const w: Window = { today, timeZone, counts, since, sinceInstant: new Date(Date.parse(`${since}T00:00:00Z`) - MAX_OFFSET_MS) };
-  const [user, notes, interview, speaking, ielts] = await Promise.all([
+  const w: Window = { timeZone, counts };
+  const [user, notes, interview, graphs, speaking, ielts] = await Promise.all([
     User.findById(uid, { createdAt: 1 }).lean<{ createdAt?: Date } | null>(),
     notesArea(uid, w),
     interviewArea(uid, w),
+    graphsArea(uid, w),
     speakingArea(uid, w),
     ieltsArea(uid, w),
   ]);
-  const activity = fillActivity(counts, today);
   return {
     ...fallback,
     joined: user?.createdAt ? localDate(user.createdAt, timeZone) : null,
-    streak: streakOf(activity),
-    activity,
+    streak: activityStreak(counts, today),
+    activity: fillActivity(counts, today),
     notes,
     interview,
+    graphs,
     speaking,
     ielts,
   };

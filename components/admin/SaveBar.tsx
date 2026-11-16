@@ -1,7 +1,6 @@
 import type { FieldErrors } from "@/admin/result";
 import { Button } from "@/components/ui/button";
 
-/** The outcome of an admin update: "Saved." (or `savedText`), or the first error. */
 export function ActionStatus({ saved, errors, savedText = "Saved." }: { saved: boolean; errors: FieldErrors; savedText?: string }) {
   const first = Object.entries(errors).find(([key]) => key === "_") ?? Object.entries(errors)[0];
   if (first) {
@@ -18,10 +17,8 @@ export function ActionStatus({ saved, errors, savedText = "Saved." }: { saved: b
   ) : null;
 }
 
-/** "fallbackModel" → "Fallback model", for errors on fields without their own message slot. */
 const labelOf = (key: string) => key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).replace(/ ([A-Z])/g, (m) => m.toLowerCase());
 
-/** The footer of every admin form: the submit button plus ActionStatus. */
 export function SaveBar({
   label,
   pending,
@@ -33,7 +30,6 @@ export function SaveBar({
   pending: boolean;
   saved: boolean;
   errors: FieldErrors;
-  /** Extra buttons placed after the submit button. */
   children?: React.ReactNode;
 }) {
   return (

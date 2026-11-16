@@ -1,8 +1,5 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
 
-// Encrypts small secrets (the OpenRouter key an admin saves) before they reach the database, so a
-// database dump or backup alone does not leak them. The key is derived from AUTH_SECRET; changing
-// AUTH_SECRET makes stored secrets unreadable, and they must be entered again.
 
 const VERSION = "v1";
 
@@ -10,7 +7,6 @@ function keyFor(secret: string, purpose: string): Buffer {
   return Buffer.from(hkdfSync("sha256", secret, "learn", purpose, 32));
 }
 
-/** `v1.<iv>.<tag>.<ciphertext>`, base64url parts, AES-256-GCM. */
 export function encryptSecret(plain: string, secret: string, purpose: string): string {
   if (!secret) throw new Error("AUTH_SECRET is required to store secrets");
   const iv = randomBytes(12);
@@ -19,7 +15,6 @@ export function encryptSecret(plain: string, secret: string, purpose: string): s
   return [VERSION, iv, cipher.getAuthTag(), data].map((p) => (typeof p === "string" ? p : p.toString("base64url"))).join(".");
 }
 
-/** The plain text, or null when the value is malformed or was sealed with another secret. */
 export function decryptSecret(sealed: string, secret: string, purpose: string): string | null {
   const [version, iv, tag, data] = sealed.split(".");
   if (version !== VERSION || !iv || !tag || data === undefined || !secret) return null;

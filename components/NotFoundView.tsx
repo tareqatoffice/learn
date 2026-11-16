@@ -2,7 +2,6 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-/** Shared 404 body for root and signed-in `not-found` routes. */
 export function NotFoundView() {
   return (
     <div className="mx-auto grid max-w-lg gap-4 py-16 text-center">

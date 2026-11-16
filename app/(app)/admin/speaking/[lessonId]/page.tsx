@@ -17,7 +17,6 @@ export async function generateMetadata({ params }: { params: Promise<{ lessonId:
   });
 }
 
-/** `/admin/speaking/new` creates a lesson; any other segment is a lesson id. */
 export default async function AdminSpeakingLessonPage({ params }: { params: Promise<{ lessonId: string }> }) {
   const { lessonId } = await params;
   await connectDb();

@@ -1,7 +1,13 @@
-// @vitest-environment jsdom
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const confirmMock = vi.hoisted(() => vi.fn(async () => true));
+vi.mock("@/components/ConfirmDialog", () => ({
+  confirm: (...args: unknown[]) => confirmMock(...args),
+  ConfirmHost: () => null,
+}));
+
 import { type QuizCoach, QuizCard } from "@/components/QuizCard";
 import type { SessionView } from "@/progress/quiz";
 
@@ -27,7 +33,11 @@ const view = (over: Partial<SessionView> = {}): SessionView => ({
 
 const ANSWER = "A function that keeps its scope.";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  confirmMock.mockReset();
+  confirmMock.mockResolvedValue(true);
+});
 
 function setup(over: Partial<SessionView> = {}, onResult = vi.fn(() => Promise.resolve(view({ position: 4 })))) {
   const onFinish = vi.fn();
@@ -56,13 +66,17 @@ describe("QuizCard", () => {
     expect(screen.getByText(ANSWER)).toBeTruthy();
   });
 
-  it("maps G, R and S to got, review and skip", async () => {
+  it("maps G, R and S to got, review and skip; G and R wait for the reveal (U10)", async () => {
     const { onResult, user } = setup();
+    await user.keyboard("g");
+    expect(onResult).not.toHaveBeenCalled();
+    await user.keyboard(" ");
     await user.keyboard("g");
     expect(onResult).toHaveBeenLastCalledWith("got", undefined);
     cleanup();
 
     const review = setup();
+    await review.user.keyboard(" ");
     await review.user.keyboard("r");
     expect(review.onResult).toHaveBeenLastCalledWith("review", undefined);
     cleanup();
@@ -110,15 +124,29 @@ describe("QuizCard", () => {
   it("shows an error and re-enables the buttons when saving fails", async () => {
     const onResult = vi.fn(() => Promise.reject(new Error("boom")));
     const { user } = setup({}, onResult);
+    await user.keyboard(" ");
     await user.keyboard("g");
     expect((await screen.findByRole("alert")).textContent).toMatch(/could not save/i);
     expect((screen.getByRole("button", { name: "Got it" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("calls onFinish from End quiz", async () => {
+  it("asks before ending the quiz and reports a failed end (U1)", async () => {
+    confirmMock.mockResolvedValueOnce(false).mockResolvedValue(true);
     const { onFinish, user } = setup();
     await user.click(screen.getByRole("button", { name: "End quiz" }));
+    expect(onFinish).not.toHaveBeenCalled();
+    onFinish.mockRejectedValueOnce(new Error("offline"));
+    await user.click(screen.getByRole("button", { name: "End quiz" }));
     expect(onFinish).toHaveBeenCalledTimes(1);
+    expect((await screen.findByText(/could not end the quiz/i))).toBeTruthy();
+  });
+
+  it("moves focus to the new question after a mark, not on the first card (U8)", () => {
+    setup({ position: 0 });
+    expect(document.activeElement?.tagName).not.toBe("H1");
+    cleanup();
+    setup({ position: 1 });
+    expect(document.activeElement?.tagName).toBe("H1");
   });
 
   it("links to the graph topic when the card has one", () => {
@@ -183,7 +211,6 @@ describe("QuizCard", () => {
       expect(screen.getByText(ANSWER)).toBeTruthy();
       expect(screen.getByText("Coach suggests: Review")).toBeTruthy();
       expect(screen.getByRole("button", { name: "Review" }).getAttribute("aria-describedby")).toBe("quiz-suggested");
-      // The follow-up chat opens with the coach's question.
       expect(screen.getByText("Values or variables?")).toBeTruthy();
     });
 
@@ -201,7 +228,6 @@ describe("QuizCard", () => {
       await user.type(screen.getByLabelText("Your answer"), "Keeps scope");
       await user.keyboard("{Control>}{Enter}{Enter}{/Control}");
       expect(grade).toHaveBeenCalledTimes(1);
-      // Focus stays in the (read-only) box; even from <body>, Space and G must do nothing mid-check.
       expect(document.activeElement).toBe(screen.getByLabelText("Your answer"));
       (document.activeElement as HTMLElement).blur();
       await user.keyboard(" g");
@@ -305,7 +331,6 @@ describe("QuizCard", () => {
       await say("keep their scope", true);
       expect((screen.getByLabelText("Your answer") as HTMLTextAreaElement).value).toBe("Closures keep their scope");
 
-      // Mid-dictation, marks and the reveal wait: the phrase being spoken is not in the answer yet.
       expect((screen.getByRole("button", { name: /got it/i }) as HTMLButtonElement).disabled).toBe(true);
       expect((screen.getByRole("button", { name: /show answer/i }) as HTMLButtonElement).disabled).toBe(true);
       (document.activeElement as HTMLElement).blur();

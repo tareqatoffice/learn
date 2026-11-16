@@ -1,7 +1,17 @@
 import mongoose, { type ClientSession, type HydratedDocument, type Model, type Types } from "mongoose";
 import { Revision } from "@/models";
 
-export type SaveOptions = { session?: ClientSession };
+export type SaveOptions = {
+  session?: ClientSession;
+  expectedUpdatedAt?: string;
+};
+
+export class StaleEditError extends Error {
+  constructor() {
+    super("This item changed since it was opened");
+    this.name = "StaleEditError";
+  }
+}
 
 type RevisionRow = {
   _id: Types.ObjectId;
@@ -12,14 +22,9 @@ type RevisionRow = {
   editedAt: Date;
 };
 
-// Bookkeeping fields the schema regenerates; never replayed from a snapshot.
 const SNAPSHOT_META = ["_id", "__v", "createdAt", "updatedAt"] as const;
+const RESTORE_KEEPS_CURRENT = ["status", "order", "importKey", "subjects"] as const;
 
-/**
- * Creates (id null) or updates a content doc. An update first stores the previous
- * full doc in `revisions`, in the same session when one is given, so a caller's
- * transaction commits or rolls back both writes together.
- */
 export async function saveWithRevision<T>(
   model: Model<T>,
   id: string | null,
@@ -35,9 +40,10 @@ export async function saveWithRevision<T>(
 
   const doc = await model.findById(id, null, { session });
   if (!doc) throw new Error(`${model.modelName} ${id} not found`);
+  const current = (doc as { updatedAt?: Date }).updatedAt;
+  if (opts?.expectedUpdatedAt && current && current.toISOString() !== opts.expectedUpdatedAt) throw new StaleEditError();
   const snapshot = doc.toObject({ versionKey: true });
   doc.set(data);
-  // Validate before storing the snapshot, so a rejected update leaves no revision behind.
   await doc.validate();
 
   await Revision.create(
@@ -55,7 +61,6 @@ export async function saveWithRevision<T>(
   return (await doc.save({ session })) as HydratedDocument<T>;
 }
 
-/** Re-applies a stored snapshot through `saveWithRevision`, so the restore is itself revisioned. */
 export async function restoreRevision(revisionId: string, editedBy: string, opts?: SaveOptions): Promise<void> {
   const revision = await Revision.findById(revisionId, null, { session: opts?.session }).lean<RevisionRow | null>();
   if (!revision) throw new Error(`Revision ${revisionId} not found`);
@@ -64,11 +69,10 @@ export async function restoreRevision(revisionId: string, editedBy: string, opts
   if (!model) throw new Error(`Unknown entity type ${revision.entityType}`);
 
   const data = { ...revision.snapshot };
-  for (const key of SNAPSHOT_META) delete data[key];
+  for (const key of [...SNAPSHOT_META, ...RESTORE_KEEPS_CURRENT]) delete data[key];
   await saveWithRevision(model, String(revision.entityId), data, editedBy, opts);
 }
 
-/** Revisions of one entity, newest first. */
 export async function listRevisions(
   entityType: string,
   entityId: string,

@@ -1,10 +1,6 @@
 import Link from "next/link";
 import { hoursLabel } from "./format";
 
-/**
- * Shown when the study hours available before the test fall short of the rough hours needed. A warning
- * only: it lists the ways to close the gap and changes nothing itself.
- */
 export function HoursWarning({ needed, available, profileHref = "/ielts/profile" }: { needed: number; available: number; profileHref?: string | null }) {
   return (
     <div role="status" className="grid gap-1 rounded-xl border border-border bg-card p-4 text-sm">

@@ -1,10 +1,5 @@
 import { Types } from "mongoose";
 
-/**
- * A stored Speaking Practice take exactly as production holds it (field paths and R2 key format from
- * the schema before the recording/ extraction). Inserted with the raw driver so no schema defaults
- * or casting touch it.
- */
 export const legacyUserId = new Types.ObjectId("665f1c2e9b1d8a0012a3b4c5");
 export const legacyTakeId = new Types.ObjectId("665f1c2e9b1d8a0012a3b4d6");
 

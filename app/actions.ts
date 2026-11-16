@@ -3,24 +3,28 @@
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 import { signIn, signOut } from "@/auth";
+import { safeNextPath, signInPath } from "@/lib/nextPath";
+import { allow, clientAddress, LIMITS } from "@/lib/rateLimit";
 
-// Sign-ins land on `/`, which sends each user on by access status (dashboard, or the access page
-// while pending or blocked) with a page redirect, so the address bar shows where they ended up.
-const AFTER_SIGN_IN = "/";
-
-export async function signInWithGoogle(): Promise<void> {
-  await signIn("google", { redirectTo: AFTER_SIGN_IN });
+async function throttleSignIn(): Promise<void> {
+  if (!(await allow(`signin:${await clientAddress()}`, LIMITS.signIn))) redirect("/?error=rate");
 }
 
-/** Local testing only; the "credentials" provider is registered solely when AUTH_DEV_LOGIN is on in development. */
+const afterSignIn = (formData?: FormData) => signInPath(safeNextPath(formData?.get("next")));
+
+export async function signInWithGoogle(formData?: FormData): Promise<void> {
+  await throttleSignIn();
+  await signIn("google", { redirectTo: afterSignIn(formData) });
+}
+
 export async function signInDev(formData: FormData): Promise<void> {
+  await throttleSignIn();
   try {
     await signIn("credentials", {
       email: String(formData.get("email") ?? ""),
-      redirectTo: AFTER_SIGN_IN,
+      redirectTo: afterSignIn(formData),
     });
   } catch (error) {
-    // Anything else, including the redirect Auth.js throws on success, must propagate.
     if (error instanceof AuthError) redirect("/?error=dev-login");
     throw error;
   }

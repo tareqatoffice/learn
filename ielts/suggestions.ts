@@ -1,6 +1,3 @@
-// Plan suggestions: the app proposes, the user approves. Checks only ever create pending
-// suggestions; a plan version is written only by approveSuggestion (or the user's own
-// removeAdjustment / profile edit).
 
 import { randomUUID } from "node:crypto";
 import { isValidObjectId, type Types } from "mongoose";
@@ -27,10 +24,6 @@ export type SuggestionKind = "missed" | "weak" | "hoursShort" | "phase" | "curre
 
 type Bands = Partial<Record<"overall" | Skill, number>>;
 
-/**
- * Stored in `IeltsPlanSuggestion.proposal`. Empty for `hoursShort` and `phase`. `inputs.current`
- * holds only the bands that change; they are merged over the live profile when used.
- */
 type Proposal = {
   inputs?: { minutesPerDay?: number; current?: Bands };
   adjustment?: Omit<Adjustment, "id" | "createdAt">;
@@ -48,9 +41,7 @@ type Thresholds = IeltsSettingsView["thresholds"];
 type Found = { kind: SuggestionKind; reason: string; proposal: Proposal };
 
 const MAX_MINUTES = 480;
-/** Spreading a shortfall may put at most this multiple of minutes per day on a study day. */
 const DAY_CAP = 1.5;
-/** A skill-building mock this close to target suggests starting mocks and polish early. */
 const PHASE_GAP = 0.5;
 const NOT_PENDING = "That suggestion isn't pending any more. Reload the page to see the current ones.";
 const NO_PLAN = "You don't have an active IELTS plan. Set up your profile first.";
@@ -61,15 +52,10 @@ const band = (n: number) => n.toFixed(1);
 const fromView = (a: AdjustmentView): Adjustment => ({ ...a, createdAt: new Date(a.createdAt) });
 const speakingTarget = (p: ProfileView) => p.target.speaking ?? p.target.overall;
 const changesPlan = (p: Proposal) => Boolean(p.inputs || p.adjustment);
-/**
- * `createdAt` for a new adjustment: now's time of day on `today`, so its UTC date is the day of
- * the rebuild it is made for (spreadShortfall is one-shot: ruling R12).
- */
 const createdOn = (today: string) => new Date(`${today}T${new Date().toISOString().slice(11)}`);
 
 type MockBands = { date: string; low: Partial<Record<Criterion, number>>; self: Partial<Record<Criterion, number>> };
 
-/** The latest `n` complete mocks, newest first: per criterion min(self, AI), and the self rating alone. */
 async function lastMocks(userId: string, n: number): Promise<MockBands[]> {
   type Row = { date: string; self?: Partial<Record<Criterion, number>>; ai?: { bands?: Partial<Record<Criterion, number>> } };
   const rows = await IeltsSpeakingAttempt.find({ userId, kind: "mock", status: "complete" })
@@ -91,7 +77,6 @@ async function lastMocks(userId: string, n: number): Promise<MockBands[]> {
 
 type PlanContext = { profile: ProfileView; plan: PlanView; inputs: PlanInputs; adjustments: Adjustment[]; met: Criterion[] };
 
-/** Everything a rebuild from `today` needs; null without an active profile, a plan, or days left. */
 async function planContext(userId: string, today: string): Promise<PlanContext | null> {
   const [profile, plan, [latest]] = await Promise.all([getProfile(userId), currentPlan(userId), lastMocks(userId, 1)]);
   if (!profile || !plan || profile.status !== "active" || profile.testDate <= today) return null;
@@ -101,12 +86,10 @@ async function planContext(userId: string, today: string): Promise<PlanContext |
     plan,
     inputs: toPlanInputs(profile, today),
     adjustments: plan.adjustments.map(fromView),
-    // Shifts towards a criterion the latest mock already meets are dropped on rebuild.
     met: latest ? CRITERIA.filter((c) => (latest.low[c] ?? -Infinity) >= target) : [],
   };
 }
 
-/** Inputs and adjustments with `proposal` applied over the live profile, rebuilt from `today`. */
 function applied(ctx: PlanContext, proposal: Proposal, today: string): { inputs: PlanInputs; adjustments: Adjustment[] } {
   const { minutesPerDay, current } = proposal.inputs ?? {};
   const inputs = toPlanInputs(
@@ -132,7 +115,6 @@ function versionReason(p: Proposal): string {
   return "You approved spreading the minutes you missed";
 }
 
-/** Kinds not to raise now: one is pending, or one was dismissed in the last `dismissDays` days. */
 async function quietKinds(userId: string, today: string, dismissDays: number): Promise<Set<SuggestionKind>> {
   const since = new Date(`${addDays(today, -dismissDays)}T00:00:00Z`);
   const rows = await IeltsPlanSuggestion.find({
@@ -144,10 +126,6 @@ async function quietKinds(userId: string, today: string, dismissDays: number): P
   return new Set(rows.map((r) => r.kind));
 }
 
-/**
- * `n` when the last `n` study days before today (within the plan) had no IELTS minutes and no
- * stored Speaking Practice take (counted from the profile's creation day), else 0.
- */
 async function zeroStreak(userId: string, ctx: PlanContext, today: string, timeZone: string, n: number): Promise<number> {
   const start = ctx.plan.weeks[0]?.start;
   if (!start) return 0;
@@ -178,7 +156,6 @@ async function missedCheck(
   const t = settings.thresholds;
   let shortfall = 0;
   let why = "";
-  // "Last week" is the plan week before the one containing today.
   const here = weekOn(ctx.plan, today);
   if (here && here.index > 0) {
     const target = total(ctx.plan.weeks[here.index - 1].minutes);
@@ -197,7 +174,6 @@ async function missedCheck(
   }
   if (shortfall <= 0) return null;
 
-  // A rebuild starts today, so today's week is week 0 and the spread starts at week 1.
   const adjustment = { kind: "spreadShortfall" as const, minutes: shortfall, fromWeek: 1 };
   const plan = (extra: Adjustment[]) => generatePlan(ctx.inputs, [...ctx.adjustments, ...extra], settings, { metCriteria: ctx.met });
   const spread = plan([{ ...adjustment, id: "preview", createdAt: createdOn(today) }]);
@@ -213,8 +189,6 @@ async function missedCheck(
     };
   }
 
-  // Too much for some days: raise minutes per day so the study days left (today included) cover
-  // all the planned minutes plus the shortfall.
   const weeks = plan([]).weeks;
   const days = weeks.reduce((n, w) => n + studyDays(w), 0);
   if (!days) return null;
@@ -237,7 +211,6 @@ async function weakCheck(userId: string, ctx: PlanContext, t: Thresholds): Promi
   const target = speakingTarget(ctx.profile);
   const limit = target - t.weakGap;
   const low = (v: number | undefined) => v !== undefined && v <= limit;
-  // Pronunciation is estimated from the transcript only, so it counts only when the learner's own rating agrees.
   const weak = CRITERIA.filter((c) => mocks.every((m) => low(m.low[c]) && (c !== "pronunciation" || low(m.self[c]))));
   if (!weak.length) return null;
   const avg = (c: Criterion) => mocks.reduce((n, m) => n + m.low[c]!, 0) / mocks.length;
@@ -282,7 +255,6 @@ async function phaseCheck(userId: string, ctx: PlanContext, today: string): Prom
   const score = speakingBand(latest.low as Record<Criterion, number>);
   const target = speakingTarget(ctx.profile);
   if (score < target - PHASE_GAP) return null;
-  // One phase suggestion per qualifying mock, whatever became of it.
   if (await IeltsPlanSuggestion.exists({ userId, kind: "phase", forDate: { $gte: latest.date } })) return null;
   return {
     kind: "phase",
@@ -294,10 +266,6 @@ async function phaseCheck(userId: string, ctx: PlanContext, today: string): Prom
   };
 }
 
-/**
- * Runs the plan checks at most once per learner-local day (`profile.lastCheckDate`) and stores
- * what they find as pending suggestions. Never writes a plan version.
- */
 export async function runChecks(userId: string, today: string, timeZone: string): Promise<void> {
   await connectDb();
   const claimed = await IeltsProfile.findOneAndUpdate(
@@ -324,7 +292,6 @@ export async function runChecks(userId: string, today: string, timeZone: string)
   }
 }
 
-/** Pending suggestions, oldest first, each with a before/after preview of a rebuild from `today`. */
 export async function listPending(userId: string, today: string): Promise<SuggestionView[]> {
   await connectDb();
   const docs = await IeltsPlanSuggestion.find({ userId, status: "pending" }).sort({ createdAt: 1 }).lean<SuggestionDoc[]>();
@@ -345,16 +312,11 @@ export async function listPending(userId: string, today: string): Promise<Sugges
   return out;
 }
 
-/**
- * Applies a pending suggestion and writes the next plan version. `hoursShort` and `phase` change
- * nothing: approving acknowledges them and returns the current version.
- */
 export async function approveSuggestion(userId: string, id: string, today: string): Promise<ActionResult<{ version: number }>> {
   if (!isValidObjectId(id)) return fail(NOT_PENDING);
   await connectDb();
   const ctx = await planContext(userId, today);
   if (!ctx) return fail(NO_PLAN);
-  // One transaction: a failed plan write leaves the suggestion pending and the profile unchanged.
   return inTransaction(async (session) => {
     const s = await IeltsPlanSuggestion.findOneAndUpdate(
       { _id: id, userId, status: "pending" },
@@ -385,7 +347,6 @@ export async function dismissSuggestion(userId: string, id: string): Promise<Act
   return res.matchedCount ? ok() : fail(NOT_PENDING);
 }
 
-/** The user's own change: a new plan version without that standing adjustment. */
 export async function removeAdjustment(userId: string, adjustmentId: string, today: string): Promise<ActionResult> {
   await connectDb();
   const ctx = await planContext(userId, today);
@@ -396,12 +357,6 @@ export async function removeAdjustment(userId: string, adjustmentId: string, tod
   return ok();
 }
 
-/**
- * Suggests updating the profile's current band. The proposal holds only the bands that change.
- * `official`: the entered result becomes the current band (replacing any pending current-band suggestion, and not held back by a recent
- * dismissal, since the user entered it). `mocks`: `bands.speaking` (the caller's figure from the
- * last 2 mocks) is suggested when it is at least `currentBandGap` from the profile's Speaking band.
- */
 export async function suggestCurrentBand(userId: string, source: "official" | "mocks", bands: Bands, today: string): Promise<void> {
   await connectDb();
   const [profile, settings] = await Promise.all([getProfile(userId), getIeltsSettings()]);
@@ -433,7 +388,6 @@ export async function suggestCurrentBand(userId: string, source: "official" | "m
   if (now !== undefined && Math.abs(speaking - now) < settings.thresholds.currentBandGap) return;
   if ((await quietKinds(userId, today, settings.thresholds.dismissDays)).has("currentBand")) return;
   const from = now === undefined ? "" : `, against ${band(now)} on your profile`;
-  // An upsert (backed by the unique pending index), so two saves at once can't raise it twice.
   await ignoreDuplicate(() =>
     IeltsPlanSuggestion.updateOne(
       { userId, kind: "currentBand", status: "pending" },
@@ -449,7 +403,6 @@ export async function suggestCurrentBand(userId: string, source: "official" | "m
   );
 }
 
-/** Runs a write that may lose a race on the unique pending index; the other writer's row stands. */
 async function ignoreDuplicate(write: () => Promise<unknown>): Promise<void> {
   try {
     await write();

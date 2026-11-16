@@ -23,7 +23,6 @@ const DATE = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", tim
 
 const label = (date: string) => DATE.format(new Date(`${date}T00:00:00Z`));
 
-/** Minutes per day (bars) and self/AI scores per day (lines, 1–5) over the given days. Inline SVG. */
 export function TrendChart({ days }: { days: Day[] }) {
   const n = days.length;
   const innerW = W - PAD.left - PAD.right;

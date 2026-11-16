@@ -1,11 +1,6 @@
 export type AdminSectionLink = { href: string; label: string; description: string };
 export type AdminSectionGroup = { label: string; links: AdminSectionLink[] };
 
-/**
- * The admin sections, in one place: the sidebar and the admin home page both read this, so a new
- * page is added here once. Content is what learners see; Users & access controls who gets in;
- * Data moves content in and out; Settings configures app features.
- */
 export const ADMIN_NAV: AdminSectionGroup[] = [
   {
     label: "Content",

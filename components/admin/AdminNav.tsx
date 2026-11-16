@@ -2,66 +2,66 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 export type AdminNavGroup = { label: string; links: { href: string; label: string }[] };
 
-/**
- * Admin section navigation. Below md it is one horizontally scrolling row of pills, so a phone sees
- * the page content first instead of nine stacked links; from md up it is the grouped sidebar,
- * sticky under the app header. The current section is marked in both.
- */
+const sidebarLink = (active: boolean) =>
+  cn(
+    "rounded px-2 py-1 hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring",
+    active ? "bg-muted font-medium text-foreground" : "text-foreground",
+  );
+
 export function AdminNav({ groups }: { groups: AdminNavGroup[] }) {
   const pathname = usePathname();
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
-  const navRef = useRef<HTMLElement>(null);
+  const current = pathname === "/admin" ? "Admin" : (groups.flatMap((g) => g.links).find((l) => isActive(l.href))?.label ?? "Admin");
+  const [open, setOpen] = useState(false);
 
-  // On the phone strip, centre the current pill so "where am I" is never scrolled off the edge.
-  // Sets scrollLeft directly rather than scrollIntoView, which could also scroll the page.
-  useEffect(() => {
-    const nav = navRef.current;
-    const current = nav?.querySelector<HTMLElement>('[aria-current="page"]');
-    if (!nav || !current || nav.scrollWidth <= nav.clientWidth) return;
-    const navBox = nav.getBoundingClientRect();
-    const box = current.getBoundingClientRect();
-    nav.scrollLeft += box.left - navBox.left - (navBox.width - box.width) / 2;
-  }, [pathname]);
+  const [shownPath, setShownPath] = useState(pathname);
+  if (shownPath !== pathname) {
+    setShownPath(pathname);
+    setOpen(false);
+  }
 
-  return (
-    <nav
-      ref={navRef}
-      aria-label="Admin"
-      className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 text-sm [scrollbar-width:none] sm:-mx-6 sm:px-6 md:sticky md:top-20 md:mx-0 md:grid md:content-start md:gap-4 md:self-start md:overflow-visible md:px-0 md:pb-0"
-    >
-      <Link
-        href="/admin"
-        aria-current={pathname === "/admin" ? "page" : undefined}
-        className={cn(
-          "shrink-0 rounded-full border border-border px-3 py-2 font-semibold hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring md:rounded md:border-0 md:px-2 md:py-1",
-          pathname === "/admin" && "bg-muted",
-        )}
-      >
+  const list = (linkClass: (active: boolean) => string) => (
+    <>
+      <Link href="/admin" aria-current={pathname === "/admin" ? "page" : undefined} className={cn(linkClass(pathname === "/admin"), "font-semibold")}>
         Admin
       </Link>
       {groups.map((group) => (
-        <div key={group.label} className="contents md:grid md:gap-1">
-          <p className="hidden text-xs font-semibold uppercase tracking-wide text-muted-foreground md:block">{group.label}</p>
+        <div key={group.label} className="grid gap-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
           {group.links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              aria-current={isActive(l.href) ? "page" : undefined}
-              className={cn(
-                "shrink-0 whitespace-nowrap rounded-full border border-border px-3 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring md:rounded md:border-0 md:px-2 md:py-1",
-                isActive(l.href) ? "bg-muted font-medium text-foreground" : "text-muted-foreground md:text-foreground",
-              )}
-            >
+            <Link key={l.href} href={l.href} aria-current={isActive(l.href) ? "page" : undefined} className={linkClass(isActive(l.href))}>
               {l.label}
             </Link>
           ))}
         </div>
       ))}
-    </nav>
+    </>
+  );
+
+  return (
+    <>
+      <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} className="group rounded-lg border border-border bg-card text-sm md:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 font-medium focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+          <span>
+            <span className="text-muted-foreground">Admin menu · </span>
+            {current}
+          </span>
+          <span aria-hidden className="text-muted-foreground transition-transform group-open:rotate-180">
+            ▾
+          </span>
+        </summary>
+        <nav aria-label="Admin" className="grid gap-4 border-t border-border p-3">
+          {list((active) => cn(sidebarLink(active), "py-2"))}
+        </nav>
+      </details>
+      <nav aria-label="Admin" className="hidden text-sm md:sticky md:top-20 md:grid md:content-start md:gap-4 md:self-start">
+        {list(sidebarLink)}
+      </nav>
+    </>
   );
 }

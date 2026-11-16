@@ -43,7 +43,6 @@ describe("pickQuestions", () => {
     expect(await missing("part1")).toBe(true);
     await p1("About me", { aboutYou: true });
     expect(await missing("part1")).toBe(false);
-    // A card whose only Part 3 set belongs to another card: no Part 3 for the mock.
     await p2("Card");
     await p3("Other card", { cardId: new Types.ObjectId() });
     expect(await missing("mock")).toBe(true);
@@ -232,10 +231,10 @@ describe("generateQuestions", () => {
     expect(JSON.stringify(body.messages)).toContain("<card>");
   });
 
-  it("refunds an unusable reply", async () => {
+  it("counts an unusable reply, since the model answered (S4)", async () => {
     const res = await generateQuestions(userId, "part1", undefined, { fetch: async () => reply("not json") });
     expect(res.ok).toBe(false);
-    expect(await usage()).toBe(0);
+    expect(await usage()).toBe(1);
     const short = await generateQuestions(userId, "mock", undefined, { fetch: async () => reply({ part1: [] }) });
     expect(short.ok).toBe(false);
   });

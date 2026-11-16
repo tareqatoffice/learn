@@ -16,7 +16,6 @@ type Row = {
 
 const ZERO = { minutes: 0 };
 
-/** Stored takes only; unstored uploads never count. */
 function storedTakes(userId: string, filter: Record<string, unknown> = {}) {
   return SpeakingTake.find({ userId, "media.stored": true, ...filter });
 }
@@ -25,6 +24,7 @@ export async function getToday(
   userId: string,
   timeZone: string,
   now: Date = new Date(),
+  opts: { assignLesson?: boolean } = {},
 ): Promise<{
   date: string;
   settings: EffectiveSettings;
@@ -39,7 +39,7 @@ export async function getToday(
   await connectDb();
   const date = localDate(now, timeZone);
   const settings = await getEffectiveSettings(userId);
-  const lesson = await todaysLesson(userId, date, settings.enabled);
+  const lesson = await todaysLesson(userId, date, settings.enabled, { assign: opts.assignLesson });
 
   const days = weekDates(date);
   const [weekRows, practisedRows] = await Promise.all([

@@ -3,7 +3,6 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
-/** Plays the lesson clip and then the learner's take, back to back, for comparison. */
 export function ShadowPlayer({ sourceUrl, takeUrl }: { sourceUrl: string; takeUrl: string }) {
   const source = useRef<HTMLAudioElement>(null);
   const take = useRef<HTMLAudioElement>(null);

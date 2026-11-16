@@ -38,7 +38,7 @@ export default async function IeltsRunPage({ params }: PageProps<"/ielts/speakin
 
   if (!storageConfigured()) {
     return (
-      <div className="mx-auto grid w-full max-w-3xl gap-4">
+      <div className="grid w-full gap-4">
         <Link href="/ielts/speaking" className="text-sm text-muted-foreground hover:underline">
           ← Speaking practice
         </Link>
@@ -51,18 +51,15 @@ export default async function IeltsRunPage({ params }: PageProps<"/ielts/speakin
 
   const [attempt, profile] = await Promise.all([getAttempt(user.userId, attemptId), getProfile(user.userId)]);
   if (!attempt) notFound();
-  // A finished attempt, or one with recordings already stored, is reviewed rather than run again.
-  // A run left mid-way (reload or navigation) is settled first so it doesn't stay in progress forever.
   if (attempt.status !== "inProgress" || attempt.parts.some((p) => p.stored)) {
     if (attempt.status === "inProgress") await settleAttempt(user.userId, attemptId);
     redirect(`/ielts/speaking/${attemptId}/review`);
   }
 
-  // With no profile: mock video on, drill video off, examiner voice on.
   const video = attempt.kind === "mock" ? (profile?.mockVideo ?? true) : (profile?.drillVideo ?? false);
 
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-4">
+    <div className="grid w-full gap-4">
       <MockRunner
         attemptId={attempt.id}
         kind={attempt.kind}

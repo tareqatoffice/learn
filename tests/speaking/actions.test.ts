@@ -3,8 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 const session = vi.hoisted(() => ({ userId: null as string | null }));
 vi.mock("@/auth", () => ({
-  auth: () =>
-    Promise.resolve(session.userId ? { user: { id: session.userId, email: "learner@example.test", name: "Learner" } } : null),
+  auth: async () => (await import("../setup/session")).approvedSession(session.userId),
 }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "Europe/London" }) }) }));
 vi.mock("@/lib/r2", () => ({
@@ -20,6 +19,7 @@ vi.mock("@/lib/stt", () => ({ sttConfigured: vi.fn(() => false), transcribe: vi.
 import * as actions from "@/app/(app)/speaking/actions";
 import { connectDb } from "@/lib/db";
 import { SpeakingDay, SpeakingLesson, SpeakingProfile, SpeakingTake } from "@/models";
+import { localDate } from "@/speaking/schedule";
 import { resetDb } from "../setup/mongo";
 
 const id = () => String(new Types.ObjectId());
@@ -49,14 +49,12 @@ describe("speaking actions", () => {
     const other = id();
     session.userId = me;
 
-    // A smuggled userId in the input is ignored.
     const started = await actions.startTakeAction({ ...input, userId: other } as never);
     if (!started.ok) throw new Error(JSON.stringify(started.errors));
     const take = await SpeakingTake.findById(started.takeId).lean<{ userId: Types.ObjectId }>();
     expect(String(take?.userId)).toBe(me);
     expect(started.uploadUrl).toContain(`takes/${me}/`);
 
-    // Someone else's take can't be touched.
     const theirs = await SpeakingTake.create({
       userId: other,
       date: today,
@@ -69,7 +67,6 @@ describe("speaking actions", () => {
     expect((await actions.deleteTakeAction(String(theirs._id))).ok).toBe(false);
     expect(await SpeakingTake.exists({ _id: theirs._id })).toBeTruthy();
 
-    // Settings land on the session user's profile.
     expect((await actions.saveProfileAction({ targets: { readAloud: 9 } })).ok).toBe(true);
     expect((await actions.setBodyConsentAction(true)).ok).toBe(true);
     const profile = await SpeakingProfile.findOne({ userId: me }).lean<{ targets: { readAloud: number }; bodyConsentAt?: Date }>();
@@ -77,7 +74,6 @@ describe("speaking actions", () => {
     expect(profile?.bodyConsentAt).toBeInstanceOf(Date);
     expect(await SpeakingProfile.exists({ userId: other })).toBeNull();
 
-    // Swapping uses the session user and their local date.
     const lesson = await SpeakingLesson.create({ title: "L1", order: 1, status: "published", passage: "p", prompt: "q" });
     expect((await actions.swapLessonAction(String(lesson._id))).ok).toBe(true);
     const day = await SpeakingDay.findOne({ userId: me }).lean<{ lessonId: Types.ObjectId }>();
@@ -110,11 +106,27 @@ describe("speaking actions", () => {
     expect(take?.transcriptStatus).toBe("unavailable");
   });
 
+  it("refuses inputs of the wrong shape before they reach the take logic (S13)", async () => {
+    session.userId = id();
+    expect((await actions.startTakeAction({ ...input, size: "huge" } as never)).ok).toBe(false);
+    expect((await actions.saveSelfRatingAction(id(), { fluency: "3", confidence: 3 } as never)).ok).toBe(false);
+    expect((await actions.bodyFeedbackAction(id(), Array.from({ length: 20 }, () => "x"))).ok).toBe(false);
+    expect(await SpeakingTake.countDocuments()).toBe(0);
+  });
+
   it("surfaces startTake's messages", async () => {
     session.userId = id();
-    const res = await actions.startTakeAction({ ...input, date: "2020-01-01" });
+    const res = await actions.startTakeAction({ ...input, task: "nope" as never });
     expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.errors._).toBe("That date isn't today.");
+    if (!res.ok) expect(res.errors._).toBe("Unknown task.");
+  });
+
+  it("dates a take by the learner's local day on the server, ignoring the browser's date (D13)", async () => {
+    session.userId = id();
+    const res = await actions.startTakeAction({ ...input, date: "2020-01-01" });
+    if (!res.ok) throw new Error(JSON.stringify(res.errors));
+    const take = await SpeakingTake.findById(res.takeId).lean<{ date: string }>();
+    expect(take?.date).toBe(localDate(new Date(), "Europe/London"));
   });
 
   it("signed-out users are rejected", async () => {
@@ -127,6 +139,8 @@ describe("speaking actions", () => {
       ["speechFeedbackAction", () => actions.speechFeedbackAction(takeId)],
       ["bodyFeedbackAction", () => actions.bodyFeedbackAction(takeId, [])],
       ["generateMaterialAction", () => actions.generateMaterialAction("readAloud")],
+      ["deleteAllTakesAction", () => actions.deleteAllTakesAction()],
+      ["takeMediaUrlsAction", () => actions.takeMediaUrlsAction(takeId)],
       ["deleteTakeAction", () => actions.deleteTakeAction(takeId)],
       ["swapLessonAction", () => actions.swapLessonAction(id())],
       ["saveProfileAction", () => actions.saveProfileAction({})],

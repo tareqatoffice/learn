@@ -4,9 +4,7 @@ import type { Adjustment, PhaseName } from "@/ielts/plan";
 const DATE = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const SHORT = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 
-/** "2027-02-20" → "20 Feb 2027". */
 export const dateLabel = (d: string) => DATE.format(new Date(`${d}T00:00:00Z`));
-/** "2027-02-20" → "20 Feb". */
 export const shortDate = (d: string) => SHORT.format(new Date(`${d}T00:00:00Z`));
 
 export const bandLabel = (n: number) => n.toFixed(1);
@@ -20,7 +18,6 @@ export function hoursLabel(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
-/** A standing plan change in words. */
 export function adjustmentLabel(a: Pick<Adjustment, "kind" | "criterion" | "share" | "minutes">): string {
   if (a.kind === "shiftCriterion") {
     const pct = Math.round((a.share ?? 0) * 100);
