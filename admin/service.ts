@@ -1,3 +1,4 @@
+import { publicMessage } from "@/lib/errors";
 import mongoose, { isValidObjectId, Types, type ClientSession, type Model } from "mongoose";
 import { z } from "zod";
 import { findCycle } from "@/content/cycles";
@@ -556,7 +557,7 @@ export async function restoreRevisionChecked(revisionId: string, editedBy: strin
       }
     });
   } catch (error) {
-    return fail({ _: error instanceof Error ? error.message : "Restore failed" });
+    return fail({ _: publicMessage(error, "Restore failed because of a database error. Try again.") });
   }
   return done(revision.entityId);
 }

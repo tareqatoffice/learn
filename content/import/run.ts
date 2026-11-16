@@ -1,3 +1,4 @@
+import { publicMessage } from "@/lib/errors";
 import mongoose, { Types, type Model } from "mongoose";
 import { findCycle } from "@/content/cycles";
 import { parseGraph } from "@/content/parse/graph";
@@ -383,7 +384,7 @@ const stamped = (opts: ImportOptions, data: Data): Data => (opts.importedAt ? { 
 const pick = (data: Data, keys: string[]): Data => Object.fromEntries(keys.filter((k) => k in data).map((k) => [k, data[k]]));
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 const diff = (doc: Data, next: Data) => Object.keys(next).filter((k) => !same(doc[k], next[k]));
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const message = (error: unknown) => publicMessage(error, "a database error stopped it; try again");
 
 function orderAfter(docs: Row[]): () => number {
   let order = Math.max(0, ...docs.map((d) => Number(d.order) || 0));
