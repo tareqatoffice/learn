@@ -68,7 +68,7 @@ describe("saveGraph", () => {
   it("updates with a revision", async () => {
     const id = await graph();
     const r = await saveGraph({ id, slug: "js", title: "JS!", subtitle: "", footer: "", subjects: [], tracks: TRACKS, status: "published" }, ADMIN);
-    expect(r).toEqual({ ok: true, id });
+    expect(r).toMatchObject({ ok: true, id });
     expect((await Graph.findById(id).lean<{ title: string }>())?.title).toBe("JS!");
     expect(await Revision.countDocuments({ entityId: id })).toBe(1);
   });
@@ -160,7 +160,7 @@ describe("restoreRevisionChecked", () => {
     const a = await saved(node(g, "a"));
     await saved(node(g, "a", { id: a, title: "renamed" }));
     const original = await revisionWith(a, (s) => s.title === "a topic");
-    expect(await restoreRevisionChecked(original, ADMIN)).toEqual({ ok: true, id: a });
+    expect(await restoreRevisionChecked(original, ADMIN)).toMatchObject({ ok: true, id: a });
     expect((await GraphNode.findById(a).lean<{ title: string }>())?.title).toBe("a topic");
   });
 });

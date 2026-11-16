@@ -75,6 +75,15 @@ describe("revisions", () => {
     expect(newest!.snapshot.question).toBe("third");
   });
 
+  it("restores editor fields only, keeping the current status, order, subjects and importKey (D6)", async () => {
+    const id = await seedQuestion("first");
+    await saveWithRevision(Question, id, { question: "second", status: "draft", order: 5, subjects: ["js"], importKey: "k2" }, editor);
+    const [rev] = await listRevisions("Question", id); // holds "first", published, no subjects
+    await restoreRevision(rev.id, editor);
+    const now = await Question.findById(id).lean<{ question: string; status: string; order: number; subjects: string[]; importKey: string }>();
+    expect(now).toMatchObject({ question: "first", status: "draft", order: 5, subjects: ["js"], importKey: "k2" });
+  });
+
   it("rejects restoring an unknown revision", async () => {
     await expect(restoreRevision(new Types.ObjectId().toString(), editor)).rejects.toThrow(
       /not found/i,

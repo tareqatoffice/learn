@@ -49,8 +49,8 @@ describe("setNodeNoteLink", () => {
     const node = await seedNode(await seedGraph("g"), "images");
 
     expect(await setNodeNoteLink(node, n, "nope", true, ADMIN)).toMatchObject({ ok: false, errors: { anchor: expect.any(String) } });
-    expect(await setNodeNoteLink(node, n, "layers", true, ADMIN)).toEqual({ ok: true, id: node });
-    expect(await setNodeNoteLink(node, n, "", true, ADMIN)).toEqual({ ok: true, id: node });
+    expect(await setNodeNoteLink(node, n, "layers", true, ADMIN)).toMatchObject({ ok: true, id: node });
+    expect(await setNodeNoteLink(node, n, "", true, ADMIN)).toMatchObject({ ok: true, id: node });
     const links = async () =>
       ((await GraphNode.findById(node).lean<{ related: { notes: { noteId: unknown; anchor: string }[] } }>())?.related.notes ?? []).map(
         (l) => `${String(l.noteId)}#${l.anchor}`,
@@ -66,7 +66,7 @@ describe("saveSubject", () => {
   it("creates and renames a subject", async () => {
     const r = await saveSubject({ slug: "react", name: "React" }, ADMIN);
     if (!r.ok) throw new Error(JSON.stringify(r.errors));
-    expect(await saveSubject({ id: r.id, slug: "react", name: "React.js" }, ADMIN)).toEqual({ ok: true, id: r.id });
+    expect(await saveSubject({ id: r.id, slug: "react", name: "React.js" }, ADMIN)).toMatchObject({ ok: true, id: r.id });
     expect((await Subject.findById(r.id).lean<{ name: string }>())?.name).toBe("React.js");
     expect(await saveSubject({ slug: "react", name: "Dupe" }, ADMIN)).toMatchObject({ ok: false, errors: { slug: expect.any(String) } });
   });
@@ -79,12 +79,12 @@ describe("saveSubject", () => {
     if (!tagged.ok || !both.ok) throw new Error("seed failed");
     const subjectsOf = async (id: string) => (await NoteSeries.findById(id).lean<{ subjects: string[] }>())!.subjects;
 
-    expect(await saveSubject({ id: subject.id, slug: "reactjs", name: "React" }, ADMIN)).toEqual({ ok: true, id: subject.id });
+    expect(await saveSubject({ id: subject.id, slug: "reactjs", name: "React" }, ADMIN)).toMatchObject({ ok: true, id: subject.id });
     expect(await subjectsOf(tagged.id)).toEqual(["web", "reactjs"]);
     expect(await subjectsOf(both.id)).toEqual(["reactjs"]);
 
     const [before] = await Revision.find({ entityType: "Subject", entityId: subject.id }).sort({ editedAt: -1 }).lean<{ _id: unknown }[]>();
-    expect(await restoreRevisionChecked(String(before._id), ADMIN)).toEqual({ ok: true, id: subject.id });
+    expect(await restoreRevisionChecked(String(before._id), ADMIN)).toMatchObject({ ok: true, id: subject.id });
     expect((await Subject.findById(subject.id).lean<{ slug: string }>())!.slug).toBe("react");
     expect(await subjectsOf(tagged.id)).toEqual(["web", "react"]);
   });

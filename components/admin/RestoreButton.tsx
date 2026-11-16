@@ -15,7 +15,7 @@ export function RestoreButton({ revisionId }: { revisionId: string }) {
         disabled={pending}
         onClick={() =>
           run(() => restoreRevisionAction(revisionId), {
-            confirm: "Restore this version? The current version is kept in history.",
+            confirm: "Restore this version's content? Status, order and subjects stay as they are now, and the current version is kept in history.",
           })
         }
       >

@@ -2,6 +2,9 @@ import { isValidObjectId, type Types } from "mongoose";
 import { effectiveStatus } from "@/lib/access";
 import { isAdminEmail } from "@/lib/authz";
 import { byOrder, escapeRegex } from "@/lib/utils";
+
+/** `{ updatedAt }` as ISO when the doc has one: the version an editor sends back with its save. */
+const iso = (updatedAt: Date | undefined): { updatedAt?: string } => (updatedAt ? { updatedAt: updatedAt.toISOString() } : {});
 import {
   Graph,
   GraphNode,
@@ -47,6 +50,8 @@ export type AdminBook = {
   status: Status;
   parts: { key: string; title: string; intro: string }[];
   extras: { key: string; title: string; body: string }[];
+  /** ISO time of the last save; sent back with an edit so a stale one is refused. */
+  updatedAt?: string;
 };
 
 export async function getBookAdmin(id: string): Promise<{
@@ -63,6 +68,7 @@ export async function getBookAdmin(id: string): Promise<{
     status: Status;
     parts?: { key: string; title: string; intro?: string; order?: number }[];
     extras?: { key: string; title: string; body?: string; order?: number }[];
+    updatedAt?: Date;
   }>();
   if (!book) return null;
   const questions = await Question.find({ bookId: book._id }, { question: 1, partKey: 1, status: 1 })
@@ -78,6 +84,7 @@ export async function getBookAdmin(id: string): Promise<{
       status: book.status,
       parts: byOrder(book.parts).map((p) => ({ key: p.key, title: p.title, intro: p.intro ?? "" })),
       extras: byOrder(book.extras).map((e) => ({ key: e.key, title: e.title, body: e.body ?? "" })),
+      ...iso(book.updatedAt),
     },
     questions: questions.map((q) => ({ id: String(q._id), question: q.question, partKey: q.partKey, status: q.status })),
   };
@@ -92,6 +99,7 @@ export type AdminQuestion = {
   answer: string;
   subjects: string[];
   status: Status;
+  updatedAt?: string;
 };
 
 export async function getQuestionAdmin(id: string): Promise<{
@@ -108,6 +116,7 @@ export async function getQuestionAdmin(id: string): Promise<{
     answer: string;
     subjects?: string[];
     status: Status;
+    updatedAt?: Date;
   }>();
   if (!q) return null;
   const nodes = await GraphNode.find({ "related.questionIds": q._id }, { title: 1, graphId: 1 }).lean<{ _id: Id; title: string; graphId: Id }[]>();
@@ -123,6 +132,7 @@ export async function getQuestionAdmin(id: string): Promise<{
       answer: q.answer,
       subjects: q.subjects ?? [],
       status: q.status,
+      ...iso(q.updatedAt),
     },
     topics: nodes.map((n) => ({ id: String(n._id), title: n.title, graphTitle: titleOf.get(String(n.graphId)) ?? "" })),
   };
@@ -139,6 +149,7 @@ export type AdminGraph = {
   subjects: string[];
   status: Status;
   tracks: { key: string; name: string }[];
+  updatedAt?: string;
 };
 
 export async function listGraphsAdmin(): Promise<{ id: string; slug: string; title: string; status: Status; topics: number }[]> {
@@ -164,6 +175,7 @@ export async function getGraphAdmin(id: string): Promise<{
     subjects?: string[];
     status: Status;
     tracks?: { key: string; name: string; order?: number }[];
+    updatedAt?: Date;
   }>();
   if (!g) return null;
   const nodes = await GraphNode.find({ graphId: g._id }, { slug: 1, title: 1, trackKey: 1, status: 1 })
@@ -179,6 +191,7 @@ export async function getGraphAdmin(id: string): Promise<{
       subjects: g.subjects ?? [],
       status: g.status,
       tracks: byOrder(g.tracks).map(({ key, name }) => ({ key, name })),
+      ...iso(g.updatedAt),
     },
     nodes: nodes.map((n) => ({ id: String(n._id), slug: n.slug, title: n.title, trackKey: n.trackKey, status: n.status })),
   };
@@ -198,6 +211,7 @@ export type AdminNode = {
   docsUrl: string;
   subjects: string[];
   status: Status;
+  updatedAt?: string;
 };
 
 export type AdminRelated = {
@@ -222,6 +236,7 @@ export async function getNodeAdmin(id: string): Promise<{ node: AdminNode; relat
     subjects?: string[];
     status: Status;
     related?: { questionIds?: Id[]; notes?: { noteId: Id; anchor?: string }[] };
+    updatedAt?: Date;
   }>();
   if (!n) return null;
   const questionIds = n.related?.questionIds ?? [];
@@ -249,6 +264,7 @@ export async function getNodeAdmin(id: string): Promise<{ node: AdminNode; relat
       docsUrl: n.docsUrl ?? "",
       subjects: n.subjects ?? [],
       status: n.status,
+      ...iso(n.updatedAt),
     },
     related: {
       questions: questionIds.map((q) => ({ id: String(q), title: qTitle.get(String(q)) ?? "(missing question)" })),
@@ -288,8 +304,8 @@ export async function searchNotes(query: string): Promise<{ id: string; title: s
 
 // ---------- notes ----------
 
-export type AdminSeries = { id: string; slug: string; title: string; description: string; subjects: string[]; status: Status };
-export type AdminNote = { id: string; seriesId: string; slug: string; title: string; body: string; subjects: string[]; status: Status };
+export type AdminSeries = { id: string; slug: string; title: string; description: string; subjects: string[]; status: Status; updatedAt?: string };
+export type AdminNote = { id: string; seriesId: string; slug: string; title: string; body: string; subjects: string[]; status: Status; updatedAt?: string };
 
 export async function listSeriesAdmin(): Promise<{ id: string; slug: string; title: string; status: Status; chapters: number }[]> {
   const series = await NoteSeries.find({}, { slug: 1, title: 1, status: 1 })
@@ -305,22 +321,22 @@ export async function getSeriesAdmin(id: string): Promise<{
   notes: { id: string; slug: string; title: string; status: Status }[];
 } | null> {
   if (!isValidObjectId(id)) return null;
-  const s = await NoteSeries.findById(id).lean<{ _id: Id; slug: string; title: string; description?: string; subjects?: string[]; status: Status }>();
+  const s = await NoteSeries.findById(id).lean<{ _id: Id; slug: string; title: string; description?: string; subjects?: string[]; status: Status; updatedAt?: Date }>();
   if (!s) return null;
   const notes = await Note.find({ seriesId: s._id }, { slug: 1, title: 1, status: 1 })
     .sort({ order: 1, _id: 1 })
     .lean<{ _id: Id; slug: string; title: string; status: Status }[]>();
   return {
-    series: { id: String(s._id), slug: s.slug, title: s.title, description: s.description ?? "", subjects: s.subjects ?? [], status: s.status },
+    series: { id: String(s._id), slug: s.slug, title: s.title, description: s.description ?? "", subjects: s.subjects ?? [], status: s.status, ...iso(s.updatedAt) },
     notes: notes.map((n) => ({ id: String(n._id), slug: n.slug, title: n.title, status: n.status })),
   };
 }
 
 export async function getNoteAdmin(id: string): Promise<AdminNote | null> {
   if (!isValidObjectId(id)) return null;
-  const n = await Note.findById(id).lean<{ _id: Id; seriesId: Id; slug: string; title: string; body?: string; subjects?: string[]; status: Status }>();
+  const n = await Note.findById(id).lean<{ _id: Id; seriesId: Id; slug: string; title: string; body?: string; subjects?: string[]; status: Status; updatedAt?: Date }>();
   return n
-    ? { id: String(n._id), seriesId: String(n.seriesId), slug: n.slug, title: n.title, body: n.body ?? "", subjects: n.subjects ?? [], status: n.status }
+    ? { id: String(n._id), seriesId: String(n.seriesId), slug: n.slug, title: n.title, body: n.body ?? "", subjects: n.subjects ?? [], status: n.status, ...iso(n.updatedAt) }
     : null;
 }
 

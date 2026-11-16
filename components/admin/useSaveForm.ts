@@ -9,7 +9,11 @@ import { useAdminAction } from "@/components/admin/useAdminAction";
  * Draft state for a content form plus a save that reports field errors, navigates to
  * `hrefAfterCreate` on create, and refreshes on update (built on useAdminAction).
  */
-export function useSaveForm<T extends { id: string }>(initial: T, save: (draft: T) => Promise<Result>, hrefAfterCreate: (id: string) => string) {
+export function useSaveForm<T extends { id: string; updatedAt?: string }>(
+  initial: T,
+  save: (draft: T) => Promise<Result>,
+  hrefAfterCreate: (id: string) => string,
+) {
   const router = useRouter();
   const [draft, setDraft] = useState(initial);
   const { run, pending, errors, setErrors, saved, touch } = useAdminAction();
@@ -26,6 +30,8 @@ export function useSaveForm<T extends { id: string }>(initial: T, save: (draft: 
       refresh: Boolean(draft.id),
       onSuccess: (result) => {
         if (!draft.id) router.push(hrefAfterCreate(result.id));
+        // The next save is checked against this version, so keep it in step with what was saved.
+        else if (result.updatedAt) setDraft((d) => ({ ...d, updatedAt: result.updatedAt }));
       },
     });
   };

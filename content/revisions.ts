@@ -1,7 +1,19 @@
 import mongoose, { type ClientSession, type HydratedDocument, type Model, type Types } from "mongoose";
 import { Revision } from "@/models";
 
-export type SaveOptions = { session?: ClientSession };
+export type SaveOptions = {
+  session?: ClientSession;
+  /** The `updatedAt` the editor loaded (ISO); a doc saved since then is not overwritten. */
+  expectedUpdatedAt?: string;
+};
+
+/** The doc changed after the editor loaded it, so saving would silently drop someone's edit. */
+export class StaleEditError extends Error {
+  constructor() {
+    super("This item changed since it was opened");
+    this.name = "StaleEditError";
+  }
+}
 
 type RevisionRow = {
   _id: Types.ObjectId;
@@ -14,6 +26,9 @@ type RevisionRow = {
 
 // Bookkeeping fields the schema regenerates; never replayed from a snapshot.
 const SNAPSHOT_META = ["_id", "__v", "createdAt", "updatedAt"] as const;
+// Not editor content: a restore brings back what was written, not where the item sits, whether it is
+// published, which subjects list it, or the key a re-import matches it by.
+const RESTORE_KEEPS_CURRENT = ["status", "order", "importKey", "subjects"] as const;
 
 /**
  * Creates (id null) or updates a content doc. An update first stores the previous
@@ -35,6 +50,8 @@ export async function saveWithRevision<T>(
 
   const doc = await model.findById(id, null, { session });
   if (!doc) throw new Error(`${model.modelName} ${id} not found`);
+  const current = (doc as { updatedAt?: Date }).updatedAt;
+  if (opts?.expectedUpdatedAt && current && current.toISOString() !== opts.expectedUpdatedAt) throw new StaleEditError();
   const snapshot = doc.toObject({ versionKey: true });
   doc.set(data);
   // Validate before storing the snapshot, so a rejected update leaves no revision behind.
@@ -55,7 +72,10 @@ export async function saveWithRevision<T>(
   return (await doc.save({ session })) as HydratedDocument<T>;
 }
 
-/** Re-applies a stored snapshot through `saveWithRevision`, so the restore is itself revisioned. */
+/**
+ * Re-applies a stored snapshot's editor fields through `saveWithRevision`, so the restore is itself
+ * revisioned. Status, order, subjects and importKey stay as they are now.
+ */
 export async function restoreRevision(revisionId: string, editedBy: string, opts?: SaveOptions): Promise<void> {
   const revision = await Revision.findById(revisionId, null, { session: opts?.session }).lean<RevisionRow | null>();
   if (!revision) throw new Error(`Revision ${revisionId} not found`);
@@ -64,7 +84,7 @@ export async function restoreRevision(revisionId: string, editedBy: string, opts
   if (!model) throw new Error(`Unknown entity type ${revision.entityType}`);
 
   const data = { ...revision.snapshot };
-  for (const key of SNAPSHOT_META) delete data[key];
+  for (const key of [...SNAPSHOT_META, ...RESTORE_KEEPS_CURRENT]) delete data[key];
   await saveWithRevision(model, String(revision.entityId), data, editedBy, opts);
 }
 
