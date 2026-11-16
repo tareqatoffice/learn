@@ -18,6 +18,8 @@ const iconButton =
  * Audio or video with our own controls (play/pause, seek, time, mute, speed, fullscreen for video) on
  * top of ReactPlayer's media element. `video` shows the picture above the controls; audio hides it.
  * `playerRef` exposes the element so a parent can seek or play it (e.g. jump to a moment).
+ * `fallbackDuration` stands in while the file reports none (recorder WebM has no duration header),
+ * and `refreshSrc` fetches a freshly signed link when playback fails, e.g. after the old one expired.
  */
 export function MediaPlayer({
   src,
@@ -25,20 +27,26 @@ export function MediaPlayer({
   label = video ? "Video" : "Audio",
   playerRef,
   className = "",
+  fallbackDuration,
+  refreshSrc,
 }: {
   src: string;
   video?: boolean;
   label?: string;
   playerRef?: (el: HTMLVideoElement | null) => void;
   className?: string;
+  fallbackDuration?: number;
+  refreshSrc?: () => Promise<string | null>;
 }) {
+  const [currentSrc, setCurrentSrc] = useState(src);
   const el = useRef<HTMLVideoElement | null>(null);
   const screen = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [time, setTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [reported, setDuration] = useState(0);
+  const duration = Number.isFinite(reported) && reported > 0 ? reported : (fallbackDuration ?? 0);
   const [failed, setFailed] = useState(false);
 
   // A stable ref callback: the parent's function may change identity every render.
@@ -51,11 +59,14 @@ export function MediaPlayer({
     parentRef.current?.(node);
   }, []);
 
-  const toggle = () => {
+  const toggle = async () => {
     if (failed) {
-      // Try again: reload the file, e.g. after a dropped connection.
+      // Try again: with a freshly signed link when the parent can get one (the old one may have
+      // expired), else reload the same file, e.g. after a dropped connection.
       setFailed(false);
-      el.current?.load();
+      const fresh = refreshSrc ? await refreshSrc().catch(() => null) : null;
+      if (fresh && fresh !== currentSrc) setCurrentSrc(fresh);
+      else el.current?.load();
       setPlaying(true);
       return;
     }
@@ -65,7 +76,7 @@ export function MediaPlayer({
   const player = (
     <ReactPlayer
       ref={setRefs}
-      src={src}
+      src={currentSrc}
       playing={playing}
       muted={muted}
       playbackRate={speed}
@@ -103,7 +114,7 @@ export function MediaPlayer({
         <button
           type="button"
           aria-label={playing ? `Pause ${label}` : `Play ${label}`}
-          onClick={toggle}
+          onClick={() => void toggle()}
           className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           {playing ? <Pause className="size-4" aria-hidden /> : <Play className="size-4 translate-x-px" aria-hidden />}

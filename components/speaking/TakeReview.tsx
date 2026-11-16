@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { deleteTakeAction, transcribeTakeAction } from "@/app/(app)/speaking/actions";
+import { deleteTakeAction, takeMediaUrlsAction, transcribeTakeAction } from "@/app/(app)/speaking/actions";
 import { firstError } from "@/admin/result";
 import { MediaPlayer } from "@/components/MediaPlayer";
 import { Notice } from "@/components/Notice";
@@ -161,6 +161,8 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
           <MediaPlayer
             src={urls.media}
             video={video}
+            fallbackDuration={take.durationSec}
+            refreshSrc={async () => (await takeMediaUrlsAction(take.id))?.media ?? null}
             label="your take"
             playerRef={(el) => {
               player.current = el;

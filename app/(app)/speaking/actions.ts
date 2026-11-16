@@ -8,7 +8,7 @@ import { type BodyFeedback, type SpeechFeedback, bodyFeedback, generateMaterial,
 import { swapLesson } from "@/speaking/lessons";
 import { localDate } from "@/speaking/schedule";
 import { saveProfile, setBodyConsent } from "@/speaking/settings";
-import { type StartTakeInput, confirmTake, deleteAllTakes, deleteTake, saveSelfRating, startTake } from "@/speaking/takes";
+import { type StartTakeInput, confirmTake, deleteAllTakes, deleteTake, getTake, saveSelfRating, startTake } from "@/speaking/takes";
 import { readTimeZone } from "@/speaking/timezone";
 import { transcribeTake } from "@/speaking/transcribe";
 
@@ -64,6 +64,12 @@ export async function deleteTakeAction(takeId: string): Promise<ActionResult> {
 }
 
 /** Swaps today's lesson; "today" is the learner's local date, read from the time-zone cookie. */
+/** Freshly signed playback links for one of the user's takes, for a player whose link expired. */
+export async function takeMediaUrlsAction(takeId: string): Promise<{ media: string; audio?: string } | null> {
+  const take = await getTake(await session(), takeId);
+  return take ? { media: take.mediaUrl, ...(take.audioUrl ? { audio: take.audioUrl } : {}) } : null;
+}
+
 /** Deletes every recording the user made in Speaking practice, files first. */
 export async function deleteAllTakesAction(): Promise<ActionResult<{ deleted: number }>> {
   const userId = await session();

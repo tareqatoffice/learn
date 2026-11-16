@@ -1,18 +1,30 @@
 import { UploadError } from "@/lib/uploadTake";
 
+export const UPLOAD_CANCELLED = "The upload was cancelled.";
+
 const TIMEOUT_MS = 10 * 60_000;
 
 /**
- * PUT a file to a presigned URL with progress (fetch can't report upload progress, XHR can).
- * A request that never gets a response is almost always the bucket's CORS policy refusing this
- * site's origin, so the error says so.
+ * PUT a file or blob to a presigned URL with progress (fetch can't report upload progress, XHR can).
+ * `contentType` defaults to the blob's own type. A request that never gets a response is almost
+ * always the bucket's CORS policy refusing this site's origin, so the error says so.
  */
-export function putFile(url: string, file: File, onProgress?: (fraction: number) => void): Promise<void> {
+export function putFile(
+  url: string,
+  file: Blob,
+  onProgress?: (fraction: number) => void,
+  opts: { contentType?: string; signal?: AbortSignal } = {},
+): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (opts.signal?.aborted) return reject(new UploadError(UPLOAD_CANCELLED));
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
     xhr.timeout = TIMEOUT_MS;
-    xhr.setRequestHeader("Content-Type", file.type);
+    xhr.setRequestHeader("Content-Type", opts.contentType ?? file.type);
+    opts.signal?.addEventListener("abort", () => {
+      xhr.abort();
+      reject(new UploadError(UPLOAD_CANCELLED));
+    });
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && e.total > 0) onProgress?.(e.loaded / e.total);
     };

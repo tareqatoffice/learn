@@ -1,16 +1,18 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // ReactPlayer's `playing` prop drives the media element; the mock exposes it and the event props.
 vi.mock("react-player", () => ({
-  default: ({ playing, onDurationChange, onTimeUpdate, ref }: Record<string, unknown>) => {
+  default: ({ playing, onDurationChange, onTimeUpdate, onError, ref, src }: Record<string, unknown>) => {
     const el = { currentTime: 0, duration: 125 };
     (ref as (n: unknown) => void)?.(el);
     return (
       <div
         data-testid="player"
         data-playing={String(playing)}
+        data-src={String(src)}
+        onDoubleClick={() => (onError as () => void)()}
         onClick={() => {
           (onDurationChange as (e: unknown) => void)({ currentTarget: el });
           (onTimeUpdate as (e: unknown) => void)({ currentTarget: { currentTime: 65 } });
@@ -41,6 +43,21 @@ describe("MediaPlayer", () => {
     expect(screen.getByTestId("player").dataset.playing).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "Pause Video" }));
     expect(screen.getByTestId("player").dataset.playing).toBe("false");
+  });
+
+  it("shows the stored length while the file reports none (F5)", () => {
+    render(<MediaPlayer src="https://x.test/a.webm" fallbackDuration={90} />);
+    expect(screen.getByText("0:00 / 1:30")).toBeTruthy();
+  });
+
+  it("asks for a freshly signed link when playback fails (F5)", async () => {
+    const refreshSrc = vi.fn(async () => "https://x.test/fresh.webm");
+    render(<MediaPlayer src="https://x.test/old.webm" label="clip" refreshSrc={refreshSrc} />);
+    fireEvent.doubleClick(screen.getByTestId("player"));
+    fireEvent.click(screen.getByRole("button", { name: "Play clip" }));
+    await waitFor(() => expect(screen.getByTestId("player").dataset.src).toBe("https://x.test/fresh.webm"));
+    expect(refreshSrc).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("player").dataset.playing).toBe("true");
   });
 
   it("shows elapsed and total time once the media reports them", () => {
