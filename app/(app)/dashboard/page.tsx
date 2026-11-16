@@ -224,7 +224,7 @@ export default async function DashboardPage() {
           <Card title="Speaking today">
             <p className="text-sm">
               <Link href="/speaking" className={`font-medium ${linkClass}`}>
-                {speaking.streak} {speaking.streak === 1 ? "day" : "days"} streak
+                Speaking streak: {speaking.streak} {speaking.streak === 1 ? "day" : "days"}
               </Link>
               <span className="text-muted-foreground">
                 {" "}

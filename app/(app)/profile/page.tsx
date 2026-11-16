@@ -12,7 +12,7 @@ import { readTimeZone } from "@/speaking/timezone";
 
 export const metadata = buildMetadata({
   title: "Profile",
-  description: "Your progress and history across notes, interview questions, speaking and IELTS.",
+  description: "Your progress and history across notes, interview questions, graphs, speaking and IELTS.",
   path: "/profile",
 });
 
@@ -55,6 +55,13 @@ function History({ rows, empty }: { rows: { key: string; main: React.ReactNode; 
 }
 
 const KIND: Record<string, string> = { mock: "Full mock", part1: "Part 1 drill", part2: "Part 2 drill", part3: "Part 3 drill" };
+const AREA: Record<string, string> = { speaking: "Speaking", listening: "Listening", reading: "Reading", writing: "Writing" };
+const BAND_KEYS = [
+  ["listening", "L"],
+  ["reading", "R"],
+  ["writing", "W"],
+  ["speaking", "S"],
+] as const;
 const SOURCE: Record<string, string> = { official: "Official", practice: "Practice test", mockSelf: "Mock (self)", mockAi: "Mock (AI)", writingSelf: "Writing (self)", writingAi: "Writing (AI)", other: "Other" };
 
 function Overview({ d }: { d: ProfileData }) {
@@ -63,18 +70,25 @@ function Overview({ d }: { d: ProfileData }) {
       <Card title="Activity">
         <ActivityHeatmap days={d.activity} />
       </Card>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card title="Notes">
           <Stat label="Chapters read" value={`${d.notes.read}/${d.notes.total}`} />
         </Card>
         <Card title="Interview">
           <Stat label="Questions mastered" value={`${d.interview.mastered}/${d.interview.total}`} hint={`${d.interview.quizzes} quizzes finished`} />
         </Card>
+        <Card title="Graphs">
+          <Stat label="Topics done" value={`${d.graphs.done}/${d.graphs.total}`} />
+        </Card>
         <Card title="Speaking">
           <Stat label="Takes recorded" value={d.speaking.takes} />
         </Card>
         <Card title="IELTS">
-          <Stat label="Speaking attempts" value={d.ielts.attempts} hint={`${d.ielts.completed} complete`} />
+          <Stat
+            label="Practice done"
+            value={d.ielts.speaking.completed + d.ielts.tests + d.ielts.writing}
+            hint={`${d.ielts.speaking.completed} speaking · ${d.ielts.tests} listening/reading · ${d.ielts.writing} writing`}
+          />
         </Card>
       </div>
     </div>
@@ -131,6 +145,33 @@ function InterviewTab({ d }: { d: ProfileData["interview"] }) {
   );
 }
 
+function GraphsTab({ d }: { d: ProfileData["graphs"] }) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card title="Graph progress">
+        <ProgressRows
+          empty="No graphs yet."
+          rows={d.graphs.map((g) => ({ key: g.slug, href: `/graphs/${g.slug}`, label: g.title, value: g.done, max: g.total }))}
+        />
+      </Card>
+      <Card title="Recently finished topics">
+        <History
+          empty="No topics marked done yet."
+          rows={d.history.map((h) => ({
+            key: `${h.graphSlug}/${h.topicSlug}`,
+            main: (
+              <Link href={`/graphs/${h.graphSlug}?topic=${encodeURIComponent(h.topicSlug)}`} className={linkClass}>
+                {h.topic} <span className="text-muted-foreground">· {h.graph}</span>
+              </Link>
+            ),
+            meta: fmt(h.date),
+          }))}
+        />
+      </Card>
+    </div>
+  );
+}
+
 function SpeakingTab({ d }: { d: ProfileData["speaking"] }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -161,25 +202,31 @@ function IeltsTab({ d }: { d: ProfileData["ielts"] }) {
       <Card title="Band history">
         <History
           empty="No band results logged yet."
-          rows={d.bands.map((b, i) => ({
-            key: `${b.date}-${i}`,
-            main: SOURCE[b.source] ?? b.source,
-            meta: `${b.overall !== undefined ? `Band ${b.overall} · ` : ""}${fmt(b.date)}`,
-          }))}
+          rows={d.bands.map((b, i) => {
+            const skills = BAND_KEYS.flatMap(([k, short]) => (b.bands[k] !== undefined ? [`${short} ${b.bands[k]}`] : []));
+            return {
+              key: `${b.date}-${i}`,
+              main: SOURCE[b.source] ?? b.source,
+              meta: [...skills, ...(b.overall !== undefined ? [`Overall ${b.overall}`] : []), fmt(b.date)].join(" · "),
+            };
+          })}
         />
       </Card>
-      <Card title="Speaking attempts">
+      <Card title="Recent practice">
+        <p className="text-xs text-muted-foreground">
+          {d.speaking.attempts} speaking · {d.tests} listening/reading · {d.writing} writing · {d.studyMinutes} min logged study
+        </p>
         <History
-          empty="No speaking attempts yet."
+          empty="No IELTS practice yet."
           rows={d.history.map((a) => ({
-            key: a.id,
+            key: `${a.area}-${a.id}`,
             main: (
-              <>
-                {KIND[a.kind] ?? a.kind}
-                {a.status !== "complete" && <span className="text-muted-foreground"> · {a.status === "inProgress" ? "in progress" : "incomplete"}</span>}
-              </>
+              <Link href={a.href} className={linkClass}>
+                {AREA[a.area]} · {KIND[a.kind] ?? a.kind}
+                {!a.done && <span className="text-muted-foreground"> · not finished</span>}
+              </Link>
             ),
-            meta: `${a.overall !== undefined ? `AI ${a.overall} · ` : ""}${fmt(a.date)}`,
+            meta: `${a.band !== undefined ? `Band ${a.band} · ` : ""}${fmt(a.date)}`,
           }))}
         />
       </Card>
@@ -193,6 +240,8 @@ function Panel({ tab, d }: { tab: ProfileTab; d: ProfileData }) {
       return <NotesTab d={d.notes} />;
     case "interview":
       return <InterviewTab d={d.interview} />;
+    case "graphs":
+      return <GraphsTab d={d.graphs} />;
     case "speaking":
       return <SpeakingTab d={d.speaking} />;
     case "ielts":
@@ -226,7 +275,7 @@ export default async function ProfilePage({ searchParams }: PageProps<"/profile"
           <h1 className={cn("truncate", pageTitleClass)}>{d.name}</h1>
           <p className="text-sm text-muted-foreground">
             {d.joined ? `Joined ${fmt(d.joined)}` : "Member"}
-            {d.streak > 0 && ` · ${d.streak}-day streak`}
+            {d.streak > 0 && ` · ${d.streak}-day activity streak`}
           </p>
         </div>
       </header>
