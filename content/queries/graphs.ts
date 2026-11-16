@@ -1,3 +1,4 @@
+import { headingId } from "@/lib/markdown/pipeline";
 import { isValidObjectId, type Types } from "mongoose";
 import { visibleNodeFilter, visibleNoteFilter, visibleQuestionFilter } from "@/content/visibility";
 import { byOrder } from "@/lib/utils";
@@ -109,7 +110,7 @@ function noteLink(note: NoteLinkRow, anchor: string): RelatedLink {
   const heading = anchor ? note.toc.find((t) => t.anchor === anchor)?.text : undefined;
   return {
     title: heading ? `${note.title} § ${heading}` : note.title,
-    href: `/notes/${note.series}/${note.slug}${anchor ? `#${anchor}` : ""}`,
+    href: `/notes/${note.series}/${note.slug}${anchor ? `#${headingId(anchor)}` : ""}`,
   };
 }
 

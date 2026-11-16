@@ -1,3 +1,4 @@
+import { headingId } from "@/lib/markdown/pipeline";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarkReadButton } from "@/components/NoteReader";
@@ -86,7 +87,7 @@ export default async function ChapterPage({
       {view.toc.map((t) => (
         <li key={t.anchor} className={t.depth === 3 ? "pl-3" : undefined}>
           <a
-            href={`#${t.anchor}`}
+            href={`#${headingId(t.anchor)}`}
             className={cn("block pointer-coarse:py-1.5", linkClass)}
           >
             {t.text}
