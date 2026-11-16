@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { auth } from "@/auth";
+import { accessStatusFor } from "@/lib/access";
 import { getEnv } from "@/lib/env";
 import type { AccessStatus } from "@/models";
 
@@ -71,14 +73,21 @@ async function sessionUser(): Promise<SessionUser | null> {
   };
 }
 
+/** One status lookup per request however many components and actions ask; args are primitives so cache() keys work. */
+const cachedStatus = cache((userId: string, email: string) => accessStatusFor({ userId, email }));
+
 /**
- * For server components and actions. Redirects to `/` when signed out. The access status (pending,
- * blocked) is enforced once per request by the proxy, which also covers server action posts, so it
- * is not read again here.
+ * For server components and actions. Redirects to `/` when signed out or the user record is gone,
+ * and to the access page while pending or blocked. The proxy checks the status too, but its matcher
+ * skips some paths (static files) that can still carry a server action post, so the check is
+ * repeated here rather than trusted.
  */
 export async function requireUser(): Promise<SessionUser> {
   const user = await sessionUser();
   if (!user) redirect("/");
+  const status = await cachedStatus(user.userId, user.email);
+  if (!status) redirect("/");
+  if (status !== "approved") redirect(ACCESS_PATH);
   return user;
 }
 

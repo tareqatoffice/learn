@@ -8,17 +8,22 @@ import { config } from "@/proxy";
 const matcher = new RegExp(`^${config.matcher[0]}$`);
 
 describe("proxy matcher", () => {
-  it.each(["/api/admin/svg", "/admin/foo.png", "/admin/books/basico", "/dashboard", "/dashboard/svg", "/api/x.ico"])(
-    "proxies %s",
-    (path) => {
-      expect(matcher.test(path)).toBe(true);
-    },
-  );
+  it.each([
+    "/api/admin/svg",
+    "/admin/foo.png",
+    "/admin/books/basico",
+    "/dashboard",
+    "/dashboard/svg",
+    "/api/x.ico",
+    // Image-looking paths below the root can still hit a page and its server actions (audit S1).
+    "/speaking/x.png",
+    "/notes/a/x.png",
+    "/img/a.png",
+  ])("proxies %s", (path) => {
+    expect(matcher.test(path)).toBe(true);
+  });
 
-  it.each(["/logo.svg", "/_next/static/x.js", "/_next/image", "/favicon.ico", "/img/a.PNG".toLowerCase()])(
-    "skips %s",
-    (path) => {
-      expect(matcher.test(path)).toBe(false);
-    },
-  );
+  it.each(["/logo.svg", "/next.svg", "/_next/static/x.js", "/_next/image", "/favicon.ico"])("skips %s", (path) => {
+    expect(matcher.test(path)).toBe(false);
+  });
 });

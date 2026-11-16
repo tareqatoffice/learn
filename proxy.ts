@@ -34,10 +34,9 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
   return handler(request, event as never);
 }
 
-// Static asset paths skip the proxy, but never under api/ or admin/.
+// Only Next's own assets and image files at the root of public/ skip the proxy. Deeper paths such as
+// /notes/a/x.png are proxied: they can still reach a page and carry a server action post.
 // Next requires this config to be a literal, so tests read `config.matcher[0]`.
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|(?!api/|admin/).*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
-  ],
+  matcher: ["/((?!_next/static/|_next/image|favicon\\.ico$|[^/]+\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };
