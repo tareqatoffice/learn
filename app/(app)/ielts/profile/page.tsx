@@ -60,7 +60,8 @@ export default async function IeltsProfilePage() {
           )}
           <div className="grid gap-2">
             <p className="text-sm text-muted-foreground">
-              Deleting removes your IELTS profile, plans, band entries, study logs and Speaking recordings. Speaking Practice is not affected.
+              Deleting removes your IELTS profile, plans, band entries, study logs, and every Speaking, Listening, Reading and
+              Writing attempt, recordings included. Speaking Practice is not affected.
             </p>
             <div>
               <DeleteIeltsDataButton />

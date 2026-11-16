@@ -9,6 +9,7 @@ import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
 import type { WritingView } from "@/ielts/writing/attempts";
 import { MAX_TEXT_CHARS, MIN_WORDS, TASK_LIMIT_SEC, wordCount } from "@/ielts/writing/bands";
+import { rovingIndex, timeWarning } from "@/lib/a11y";
 import { cn } from "@/lib/utils";
 
 const SAVE_DELAY_MS = 1500;
@@ -114,13 +115,26 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
           {left < 0 ? "-" : ""}
           {clock(left)}
         </span>
+        <span aria-live="polite" className="sr-only">
+          {timeWarning(left)}
+        </span>
         <span className="text-xs text-muted-foreground">The timer never cuts you off. Your text saves automatically.</span>
         <span className="flex items-center gap-2">
           <DiscardAttempt discard={() => deleteWritingAction(view.id)} back="/ielts/writing" />
-          <Button type="button" disabled={pending || texts.some((t) => !t.trim())} onClick={submit}>
+          <Button
+            type="button"
+            disabled={pending || texts.some((t) => !t.trim())}
+            aria-describedby={texts.some((t) => !t.trim()) ? "submit-why" : undefined}
+            onClick={submit}
+          >
             Submit
           </Button>
         </span>
+        {texts.some((t) => !t.trim()) && (
+          <span id="submit-why" className="w-full text-xs text-muted-foreground">
+            Write something for {view.tasks.length > 1 ? "both tasks" : "the task"} to submit.
+          </span>
+        )}
       </div>
       <ActionStatus saved={false} errors={errors} />
       {saveError && (
@@ -137,6 +151,14 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
               type="button"
               role="tab"
               aria-selected={i === active}
+              tabIndex={i === active ? 0 : -1}
+              onKeyDown={(e) => {
+                const next = rovingIndex(e.key, i, view.tasks.length);
+                if (next === null) return;
+                e.preventDefault();
+                setActive(next);
+                (e.currentTarget.parentElement?.children[next] as HTMLElement | undefined)?.focus();
+              }}
               onClick={() => setActive(i)}
               className={cn("rounded-md border px-3 py-1 text-sm", i === active ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")}
             >

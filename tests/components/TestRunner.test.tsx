@@ -67,6 +67,17 @@ describe("TestRunner", () => {
     await waitFor(() => expect(saveAnswersAction).toHaveBeenCalledWith("a1", { "1": "cat" }), { timeout: 3000 });
   });
 
+  it("lets arrow keys move through answer choices with one tab stop (U14)", async () => {
+    const tfng = { kind: "tfng", instruction: "Agree?", options: [], questions: [{ n: 1, kind: "tfng", prompt: "Cats fly", options: [] }] };
+    render(<TestRunner view={view({ sections: [{ ...view().sections[0], groups: [tfng as never] }] })} />);
+    const radios = screen.getAllByRole("radio");
+    expect(radios.map((r) => r.tabIndex)).toEqual([0, -1, -1]);
+    radios[0].focus();
+    await userEvent.keyboard("{ArrowRight}");
+    expect(screen.getAllByRole("radio")[1].getAttribute("aria-checked")).toBe("true");
+    expect(document.activeElement).toBe(screen.getAllByRole("radio")[1]);
+  });
+
   it("says why when the server refuses an autosave (U5)", async () => {
     saveAnswersAction.mockResolvedValue({ ok: false, errors: { _: "Time is up for this test, so new answers aren't saved. Submit to see your score." } });
     render(<TestRunner view={view()} />);

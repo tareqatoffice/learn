@@ -8,6 +8,7 @@ import { useAdminAction } from "@/components/admin/useAdminAction";
 import { Button } from "@/components/ui/button";
 import type { RunView, SectionAudioKind } from "@/ielts/practice/attempts";
 import { choicesFor, letter, type PublicGroup, type PublicQuestion } from "@/ielts/practice/marking";
+import { rovingIndex, timeWarning } from "@/lib/a11y";
 import { cn } from "@/lib/utils";
 
 const SAVE_DELAY_MS = 1200;
@@ -94,6 +95,15 @@ function Answer({ q, group, value, onChange }: { q: PublicQuestion; group: Publi
   if (!choices.length) {
     return <input className="w-full max-w-xs rounded-md border border-border bg-background px-3 py-1.5 text-sm" value={value} maxLength={200} onChange={(e) => onChange(e.target.value)} aria-label={`Answer to question ${q.n}`} />;
   }
+  const picked = choices.indexOf(value);
+  // One tab stop for the group (the chosen answer, else the first), arrows move and choose.
+  const onKey = (e: React.KeyboardEvent<HTMLButtonElement>, i: number) => {
+    const next = rovingIndex(e.key, i, choices.length);
+    if (next === null) return;
+    e.preventDefault();
+    onChange(choices[next]);
+    (e.currentTarget.parentElement?.children[next] as HTMLElement | undefined)?.focus();
+  };
   return (
     <div role="radiogroup" aria-label={`Answer to question ${q.n}`} className="flex flex-wrap gap-2">
       {choices.map((c, i) => {
@@ -105,6 +115,8 @@ function Answer({ q, group, value, onChange }: { q: PublicQuestion; group: Publi
             type="button"
             role="radio"
             aria-checked={on}
+            tabIndex={i === (picked === -1 ? 0 : picked) ? 0 : -1}
+            onKeyDown={(e) => onKey(e, i)}
             onClick={() => onChange(on ? "" : c)}
             className={cn(
               "rounded-md border px-3 py-1 text-left text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
@@ -229,6 +241,10 @@ export function TestRunner({ view }: { view: RunView }) {
         <span role="timer" aria-label="Time left" className={cn("font-mono text-lg", left !== null && left <= 60 && "text-destructive")}>
           {left === null ? "--:--" : left >= 0 ? clock(left) : `-${clock(-left)}`}
         </span>
+        {/* The timer itself is silent; this says it at five minutes and at one. */}
+        <span aria-live="polite" className="sr-only">
+          {timeWarning(left)}
+        </span>
         <span className="flex items-center gap-2">
           <DiscardAttempt discard={() => deleteTestAttemptAction(view.id)} back={`/ielts/${view.skill}`} />
           <Button type="button" disabled={pending} onClick={() => submit(answered < total ? `You have ${total - answered} unanswered. Submit anyway?` : undefined)}>
@@ -252,6 +268,14 @@ export function TestRunner({ view }: { view: RunView }) {
               type="button"
               role="tab"
               aria-selected={i === index}
+              tabIndex={i === index ? 0 : -1}
+              onKeyDown={(e) => {
+                const next = rovingIndex(e.key, i, view.sections.length);
+                if (next === null) return;
+                e.preventDefault();
+                setIndex(next);
+                (e.currentTarget.parentElement?.children[next] as HTMLElement | undefined)?.focus();
+              }}
               onClick={() => setIndex(i)}
               className={cn("rounded-md border px-3 py-1 text-sm", i === index ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")}
             >
