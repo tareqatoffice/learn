@@ -2,7 +2,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const confirmMock = vi.hoisted(() => vi.fn(async () => true));
+const confirmMock = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => true));
 vi.mock("@/components/ConfirmDialog", () => ({
   confirm: (...args: unknown[]) => confirmMock(...args),
   ConfirmHost: () => null,
