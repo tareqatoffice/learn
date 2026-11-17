@@ -13,7 +13,7 @@ const { deleteTestAttemptAction, push } = vi.hoisted(() => ({ deleteTestAttemptA
 vi.mock("@/app/(app)/ielts/practice-actions", () => ({ saveAnswersAction, submitAttemptAction, claimSectionAction, finishSectionAction, deleteTestAttemptAction }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push }) }));
 
-const confirmMock = vi.hoisted(() => vi.fn(async () => true));
+const confirmMock = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => true));
 vi.mock("@/components/ConfirmDialog", () => ({
   confirm: (...args: unknown[]) => confirmMock(...args),
   ConfirmHost: () => null,
