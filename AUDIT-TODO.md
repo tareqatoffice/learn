@@ -174,7 +174,7 @@ Status key: CONFIRMED = proven in code or reproduced; SUSPECTED = check first, c
 ## Final check
 
 - [x] `npx tsc --noEmit`, `npm run lint`, `npm test` all pass — 123 files / 1119 tests (baseline 112 / 1014).
-- [ ] **Blocked:** another `next dev` (PID 16940, started 20:54, not this session) runs in the project folder, so a second dev server won't start; it was left alone and not used because it likely reads `.env.local` (remote cluster). Waiting on approval to stop it. Browser pass on a throwaway DB (desktop + 375px, light + dark): sign in as pending user and confirm S1 POST to `/notes/<series>/x.png` is now rejected; D2 graph Back shows saved status; quiz End confirm; skip link.
+- [ ] blocked: user's dev server on port 3000 (PID 16940, not this session's) runs in the project folder, so a second dev server won't start; it was left running and not used because it likely reads `.env.local` (remote cluster). Waiting on the user's answer. Browser pass on a throwaway DB (desktop + 375px, light + dark): sign in as pending user and confirm S1 POST to `/notes/<series>/x.png` is now rejected; D2 graph Back shows saved status; quiz End confirm; skip link.
 - [x] Temporary `.env.development.local` removed (it must be recreated for the browser pass); `git status` shows only `AUDIT-TODO.md` (left untracked, not committed); `git status` shows only intended changes.
 - [x] Summary at the bottom of this file: what was fixed, what was skipped and why, any DECIDE choices made.
 
@@ -203,5 +203,5 @@ Status key: CONFIRMED = proven in code or reproduced; SUSPECTED = check first, c
 - U15 `SubjectsEditor`: it already uses `AdminList`. Its rows are inline edit forms that don't fit `AdminListItem`.
 - D15 `NodeProgress.startedAt`: kept, because it is written on the first status change and covered by tests.
 
-**Still open:** the browser pass in Final check (see the blocked note above).
+**Still open:** the browser pass in Final check — blocked: user's dev server on port 3000.
 
