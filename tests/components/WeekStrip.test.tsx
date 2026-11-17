@@ -23,7 +23,7 @@ describe("WeekStrip", () => {
     const today = days.find((d) => d.getAttribute("aria-current") === "date");
     expect(today?.dataset.date).toBe("2026-11-10");
     expect(days.filter((d) => d.getAttribute("aria-current"))).toHaveLength(1);
-    expect(today?.querySelector("[data-bar]")?.className).toMatch(/outline/);
+    expect(today?.querySelector("[data-bar]")?.className).toMatch(/ring/);
 
     const height = (i: number) => (days[i].querySelector("[data-fill]") as HTMLElement).style.height;
     expect(height(0)).toBe("100%");
