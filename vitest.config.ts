@@ -15,16 +15,40 @@ if (process.cwd() !== root && !process.env.VITEST_DRIVE_FIXED) {
   process.exit(result.status ?? 1);
 }
 
+const jsdomFiles = [
+  "tests/**/*.test.tsx",
+  "tests/lib/useExaminer.test.ts",
+  "tests/lib/useRecorder.test.ts",
+  "tests/lib/media.test.ts",
+];
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: [{ find: /^@\//, replacement: `${root.replaceAll("\\", "/")}/` }],
   },
   test: {
-    environment: "node",
     globalSetup: ["./tests/setup/mongo.ts"],
     fileParallelism: false,
-    include: ["tests/**/*.test.{ts,tsx}"],
     server: { deps: { inline: ["next-auth"] } },
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "node",
+          environment: "node",
+          include: ["tests/**/*.test.ts"],
+          exclude: jsdomFiles,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "jsdom",
+          environment: "jsdom",
+          include: jsdomFiles,
+        },
+      },
+    ],
   },
 });
