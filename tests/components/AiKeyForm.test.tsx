@@ -6,7 +6,7 @@ const { saveAiKeyAction, clearAiKeyAction, refresh, confirmMock } = vi.hoisted((
   saveAiKeyAction: vi.fn(),
   clearAiKeyAction: vi.fn(async () => ({ ok: true as const })),
   refresh: vi.fn(),
-  confirmMock: vi.fn(async () => true),
+  confirmMock: vi.fn(async (..._args: unknown[]) => true),
 }));
 vi.mock("@/app/(app)/admin/ai/actions", () => ({ saveAiKeyAction, clearAiKeyAction }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));

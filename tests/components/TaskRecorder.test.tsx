@@ -43,7 +43,7 @@ vi.mock("@/app/(app)/speaking/actions", () => actions);
 const push = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh: vi.fn() }) }));
 
-const confirmMock = vi.hoisted(() => vi.fn(async () => true));
+const confirmMock = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => true));
 vi.mock("@/components/ConfirmDialog", () => ({
   confirm: (...args: unknown[]) => confirmMock(...args),
   ConfirmHost: () => null,

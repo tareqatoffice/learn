@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { refresh, confirmMock } = vi.hoisted(() => ({
   refresh: vi.fn(),
-  confirmMock: vi.fn(async () => true),
+  confirmMock: vi.fn(async (..._args: unknown[]) => true),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push: vi.fn() }) }));
 vi.mock("@/components/ConfirmDialog", () => ({
