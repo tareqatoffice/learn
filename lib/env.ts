@@ -42,6 +42,11 @@ const schema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().default(""),
   R2_BUCKET: z.string().default(""),
   CF_AI_TOKEN: z.string().default(""),
+  /** Set to "1" by Vercel; its edge overwrites x-vercel-forwarded-for, so that header is trustworthy only there. */
+  VERCEL: z
+    .string()
+    .default("")
+    .transform((value) => value.trim() === "1"),
   STT_DAILY_LIMIT: z
     .string()
     .default("")

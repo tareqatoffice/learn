@@ -35,4 +35,8 @@ export function newNonce(): string {
 export const STATIC_SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  // No includeSubDomains: on a custom apex domain it would force HTTPS on unrelated subdomains.
+  { key: "Strict-Transport-Security", value: "max-age=63072000" },
+  // Speaking practice records from the camera and microphone on this origin only.
+  { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=(), payment=(), usb=()" },
 ];

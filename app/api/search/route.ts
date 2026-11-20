@@ -1,19 +1,15 @@
-import { auth } from "@/auth";
 import { searchContent } from "@/features/content/queries";
-import { accessStatusFor } from "@/features/auth/lib/access";
+import { approvedRouteUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { allow, LIMITS } from "@/lib/rateLimit";
 
 const TERM_MAX = 100;
 
 export async function GET(request: Request): Promise<Response> {
-  const session = await auth();
-  const user = session?.user;
-  if (!user?.email) return new Response("Unauthorized", { status: 401 });
-  const status = await accessStatusFor({ userId: user.id, email: user.email });
-  if (!status) return new Response("Unauthorized", { status: 401 });
-  if (status !== "approved") return new Response("Forbidden", { status: 403 });
-  if (!(await allow(`search:${user.id ?? user.email}`, LIMITS.search))) {
+  const access = await approvedRouteUser();
+  if ("response" in access) return access.response;
+  const { user } = access;
+  if (!(await allow(`search:${user.userId}`, LIMITS.search))) {
     return new Response("Too many searches", { status: 429, headers: { "Retry-After": "60" } });
   }
 

@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectDb } from "@/lib/db";
 import { answerModeOf } from "@/lib/quiz-answer";
-import { AiConversation, Question, QuizSession } from "@/models";
+import { AiConversation, Question, QuizSession, User } from "@/models";
 import { attemptsMarkdown, exportFileName, getAttemptLogs, listAttemptSessions } from "@/features/progress/attempts";
 import { createSession, recordResult } from "@/features/progress/quiz";
 import { appendSpoken } from "@/features/interview/components/QuizCoach";
@@ -11,8 +11,13 @@ import { newUserId, seedBook, seedQuestions } from "./seed";
 
 const authUser = vi.hoisted(() => ({ id: "" as string | null }));
 vi.mock("@/auth", () => ({
-  auth: () => Promise.resolve(authUser.id ? { user: { id: authUser.id, email: "me@example.test" } } : null),
+  auth: () => Promise.resolve(authUser.id ? { user: { id: authUser.id, email: `${authUser.id}@example.test` } } : null),
 }));
+
+async function signInAs(userId: string, status: "approved" | "pending" = "approved"): Promise<void> {
+  await User.create({ _id: userId, email: `${userId}@example.test`, name: "Me", status, lastLoginAt: new Date() });
+  authUser.id = userId;
+}
 const { GET: exportRoute } = await import("@/app/(app)/interview/history/export/route");
 
 const keep = () => 0.999;
@@ -143,16 +148,22 @@ describe("quiz attempts", () => {
       const sessionId = await start(user, ids);
       await recordResult(user, sessionId, ids[0], "got", keep, { answer: "x", mode: "typed" });
 
-      authUser.id = user;
+      await signInAs(user);
       const res = await exportRoute(new Request(`http://localhost/interview/history/export?session=${sessionId}`));
       expect(res.status).toBe(200);
       expect(res.headers.get("Content-Type")).toContain("text/markdown");
       expect(res.headers.get("Content-Disposition")).toMatch(/attachment; filename="interview-answers-.+\.md"/);
       expect(await res.text()).toContain("> x");
 
-      authUser.id = newUserId();
+      await signInAs(newUserId());
       const other = await exportRoute(new Request(`http://localhost/interview/history/export?session=${sessionId}`));
       expect(other.status).toBe(404);
+    });
+
+    it("refuses a signed-in user whose account isn't approved", async () => {
+      await signInAs(newUserId(), "pending");
+      const res = await exportRoute(new Request("http://localhost/interview/history/export"));
+      expect(res.status).toBe(403);
     });
   });
 });

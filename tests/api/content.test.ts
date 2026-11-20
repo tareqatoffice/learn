@@ -29,7 +29,7 @@ const URL_BASE = "http://localhost:3000";
 
 async function token(options: Parameters<typeof createToken>[2] = {}, now?: Date) {
   const owner = (await User.findOne({ email: "owner@example.test" })) ?? (await User.create({ email: "owner@example.test", name: "Owner", role: "admin" }));
-  return createToken("cli", String(owner._id), options, now);
+  return createToken("cli", String(owner._id), { scope: "write", ...options }, now);
 }
 
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
@@ -56,6 +56,12 @@ describe("content API tokens", () => {
     expect((await listContent(new Request(`${URL_BASE}/api/content`, { headers: auth(t) }))).status).toBe(200);
     const res = await importContent(new Request(`${URL_BASE}/api/content/import`, { method: "POST", headers: auth(t), body: importBody() }));
     expect(res.status).toBe(403);
+  });
+
+  it("makes read-only tokens unless write access is asked for", async () => {
+    const owner = await User.create({ email: "owner@example.test", name: "Owner", role: "admin" });
+    const { id } = await createToken("default", String(owner._id));
+    expect((await ApiToken.findById(id).lean<{ scope: string }>())?.scope).toBe("read");
   });
 
   it("rejects an expired token (S5)", async () => {
