@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
-  ADMIN_ITEM,
   isActivePath,
   NAV_ITEMS,
   PROFILE_ITEM,
@@ -34,7 +33,7 @@ function Icon({ item, active }: { item: NavItem; active: boolean }) {
   );
 }
 
-export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
+export function BottomNav() {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
@@ -44,7 +43,6 @@ export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
   const more = [
     ...NAV_ITEMS.filter((i) => !TAB_HREFS.includes(i.href)),
     PROFILE_ITEM,
-    ...(isAdmin ? [ADMIN_ITEM] : []),
   ];
   const moreActive = more.some((i) => isActivePath(pathname, i.href));
 

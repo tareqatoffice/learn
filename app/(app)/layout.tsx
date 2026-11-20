@@ -22,7 +22,7 @@ export default async function AppLayout({
         user={{ name: user.name, image: user.image, isAdmin: user.isAdmin }}
       />
       <main id="main" tabIndex={-1} className={cn(containerClass, "min-w-0 flex-1 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))] focus:outline-none md:pb-6")}>{children}</main>
-      <BottomNav isAdmin={user.isAdmin} />
+      <BottomNav />
       <CommandPalette />
       <Toaster />
       <ConfirmHost />

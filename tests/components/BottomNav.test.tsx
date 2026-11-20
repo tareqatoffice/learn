@@ -13,7 +13,7 @@ afterEach(cleanup);
 
 describe("BottomNav", () => {
   it("shows the four primary tabs and a More button", () => {
-    render(<BottomNav isAdmin={false} />);
+    render(<BottomNav />);
     const bar = screen.getByRole("navigation", { name: "Primary" });
     const names = within(bar)
       .getAllByRole("link")
@@ -24,7 +24,7 @@ describe("BottomNav", () => {
 
   it("marks the current tab", () => {
     pathname.value = "/interview/react";
-    render(<BottomNav isAdmin={false} />);
+    render(<BottomNav />);
     const current = screen.getAllByRole("link").filter((a) => a.getAttribute("aria-current") === "page");
     expect(current.map((a) => a.textContent)).toEqual(["Interview"]);
   });
@@ -33,7 +33,7 @@ describe("BottomNav", () => {
     const main = document.createElement("main");
     main.id = "main";
     document.body.appendChild(main);
-    render(<BottomNav isAdmin={false} />);
+    render(<BottomNav />);
     const more = screen.getByRole("button", { name: "More" });
     expect(more.getAttribute("aria-expanded")).toBe("false");
     await userEvent.click(more);
@@ -50,20 +50,20 @@ describe("BottomNav", () => {
     main.remove();
   });
 
-  it("adds Admin under More for admins only", async () => {
-    render(<BottomNav isAdmin />);
+  it("never lists Admin under More (it lives in the account menu)", async () => {
+    render(<BottomNav />);
     await userEvent.click(screen.getByRole("button", { name: "More" }));
-    expect(within(screen.getByRole("navigation", { name: "More" })).getByRole("link", { name: "Admin" })).toBeTruthy();
+    expect(within(screen.getByRole("navigation", { name: "More" })).queryByRole("link", { name: "Admin" })).toBeNull();
   });
 
   it("highlights More when the current page lives under it", () => {
     pathname.value = "/notes";
-    render(<BottomNav isAdmin={false} />);
+    render(<BottomNav />);
     expect(screen.getByRole("button", { name: "More" }).className).toContain("text-foreground");
   });
 
   it("closes the sheet on Escape and returns focus to More", async () => {
-    render(<BottomNav isAdmin={false} />);
+    render(<BottomNav />);
     const more = screen.getByRole("button", { name: "More" });
     await userEvent.click(more);
     await userEvent.keyboard("{Escape}");

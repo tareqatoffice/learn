@@ -65,7 +65,7 @@ export function TopBar({ user }: { user: TopBarUser }) {
 		<AppHeader logoHref="/dashboard">
 			<nav
 				aria-label="Main"
-				className="hidden min-w-0 flex-1 gap-1 self-stretch overflow-x-auto overflow-y-hidden lg:flex justify-center"
+				className="hidden min-w-0 flex-1 gap-1 self-stretch overflow-x-auto overflow-y-hidden lg:flex"
 			>
 				{NAV_ITEMS.map(({ href, label, icon: Glyph, track }) => {
 					const active = isActivePath(pathname, href);
