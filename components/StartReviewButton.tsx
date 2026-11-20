@@ -3,9 +3,20 @@
 import { useState } from "react";
 import { startQuizAction } from "@/app/(app)/interview/actions";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { isNavigationError, START_FAILED } from "@/lib/navigationError";
 
-export function StartReviewButton({ disabled }: { disabled?: boolean }) {
+export function StartReviewButton({
+  disabled,
+  variant,
+  size,
+  className,
+}: {
+  className?: string;
+  disabled?: boolean;
+  variant?: React.ComponentProps<typeof Button>["variant"];
+  size?: React.ComponentProps<typeof Button>["size"];
+}) {
   const [starting, setStarting] = useState(false);
   const [empty, setEmpty] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -27,7 +38,7 @@ export function StartReviewButton({ disabled }: { disabled?: boolean }) {
 
   return (
     <div className="grid gap-2">
-      <Button onClick={start} disabled={disabled || starting} className="justify-self-start">
+      <Button onClick={start} disabled={disabled || starting} variant={variant} size={size} className={cn("justify-self-start", className)}>
         Start review quiz
       </Button>
       {failed && (

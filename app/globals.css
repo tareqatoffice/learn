@@ -18,6 +18,8 @@
 
 @theme inline {
   --color-ok: var(--ok);
+  --color-slab: var(--slab);
+  --color-slab-foreground: var(--slab-foreground);
   --color-track-0: var(--t-0);
   --color-track-1: var(--t-1);
   --color-track-2: var(--t-2);
@@ -104,6 +106,8 @@
   --sidebar-border: #c9d1dc;
   --sidebar-ring: #2563c9;
   --ok: #1b7f4b;
+  --slab: #131a25;
+  --slab-foreground: #f2f4f7;
   --t-0: #2563c9;
   --t-1: #b45309;
   --t-2: #0f7b6c;
@@ -150,6 +154,8 @@
     --sidebar-border: #33405a;
     --sidebar-ring: #6ea8ff;
     --ok: #4cc58a;
+    --slab: #1b3358;
+    --slab-foreground: #e8eef7;
     --t-0: #6ea8ff;
     --t-1: #f0a14a;
     --t-2: #4fd1b8;
@@ -197,6 +203,8 @@
   --sidebar-border: #33405a;
   --sidebar-ring: #6ea8ff;
   --ok: #4cc58a;
+  --slab: #1b3358;
+  --slab-foreground: #e8eef7;
   --t-0: #6ea8ff;
   --t-1: #f0a14a;
   --t-2: #4fd1b8;
@@ -600,6 +608,9 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
   .progress-fill {
     animation: grow-x 700ms cubic-bezier(0.22, 1, 0.36, 1) 200ms both;
   }
+  .ring-fill {
+    animation: ring-draw 900ms cubic-bezier(0.22, 1, 0.36, 1) 250ms both;
+  }
 
   .graph-node .node-lift {
     transition: translate 220ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -638,6 +649,11 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
   from {
     opacity: 0;
     translate: 0 0.625rem;
+  }
+}
+@keyframes ring-draw {
+  from {
+    stroke-dashoffset: var(--c);
   }
 }
 @keyframes grow-x {

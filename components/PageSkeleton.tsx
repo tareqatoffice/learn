@@ -52,39 +52,46 @@ function ProgressRows({ count = 3 }: { count?: number }) {
 export function DashboardSkeleton() {
   return (
     <Status label="Loading dashboard" className="grid gap-8">
-      <header className="grid gap-1">
-        <Skeleton className="h-8 w-56 max-w-full" />
-        <Skeleton className="h-4 w-64 max-w-full" />
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <div className="grid gap-1">
+          <Skeleton className="h-8 w-56 max-w-full" />
+          <Skeleton className="h-4 w-64 max-w-full" />
+        </div>
+        <Skeleton className="h-10 w-48" />
       </header>
 
-      <section className="grid gap-3">
-        <Skeleton className="h-4 w-16" />
-        <div className="grid divide-y divide-border rounded-xl border border-border bg-card shadow-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          {Array.from({ length: 3 }, (_, i) => (
-            <div key={i} className="grid min-w-0 content-start gap-2 p-4 sm:p-5">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-8 w-16" />
-              <Skeleton className="h-4 w-36 max-w-full" />
-              <Skeleton className="mt-1 h-8 w-28" />
-            </div>
-          ))}
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
+        <div className="grid min-w-0 gap-6">
+          <div className="grid gap-4 rounded-2xl bg-slab p-5 sm:p-8">
+            <Skeleton className="h-9 w-72 max-w-full bg-slab-foreground/20" />
+            <Skeleton className="h-4 w-80 max-w-full bg-slab-foreground/20" />
+            <Skeleton className="h-2.5 w-full bg-slab-foreground/20" />
+            <Skeleton className="h-10 w-40 bg-slab-foreground/20" />
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2">
+            {Array.from({ length: 2 }, (_, i) => (
+              <section key={i} className="grid content-start gap-2 rounded-xl border border-border bg-card p-4 sm:p-5">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-4 w-44 max-w-full" />
+                <Skeleton className="h-4 w-36 max-w-full" />
+              </section>
+            ))}
+          </div>
+          <section className="grid content-start gap-3 rounded-xl border border-border bg-card p-4 sm:p-5">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-12 w-full" />
+            <ProgressRows count={4} />
+          </section>
         </div>
-      </section>
-
-      <section className="grid gap-3">
-        <Skeleton className="h-4 w-28" />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 5 }, (_, i) => (
-            <section
-              key={i}
-              className="grid content-start gap-2 rounded-xl border border-border bg-card p-4"
-            >
-              <Skeleton className="h-3 w-24" />
-              <ProgressRows count={i === 2 ? 2 : 3} />
+        <div className="grid min-w-0 gap-6">
+          {Array.from({ length: 3 }, (_, i) => (
+            <section key={i} className="grid content-start gap-2 rounded-xl border border-border bg-card p-4 sm:p-5">
+              <Skeleton className="h-5 w-32" />
+              <ProgressRows count={i === 0 ? 1 : 2} />
             </section>
           ))}
         </div>
-      </section>
+      </div>
     </Status>
   );
 }
