@@ -1,7 +1,14 @@
+import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 export const containerClass = "mx-auto w-full min-w-0 max-w-[75rem] px-4 sm:px-6 lg:px-8";
+
+function Brand() {
+  return (
+    <Image src="/logo.svg" alt="Learn" width={28} height={28} unoptimized className="size-7" />
+  );
+}
 
 export function AppHeader({
   logoHref,
@@ -22,10 +29,12 @@ export function AppHeader({
               "shrink-0 transition-colors hover:text-ring focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
             )}
           >
-            Learn
+            <Brand />
           </Link>
         ) : (
-          <span className={cn(logoClass, "shrink-0")}>Learn</span>
+          <span className={cn(logoClass, "shrink-0")}>
+            <Brand />
+          </span>
         )}
         {children}
       </div>

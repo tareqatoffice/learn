@@ -84,7 +84,7 @@ export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
   }, [moreOpen]);
 
   return (
-    <div className="md:hidden">
+    <div className="lg:hidden">
       {moreOpen && (
         <>
           <div

@@ -33,8 +33,17 @@ export function isAdminEmail(email: string | null | undefined): boolean {
 const isUnder = (pathname: string, base: string) =>
   pathname === base || pathname.startsWith(`${base}/`);
 
+/** SEO/metadata files crawlers and browsers fetch without a session. */
+const METADATA_FILE =
+  /^\/(?:robots\.txt|sitemap\.xml|manifest\.webmanifest|(?:icon|apple-icon|opengraph-image|twitter-image)(?:[-.][\w.-]*)?)$/;
+
 export function isPublicPath(pathname: string): boolean {
-  return pathname === "/" || isUnder(pathname, "/api/auth") || isUnder(pathname, "/api/content");
+  return (
+    pathname === "/" ||
+    METADATA_FILE.test(pathname) ||
+    isUnder(pathname, "/api/auth") ||
+    isUnder(pathname, "/api/content")
+  );
 }
 
 export function routeAccess(
