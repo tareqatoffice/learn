@@ -2,12 +2,12 @@
 
 import { signOutAction } from '@/app/actions';
 import { AppHeader } from '@/components/AppHeader';
-import { ADMIN_ITEM, isActivePath, NAV_ITEMS } from '@/components/nav';
+import { ADMIN_ITEM, isActivePath, NAV_ITEMS, PROFILE_ITEM } from '@/components/nav';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { focusRing, trackVar } from '@/components/track';
 import { openSearch } from '@/lib/searchBus';
 import { cn } from '@/lib/utils';
-import { Search } from 'lucide-react';
+import { LogOut, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -172,7 +172,11 @@ export function TopBar({ user }: { user: TopBarUser }) {
 								onClick={() => setAccountOpen(false)}
 								className={menuItemClass}
 							>
-								Profile
+								<PROFILE_ITEM.icon
+									aria-hidden
+									className="size-4 shrink-0"
+								/>
+								{PROFILE_ITEM.label}
 							</Link>
 							{user.isAdmin && (
 								<Link
@@ -180,6 +184,10 @@ export function TopBar({ user }: { user: TopBarUser }) {
 									onClick={() => setAccountOpen(false)}
 									className={menuItemClass}
 								>
+									<ADMIN_ITEM.icon
+										aria-hidden
+										className="size-4 shrink-0"
+									/>
 									{ADMIN_ITEM.label}
 								</Link>
 							)}
@@ -188,6 +196,10 @@ export function TopBar({ user }: { user: TopBarUser }) {
 									type="submit"
 									className={menuItemClass}
 								>
+									<LogOut
+										aria-hidden
+										className="size-4 shrink-0"
+									/>
 									Sign out
 								</button>
 							</form>

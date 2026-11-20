@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { chipClass } from "@/components/Chip";
+import { areaLabel, formatDuration } from "@/features/focus/context";
 import { ActivityHeatmap } from "@/features/profile/components/ActivityHeatmap";
 import { TimeZoneCookie } from "@/features/speaking/components/TimeZoneCookie";
 import { Panel as Card } from "@/components/Panel";
@@ -9,6 +10,7 @@ import { ProgressRows } from "@/features/profile/components/TrackCard";
 import { pageTitleBase } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { PROFILE_TABS, TAB_LABEL, type ProfileData, type ProfileTab } from "@/features/profile/data";
+import type { FocusArea } from "@/models/focusConstants";
 
 const linkClass = "hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 const dateFormat = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -53,6 +55,9 @@ function History({ rows, empty }: { rows: { key: string; main: React.ReactNode; 
   );
 }
 
+const focusColor = (area: FocusArea) => (area === "general" ? "var(--primary)" : trackVar(area));
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
 const KIND: Record<string, string> = { mock: "Full mock", part1: "Part 1 drill", part2: "Part 2 drill", part3: "Part 3 drill" };
 const AREA: Record<string, string> = { speaking: "Speaking", listening: "Listening", reading: "Reading", writing: "Writing" };
 const BAND_KEYS = [
@@ -69,7 +74,14 @@ function Overview({ d }: { d: ProfileData }) {
       <Card title="Activity">
         <ActivityHeatmap days={d.activity} />
       </Card>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Card title="Focus">
+          <Stat
+            label="Time focused"
+            value={d.focus.sessions ? formatDuration(d.focus.totalSeconds) : "0m"}
+            hint={`${plural(d.focus.sessions, "session")} · ${formatDuration(d.focus.weekSeconds)} this week`}
+          />
+        </Card>
         <Card title="Notes" track="notes">
           <Stat label="Chapters read" value={`${d.notes.read}/${d.notes.total}`} bar={{ value: d.notes.read, max: d.notes.total, track: "notes" }} />
         </Card>
@@ -95,6 +107,54 @@ function Overview({ d }: { d: ProfileData }) {
           />
         </Card>
       </div>
+    </div>
+  );
+}
+
+function FocusTab({ d }: { d: ProfileData["focus"] }) {
+  const most = Math.max(0, ...d.byArea.map((a) => a.seconds));
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card title="Time by area">
+        {d.byArea.length ? (
+          <div className="grid gap-4">
+            <p className="text-xs text-muted-foreground">
+              {formatDuration(d.totalSeconds)} in {plural(d.sessions, "session")} · {formatDuration(d.weekSeconds)} in the last 7 days
+            </p>
+            <ul className="grid gap-2 text-sm">
+              {d.byArea.map((a) => (
+                <li key={a.area} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
+                  <span>{areaLabel(a.area)}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {formatDuration(a.seconds)} · {plural(a.sessions, "session")}
+                  </span>
+                  <ProgressBar value={a.seconds} max={most} color={focusColor(a.area)} className="col-span-2" />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <Empty>No focus sessions yet. Start one with the focus timer on any page.</Empty>
+        )}
+      </Card>
+      <Card title="Recent sessions">
+        <History
+          empty="No focus sessions yet."
+          rows={d.history.map((f) => ({
+            key: f.id,
+            main: (
+              <Link href={f.path} className={linkClass}>
+                {f.label} <span className="text-muted-foreground">· {areaLabel(f.area)}</span>
+              </Link>
+            ),
+            meta: [
+              formatDuration(f.seconds),
+              ...(f.targetMinutes ? [f.completed ? `${f.targetMinutes}m goal met` : `of ${f.targetMinutes}m`] : []),
+              fmt(f.date),
+            ].join(" · "),
+          }))}
+        />
+      </Card>
     </div>
   );
 }
@@ -254,6 +314,8 @@ function IeltsTab({ d }: { d: ProfileData["ielts"] }) {
 
 function Panel({ tab, d }: { tab: ProfileTab; d: ProfileData }) {
   switch (tab) {
+    case "focus":
+      return <FocusTab d={d.focus} />;
     case "notes":
       return <NotesTab d={d.notes} />;
     case "interview":
