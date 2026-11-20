@@ -1,8 +1,8 @@
 "use server";
 
-import { adminContext } from "@/admin/action";
-import type { Result } from "@/admin/service";
-import { deleteUser, setUserAccess } from "@/admin/users";
+import { adminContext } from "@/features/admin/action";
+import type { Result } from "@/features/admin/service";
+import { deleteUser, setUserAccess } from "@/features/admin/users";
 
 export async function setUserAccessAction(
   id: string,

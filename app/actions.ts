@@ -3,7 +3,7 @@
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 import { signIn, signOut } from "@/auth";
-import { safeNextPath, signInPath } from "@/lib/nextPath";
+import { safeNextPath, signInPath } from "@/features/auth/lib/nextPath";
 import { allow, clientAddress, LIMITS } from "@/lib/rateLimit";
 
 async function throttleSignIn(): Promise<void> {

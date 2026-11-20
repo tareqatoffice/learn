@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import nextConfig from "@/next.config";
-import { buildCsp, newNonce } from "@/lib/csp";
+import { buildCsp, frameOptionsFor, isSandboxPath, newNonce } from "@/lib/csp";
 
 describe("Content Security Policy (S2)", () => {
   it("allows scripts only by nonce, blocks framing and plugins, and lets R2 media through", () => {
@@ -17,6 +17,19 @@ describe("Content Security Policy (S2)", () => {
     expect(buildCsp({ nonce: "n", dev: true })).toContain("'unsafe-eval'");
   });
 
+  it("lets only the coding sandbox be framed, and only by this origin", () => {
+    for (const path of ["/sandbox", "/sandbox/products/1"]) {
+      expect(isSandboxPath(path)).toBe(true);
+      expect(buildCsp({ nonce: "n", dev: false, pathname: path })).toContain("frame-ancestors 'self'");
+      expect(frameOptionsFor(path)).toBe("SAMEORIGIN");
+    }
+    for (const path of ["/sandboxed", "/coding", "/"]) {
+      expect(isSandboxPath(path)).toBe(false);
+      expect(buildCsp({ nonce: "n", dev: false, pathname: path })).toContain("frame-ancestors 'none'");
+      expect(frameOptionsFor(path)).toBe("DENY");
+    }
+  });
+
   it("makes a fresh nonce each time", () => {
     expect(newNonce()).not.toBe(newNonce());
   });
@@ -25,7 +38,6 @@ describe("Content Security Policy (S2)", () => {
     const rules = await nextConfig.headers!();
     expect(rules[0].source).toBe("/:path*");
     expect(Object.fromEntries(rules[0].headers.map((h) => [h.key, h.value]))).toEqual({
-      "X-Frame-Options": "DENY",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
     });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseBook } from "@/content/parse/questions";
+import { parseBook } from "@/features/content/parse/questions";
 import { importKey } from "@/lib/ids";
 
 const md = (...lines: string[]) => lines.join("\n");

@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSeriesAdmin, listSubjects } from "@/admin/queries";
-import { AdminCard, AdminList, AdminListItem, AdminPage, AdminSection } from "@/components/admin/layout";
-import { RowActions } from "@/components/admin/RowActions";
-import { SeriesForm } from "@/components/admin/SeriesForm";
+import { getSeriesAdmin, listSubjects } from "@/features/admin/queries";
+import { AdminCard, AdminList, AdminListItem, AdminPage, AdminSection } from "@/features/admin/components/layout";
+import { RowActions } from "@/features/admin/components/RowActions";
+import { SeriesForm } from "@/features/admin/components/SeriesForm";
 import { buttonVariants } from "@/components/ui/button";
 import { connectDb } from "@/lib/db";
 

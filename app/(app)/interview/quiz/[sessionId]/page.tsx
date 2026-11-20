@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { QuizRunner } from "@/components/QuizRunner";
-import { requireUser } from "@/lib/authz";
+import { QuizRunner } from "@/features/interview/components/QuizRunner";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
-import { getAiSettings } from "@/lib/aiSettings";
+import { getAiSettings } from "@/features/ai/lib/aiSettings";
 import { buildMetadata } from "@/lib/seo";
-import { getSessionView } from "@/progress/quiz";
+import { getSessionView } from "@/features/progress/quiz";
 
 export async function generateMetadata({
   params,

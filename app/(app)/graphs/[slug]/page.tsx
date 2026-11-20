@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { GraphView } from "@/components/GraphView";
-import { getGraphView } from "@/content/queries";
-import { requireUser } from "@/lib/authz";
+import { GraphView } from "@/features/graph/components/GraphView";
+import { getGraphView } from "@/features/content/queries";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { Markdown } from "@/lib/markdown/Markdown";
 import { cache } from "react";

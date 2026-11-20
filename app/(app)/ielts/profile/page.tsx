@@ -1,14 +1,14 @@
 import Link from "next/link";
-import { DeleteIeltsDataButton, EndPlanButton } from "@/components/ielts/PlanActions";
-import { ProfileForm } from "@/components/ielts/ProfileForm";
-import { TimeZoneCookie } from "@/components/speaking/TimeZoneCookie";
-import { getProfile, testDayStatus } from "@/ielts/profile";
-import { requireUser } from "@/lib/authz";
+import { DeleteIeltsDataButton, EndPlanButton } from "@/features/ielts/components/PlanActions";
+import { ProfileForm } from "@/features/ielts/components/ProfileForm";
+import { TimeZoneCookie } from "@/features/speaking/components/TimeZoneCookie";
+import { getProfile, testDayStatus } from "@/features/ielts/profile";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
-import { localDate } from "@/speaking/schedule";
-import { readTimeZone } from "@/speaking/timezone";
+import { localDate } from "@/features/speaking/schedule";
+import { readTimeZone } from "@/features/speaking/timezone";
 
 export const metadata = buildMetadata({
   title: "IELTS profile",
@@ -24,7 +24,7 @@ export default async function IeltsProfilePage() {
   const profile = await getProfile(user.userId);
 
   return (
-    <div className="grid w-full gap-4">
+    <div className="grid w-full gap-6">
       <TimeZoneCookie current={timeZone} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>{profile ? "IELTS profile" : "Set up your IELTS plan"}</h1>

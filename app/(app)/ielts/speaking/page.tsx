@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { type HubOption, SpeakingHub } from "@/components/ielts/SpeakingHub";
-import { listAttempts } from "@/ielts/speaking/attempts";
-import { type Kind, missingParts, pickQuestions } from "@/ielts/speaking/questions";
-import { getAiConfig } from "@/lib/aiSettings";
-import { requireUser } from "@/lib/authz";
+import { type HubOption, SpeakingHub } from "@/features/ielts/components/SpeakingHub";
+import { listAttempts } from "@/features/ielts/speaking/attempts";
+import { type Kind, missingParts, pickQuestions } from "@/features/ielts/speaking/questions";
+import { getAiConfig } from "@/features/ai/lib/aiSettings";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { storageConfigured } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";
@@ -38,7 +38,7 @@ export default async function IeltsSpeakingPage({ searchParams }: PageProps<"/ie
   }));
 
   return (
-    <div className="grid w-full gap-4">
+    <div className="grid w-full gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>Speaking practice</h1>
         <Link

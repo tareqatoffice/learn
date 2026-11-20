@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { accessStatusFor, saveRequestNote } from "@/lib/access";
+import { accessStatusFor, saveRequestNote } from "@/features/auth/lib/access";
 import { allow, LIMITS, RATE_LIMIT_MESSAGE } from "@/lib/rateLimit";
 
 export type NoteState = { ok: boolean; message: string } | null;

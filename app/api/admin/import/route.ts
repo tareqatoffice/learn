@@ -1,6 +1,6 @@
-import { runAdminImport } from "@/admin/import";
+import { runAdminImport } from "@/features/admin/import";
 import { auth } from "@/auth";
-import { isAdminEmail } from "@/lib/authz";
+import { isAdminEmail } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { BodyError, IMPORT_BODY_MAX, readJsonBody } from "@/lib/jsonBody";
 

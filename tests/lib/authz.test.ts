@@ -4,7 +4,7 @@ import { resetEnvCache } from "@/lib/env";
 const authMock = vi.fn();
 vi.mock("@/auth", () => ({ auth: () => authMock() }));
 
-import { ForbiddenError, isAdminEmail, isPublicPath, requireAdmin, requireUser, routeAccess } from "@/lib/authz";
+import { ForbiddenError, isAdminEmail, isPublicPath, requireAdmin, requireUser, routeAccess } from "@/features/auth/lib/authz";
 import { User } from "@/models";
 import { resetDb } from "../setup/mongo";
 
@@ -85,6 +85,10 @@ describe("authz", () => {
     it("lists /, /api/auth/* and /api/content/* only", () => {
       expect(isPublicPath("/")).toBe(true);
       expect(isPublicPath("/api/auth/session")).toBe(true);
+      for (const p of ["/robots.txt", "/sitemap.xml", "/manifest.webmanifest", "/opengraph-image-1a2b3c", "/apple-icon.png", "/icon"]) {
+        expect(isPublicPath(p)).toBe(true);
+      }
+      expect(isPublicPath("/icons-admin")).toBe(false);
       expect(isPublicPath("/api/content/books")).toBe(true);
       expect(isPublicPath("/dashboard")).toBe(false);
       expect(isPublicPath("/api/authentic")).toBe(false);

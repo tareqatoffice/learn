@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { listTestsAdmin, type TestKind } from "@/admin/ieltsTests";
-import { AdminList, AdminListItem, AdminPage, AdminSection } from "@/components/admin/layout";
-import { GenerateDraftButton, StatusButton } from "@/components/admin/IeltsContentButtons";
+import { listTestsAdmin, type TestKind } from "@/features/admin/ieltsTests";
+import { AdminList, AdminListItem, AdminPage, AdminSection } from "@/features/admin/components/layout";
+import { GenerateDraftButton, StatusButton } from "@/features/admin/components/IeltsContentButtons";
 import { buttonVariants } from "@/components/ui/button";
-import { getAiConfig } from "@/lib/aiSettings";
+import { getAiConfig } from "@/features/ai/lib/aiSettings";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 

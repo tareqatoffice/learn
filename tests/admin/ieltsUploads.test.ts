@@ -21,7 +21,7 @@ import {
   saveTest,
   startPromptImageUpload,
   startSectionAudioUpload,
-} from "@/admin/ieltsTests";
+} from "@/features/admin/ieltsTests";
 import { connectDb } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
 import { AiUsage } from "@/models";

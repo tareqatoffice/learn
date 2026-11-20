@@ -1,6 +1,6 @@
 import mongoose, { Types } from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { exportContent } from "@/content/backup";
+import { exportContent } from "@/features/content/backup";
 import { connectDb } from "@/lib/db";
 import { ApiToken, QuestionProgress, Revision, Subject, User } from "@/models";
 import { resetDb } from "../setup/mongo";

@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TakeTranscript } from "@/components/speaking/TakeReview";
+import { TakeTranscript } from "@/features/speaking/components/TakeReview";
 
 const actions = vi.hoisted(() => ({
   transcribeTakeAction: vi.fn<(...args: unknown[]) => Promise<object>>(async () => ({ ok: true as const, transcript: "hello world" })),

@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { moveItem, saveBook, saveQuestion, setQuestionTopicLink, setStatus, STALE_EDIT_MESSAGE } from "@/admin/service";
+import { moveItem, saveBook, saveQuestion, setQuestionTopicLink, setStatus, STALE_EDIT_MESSAGE } from "@/features/admin/service";
 import { connectDb } from "@/lib/db";
 import { importKey } from "@/lib/ids";
 import { GraphNode, Question, QuestionBook, Revision } from "@/models";

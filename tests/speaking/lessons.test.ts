@@ -2,8 +2,8 @@ import mongoose, { Types } from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectDb } from "@/lib/db";
 import { SpeakingDay, SpeakingLesson, SpeakingTake } from "@/models";
-import { lessonHasPart, listPublishedLessons, swapLesson, todaysLesson } from "@/speaking/lessons";
-import type { TaskKey } from "@/speaking/tasks";
+import { lessonHasPart, listPublishedLessons, swapLesson, todaysLesson } from "@/features/speaking/lessons";
+import type { TaskKey } from "@/features/speaking/tasks";
 import { resetDb } from "../setup/mongo";
 
 const ALL = { shadowing: true, readAloud: true, recordReview: true };

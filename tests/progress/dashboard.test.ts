@@ -2,12 +2,12 @@ import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectDb } from "@/lib/db";
 import { Graph, GraphNode, Note, NoteProgress, Question } from "@/models";
-import { endPlan, saveProfile } from "@/ielts/profile";
-import { getDashboard } from "@/progress/dashboard";
-import { setNodeStatus } from "@/progress/graph";
-import { openNote, setNoteRead } from "@/progress/notes";
-import { markQuestion } from "@/progress/questions";
-import { createSession, recordResult } from "@/progress/quiz";
+import { endPlan, saveProfile } from "@/features/ielts/profile";
+import { getDashboard } from "@/features/progress/dashboard";
+import { setNodeStatus } from "@/features/progress/graph";
+import { openNote, setNoteRead } from "@/features/progress/notes";
+import { markQuestion } from "@/features/progress/questions";
+import { createSession, recordResult } from "@/features/progress/quiz";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedBook, seedGraph, seedNode, seedNote, seedQuestions, seedSeries } from "./seed";
 

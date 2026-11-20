@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { runImport } from "@/content/import/run";
-import { pullBook, pullGraph, pullSeries } from "@/content/pull";
+import { runImport } from "@/features/content/import/run";
+import { pullBook, pullGraph, pullSeries } from "@/features/content/pull";
 import { connectDb } from "@/lib/db";
 import { Question } from "@/models";
 import { resetDb } from "../setup/mongo";

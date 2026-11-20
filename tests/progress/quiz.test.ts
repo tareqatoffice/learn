@@ -1,9 +1,9 @@
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { ForbiddenError } from "@/lib/authz";
+import { ForbiddenError } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { Question, QuestionProgress, QuizSession } from "@/models";
-import { markQuestion } from "@/progress/questions";
+import { markQuestion } from "@/features/progress/questions";
 import {
   countDeck,
   createSession,
@@ -15,7 +15,7 @@ import {
   requeueIndex,
   sessionLabel,
   type QuizFilter,
-} from "@/progress/quiz";
+} from "@/features/progress/quiz";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedBook, seedGraph, seedNode, seedQuestions } from "./seed";
 

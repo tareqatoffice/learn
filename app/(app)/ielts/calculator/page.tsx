@@ -1,14 +1,14 @@
 import Link from "next/link";
-import { BandCalculator } from "@/components/ielts/BandCalculator";
-import { BandEntryList } from "@/components/ielts/BandEntryList";
-import { TimeZoneCookie } from "@/components/speaking/TimeZoneCookie";
-import { listBandEntries } from "@/ielts/bandHistory";
-import { requireUser } from "@/lib/authz";
+import { BandCalculator } from "@/features/ielts/components/BandCalculator";
+import { BandEntryList } from "@/features/ielts/components/BandEntryList";
+import { TimeZoneCookie } from "@/features/speaking/components/TimeZoneCookie";
+import { listBandEntries } from "@/features/ielts/bandHistory";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
-import { localDate } from "@/speaking/schedule";
-import { readTimeZone } from "@/speaking/timezone";
+import { localDate } from "@/features/speaking/schedule";
+import { readTimeZone } from "@/features/speaking/timezone";
 
 export const metadata = buildMetadata({
   title: "IELTS band calculator",
@@ -26,7 +26,7 @@ export default async function IeltsCalculatorPage() {
     .reverse();
 
   return (
-    <div className="grid w-full gap-4">
+    <div className="grid w-full gap-6">
       <TimeZoneCookie current={timeZone} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>IELTS band calculator</h1>

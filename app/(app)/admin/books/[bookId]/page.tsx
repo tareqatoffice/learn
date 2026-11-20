@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getBookAdmin, listSubjects } from "@/admin/queries";
-import { BookForm } from "@/components/admin/BookForm";
-import { AdminCard, AdminList, AdminListItem, AdminPage, AdminSection } from "@/components/admin/layout";
-import { RowActions } from "@/components/admin/RowActions";
+import { getBookAdmin, listSubjects } from "@/features/admin/queries";
+import { BookForm } from "@/features/admin/components/BookForm";
+import { AdminCard, AdminList, AdminListItem, AdminPage, AdminSection } from "@/features/admin/components/layout";
+import { RowActions } from "@/features/admin/components/RowActions";
 import { buttonVariants } from "@/components/ui/button";
 import { connectDb } from "@/lib/db";
 import { Markdown } from "@/lib/markdown/Markdown";

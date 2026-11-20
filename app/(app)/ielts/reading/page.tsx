@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { TestHub } from "@/components/ielts/TestHub";
-import { listTestAttempts, listTests } from "@/ielts/practice/attempts";
-import { requireUser } from "@/lib/authz";
+import { TestHub } from "@/features/ielts/components/TestHub";
+import { listTestAttempts, listTests } from "@/features/ielts/practice/attempts";
+import { requireUser } from "@/features/auth/lib/authz";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
 
@@ -15,7 +15,7 @@ export default async function IeltsReadingPage() {
   const user = await requireUser();
   const [tests, recent] = await Promise.all([listTests("reading"), listTestAttempts(user.userId, { skill: "reading", limit: 10 })]);
   return (
-    <div className="grid w-full gap-4">
+    <div className="grid w-full gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>Reading practice</h1>
         <Link href="/ielts" className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">

@@ -4,7 +4,7 @@ import Google from "next-auth/providers/google";
 import { z } from "zod";
 import { connectDb, retryOnDuplicateKey } from "@/lib/db";
 import { getEnv } from "@/lib/env";
-import { isAdminEmail } from "@/lib/authz";
+import { isAdminEmail } from "@/features/auth/lib/authz";
 import { isLocalMongoUri } from "@/lib/mongoUri";
 import { User } from "@/models";
 

@@ -9,8 +9,8 @@ import {
   takeCapSec,
   taskDone,
   weekDates,
-} from "@/speaking/schedule";
-import { TASK_SLUG, taskFromSlug } from "@/speaking/tasks";
+} from "@/features/speaking/schedule";
+import { TASK_SLUG, taskFromSlug } from "@/features/speaking/tasks";
 
 const T = { shadowing: 15, readAloud: 5, recordReview: 2 };
 const E = { shadowing: true, readAloud: true, recordReview: true };

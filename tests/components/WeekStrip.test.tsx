@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { WeekStrip } from "@/components/speaking/WeekStrip";
+import { WeekStrip } from "@/features/speaking/components/WeekStrip";
 
 afterEach(cleanup);
 

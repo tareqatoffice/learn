@@ -1,13 +1,13 @@
 import mongoose from "mongoose";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { AI_REPLY_MAX } from "@/lib/ai-limits";
-import { clearAiKey, getAiConfig, getAiSettings, saveAiKey, saveAiSettings } from "@/lib/aiSettings";
+import { AI_REPLY_MAX } from "@/features/ai/lib/ai-limits";
+import { clearAiKey, getAiConfig, getAiSettings, saveAiKey, saveAiSettings } from "@/features/ai/lib/aiSettings";
 import { connectDb } from "@/lib/db";
 import { DEFAULT_OPENROUTER_MODEL, resetEnvCache } from "@/lib/env";
-import { AiError } from "@/lib/openrouter";
+import { AiError } from "@/features/ai/lib/openrouter";
 import { AiConversation, AiSettings, AiUsage, Question, QuizSession } from "@/models";
-import { createSession, recordResult } from "@/progress/quiz";
-import { askFollowUp, consumeAiCall, gradeAnswer, loadCoachCard, parseFeedback, tagSafe } from "@/progress/quizAi";
+import { createSession, recordResult } from "@/features/progress/quiz";
+import { askFollowUp, consumeAiCall, gradeAnswer, loadCoachCard, parseFeedback, tagSafe } from "@/features/progress/quizAi";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedBook, seedQuestions } from "./seed";
 

@@ -1,17 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { HoursWarning } from "@/components/ielts/HoursWarning";
-import { PlanTimeline } from "@/components/ielts/PlanTimeline";
-import { TimeZoneCookie } from "@/components/speaking/TimeZoneCookie";
-import { weekOn } from "@/ielts/plan";
-import { currentPlan, getProfile, planHistory } from "@/ielts/profile";
-import { weekProgress } from "@/ielts/progress";
-import { requireUser } from "@/lib/authz";
+import { HoursWarning } from "@/features/ielts/components/HoursWarning";
+import { PlanTimeline } from "@/features/ielts/components/PlanTimeline";
+import { TimeZoneCookie } from "@/features/speaking/components/TimeZoneCookie";
+import { weekOn } from "@/features/ielts/plan";
+import { currentPlan, getProfile, planHistory } from "@/features/ielts/profile";
+import { weekProgress } from "@/features/ielts/progress";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
-import { localDate } from "@/speaking/schedule";
-import { readTimeZone } from "@/speaking/timezone";
+import { localDate } from "@/features/speaking/schedule";
+import { readTimeZone } from "@/features/speaking/timezone";
 
 export const metadata = buildMetadata({
   title: "IELTS plan",
@@ -34,7 +34,7 @@ export default async function IeltsPlanPage() {
   ]);
 
   return (
-    <div className="grid w-full gap-4">
+    <div className="grid w-full gap-6">
       <TimeZoneCookie current={timeZone} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>IELTS plan</h1>

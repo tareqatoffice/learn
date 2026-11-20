@@ -12,8 +12,8 @@ vi.mock("@/auth", () => ({
 }));
 
 const statusMock = vi.fn<(user: { userId?: string; email: string }) => Promise<AccessStatus | null>>();
-vi.mock("@/lib/access", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/access")>()),
+vi.mock("@/features/auth/lib/access", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/auth/lib/access")>()),
   accessStatusFor: (user: { userId?: string; email: string }) => statusMock(user),
 }));
 
@@ -52,6 +52,17 @@ describe("proxy", () => {
     expect(csp).not.toBe(b.headers.get("content-security-policy"));
     expect(a.headers.get("x-middleware-request-content-security-policy")).toBe(csp);
     expect(a.headers.get("x-middleware-request-x-nonce")).toBeTruthy();
+  });
+
+  it("denies framing everywhere except the coding sandbox, which only this origin may frame", async () => {
+    signIn();
+    statusMock.mockResolvedValue("approved");
+    const page = await run("/dashboard");
+    expect(page.headers.get("x-frame-options")).toBe("DENY");
+    expect(page.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
+    const sandbox = await run("/sandbox/products");
+    expect(sandbox.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    expect(sandbox.headers.get("content-security-policy")).toContain("frame-ancestors 'self'");
   });
 
   it.each(["pending", "blocked"] as const)("answers a %s user's API call with 403 and the reason", async (status) => {

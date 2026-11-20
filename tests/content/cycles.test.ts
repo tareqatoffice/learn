@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findCycle } from "@/content/cycles";
+import { findCycle } from "@/features/content/cycles";
 
 describe("findCycle", () => {
   it("finds a 2-node cycle as a closed path", () => {

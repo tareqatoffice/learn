@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { StartReviewButton } from "@/components/StartReviewButton";
+import { StartReviewButton } from "@/features/interview/components/StartReviewButton";
 
 const { startQuizAction } = vi.hoisted(() => ({
   startQuizAction: vi.fn<(filter: unknown) => Promise<{ empty: true }>>(() => Promise.resolve({ empty: true })),

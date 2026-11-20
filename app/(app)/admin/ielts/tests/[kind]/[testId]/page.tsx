@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { getTestAdmin, type TestKind } from "@/admin/ieltsTests";
-import { AdminCard, AdminPage } from "@/components/admin/layout";
-import { IeltsTestForm } from "@/components/admin/IeltsTestForm";
+import { getTestAdmin, type TestKind } from "@/features/admin/ieltsTests";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
+import { IeltsTestForm } from "@/features/admin/components/IeltsTestForm";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 

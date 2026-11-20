@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatBytes, putFile } from "@/lib/uploadFile";
-import { UploadError } from "@/lib/uploadTake";
+import { formatBytes, putFile, UploadError } from "@/lib/uploadFile";
 
 type Handlers = {
   onload?: () => void;

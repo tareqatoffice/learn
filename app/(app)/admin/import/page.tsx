@@ -1,6 +1,6 @@
-import { listSubjects } from "@/admin/queries";
-import { ImportForm } from "@/components/admin/ImportForm";
-import { AdminCard, AdminPage } from "@/components/admin/layout";
+import { listSubjects } from "@/features/admin/queries";
+import { ImportForm } from "@/features/admin/components/ImportForm";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 

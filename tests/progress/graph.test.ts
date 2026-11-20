@@ -8,10 +8,10 @@ const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock("next/cache", () => ({ refresh }));
 
 import { setNodeStatusAction } from "@/app/(app)/graphs/actions";
-import { ForbiddenError } from "@/lib/authz";
+import { ForbiddenError } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { GraphNode, NodeProgress } from "@/models";
-import { getGraphProgress, PrereqNotDoneError, setNodeStatus } from "@/progress/graph";
+import { getGraphProgress, PrereqNotDoneError, setNodeStatus } from "@/features/progress/graph";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedGraph, seedNode } from "./seed";
 

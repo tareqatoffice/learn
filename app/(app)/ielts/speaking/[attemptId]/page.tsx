@@ -7,10 +7,10 @@ import {
   startPartAction,
   transcribePartAction,
 } from "@/app/(app)/ielts/speaking/actions";
-import { MockRunner, type MockQuestions } from "@/components/ielts/MockRunner";
-import { getProfile } from "@/ielts/profile";
-import { getAttempt, settleAttempt } from "@/ielts/speaking/attempts";
-import { requireUser } from "@/lib/authz";
+import { MockRunner, type MockQuestions } from "@/features/ielts/components/MockRunner";
+import { getProfile } from "@/features/ielts/profile";
+import { getAttempt, settleAttempt } from "@/features/ielts/speaking/attempts";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { storageConfigured } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";

@@ -13,7 +13,7 @@ import {
   setPromptStatus,
   setTestStatus,
   listPromptsAdmin,
-} from "@/admin/ieltsTests";
+} from "@/features/admin/ieltsTests";
 import { resetDb } from "../setup/mongo";
 
 const QUESTIONS = "## tfng | Agree?\nSky is blue => TRUE\n## completion | One word\nThe ___ => cat";

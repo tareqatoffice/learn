@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { AccessPage } from "@/components/AccessPage";
-import { accessRecordFor } from "@/lib/access";
+import { AccessPage } from "@/features/auth/components/AccessPage";
+import { accessRecordFor } from "@/features/auth/lib/access";
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({

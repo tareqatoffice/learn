@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import { ChapterView } from "@/components/notes/ChapterView";
-import { getChapterView } from "@/content/queries";
-import { requireUser } from "@/lib/authz";
+import { ChapterView } from "@/features/notes/components/ChapterView";
+import { getChapterView } from "@/features/content/queries";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
-import { openNote } from "@/progress/notes";
+import { openNote } from "@/features/progress/notes";
 import { cache } from "react";
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo";

@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectDb } from "@/lib/db";
 import { QuestionProgress } from "@/models";
-import { clearQuestionProgress, markQuestion } from "@/progress/questions";
+import { clearQuestionProgress, markQuestion } from "@/features/progress/questions";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedBook, seedQuestions } from "./seed";
 

@@ -1,8 +1,8 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ProfileForm } from "@/components/ielts/ProfileForm";
-import type { PlanView } from "@/ielts/profile";
+import { ProfileForm } from "@/features/ielts/components/ProfileForm";
+import type { PlanView } from "@/features/ielts/profile";
 
 const { previewProfileAction, saveProfileAction } = vi.hoisted(() => ({
   previewProfileAction: vi.fn<(...args: unknown[]) => Promise<object>>(),

@@ -41,3 +41,16 @@ export function shape<T>(schema: z.ZodType<T>, value: unknown): T | null {
   const parsed = schema.safeParse(value);
   return parsed.success ? parsed.data : null;
 }
+
+export const codingResultsInput = z.object({
+  group: z.string().regex(/^[a-z-]{1,60}$/),
+  results: z
+    .array(
+      z.object({
+        question: text(200).min(1),
+        checks: z.array(z.object({ name: text(300), passed: z.boolean(), detail: text(2000) })).max(50),
+      }),
+    )
+    .min(1)
+    .max(50),
+});

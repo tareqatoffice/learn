@@ -1,4 +1,4 @@
-import { AdminCard, AdminPage } from "@/components/admin/layout";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
 import { buttonVariants } from "@/components/ui/button";
 import { buildMetadata } from "@/lib/seo";
 

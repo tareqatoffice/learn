@@ -1,8 +1,8 @@
 "use server";
 
-import { adminContext } from "@/admin/action";
-import { type ActionResult, fail, ok } from "@/admin/result";
-import { TOKEN_LIFETIMES, type TokenLifetime, createToken, revokeToken } from "@/admin/tokens";
+import { adminContext } from "@/features/admin/action";
+import { type ActionResult, fail, ok } from "@/features/admin/result";
+import { TOKEN_LIFETIMES, type TokenLifetime, createToken, revokeToken } from "@/features/admin/tokens";
 import { TOKEN_SCOPES, type TokenScope } from "@/models";
 
 export async function createTokenAction(

@@ -1,10 +1,9 @@
-import Link from "next/link";
-import { ProgressBar } from "@/components/ProgressBar";
-import { listGraphsWithProgress } from "@/content/queries";
-import { requireUser } from "@/lib/authz";
+import { PageHeader } from "@/components/PageHeader";
+import { TileGrid } from "@/components/TileGrid";
+import { listGraphsWithProgress } from "@/features/content/queries";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
-import { pageTitleClass } from "@/lib/ui";
 
 export const metadata = buildMetadata({
   title: "Graphs",
@@ -17,39 +16,28 @@ export default async function GraphsPage() {
   const user = await requireUser();
   await connectDb();
   const graphs = await listGraphsWithProgress(user.userId);
+  const done = graphs.reduce((n, g) => n + g.done, 0);
+  const total = graphs.reduce((n, g) => n + g.total, 0);
 
   return (
-    <section aria-labelledby="graphs" className="grid gap-4">
-      <h1 id="graphs" className={pageTitleClass}>
-        Learning graphs
-      </h1>
-      {graphs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No graphs published yet.
-        </p>
-      ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {graphs.map((g) => (
-            <li
-              key={g.slug}
-              className="rounded-xl border border-border bg-card p-4"
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <Link
-                  href={`/graphs/${g.slug}`}
-                  className="min-w-0 truncate font-medium hover:underline pointer-coarse:py-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                >
-                  {g.title}
-                </Link>
-                <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
-                  {g.done}/{g.total}
-                </span>
-              </div>
-              <ProgressBar value={g.done} max={g.total} className="mt-2" />
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <div className="grid gap-6">
+      <PageHeader
+        title="Learning graphs"
+        track="graphs"
+        description={total > 0 ? `${done} of ${total} topics done across ${graphs.length} ${graphs.length === 1 ? "graph" : "graphs"}.` : undefined}
+      />
+      <TileGrid
+        track="graphs"
+        empty="No graphs published yet."
+        tiles={graphs.map((g) => ({
+          key: g.slug,
+          href: `/graphs/${g.slug}`,
+          title: g.title,
+          value: g.done,
+          max: g.total,
+          stat: `${g.done} of ${g.total} topics done`,
+        }))}
+      />
+    </div>
   );
 }

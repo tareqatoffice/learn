@@ -3,11 +3,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import mongoose from "mongoose";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { ALL_COLLECTIONS, CONTENT_COLLECTIONS, backupAll, restoreAll } from "@/content/backup";
+import { ALL_COLLECTIONS, CONTENT_COLLECTIONS, backupAll, restoreAll } from "@/features/content/backup";
 import { connectDb } from "@/lib/db";
 import * as models from "@/models";
 import { IeltsTestAttempt, Question, QuestionBook, QuestionProgress, Revision, Subject, User } from "@/models";
-import { markQuestion } from "@/progress/questions";
+import { markQuestion } from "@/features/progress/questions";
 import { resetDb } from "../setup/mongo";
 import { seedBook, seedQuestions } from "../progress/seed";
 

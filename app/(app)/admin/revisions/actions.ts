@@ -1,7 +1,7 @@
 "use server";
 
-import { adminContext } from "@/admin/action";
-import { restoreRevisionChecked, type Result } from "@/admin/service";
+import { adminContext } from "@/features/admin/action";
+import { restoreRevisionChecked, type Result } from "@/features/admin/service";
 
 export async function restoreRevisionAction(
   revisionId: string,

@@ -10,7 +10,7 @@ import {
   verifyKey,
   parseCatalog,
   resetCatalogCache,
-} from "@/lib/openrouter";
+} from "@/features/ai/lib/openrouter";
 
 const reply = (content: unknown, status = 200) =>
   new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status });

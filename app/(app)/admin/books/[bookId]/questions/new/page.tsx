@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { getBookAdmin, listSubjects } from "@/admin/queries";
-import { QuestionForm } from "@/components/admin/QuestionForm";
-import { AdminCard, AdminPage } from "@/components/admin/layout";
+import { getBookAdmin, listSubjects } from "@/features/admin/queries";
+import { QuestionForm } from "@/features/admin/components/QuestionForm";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
 import { connectDb } from "@/lib/db";
 
 export default async function NewQuestionPage({

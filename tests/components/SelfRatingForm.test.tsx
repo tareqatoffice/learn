@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SelfRatingForm } from "@/components/speaking/SelfRatingForm";
+import { SelfRatingForm } from "@/features/speaking/components/SelfRatingForm";
 
 const { saveSelfRatingAction } = vi.hoisted(() => ({
   saveSelfRatingAction: vi.fn<(...args: unknown[]) => Promise<object>>(async () => ({ ok: true as const })),

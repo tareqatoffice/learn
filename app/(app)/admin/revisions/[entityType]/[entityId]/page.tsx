@@ -1,6 +1,6 @@
-import { listRevisionsAdmin } from "@/admin/queries";
-import { RestoreButton } from "@/components/admin/RestoreButton";
-import { AdminList, AdminListItem, AdminPage } from "@/components/admin/layout";
+import { listRevisionsAdmin } from "@/features/admin/queries";
+import { RestoreButton } from "@/features/admin/components/RestoreButton";
+import { AdminList, AdminListItem, AdminPage } from "@/features/admin/components/layout";
 import { connectDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
 

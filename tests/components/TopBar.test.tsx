@@ -15,13 +15,16 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("TopBar", () => {
-  it("hides the Admin link for non-admins", () => {
+  it("keeps Admin out of the main links and the menu for non-admins", async () => {
     render(<TopBar user={user} />);
+    await userEvent.click(screen.getByRole("button", { name: "Account menu" }));
     expect(screen.queryByRole("link", { name: "Admin" })).toBeNull();
   });
 
-  it("shows the Admin link for admins", () => {
+  it("puts Admin in the account menu for admins, not the main links", async () => {
     render(<TopBar user={{ ...user, isAdmin: true }} />);
+    expect(screen.queryByRole("link", { name: "Admin" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Account menu" }));
     expect(screen.getByRole("link", { name: "Admin" }).getAttribute("href")).toBe("/admin");
   });
 
@@ -34,6 +37,7 @@ describe("TopBar", () => {
     expect(href("IELTS")).toBe("/ielts");
     expect(href("Graphs")).toBe("/graphs");
     expect(href("Notes")).toBe("/notes");
+    expect(href("Coding")).toBe("/coding");
     expect(href("Learn")).toBe("/dashboard");
   });
 
@@ -57,21 +61,6 @@ describe("TopBar", () => {
     expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
   });
 
-  it("lists Profile in the mobile menu, focuses it and makes the page inert while open (U3, U12)", async () => {
-    const main = document.createElement("main");
-    main.id = "main";
-    document.body.appendChild(main);
-    render(<TopBar user={user} />);
-    await userEvent.click(screen.getByRole("button", { name: "Menu" }));
-    const nav = screen.getByRole("navigation", { name: "Mobile" });
-    expect(nav.querySelector('a[href="/profile"]')).not.toBeNull();
-    expect(document.activeElement?.getAttribute("href")).toBe("/dashboard");
-    expect(main.inert).toBe(true);
-    await userEvent.click(screen.getByRole("button", { name: "Menu" }));
-    expect(main.inert).toBe(false);
-    main.remove();
-  });
-
   it("closes the account menu when focus leaves it (U12)", async () => {
     render(<TopBar user={user} />);
     await userEvent.click(screen.getByRole("button", { name: "Account menu" }));
@@ -80,14 +69,5 @@ describe("TopBar", () => {
     await userEvent.tab();
     await userEvent.tab();
     expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
-  });
-
-  it("collapses the links into a menu button on small screens", async () => {
-    render(<TopBar user={user} />);
-    const toggle = screen.getByRole("button", { name: "Menu" });
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    await userEvent.click(toggle);
-    expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getAllByRole("link", { name: "Notes" })).toHaveLength(2);
   });
 });

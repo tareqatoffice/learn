@@ -1,6 +1,6 @@
 import mongoose, { Types } from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { generateQuestions, missingParts, pickQuestions } from "@/ielts/speaking/questions";
+import { generateQuestions, missingParts, pickQuestions } from "@/features/ielts/speaking/questions";
 import { connectDb } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
 import { AiUsage, IeltsSpeakingAttempt, IeltsSpeakingItem } from "@/models";

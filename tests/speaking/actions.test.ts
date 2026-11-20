@@ -19,7 +19,7 @@ vi.mock("@/lib/stt", () => ({ sttConfigured: vi.fn(() => false), transcribe: vi.
 import * as actions from "@/app/(app)/speaking/actions";
 import { connectDb } from "@/lib/db";
 import { SpeakingDay, SpeakingLesson, SpeakingProfile, SpeakingTake } from "@/models";
-import { localDate } from "@/speaking/schedule";
+import { localDate } from "@/features/speaking/schedule";
 import { resetDb } from "../setup/mongo";
 
 const id = () => String(new Types.ObjectId());

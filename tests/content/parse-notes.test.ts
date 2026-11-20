@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseChapter } from "@/content/parse/notes";
+import { parseChapter } from "@/features/content/parse/notes";
 
 describe("parseChapter", () => {
   it("takes title from the first H1, body after it, slug from the file name", () => {

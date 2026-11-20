@@ -3,9 +3,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { connectDb } from "@/lib/db";
 import { answerModeOf } from "@/lib/quiz-answer";
 import { AiConversation, Question, QuizSession } from "@/models";
-import { attemptsMarkdown, exportFileName, getAttemptLogs, listAttemptSessions } from "@/progress/attempts";
-import { createSession, recordResult } from "@/progress/quiz";
-import { appendSpoken } from "@/components/QuizCoach";
+import { attemptsMarkdown, exportFileName, getAttemptLogs, listAttemptSessions } from "@/features/progress/attempts";
+import { createSession, recordResult } from "@/features/progress/quiz";
+import { appendSpoken } from "@/features/interview/components/QuizCoach";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedBook, seedQuestions } from "./seed";
 

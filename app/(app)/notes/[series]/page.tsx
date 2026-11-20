@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { SeriesView } from "@/components/notes/SeriesView";
-import { getSeriesView } from "@/content/queries";
-import { requireUser } from "@/lib/authz";
+import { SeriesView } from "@/features/notes/components/SeriesView";
+import { getSeriesView } from "@/features/content/queries";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { cache } from "react";
 import type { Metadata } from "next";

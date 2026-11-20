@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MarkReadButton } from "@/components/NoteReader";
+import { MarkReadButton } from "@/features/notes/components/NoteReader";
 
 const { setNoteReadAction } = vi.hoisted(() => ({
   setNoteReadAction: vi.fn<(noteId: string, read: boolean) => Promise<void>>(() => Promise.resolve()),

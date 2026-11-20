@@ -3,13 +3,13 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { AI_ANSWER_MAX, AI_MESSAGE_MAX } from "@/lib/ai-limits";
-import { requireUser } from "@/lib/authz";
+import { AI_ANSWER_MAX, AI_MESSAGE_MAX } from "@/features/ai/lib/ai-limits";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
-import { AiError } from "@/lib/openrouter";
+import { AiError } from "@/features/ai/lib/openrouter";
 import { ANSWER_MODES, type QuizAttempt } from "@/lib/quiz-answer";
-import { clearQuestionProgress, type MarkResult } from "@/progress/questions";
-import { type AiGrade, type AiReply, type AiResult, askFollowUp, gradeAnswer } from "@/progress/quizAi";
+import { clearQuestionProgress, type MarkResult } from "@/features/progress/questions";
+import { type AiGrade, type AiReply, type AiResult, askFollowUp, gradeAnswer } from "@/features/progress/quizAi";
 import {
   countDeck,
   createSession,
@@ -18,7 +18,7 @@ import {
   recordResult,
   type QuizFilter,
   type SessionView,
-} from "@/progress/quiz";
+} from "@/features/progress/quiz";
 
 const objectId = z.string().regex(/^[0-9a-f]{24}$/i);
 

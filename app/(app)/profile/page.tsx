@@ -1,9 +1,9 @@
-import { Profile } from "@/components/profile/Profile";
-import { requireUser } from "@/lib/authz";
+import { Profile } from "@/features/profile/components/Profile";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
-import { getProfileData, parseTab } from "@/profile/data";
-import { readTimeZone } from "@/speaking/timezone";
+import { getProfileData, parseTab } from "@/features/profile/data";
+import { readTimeZone } from "@/features/speaking/timezone";
 
 export const metadata = buildMetadata({
   title: "Profile",

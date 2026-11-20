@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { getItemAdmin, ITEM_TYPES, listItemsAdmin, type ItemType } from "@/admin/ielts";
-import { AdminCard, AdminPage } from "@/components/admin/layout";
-import { IeltsSpeakingItemForm } from "@/components/admin/IeltsSpeakingItemForm";
+import { getItemAdmin, ITEM_TYPES, listItemsAdmin, type ItemType } from "@/features/admin/ielts";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
+import { IeltsSpeakingItemForm } from "@/features/admin/components/IeltsSpeakingItemForm";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 

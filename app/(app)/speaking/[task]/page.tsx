@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { type Material } from "@/components/speaking/TaskRecorder";
-import { SpeakingTask } from "@/components/speaking/SpeakingTask";
-import { getAiConfig } from "@/lib/aiSettings";
-import { requireUser } from "@/lib/authz";
+import { type Material } from "@/features/speaking/components/TaskRecorder";
+import { SpeakingTask } from "@/features/speaking/components/SpeakingTask";
+import { getAiConfig } from "@/features/ai/lib/aiSettings";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { presignGet } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";
-import { lessonHasPart } from "@/speaking/lessons";
-import { getToday } from "@/speaking/progress";
-import { TASK_LABEL, taskFromSlug } from "@/speaking/tasks";
-import { hasTimeZoneCookie, readTimeZone } from "@/speaking/timezone";
+import { lessonHasPart } from "@/features/speaking/lessons";
+import { getToday } from "@/features/speaking/progress";
+import { TASK_LABEL, taskFromSlug } from "@/features/speaking/tasks";
+import { hasTimeZoneCookie, readTimeZone } from "@/features/speaking/timezone";
 
 const HINT = {
   shadowing: "Play the clip and speak along with it. One pass of the clip is one take.",

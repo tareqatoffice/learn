@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { UploadError, uploadTake } from "@/lib/uploadTake";
+import { UploadError, uploadTake } from "@/features/recording/lib/uploadTake";
 
 type Fake = {
   status: number;

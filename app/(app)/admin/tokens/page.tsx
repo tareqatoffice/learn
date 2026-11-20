@@ -1,6 +1,6 @@
-import { listTokens } from "@/admin/tokens";
-import { TokensEditor } from "@/components/admin/TokensEditor";
-import { AdminPage } from "@/components/admin/layout";
+import { listTokens } from "@/features/admin/tokens";
+import { TokensEditor } from "@/features/admin/components/TokensEditor";
+import { AdminPage } from "@/features/admin/components/layout";
 import { connectDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
 import { buildMetadata } from "@/lib/seo";

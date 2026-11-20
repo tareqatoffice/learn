@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { deleteSubject, restoreRevisionChecked, saveNote, saveSeries, saveSubject, setNodeNoteLink } from "@/admin/service";
+import { deleteSubject, restoreRevisionChecked, saveNote, saveSeries, saveSubject, setNodeNoteLink } from "@/features/admin/service";
 import { connectDb } from "@/lib/db";
 import { GraphNode, Note, NoteSeries, Revision, Subject } from "@/models";
 import { resetDb } from "../setup/mongo";

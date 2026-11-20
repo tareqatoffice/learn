@@ -10,7 +10,7 @@ import {
   readingBand,
   roundHalf,
   speakingBand,
-} from "@/ielts/bands";
+} from "@/features/ielts/bands";
 
 describe("roundHalf", () => {
   it("rounds at the quarter boundaries", () => {
