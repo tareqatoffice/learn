@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { clock } from "@/components/speaking/format";
-import { TakeReview } from "@/components/speaking/TakeReview";
-import { getAiConfig } from "@/lib/aiSettings";
-import { requireUser } from "@/lib/authz";
+import { clock } from "@/features/speaking/components/format";
+import { TakeReview } from "@/features/speaking/components/TakeReview";
+import { getAiConfig } from "@/features/ai/lib/aiSettings";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { storageConfigured } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
-import { getEffectiveSettings } from "@/speaking/settings";
-import { getTake } from "@/speaking/takes";
-import { TASK_LABEL, TASK_SLUG } from "@/speaking/tasks";
+import { getEffectiveSettings } from "@/features/speaking/settings";
+import { getTake } from "@/features/speaking/takes";
+import { TASK_LABEL, TASK_SLUG } from "@/features/speaking/tasks";
 
 export async function generateMetadata({ params }: PageProps<"/speaking/takes/[takeId]">): Promise<Metadata> {
   const { takeId } = await params;

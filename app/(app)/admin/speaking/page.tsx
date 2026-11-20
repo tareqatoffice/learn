@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { listLessonsAdmin } from "@/admin/speaking";
-import { AdminCard, AdminList, AdminListItem, AdminPage, AdminSection } from "@/components/admin/layout";
-import { SpeakingDefaultsForm } from "@/components/admin/SpeakingDefaultsForm";
-import { SpeakingLessonRowActions } from "@/components/admin/SpeakingLessonRowActions";
+import { listLessonsAdmin } from "@/features/admin/speaking";
+import { AdminCard, AdminList, AdminListItem, AdminPage, AdminSection } from "@/features/admin/components/layout";
+import { SpeakingDefaultsForm } from "@/features/admin/components/SpeakingDefaultsForm";
+import { SpeakingLessonRowActions } from "@/features/admin/components/SpeakingLessonRowActions";
 import { buttonVariants } from "@/components/ui/button";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
-import { getDefaults } from "@/speaking/settings";
+import { getDefaults } from "@/features/speaking/settings";
 
 export const metadata = buildMetadata({
   title: "Speaking lessons · Admin",

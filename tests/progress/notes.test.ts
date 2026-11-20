@@ -1,9 +1,9 @@
 import mongoose from "mongoose";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { ForbiddenError } from "@/lib/authz";
+import { ForbiddenError } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { Note, NoteProgress } from "@/models";
-import { getSeriesProgress, openNote, setNoteRead } from "@/progress/notes";
+import { getSeriesProgress, openNote, setNoteRead } from "@/features/progress/notes";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedNote, seedSeries } from "./seed";
 

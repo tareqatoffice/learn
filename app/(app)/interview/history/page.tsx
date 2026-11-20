@@ -1,9 +1,9 @@
-import { QuizHistory } from "@/components/interview/QuizHistory";
-import { requireUser } from "@/lib/authz";
+import { QuizHistory } from "@/features/interview/components/QuizHistory";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
-import { listAttemptSessions } from "@/progress/attempts";
-import { readTimeZone } from "@/speaking/timezone";
+import { listAttemptSessions } from "@/features/progress/attempts";
+import { readTimeZone } from "@/features/speaking/timezone";
 
 export const metadata = buildMetadata({
   title: "Quiz answers",

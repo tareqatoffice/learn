@@ -7,7 +7,7 @@ vi.mock("@/auth", () => ({
 }));
 
 import { saveCodingResultsAction } from "@/app/(app)/coding/actions";
-import { getCodingProgress, saveCodingResults } from "@/coding/progress";
+import { getCodingProgress, saveCodingResults } from "@/features/coding/progress";
 import { connectDb } from "@/lib/db";
 import { CodingResult } from "@/models";
 import { resetDb } from "../setup/mongo";

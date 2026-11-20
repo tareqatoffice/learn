@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   },
   // The coding-test pages read question specs from the source files at runtime.
   outputFileTracingIncludes: {
-    "/coding/[slug]": ["./coding/problems/**/*.ts", "./coding/problems/**/*.tsx"],
+    "/coding/[slug]": ["./features/coding/problems/**/*.ts", "./features/coding/problems/**/*.tsx"],
   },
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },

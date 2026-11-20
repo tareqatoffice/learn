@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { listGraphsAdmin } from "@/admin/queries";
-import { AdminList, AdminListItem, AdminPage } from "@/components/admin/layout";
-import { RowActions } from "@/components/admin/RowActions";
+import { listGraphsAdmin } from "@/features/admin/queries";
+import { AdminList, AdminListItem, AdminPage } from "@/features/admin/components/layout";
+import { RowActions } from "@/features/admin/components/RowActions";
 import { buttonVariants } from "@/components/ui/button";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";

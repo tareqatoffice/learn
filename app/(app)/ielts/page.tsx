@@ -1,4 +1,4 @@
-import { IeltsHome } from "@/components/ielts/IeltsHome";
+import { IeltsHome } from "@/features/ielts/components/IeltsHome";
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({

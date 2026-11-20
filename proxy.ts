@@ -1,9 +1,9 @@
 import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 import { auth } from "@/auth";
-import { ACCESS_MESSAGES, accessStatusFor } from "@/lib/access";
-import { ACCESS_PATH, isPublicPath, routeAccess } from "@/lib/authz";
+import { ACCESS_MESSAGES, accessStatusFor } from "@/features/auth/lib/access";
+import { ACCESS_PATH, isPublicPath, routeAccess } from "@/features/auth/lib/authz";
 import { buildCsp, frameOptionsFor, newNonce } from "@/lib/csp";
-import { signInPath } from "@/lib/nextPath";
+import { signInPath } from "@/features/auth/lib/nextPath";
 
 function nextWithCsp(req: NextRequest): NextResponse {
   const nonce = newNonce();

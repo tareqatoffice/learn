@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { WritingHub } from "@/components/ielts/WritingHub";
-import { listWritingAttempts } from "@/ielts/writing/attempts";
-import type { WritingKind } from "@/ielts/writing/bands";
-import { requireUser } from "@/lib/authz";
+import { WritingHub } from "@/features/ielts/components/WritingHub";
+import { listWritingAttempts } from "@/features/ielts/writing/attempts";
+import type { WritingKind } from "@/features/ielts/writing/bands";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";

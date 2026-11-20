@@ -1,5 +1,5 @@
 import mongoose, { Schema, model } from "mongoose";
-import { DEFAULT_TARGET_MIN } from "@/speaking/tasks";
+import { DEFAULT_TARGET_MIN } from "@/models/speakingTasks";
 
 const speakingSettingsSchema = new Schema(
   {

@@ -4,7 +4,7 @@ import { BookOpen, MessagesSquare, Network, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { SearchHit } from "@/content/queries/search";
+import type { SearchHit } from "@/lib/searchTypes";
 import { lockPageScroll } from "@/lib/scrollLock";
 import { SEARCH_EVENT } from "@/lib/searchBus";
 import { cn } from "@/lib/utils";

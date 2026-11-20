@@ -15,8 +15,8 @@ vi.mock("@/app/(app)/admin/ielts/tests/actions", () => ({
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push }) }));
 
-import { IeltsTestForm } from "@/components/admin/IeltsTestForm";
-import type { AdminTest } from "@/admin/ieltsTests";
+import { IeltsTestForm } from "@/features/admin/components/IeltsTestForm";
+import type { AdminTest } from "@/features/admin/ieltsTests";
 
 afterEach(() => {
   cleanup();

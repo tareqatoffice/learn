@@ -1,13 +1,13 @@
 "use server";
 
-import { adminContext } from "@/admin/action";
+import { adminContext } from "@/features/admin/action";
 import {
   saveNote,
   saveSeries,
   type NoteInput,
   type Result,
   type SeriesInput,
-} from "@/admin/service";
+} from "@/features/admin/service";
 
 export async function saveSeriesAction(input: SeriesInput): Promise<Result> {
   const user = await adminContext();

@@ -1,11 +1,11 @@
 "use server";
 
 import { z } from "zod";
-import { adminContext } from "@/admin/action";
-import { type ActionResult, ok } from "@/admin/result";
-import { MODEL_ID_MAX, MODEL_ID_PATTERN } from "@/lib/ai-limits";
-import { type AiSettingsInput, clearAiKey, getAiConfig, saveAiKey, saveAiSettings } from "@/lib/aiSettings";
-import { type KeyCheck, type ModelCheck, checkModels } from "@/lib/openrouter";
+import { adminContext } from "@/features/admin/action";
+import { type ActionResult, ok } from "@/features/admin/result";
+import { MODEL_ID_MAX, MODEL_ID_PATTERN } from "@/features/ai/lib/ai-limits";
+import { type AiSettingsInput, clearAiKey, getAiConfig, saveAiKey, saveAiSettings } from "@/features/ai/lib/aiSettings";
+import { type KeyCheck, type ModelCheck, checkModels } from "@/features/ai/lib/openrouter";
 
 export async function saveAiSettingsAction(input: AiSettingsInput): Promise<ActionResult> {
   const user = await adminContext();

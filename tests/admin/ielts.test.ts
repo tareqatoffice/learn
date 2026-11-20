@@ -9,8 +9,8 @@ import {
   listItemsAdmin,
   setItemStatus,
   updateItem,
-} from "@/admin/ielts";
-import { saveAiSettings } from "@/lib/aiSettings";
+} from "@/features/admin/ielts";
+import { saveAiSettings } from "@/features/ai/lib/aiSettings";
 import { connectDb } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
 import { AiUsage, IeltsSpeakingItem } from "@/models";

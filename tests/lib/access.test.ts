@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resetDb } from "../setup/mongo";
-import { setUserAccess } from "@/admin/users";
-import { accessRecordFor, accessStatusFor, saveRequestNote } from "@/lib/access";
-import { REQUEST_NOTE_MAX } from "@/lib/access-limits";
+import { setUserAccess } from "@/features/admin/users";
+import { accessRecordFor, accessStatusFor, saveRequestNote } from "@/features/auth/lib/access";
+import { REQUEST_NOTE_MAX } from "@/features/auth/lib/access-limits";
 import { resetEnvCache } from "@/lib/env";
 import { User } from "@/models";
 

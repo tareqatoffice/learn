@@ -2,9 +2,9 @@ import mongoose, { Types } from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectDb } from "@/lib/db";
 import { IeltsPlan, IeltsPlanSuggestion, IeltsProfile, IeltsSpeakingAttempt, SpeakingTake } from "@/models";
-import type { Criterion } from "@/ielts/bands";
-import { currentPlan, getProfile, previewPlan, previewProfile, saveProfile, toPlanInputs, type ProfileInput } from "@/ielts/profile";
-import { logStudy } from "@/ielts/progress";
+import type { Criterion } from "@/features/ielts/bands";
+import { currentPlan, getProfile, previewPlan, previewProfile, saveProfile, toPlanInputs, type ProfileInput } from "@/features/ielts/profile";
+import { logStudy } from "@/features/ielts/progress";
 import {
   approveSuggestion,
   dismissSuggestion,
@@ -12,8 +12,8 @@ import {
   removeAdjustment,
   runChecks,
   suggestCurrentBand,
-} from "@/ielts/suggestions";
-import { addDays } from "@/speaking/schedule";
+} from "@/features/ielts/suggestions";
+import { addDays } from "@/features/speaking/schedule";
 import { resetDb } from "../setup/mongo";
 
 const TODAY = "2026-11-11";

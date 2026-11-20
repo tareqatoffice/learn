@@ -3,7 +3,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import mongoose from "mongoose";
-import { backupAll } from "@/content/backup";
+import { backupAll } from "@/features/content/backup";
 import { connectDb } from "@/lib/db";
 
 async function main(): Promise<void> {

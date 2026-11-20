@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ProgressBar } from "@/components/ProgressBar";
-import { listSeriesWithProgress } from "@/content/queries";
-import { requireUser } from "@/lib/authz";
+import { listSeriesWithProgress } from "@/features/content/queries";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";

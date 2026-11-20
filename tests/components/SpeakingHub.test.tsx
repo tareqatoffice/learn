@@ -1,6 +1,6 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SpeakingHub, type HubOption } from "@/components/ielts/SpeakingHub";
+import { SpeakingHub, type HubOption } from "@/features/ielts/components/SpeakingHub";
 
 vi.mock("@/app/(app)/ielts/speaking/actions", () => ({ generateQuestionsAction: vi.fn(), startAttemptAction: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));

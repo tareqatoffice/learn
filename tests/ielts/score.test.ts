@@ -1,12 +1,12 @@
 import mongoose, { Types } from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { saveAiSettings } from "@/lib/aiSettings";
+import { saveAiSettings } from "@/features/ai/lib/aiSettings";
 import { connectDb } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
 import { AiUsage, IeltsBandEntry, IeltsPlanSuggestion, IeltsSpeakingAttempt, SpeakingProfile } from "@/models";
-import { saveProfile } from "@/ielts/profile";
-import { addDays } from "@/speaking/schedule";
-import { aiEstimate, attemptBodyFeedback, saveSelfBands } from "@/ielts/speaking/score";
+import { saveProfile } from "@/features/ielts/profile";
+import { addDays } from "@/features/speaking/schedule";
+import { aiEstimate, attemptBodyFeedback, saveSelfBands } from "@/features/ielts/speaking/score";
 import { resetDb } from "../setup/mongo";
 
 const TODAY = "2026-11-11";

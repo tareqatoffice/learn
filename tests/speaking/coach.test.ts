@@ -1,10 +1,10 @@
 import mongoose, { Types } from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { saveAiSettings } from "@/lib/aiSettings";
+import { saveAiSettings } from "@/features/ai/lib/aiSettings";
 import { connectDb } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
 import { AiUsage, SpeakingProfile, SpeakingTake } from "@/models";
-import { bodyFeedback, generateMaterial, speechFeedback } from "@/speaking/coach";
+import { bodyFeedback, generateMaterial, speechFeedback } from "@/features/speaking/coach";
 import { resetDb } from "../setup/mongo";
 
 const SPEECH = {

@@ -2,9 +2,9 @@ import mongoose, { Types } from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectDb } from "@/lib/db";
 import { IeltsBandEntry, IeltsListeningTest, IeltsReadingTest, IeltsTestAttempt } from "@/models";
-import { AUDIO_LINK_SEC, claimSection, deleteTestAttempt, finishSection, getAttempt, listTestAttempts, listTests, saveAnswers, startTestAttempt, submitAttempt, TIME_UP_MESSAGE } from "@/ielts/practice/attempts";
-import { parseQuestions } from "@/ielts/practice/format";
-import { deleteBandEntry } from "@/ielts/bandHistory";
+import { AUDIO_LINK_SEC, claimSection, deleteTestAttempt, finishSection, getAttempt, listTestAttempts, listTests, saveAnswers, startTestAttempt, submitAttempt, TIME_UP_MESSAGE } from "@/features/ielts/practice/attempts";
+import { parseQuestions } from "@/features/ielts/practice/format";
+import { deleteBandEntry } from "@/features/ielts/bandHistory";
 import { resetDb } from "../setup/mongo";
 
 const user = () => String(new Types.ObjectId());

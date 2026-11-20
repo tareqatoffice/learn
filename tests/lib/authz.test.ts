@@ -4,7 +4,7 @@ import { resetEnvCache } from "@/lib/env";
 const authMock = vi.fn();
 vi.mock("@/auth", () => ({ auth: () => authMock() }));
 
-import { ForbiddenError, isAdminEmail, isPublicPath, requireAdmin, requireUser, routeAccess } from "@/lib/authz";
+import { ForbiddenError, isAdminEmail, isPublicPath, requireAdmin, requireUser, routeAccess } from "@/features/auth/lib/authz";
 import { User } from "@/models";
 import { resetDb } from "../setup/mongo";
 

@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { WritingReview } from "@/components/ielts/WritingReview";
-import { WritingRunner } from "@/components/ielts/WritingRunner";
-import { getWritingAttempt } from "@/ielts/writing/attempts";
-import { requireUser } from "@/lib/authz";
+import { WritingReview } from "@/features/ielts/components/WritingReview";
+import { WritingRunner } from "@/features/ielts/components/WritingRunner";
+import { getWritingAttempt } from "@/features/ielts/writing/attempts";
+import { requireUser } from "@/features/auth/lib/authz";
 import { presignGet, storageConfigured } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";

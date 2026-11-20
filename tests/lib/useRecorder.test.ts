@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useRecorder } from "@/lib/useRecorder";
+import { useRecorder } from "@/features/recording/lib/useRecorder";
 
 class FakeRecorder {
   static instances: FakeRecorder[] = [];

@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { TestReview } from "@/components/ielts/TestReview";
-import { TestRunner } from "@/components/ielts/TestRunner";
-import { getAttempt } from "@/ielts/practice/attempts";
-import { requireUser } from "@/lib/authz";
+import { TestReview } from "@/features/ielts/components/TestReview";
+import { TestRunner } from "@/features/ielts/components/TestRunner";
+import { getAttempt } from "@/features/ielts/practice/attempts";
+import { requireUser } from "@/features/auth/lib/authz";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
 

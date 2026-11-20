@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { formatQuestions, parseQuestions } from "@/ielts/practice/format";
-import { isCorrect, numberSections, scoreSections, toPublic, type Section } from "@/ielts/practice/marking";
+import { formatQuestions, parseQuestions } from "@/features/ielts/practice/format";
+import { isCorrect, numberSections, scoreSections, toPublic, type Section } from "@/features/ielts/practice/marking";
 
 const TEXT = `## tfng | Do the statements agree?
 The earth is flat. => FALSE ~ It is round.

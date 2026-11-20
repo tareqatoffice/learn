@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { QuestionView } from "@/components/interview/QuestionView";
-import { getQuestionView } from "@/content/queries";
-import { requireUser } from "@/lib/authz";
+import { QuestionView } from "@/features/interview/components/QuestionView";
+import { getQuestionView } from "@/features/content/queries";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { cache } from "react";
 import type { Metadata } from "next";

@@ -1,16 +1,16 @@
 "use server";
 
-import { type ActionResult, fail, ok } from "@/admin/result";
-import { deleteAllIeltsData } from "@/ielts/data";
-import { deleteBandEntry, saveCalculatorResult, type CalculatorInput } from "@/ielts/bandHistory";
-import type { Skill } from "@/ielts/bands";
-import { endPlan, previewProfile, saveProfile, type ProfileInput } from "@/ielts/profile";
-import { deleteStudyLog, logStudy, studyLogDateError } from "@/ielts/progress";
-import { approveSuggestion, dismissSuggestion, removeAdjustment } from "@/ielts/suggestions";
-import { requireUser } from "@/lib/authz";
+import { type ActionResult, fail, ok } from "@/features/admin/result";
+import { deleteAllIeltsData } from "@/features/ielts/data";
+import { deleteBandEntry, saveCalculatorResult, type CalculatorInput } from "@/features/ielts/bandHistory";
+import type { Skill } from "@/features/ielts/bands";
+import { endPlan, previewProfile, saveProfile, type ProfileInput } from "@/features/ielts/profile";
+import { deleteStudyLog, logStudy, studyLogDateError } from "@/features/ielts/progress";
+import { approveSuggestion, dismissSuggestion, removeAdjustment } from "@/features/ielts/suggestions";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
-import { localDate } from "@/speaking/schedule";
-import { readTimeZone } from "@/speaking/timezone";
+import { localDate } from "@/features/speaking/schedule";
+import { readTimeZone } from "@/features/speaking/timezone";
 
 
 async function session(): Promise<string> {

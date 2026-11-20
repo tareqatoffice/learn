@@ -26,7 +26,7 @@ import {
   SpeakingTake,
   SpeakingUsage,
 } from "@/models";
-import { deleteAllIeltsData } from "@/ielts/data";
+import { deleteAllIeltsData } from "@/features/ielts/data";
 import {
   confirmPart,
   deleteAttempt,
@@ -37,11 +37,11 @@ import {
   startAttempt,
   startPart,
   transcribePart,
-} from "@/ielts/speaking/attempts";
-import { writeMockEntries } from "@/ielts/bandHistory";
-import { weekProgress } from "@/ielts/progress";
-import { saveSelfBands } from "@/ielts/speaking/score";
-import { TRANSCRIBE_LIMIT_MESSAGE } from "@/recording/transcribe";
+} from "@/features/ielts/speaking/attempts";
+import { writeMockEntries } from "@/features/ielts/bandHistory";
+import { weekProgress } from "@/features/ielts/progress";
+import { saveSelfBands } from "@/features/ielts/speaking/score";
+import { TRANSCRIBE_LIMIT_MESSAGE } from "@/features/recording/transcribe";
 import { resetDb } from "../setup/mongo";
 
 const today = new Date().toISOString().slice(0, 10);

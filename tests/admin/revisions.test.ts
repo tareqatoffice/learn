@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { saveQuestion } from "@/admin/service";
+import { saveQuestion } from "@/features/admin/service";
 import { restoreRevisionAction } from "@/app/(app)/admin/revisions/actions";
-import { listRevisions } from "@/content/revisions";
+import { listRevisions } from "@/features/content/revisions";
 import { connectDb } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
 import { Question } from "@/models";

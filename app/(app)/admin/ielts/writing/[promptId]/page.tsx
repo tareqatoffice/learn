@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { getPromptAdmin } from "@/admin/ieltsTests";
-import { AdminCard, AdminPage } from "@/components/admin/layout";
-import { IeltsPromptForm } from "@/components/admin/IeltsPromptForm";
+import { getPromptAdmin } from "@/features/admin/ieltsTests";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
+import { IeltsPromptForm } from "@/features/admin/components/IeltsPromptForm";
 import { connectDb } from "@/lib/db";
 import { presignGet, storageConfigured } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";

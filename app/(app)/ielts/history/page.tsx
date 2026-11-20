@@ -1,13 +1,13 @@
-import { FILTERS, IeltsHistory, type Filter } from "@/components/ielts/IeltsHistory";
-import { bandSeries, criteriaSeries, weeklyMinutes } from "@/ielts/history";
-import { getProfile } from "@/ielts/profile";
-import { listTestAttempts } from "@/ielts/practice/attempts";
-import { listAttempts } from "@/ielts/speaking/attempts";
-import { listWritingAttempts } from "@/ielts/writing/attempts";
-import { requireUser } from "@/lib/authz";
+import { FILTERS, IeltsHistory, type Filter } from "@/features/ielts/components/IeltsHistory";
+import { bandSeries, criteriaSeries, weeklyMinutes } from "@/features/ielts/history";
+import { getProfile } from "@/features/ielts/profile";
+import { listTestAttempts } from "@/features/ielts/practice/attempts";
+import { listAttempts } from "@/features/ielts/speaking/attempts";
+import { listWritingAttempts } from "@/features/ielts/writing/attempts";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
-import { readTimeZone } from "@/speaking/timezone";
+import { readTimeZone } from "@/features/speaking/timezone";
 
 export const metadata = buildMetadata({
   title: "IELTS history",

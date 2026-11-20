@@ -1,9 +1,9 @@
-import { Dashboard } from "@/components/dashboard/Dashboard";
-import { requireUser } from "@/lib/authz";
+import { Dashboard } from "@/features/dashboard/components/Dashboard";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
-import { getDashboard } from "@/progress/dashboard";
-import { getToday } from "@/speaking/progress";
-import { hasTimeZoneCookie, readTimeZone } from "@/speaking/timezone";
+import { getDashboard } from "@/features/progress/dashboard";
+import { getToday } from "@/features/speaking/progress";
+import { hasTimeZoneCookie, readTimeZone } from "@/features/speaking/timezone";
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({

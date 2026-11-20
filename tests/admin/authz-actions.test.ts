@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ForbiddenError } from "@/lib/authz";
+import { ForbiddenError } from "@/features/auth/lib/authz";
 
 vi.mock("@/auth", () => ({
   auth: () => Promise.resolve({ user: { id: "64b000000000000000000001", email: "someone@example.test", name: "Someone" } }),

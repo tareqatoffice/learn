@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import { auth, getProviders } from "@/auth";
 import { Landing } from "@/components/Landing";
-import { accessStatusFor } from "@/lib/access";
-import { ACCESS_PATH } from "@/lib/authz";
-import { safeNextPath } from "@/lib/nextPath";
+import { accessStatusFor } from "@/features/auth/lib/access";
+import { ACCESS_PATH } from "@/features/auth/lib/authz";
+import { safeNextPath } from "@/features/auth/lib/nextPath";
 import { buildMetadata } from "@/lib/seo";
 
 const hasDevLogin = () =>

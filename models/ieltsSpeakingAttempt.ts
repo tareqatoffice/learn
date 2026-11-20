@@ -1,6 +1,6 @@
 import mongoose, { type Types, Schema, model } from "mongoose";
-import { CRITERIA } from "@/ielts/bands";
-import { bodySchema, mediaSchema } from "@/recording/media";
+import { CRITERIA } from "@/models/ieltsConstants";
+import { bodySchema, mediaSchema } from "@/models/mediaSchemas";
 
 const numbers = () => Object.fromEntries(CRITERIA.map((c) => [c, Number]));
 const strings = () => Object.fromEntries(CRITERIA.map((c) => [c, String]));

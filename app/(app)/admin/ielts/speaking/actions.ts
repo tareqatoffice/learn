@@ -1,8 +1,8 @@
 "use server";
 
-import { adminContext } from "@/admin/action";
-import { createItem, deleteItem, generateItemDraft, setItemStatus, updateItem, type ItemInput, type ItemStatus, type ItemType } from "@/admin/ielts";
-import type { ActionResult } from "@/admin/result";
+import { adminContext } from "@/features/admin/action";
+import { createItem, deleteItem, generateItemDraft, setItemStatus, updateItem, type ItemInput, type ItemStatus, type ItemType } from "@/features/admin/ielts";
+import type { ActionResult } from "@/features/admin/result";
 
 export async function createItemAction(input: ItemInput) {
   await adminContext();

@@ -1,6 +1,6 @@
-import { listSubjects } from "@/admin/queries";
-import { GraphForm } from "@/components/admin/GraphForm";
-import { AdminCard, AdminPage } from "@/components/admin/layout";
+import { listSubjects } from "@/features/admin/queries";
+import { GraphForm } from "@/features/admin/components/GraphForm";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
 import { connectDb } from "@/lib/db";
 
 export default async function NewGraphPage() {

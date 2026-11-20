@@ -8,7 +8,7 @@ import {
   visibleNoteFilter,
   visibleQuestionFilter,
   visibleSeriesIds,
-} from "@/content/visibility";
+} from "@/features/content/visibility";
 import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook } from "@/models";
 import { resetDb } from "../setup/mongo";
 

@@ -1,6 +1,6 @@
-import { listSubjects } from "@/admin/queries";
-import { SeriesForm } from "@/components/admin/SeriesForm";
-import { AdminCard, AdminPage } from "@/components/admin/layout";
+import { listSubjects } from "@/features/admin/queries";
+import { SeriesForm } from "@/features/admin/components/SeriesForm";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
 import { connectDb } from "@/lib/db";
 
 export default async function NewSeriesPage() {

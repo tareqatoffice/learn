@@ -1,5 +1,5 @@
 import mongoose, { Schema, model } from "mongoose";
-import { VIDEO_DEFAULT } from "@/speaking/tasks";
+import { VIDEO_DEFAULT } from "@/models/speakingTasks";
 
 const speakingProfileSchema = new Schema(
   {

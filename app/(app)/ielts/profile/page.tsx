@@ -1,14 +1,14 @@
 import Link from "next/link";
-import { DeleteIeltsDataButton, EndPlanButton } from "@/components/ielts/PlanActions";
-import { ProfileForm } from "@/components/ielts/ProfileForm";
-import { TimeZoneCookie } from "@/components/speaking/TimeZoneCookie";
-import { getProfile, testDayStatus } from "@/ielts/profile";
-import { requireUser } from "@/lib/authz";
+import { DeleteIeltsDataButton, EndPlanButton } from "@/features/ielts/components/PlanActions";
+import { ProfileForm } from "@/features/ielts/components/ProfileForm";
+import { TimeZoneCookie } from "@/features/speaking/components/TimeZoneCookie";
+import { getProfile, testDayStatus } from "@/features/ielts/profile";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
-import { localDate } from "@/speaking/schedule";
-import { readTimeZone } from "@/speaking/timezone";
+import { localDate } from "@/features/speaking/schedule";
+import { readTimeZone } from "@/features/speaking/timezone";
 
 export const metadata = buildMetadata({
   title: "IELTS profile",

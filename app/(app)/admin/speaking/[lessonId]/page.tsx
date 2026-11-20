@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { getLessonAdmin } from "@/admin/speaking";
-import { AdminCard, AdminPage } from "@/components/admin/layout";
-import { SpeakingLessonForm } from "@/components/admin/SpeakingLessonForm";
+import { getLessonAdmin } from "@/features/admin/speaking";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
+import { SpeakingLessonForm } from "@/features/admin/components/SpeakingLessonForm";
 import { connectDb } from "@/lib/db";
 import { presignGet, storageConfigured } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";

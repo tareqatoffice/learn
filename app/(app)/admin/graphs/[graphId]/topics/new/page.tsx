@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { getGraphAdmin, listSubjects } from "@/admin/queries";
-import { NodeForm } from "@/components/admin/NodeForm";
-import { AdminCard, AdminPage } from "@/components/admin/layout";
+import { getGraphAdmin, listSubjects } from "@/features/admin/queries";
+import { NodeForm } from "@/features/admin/components/NodeForm";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
 import { connectDb } from "@/lib/db";
 
 export default async function NewTopicPage({

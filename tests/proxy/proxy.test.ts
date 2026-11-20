@@ -12,8 +12,8 @@ vi.mock("@/auth", () => ({
 }));
 
 const statusMock = vi.fn<(user: { userId?: string; email: string }) => Promise<AccessStatus | null>>();
-vi.mock("@/lib/access", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/access")>()),
+vi.mock("@/features/auth/lib/access", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/auth/lib/access")>()),
   accessStatusFor: (user: { userId?: string; email: string }) => statusMock(user),
 }));
 

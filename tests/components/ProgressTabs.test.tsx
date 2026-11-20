@@ -1,7 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import { ProgressTabs, type TrackTab } from "@/components/dashboard/ProgressTabs";
+import { ProgressTabs, type TrackTab } from "@/features/dashboard/components/ProgressTabs";
 
 const tabs: TrackTab[] = [
   {

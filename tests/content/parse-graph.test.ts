@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseGraph, validateNode } from "@/content/parse/graph";
+import { parseGraph, validateNode } from "@/features/content/parse/graph";
 
 const node = (over: Record<string, unknown> = {}) => ({
   id: "a-node", tr: "t1", t: "A node", pre: [], s: "sum", p: ["one", "two"], c: "code", pit: "pit",

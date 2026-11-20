@@ -2,9 +2,9 @@ import mongoose, { Types } from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectDb } from "@/lib/db";
 import { IeltsBandEntry, IeltsProfile, IeltsSpeakingAttempt } from "@/models";
-import { saveProfile } from "@/ielts/profile";
-import { bandSeries, criteriaSeries, weeklyMinutes } from "@/ielts/history";
-import { addDays, localDate } from "@/speaking/schedule";
+import { saveProfile } from "@/features/ielts/profile";
+import { bandSeries, criteriaSeries, weeklyMinutes } from "@/features/ielts/history";
+import { addDays, localDate } from "@/features/speaking/schedule";
 import { resetDb } from "../setup/mongo";
 
 const user = () => String(new Types.ObjectId());

@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
-import { exportContent } from "@/content/backup";
-import { isAdminEmail } from "@/lib/authz";
+import { exportContent } from "@/features/content/backup";
+import { isAdminEmail } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 
 export async function GET(): Promise<Response> {

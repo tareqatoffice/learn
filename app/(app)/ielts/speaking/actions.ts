@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { type ActionResult, fail, ok } from "@/admin/result";
+import { type ActionResult, fail, ok } from "@/features/admin/result";
 import { confirmInput, recordingInput, shape } from "@/lib/actionInput";
 import {
   confirmPart,
@@ -12,16 +12,16 @@ import {
   transcribePart,
   type Part,
   type StartPartInput,
-} from "@/ielts/speaking/attempts";
-import { generateQuestions, type Kind, type QuestionSet } from "@/ielts/speaking/questions";
-import { aiEstimate, attemptBodyFeedback, saveSelfBands, type AiEstimate, type SelfBandsInput } from "@/ielts/speaking/score";
-import { requireUser } from "@/lib/authz";
+} from "@/features/ielts/speaking/attempts";
+import { generateQuestions, type Kind, type QuestionSet } from "@/features/ielts/speaking/questions";
+import { aiEstimate, attemptBodyFeedback, saveSelfBands, type AiEstimate, type SelfBandsInput } from "@/features/ielts/speaking/score";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
-import type { AiResult } from "@/progress/quizAi";
-import type { BodyFeedback } from "@/speaking/coach";
-import { localDate } from "@/speaking/schedule";
-import { setBodyConsent } from "@/speaking/settings";
-import { readTimeZone } from "@/speaking/timezone";
+import type { AiResult } from "@/features/progress/quizAi";
+import type { BodyFeedback } from "@/features/speaking/coach";
+import { localDate } from "@/features/speaking/schedule";
+import { setBodyConsent } from "@/features/speaking/settings";
+import { readTimeZone } from "@/features/speaking/timezone";
 
 
 async function session(): Promise<string> {

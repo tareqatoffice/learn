@@ -1,9 +1,9 @@
 "use server";
 
-import { type ActionResult, fail, ok } from "@/admin/result";
-import { type QuestionResult, saveCodingResults } from "@/coding/progress";
+import { type ActionResult, fail, ok } from "@/features/admin/result";
+import { type QuestionResult, saveCodingResults } from "@/features/coding/progress";
 import { codingResultsInput, shape } from "@/lib/actionInput";
-import { requireUser } from "@/lib/authz";
+import { requireUser } from "@/features/auth/lib/authz";
 
 const INVALID = "Those results aren't valid. Reload the page and run the checks again.";
 

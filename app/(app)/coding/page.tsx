@@ -1,6 +1,6 @@
-import { getCodingProgress } from "@/coding/progress";
-import { CodingHome } from "@/components/coding/CodingHome";
-import { requireUser } from "@/lib/authz";
+import { getCodingProgress } from "@/features/coding/progress";
+import { CodingHome } from "@/features/coding/components/CodingHome";
+import { requireUser } from "@/features/auth/lib/authz";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
 

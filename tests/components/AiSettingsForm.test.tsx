@@ -1,7 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CatalogModel } from "@/lib/openrouter";
+import type { CatalogModel } from "@/features/ai/lib/openrouter";
 
 const { saveAiSettingsAction, testAiModelsAction, refresh } = vi.hoisted(() => ({
   saveAiSettingsAction: vi.fn(),
@@ -11,7 +11,7 @@ const { saveAiSettingsAction, testAiModelsAction, refresh } = vi.hoisted(() => (
 vi.mock("@/app/(app)/admin/ai/actions", () => ({ saveAiSettingsAction, testAiModelsAction }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
-import { AiSettingsForm } from "@/components/admin/AiSettingsForm";
+import { AiSettingsForm } from "@/features/admin/components/AiSettingsForm";
 
 const catalog: CatalogModel[] = [
   { id: "meta/llama:free", name: "Llama (free)", free: true, contextLength: 131072, json: true, images: false },

@@ -8,7 +8,7 @@ const { countDeckAction, startQuizAction } = vi.hoisted(() => ({
 }));
 vi.mock("@/app/(app)/interview/actions", () => ({ countDeckAction, startQuizAction }));
 
-import { QuizSetup } from "@/components/QuizSetup";
+import { QuizSetup } from "@/features/interview/components/QuizSetup";
 
 afterEach(() => {
   cleanup();

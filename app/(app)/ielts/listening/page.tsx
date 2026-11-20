@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { TestHub } from "@/components/ielts/TestHub";
-import { listTestAttempts, listTests } from "@/ielts/practice/attempts";
-import { requireUser } from "@/lib/authz";
+import { TestHub } from "@/features/ielts/components/TestHub";
+import { listTestAttempts, listTests } from "@/features/ielts/practice/attempts";
+import { requireUser } from "@/features/auth/lib/authz";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
 

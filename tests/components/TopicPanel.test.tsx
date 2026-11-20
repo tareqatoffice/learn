@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TopicPanel, type TopicPanelProps } from "@/components/TopicPanel";
+import { TopicPanel, type TopicPanelProps } from "@/features/graph/components/TopicPanel";
 
 const { startQuizAction } = vi.hoisted(() => ({
   startQuizAction: vi.fn<(filter: unknown) => Promise<{ empty: true }>>(() => Promise.resolve({ empty: true })),

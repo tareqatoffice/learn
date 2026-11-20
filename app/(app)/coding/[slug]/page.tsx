@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { codingGroup } from "@/coding/groups";
-import { getCodingProgress } from "@/coding/progress";
-import { readGroupSpecs } from "@/coding/specs";
-import { CodingGroup } from "@/components/coding/CodingGroup";
-import { requireUser } from "@/lib/authz";
+import { codingGroup } from "@/features/coding/groups";
+import { getCodingProgress } from "@/features/coding/progress";
+import { readGroupSpecs } from "@/features/coding/specs";
+import { CodingGroup } from "@/features/coding/components/CodingGroup";
+import { requireUser } from "@/features/auth/lib/authz";
 import { buildMetadata } from "@/lib/seo";
 
 export async function generateMetadata({ params }: PageProps<"/coding/[slug]">): Promise<Metadata> {

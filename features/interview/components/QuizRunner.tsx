@@ -1,0 +1,38 @@
+"use client";
+
+import { useState } from "react";
+import {
+  askFollowUpAction,
+  finishQuizAction,
+  gradeAnswerAction,
+  recordResultAction,
+} from "@/app/(app)/interview/actions";
+import { type QuizCoach, QuizCard } from "@/features/interview/components/QuizCard";
+import type { QuizAttempt } from "@/lib/quiz-answer";
+import type { MarkResult } from "@/features/progress/questions";
+import type { SessionView } from "@/features/progress/quiz";
+
+export function QuizRunner({ initial, aiEnabled = false }: { initial: SessionView; aiEnabled?: boolean }) {
+  const [view, setView] = useState(initial);
+
+  async function onResult(result: MarkResult, attempt?: QuizAttempt): Promise<SessionView> {
+    if (!view.current) return view;
+    const next = await recordResultAction(view.sessionId, view.current.id, result, attempt);
+    setView(next);
+    return next;
+  }
+
+  async function onFinish() {
+    await finishQuizAction(view.sessionId);
+    setView((v) => ({ ...v, done: true, current: null }));
+  }
+
+  const coach: QuizCoach | undefined = aiEnabled
+    ? {
+        grade: (questionId, answer) => gradeAnswerAction(view.sessionId, questionId, answer),
+        ask: (questionId, input) => askFollowUpAction(view.sessionId, questionId, input),
+      }
+    : undefined;
+
+  return <QuizCard view={view} onResult={onResult} onFinish={onFinish} coach={coach} />;
+}

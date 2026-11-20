@@ -11,7 +11,7 @@ vi.mock("@/auth", () => ({
   auth: () => Promise.resolve({ user: { id: "64b000000000000000000001", email: "someone@example.test", name: "Someone" } }),
 }));
 
-import { ForbiddenError } from "@/lib/authz";
+import { ForbiddenError } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { SpeakingDay, SpeakingLesson, SpeakingTake } from "@/models";
 import * as r2 from "@/lib/r2";
@@ -22,7 +22,7 @@ import {
   moveLesson,
   startLessonAudioUpload,
   updateLesson,
-} from "@/admin/speaking";
+} from "@/features/admin/speaking";
 import { createLessonAction } from "@/app/(app)/admin/speaking/actions";
 import { resetDb } from "../setup/mongo";
 

@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { runImport } from "@/content/import/run";
-import { importFields } from "@/content/import/schema";
+import { runImport } from "@/features/content/import/run";
+import { importFields } from "@/features/content/import/schema";
 import { BodyError, IMPORT_BODY_MAX, readJsonBody } from "@/lib/jsonBody";
-import { withToken } from "@/lib/tokenAuth";
+import { withToken } from "@/features/auth/lib/tokenAuth";
 import { issuesMessage } from "@/lib/zod";
 
 const body = z.object({

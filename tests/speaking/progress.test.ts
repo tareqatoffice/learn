@@ -6,8 +6,8 @@ vi.mock("@/lib/stt", () => ({ sttConfigured: vi.fn(() => true) }));
 
 import { connectDb } from "@/lib/db";
 import { SpeakingTake } from "@/models";
-import { getToday, getTrends } from "@/speaking/progress";
-import type { TaskKey } from "@/speaking/tasks";
+import { getToday, getTrends } from "@/features/speaking/progress";
+import type { TaskKey } from "@/features/speaking/tasks";
 import { resetDb } from "../setup/mongo";
 
 const user = () => String(new Types.ObjectId());

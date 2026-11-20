@@ -1,10 +1,10 @@
-import { AiKeyForm } from "@/components/admin/AiKeyForm";
-import { AiSettingsForm } from "@/components/admin/AiSettingsForm";
-import { AdminCard, AdminPage } from "@/components/admin/layout";
-import { getAiConfig } from "@/lib/aiSettings";
+import { AiKeyForm } from "@/features/admin/components/AiKeyForm";
+import { AiSettingsForm } from "@/features/admin/components/AiSettingsForm";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
+import { getAiConfig } from "@/features/ai/lib/aiSettings";
 import { connectDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
-import { listCatalog } from "@/lib/openrouter";
+import { listCatalog } from "@/features/ai/lib/openrouter";
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({

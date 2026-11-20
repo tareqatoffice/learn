@@ -1,6 +1,6 @@
-import { AdminCard, AdminPage } from "@/components/admin/layout";
-import { IeltsSettingsForm } from "@/components/admin/IeltsSettingsForm";
-import { getIeltsSettings } from "@/ielts/settings";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
+import { IeltsSettingsForm } from "@/features/admin/components/IeltsSettingsForm";
+import { getIeltsSettings } from "@/features/ielts/settings";
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({

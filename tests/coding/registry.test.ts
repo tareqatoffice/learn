@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { renderCatalog } from "@/scripts/coding-groups";
-import { groups } from "@/coding/problems";
-import { readGroupSpecs } from "@/coding/specs";
+import { groups } from "@/features/coding/problems";
+import { readGroupSpecs } from "@/features/coding/specs";
 
 describe("coding test registry", () => {
   it("has unique slugs, and every group page can load its specs", async () => {
@@ -33,7 +33,7 @@ describe("coding test registry", () => {
   });
 
   it("keeps the generated server catalog in sync (npm run coding:groups)", () => {
-    expect(readFileSync(path.join(process.cwd(), "coding", "groups.ts"), "utf8")).toBe(renderCatalog());
+    expect(readFileSync(path.join(process.cwd(), "features", "coding", "groups.ts"), "utf8")).toBe(renderCatalog());
   });
 
   it("returns null for an unknown group", async () => {

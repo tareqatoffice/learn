@@ -1,7 +1,7 @@
 "use server";
 
-import { adminContext } from "@/admin/action";
-import type { ActionResult } from "@/admin/result";
+import { adminContext } from "@/features/admin/action";
+import type { ActionResult } from "@/features/admin/result";
 import {
   confirmLessonAudio,
   createLesson,
@@ -10,9 +10,9 @@ import {
   startLessonAudioUpload,
   updateLesson,
   type LessonInput,
-} from "@/admin/speaking";
-import { saveDefaults } from "@/speaking/settings";
-import type { TaskKey } from "@/speaking/tasks";
+} from "@/features/admin/speaking";
+import { saveDefaults } from "@/features/speaking/settings";
+import type { TaskKey } from "@/features/speaking/tasks";
 
 export async function createLessonAction(input: LessonInput) {
   await adminContext();

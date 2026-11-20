@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getGraphAdmin, listSubjects } from "@/admin/queries";
-import { GraphForm } from "@/components/admin/GraphForm";
-import { AdminCard, AdminList, AdminListItem, AdminPage, AdminSection } from "@/components/admin/layout";
-import { RowActions } from "@/components/admin/RowActions";
+import { getGraphAdmin, listSubjects } from "@/features/admin/queries";
+import { GraphForm } from "@/features/admin/components/GraphForm";
+import { AdminCard, AdminList, AdminListItem, AdminPage, AdminSection } from "@/features/admin/components/layout";
+import { RowActions } from "@/features/admin/components/RowActions";
 import { buttonVariants } from "@/components/ui/button";
 import { connectDb } from "@/lib/db";
 

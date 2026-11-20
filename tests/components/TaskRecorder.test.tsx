@@ -1,8 +1,8 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TaskRecorder } from "@/components/speaking/TaskRecorder";
-import type { RecorderResult, RecorderState } from "@/lib/useRecorder";
+import { TaskRecorder } from "@/features/speaking/components/TaskRecorder";
+import type { RecorderResult, RecorderState } from "@/features/recording/lib/useRecorder";
 
 
 const recorder = vi.hoisted(() => ({
@@ -17,13 +17,13 @@ const recorder = vi.hoisted(() => ({
     reset: vi.fn(),
   },
 }));
-vi.mock("@/lib/useRecorder", () => ({ useRecorder: () => recorder.value }));
+vi.mock("@/features/recording/lib/useRecorder", () => ({ useRecorder: () => recorder.value }));
 
 const upload = vi.hoisted(() => {
   class UploadError extends Error {}
   return { UploadError, uploadTake: vi.fn<(...args: unknown[]) => Promise<void>>(async () => {}) };
 });
-vi.mock("@/lib/uploadTake", () => upload);
+vi.mock("@/features/recording/lib/uploadTake", () => upload);
 
 const actions = vi.hoisted(() => ({
   startTakeAction: vi.fn<(...args: unknown[]) => Promise<object>>(async () => ({

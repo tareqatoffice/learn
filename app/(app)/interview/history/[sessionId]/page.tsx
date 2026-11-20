@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { QuizSession } from "@/components/interview/QuizSession";
-import { requireUser } from "@/lib/authz";
+import { QuizSession } from "@/features/interview/components/QuizSession";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
-import { getAttemptLogs } from "@/progress/attempts";
+import { getAttemptLogs } from "@/features/progress/attempts";
 
 export async function generateMetadata({ params }: PageProps<"/interview/history/[sessionId]">): Promise<Metadata> {
   const { sessionId } = await params;

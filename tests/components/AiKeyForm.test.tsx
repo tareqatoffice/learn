@@ -15,7 +15,7 @@ vi.mock("@/components/ConfirmDialog", () => ({
   ConfirmHost: () => null,
 }));
 
-import { AiKeyForm } from "@/components/admin/AiKeyForm";
+import { AiKeyForm } from "@/features/admin/components/AiKeyForm";
 
 afterEach(() => {
   cleanup();

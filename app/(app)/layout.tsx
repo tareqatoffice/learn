@@ -3,7 +3,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { ConfirmHost } from "@/components/ConfirmDialog";
 import { TopBar } from "@/components/TopBar";
 import { Toaster } from "@/components/ui/sonner";
-import { requireUser } from "@/lib/authz";
+import { requireUser } from "@/features/auth/lib/authz";
 import { cn } from "@/lib/utils";
 import type { Metadata } from "next";
 

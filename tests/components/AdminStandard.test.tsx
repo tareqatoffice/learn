@@ -13,11 +13,11 @@ vi.mock("@/components/ConfirmDialog", () => ({
   ConfirmHost: () => null,
 }));
 
-import { ADMIN_NAV } from "@/admin/nav";
-import { fail, firstError, ok } from "@/admin/result";
-import { AdminList, AdminListItem, AdminPage } from "@/components/admin/layout";
-import { ActionStatus } from "@/components/admin/SaveBar";
-import { useAdminAction } from "@/components/admin/useAdminAction";
+import { ADMIN_NAV } from "@/features/admin/nav";
+import { fail, firstError, ok } from "@/features/admin/result";
+import { AdminList, AdminListItem, AdminPage } from "@/features/admin/components/layout";
+import { ActionStatus } from "@/features/admin/components/SaveBar";
+import { useAdminAction } from "@/features/admin/components/useAdminAction";
 
 afterEach(() => {
   cleanup();

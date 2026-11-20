@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { BookView } from "@/components/interview/BookView";
-import { getBookView } from "@/content/queries";
-import { requireUser } from "@/lib/authz";
+import { BookView } from "@/features/interview/components/BookView";
+import { getBookView } from "@/features/content/queries";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { cache } from "react";
 import type { Metadata } from "next";

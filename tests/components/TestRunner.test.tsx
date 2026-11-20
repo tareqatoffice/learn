@@ -19,8 +19,8 @@ vi.mock("@/components/ConfirmDialog", () => ({
   ConfirmHost: () => null,
 }));
 
-import { TestRunner } from "@/components/ielts/TestRunner";
-import type { RunView } from "@/ielts/practice/attempts";
+import { TestRunner } from "@/features/ielts/components/TestRunner";
+import type { RunView } from "@/features/ielts/practice/attempts";
 
 const view = (over: Partial<RunView> = {}): RunView => ({
   id: "a1",

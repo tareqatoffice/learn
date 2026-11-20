@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ADMIN_NAV } from "@/admin/nav";
-import { AdminCard, AdminPage } from "@/components/admin/layout";
-import { getAiSettings } from "@/lib/aiSettings";
+import { ADMIN_NAV } from "@/features/admin/nav";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
+import { getAiSettings } from "@/features/ai/lib/aiSettings";
 import { connectDb } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { buildMetadata } from "@/lib/seo";
