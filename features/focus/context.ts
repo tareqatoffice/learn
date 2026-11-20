@@ -29,6 +29,9 @@ export function areaFor(pathname: string): FocusArea {
     : "general";
 }
 
+/** Whether the idle focus button belongs on this page: only inside a study track, not profile/admin/dashboard. */
+export const offersFocus = (pathname: string) => areaFor(pathname) !== "general";
+
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const TITLE_SUFFIX = new RegExp(`\\s*·\\s*${escapeRegExp(SITE_NAME)}$`);
 

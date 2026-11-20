@@ -17,6 +17,7 @@ import {
   focusContextFor,
   formatClock,
   formatDuration,
+  offersFocus,
 } from "@/features/focus/context";
 import type { FocusToday } from "@/features/focus/sessions";
 import {
@@ -33,9 +34,6 @@ import {
 import { isCurrentRun, syncFocusStore, useFocusStore } from "@/features/focus/lib/store";
 import { cn } from "@/lib/utils";
 import type { FocusArea } from "@/models/focusConstants";
-
-/** Pages where the idle focus button is not shown. */
-const HIDDEN_ON = ["/dashboard"];
 
 const colorOf = (area: FocusArea) => (area === "general" ? "var(--primary)" : trackVar(area));
 
@@ -222,8 +220,8 @@ export function FocusButton() {
   const color = colorOf(run?.context.area ?? here?.area ?? "general");
   const elsewhere = run && here && run.context.path !== here.path ? here : null;
 
-  // Nothing to focus on from the dashboard; still show a running timer there.
-  if (!run && HIDDEN_ON.includes(pathname)) return null;
+  // Only offer a new session inside a study track; a running timer stays visible everywhere.
+  if (!run && !offersFocus(pathname)) return null;
 
   return (
     <>
