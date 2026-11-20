@@ -252,6 +252,17 @@ html {
   html {
     scroll-behavior: auto;
   }
+  /* Catch-all: tw-animate `animate-in`, `animate-pulse` and hover transitions don't check this themselves. */
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Small, subtle scrollbars everywhere */
