@@ -8,7 +8,7 @@ vi.mock("@/auth", () => ({
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "UTC" }) }) }));
 
 import * as actions from "@/app/(app)/focus-actions";
-import { areaFor, focusContextFor, formatClock, formatDuration, isAppPath } from "@/features/focus/context";
+import { areaFor, focusContextFor, formatClock, formatDuration, isAppPath, offersFocus } from "@/features/focus/context";
 import {
   elapsedSeconds,
   isCompleted,
@@ -30,6 +30,15 @@ const today = localDate(new Date(), "UTC");
 const ctx = { area: "notes" as const, label: "Channels", path: "/notes/go/channels" };
 
 describe("focus context", () => {
+  it("offers focus only inside study tracks", () => {
+    for (const p of ["/interview", "/speaking/x", "/ielts/plan", "/graphs/go", "/notes/go/ch1", "/coding/arrays"]) {
+      expect(offersFocus(p)).toBe(true);
+    }
+    for (const p of ["/profile", "/admin", "/admin/users", "/dashboard", "/access", "/"]) {
+      expect(offersFocus(p)).toBe(false);
+    }
+  });
+
   it("maps the first path segment to an area", () => {
     expect(areaFor("/notes/go/channels")).toBe("notes");
     expect(areaFor("/interview/react/q1")).toBe("interview");
