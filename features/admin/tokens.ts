@@ -18,7 +18,7 @@ export async function createToken(
 ): Promise<{ id: string; token: string }> {
   const label = name.trim().slice(0, 100);
   if (!label) throw new Error("Token name is required");
-  const scope = options.scope ?? "write";
+  const scope = options.scope ?? "read";
   if (!TOKEN_SCOPES.includes(scope)) throw new Error("Unknown token scope");
   const days = options.lifetimeDays ?? null;
   if (!TOKEN_LIFETIMES.includes(days)) throw new Error("Unknown token lifetime");

@@ -1,6 +1,7 @@
 import mongoose, { Schema, model } from "mongoose";
 import { headers } from "next/headers";
 import { connectDb, retryOnDuplicateKey } from "@/lib/db";
+import { getEnv } from "@/lib/env";
 
 const rateLimitSchema = new Schema({
   key: { type: String, required: true },
@@ -35,9 +36,22 @@ export async function allow(key: string, limit: Limit, now: Date = new Date()): 
   return (row?.count ?? 0) <= limit.max;
 }
 
+/**
+ * Client IP for rate limiting. On Vercel, x-vercel-forwarded-for is set by the edge and can't be forged.
+ * Elsewhere, the last X-Forwarded-For hop is the one the nearest proxy added (the first is client-supplied).
+ * Without a proxy in front, every forwarding header is client-controlled: deploy behind one.
+ */
+export function addressFrom(h: Pick<Headers, "get">, { vercel }: { vercel: boolean }): string {
+  if (vercel) {
+    const edge = h.get("x-vercel-forwarded-for")?.split(",")[0]?.trim();
+    if (edge) return edge;
+  }
+  const hops = (h.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  return hops.at(-1) ?? h.get("x-real-ip")?.trim() ?? "unknown";
+}
+
 export async function clientAddress(): Promise<string> {
-  const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+  return addressFrom(await headers(), { vercel: getEnv().VERCEL });
 }
 
 export const RATE_LIMIT_MESSAGE = "Too many tries in a short time. Wait a few minutes and try again.";

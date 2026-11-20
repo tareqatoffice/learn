@@ -40,6 +40,8 @@ describe("Content Security Policy (S2)", () => {
     expect(Object.fromEntries(rules[0].headers.map((h) => [h.key, h.value]))).toEqual({
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
+      "Strict-Transport-Security": "max-age=63072000",
+      "Permissions-Policy": "camera=(self), microphone=(self), geolocation=(), payment=(), usb=()",
     });
   });
 });

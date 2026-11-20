@@ -84,6 +84,19 @@ export async function requireUser(): Promise<SessionUser> {
   return user;
 }
 
+/**
+ * For route handlers, which return a Response instead of redirecting: the signed-in, approved user,
+ * or the 401/403 to send back. Repeats the proxy's status check so a handler stays gated on its own.
+ */
+export async function approvedRouteUser(): Promise<{ user: SessionUser } | { response: Response }> {
+  const user = await sessionUser();
+  if (!user) return { response: new Response("Sign in first", { status: 401 }) };
+  const status = await cachedStatus(user.userId, user.email);
+  if (!status) return { response: new Response("Sign in first", { status: 401 }) };
+  if (status !== "approved") return { response: new Response("Forbidden", { status: 403 }) };
+  return { user };
+}
+
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await sessionUser();
   if (!user) redirect("/");

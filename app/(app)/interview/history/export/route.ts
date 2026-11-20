@@ -1,11 +1,11 @@
-import { auth } from "@/auth";
+import { approvedRouteUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { attemptsMarkdown, exportFileName, getAttemptLogs } from "@/features/progress/attempts";
 
 export async function GET(request: Request): Promise<Response> {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) return new Response("Sign in first", { status: 401 });
+  const access = await approvedRouteUser();
+  if ("response" in access) return access.response;
+  const { userId } = access.user;
   await connectDb();
 
   const sessionId = new URL(request.url).searchParams.get("session") ?? undefined;
