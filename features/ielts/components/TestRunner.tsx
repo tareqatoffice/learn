@@ -10,15 +10,12 @@ import { Button } from "@/components/ui/button";
 import type { RunView, SectionAudioKind } from "@/features/ielts/practice/attempts";
 import { choicesFor, letter, type PublicGroup, type PublicQuestion } from "@/features/ielts/practice/marking";
 import { rovingIndex, timeWarning } from "@/features/ielts/lib/a11y";
+import { clock } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const SAVE_DELAY_MS = 1200;
 const RETRY_MS = 5000;
 
-function clock(sec: number): string {
-  const s = Math.max(0, sec);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
 
 function SectionAudio({ kind, once, attemptId, index, heard }: { kind: SectionAudioKind; once: boolean; attemptId: string; index: number; heard: boolean }) {
   const [state, setState] = useState<"idle" | "playing" | "done">(heard ? "done" : "idle");

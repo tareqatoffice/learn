@@ -5,6 +5,7 @@ import { ConfirmHost } from "@/components/ConfirmDialog";
 import { TopBar } from "@/components/TopBar";
 import { Toaster } from "@/components/ui/sonner";
 import { requireUser } from "@/features/auth/lib/authz";
+import { FocusButton } from "@/features/focus/components/FocusButton";
 import { cn } from "@/lib/utils";
 import type { Metadata } from "next";
 
@@ -23,6 +24,7 @@ export default async function AppLayout({
       />
       <main id="main" tabIndex={-1} className={cn(containerClass, "min-w-0 flex-1 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))] focus:outline-none md:pb-6")}>{children}</main>
       <BottomNav />
+      <FocusButton />
       <CommandPalette />
       <Toaster />
       <ConfirmHost />
