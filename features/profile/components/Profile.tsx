@@ -2,8 +2,11 @@ import Link from "next/link";
 import { chipClass } from "@/components/Chip";
 import { ActivityHeatmap } from "@/features/profile/components/ActivityHeatmap";
 import { TimeZoneCookie } from "@/features/speaking/components/TimeZoneCookie";
-import { Card as TrackCard, ProgressRows } from "@/features/profile/components/TrackCard";
-import { pageTitleClass } from "@/lib/ui";
+import { Panel as Card } from "@/components/Panel";
+import { ProgressBar } from "@/components/ProgressBar";
+import { trackVar, type TrackName } from "@/components/track";
+import { ProgressRows } from "@/features/profile/components/TrackCard";
+import { pageTitleBase } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { PROFILE_TABS, TAB_LABEL, type ProfileData, type ProfileTab } from "@/features/profile/data";
 
@@ -11,15 +14,22 @@ const linkClass = "hover:underline focus-visible:outline-2 focus-visible:outline
 const dateFormat = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 const fmt = (date: string) => dateFormat.format(new Date(`${date}T00:00:00Z`));
 
-function Card(props: Omit<React.ComponentProps<typeof TrackCard>, "heading">) {
-  return <TrackCard heading="h2" {...props} />;
-}
-
-function Stat({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
+function Stat({
+  label,
+  value,
+  hint,
+  bar,
+}: {
+  label: string;
+  value: React.ReactNode;
+  hint?: string;
+  bar?: { value: number; max: number; track: TrackName };
+}) {
   return (
-    <div className="grid gap-0.5">
-      <span className="text-xs text-muted-foreground">{label}</span>
+    <div className="grid gap-1">
+      <span className="text-sm text-muted-foreground">{label}</span>
       <span className="text-2xl font-semibold tabular-nums">{value}</span>
+      {bar && <ProgressBar value={bar.value} max={bar.max} color={trackVar(bar.track)} />}
       {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
     </div>
   );
@@ -60,19 +70,24 @@ function Overview({ d }: { d: ProfileData }) {
         <ActivityHeatmap days={d.activity} />
       </Card>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Card title="Notes">
-          <Stat label="Chapters read" value={`${d.notes.read}/${d.notes.total}`} />
+        <Card title="Notes" track="notes">
+          <Stat label="Chapters read" value={`${d.notes.read}/${d.notes.total}`} bar={{ value: d.notes.read, max: d.notes.total, track: "notes" }} />
         </Card>
-        <Card title="Interview">
-          <Stat label="Questions mastered" value={`${d.interview.mastered}/${d.interview.total}`} hint={`${d.interview.quizzes} quizzes finished`} />
+        <Card title="Interview" track="interview">
+          <Stat
+            label="Questions mastered"
+            value={`${d.interview.mastered}/${d.interview.total}`}
+            bar={{ value: d.interview.mastered, max: d.interview.total, track: "interview" }}
+            hint={`${d.interview.quizzes} quizzes finished`}
+          />
         </Card>
-        <Card title="Graphs">
-          <Stat label="Topics done" value={`${d.graphs.done}/${d.graphs.total}`} />
+        <Card title="Graphs" track="graphs">
+          <Stat label="Topics done" value={`${d.graphs.done}/${d.graphs.total}`} bar={{ value: d.graphs.done, max: d.graphs.total, track: "graphs" }} />
         </Card>
-        <Card title="Speaking">
+        <Card title="Speaking" track="speaking">
           <Stat label="Takes recorded" value={d.speaking.takes} />
         </Card>
-        <Card title="IELTS">
+        <Card title="IELTS" track="ielts">
           <Stat
             label="Practice done"
             value={d.ielts.speaking.completed + d.ielts.tests + d.ielts.writing}
@@ -87,8 +102,9 @@ function Overview({ d }: { d: ProfileData }) {
 function NotesTab({ d }: { d: ProfileData["notes"] }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card title="Series progress">
+      <Card title="Series progress" track="notes">
         <ProgressRows
+          track="notes"
           empty="No note series yet."
           rows={d.series.map((s) => ({ key: s.slug, href: `/notes/${s.slug}`, label: s.title, value: s.read, max: s.total }))}
         />
@@ -114,8 +130,9 @@ function NotesTab({ d }: { d: ProfileData["notes"] }) {
 function InterviewTab({ d }: { d: ProfileData["interview"] }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card title="Books mastered">
+      <Card title="Books mastered" track="interview">
         <ProgressRows
+          track="interview"
           empty="No question books yet."
           rows={d.books.map((b) => ({ key: b.slug, href: `/interview/${b.slug}`, label: b.title, value: b.mastered, max: b.total }))}
         />
@@ -142,8 +159,9 @@ function InterviewTab({ d }: { d: ProfileData["interview"] }) {
 function GraphsTab({ d }: { d: ProfileData["graphs"] }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card title="Graph progress">
+      <Card title="Graph progress" track="graphs">
         <ProgressRows
+          track="graphs"
           empty="No graphs yet."
           rows={d.graphs.map((g) => ({ key: g.slug, href: `/graphs/${g.slug}`, label: g.title, value: g.done, max: g.total }))}
         />
@@ -169,13 +187,19 @@ function GraphsTab({ d }: { d: ProfileData["graphs"] }) {
 function SpeakingTab({ d }: { d: ProfileData["speaking"] }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card title="Takes by task">
+      <Card title="Takes by task" track="speaking">
         {d.byTask.length ? (
-          <ul className="grid gap-1 text-sm">
-            {d.byTask.map((t) => (
-              <li key={t.task} className="flex justify-between">
+          <ul className="grid gap-2 text-sm">
+            {d.byTask.map((t, _i, all) => (
+              <li key={t.task} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
                 <span>{t.task}</span>
                 <span className="tabular-nums text-muted-foreground">{t.count}</span>
+                <ProgressBar
+                  value={t.count}
+                  max={Math.max(...all.map((x) => x.count))}
+                  color={trackVar("speaking")}
+                  className="col-span-2"
+                />
               </li>
             ))}
           </ul>
@@ -267,7 +291,7 @@ export function Profile({
           )}
         </div>
         <div className="min-w-0">
-          <h1 className={cn("truncate", pageTitleClass)}>{d.name}</h1>
+          <h1 className={cn("truncate", pageTitleBase)}>{d.name}</h1>
           <p className="text-sm text-muted-foreground">
             {d.joined ? `Joined ${fmt(d.joined)}` : "Member"}
             {d.streak > 0 && ` · ${d.streak}-day activity streak`}

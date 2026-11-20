@@ -1,16 +1,16 @@
 import Link from "next/link";
+import { PageHeader } from "@/components/PageHeader";
+import { Panel } from "@/components/Panel";
+import { buttonVariants } from "@/components/ui/button";
+import { trackVar } from "@/components/track";
 import { TimeZoneCookie } from "@/features/speaking/components/TimeZoneCookie";
 import { type TodayTask, TodayTasks } from "@/features/speaking/components/TodayTasks";
 import { WeekStrip } from "@/features/speaking/components/WeekStrip";
-import { pageTitleClass } from "@/lib/ui";
 import { lessonHasPart } from "@/features/speaking/lessons";
 import { TASKS } from "@/features/speaking/tasks";
 
 type Today = Awaited<ReturnType<typeof import("@/features/speaking/progress").getToday>>;
 type LessonListItem = { id: string; title: string };
-
-const linkClass =
-  "rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
 
@@ -37,19 +37,22 @@ export function SpeakingHome({
   }));
 
   return (
-    <div className="grid w-full gap-4">
+    <div className="grid w-full gap-6">
       <TimeZoneCookie current={timeZone} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={pageTitleClass}>Speaking practice</h1>
-        <div className="flex gap-2">
-          <Link href="/speaking/history" className={linkClass}>
-            History
-          </Link>
-          <Link href="/speaking/settings" className={linkClass}>
-            Settings
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Speaking practice"
+        track="speaking"
+        actions={
+          <>
+            <Link href="/speaking/history" className={buttonVariants({ variant: "outline", size: "sm" })}>
+              History
+            </Link>
+            <Link href="/speaking/settings" className={buttonVariants({ variant: "outline", size: "sm" })}>
+              Settings
+            </Link>
+          </>
+        }
+      />
 
       {!today.storage && (
         <p role="status" className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
@@ -58,19 +61,22 @@ export function SpeakingHome({
         </p>
       )}
 
-      <section aria-labelledby="week" className="grid gap-4 rounded-xl border border-border bg-card p-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 id="week" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            This week
-          </h2>
+      <Panel
+        title="This week"
+        track="speaking"
+        action={
           <p className="text-sm">
-            <span className="font-semibold tabular-nums">{days(today.streak)}</span>{" "}
-            <span className="text-muted-foreground">streak · best</span>{" "}
+            <span className="text-lg font-semibold tabular-nums" style={{ color: trackVar("speaking") }}>
+              {days(today.streak)}
+            </span>{" "}
+            <span className="text-muted-foreground">streak, best</span>{" "}
             <span className="font-semibold tabular-nums">{days(today.best)}</span>
           </p>
-        </div>
+        }
+        className="gap-4 p-5"
+      >
         <WeekStrip week={today.week} today={today.date} />
-      </section>
+      </Panel>
 
       <TodayTasks
         tasks={tasks}

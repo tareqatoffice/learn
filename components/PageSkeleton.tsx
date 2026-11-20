@@ -33,6 +33,30 @@ function ChipRow({ count = 4 }: { count?: number }) {
   );
 }
 
+/** Matches PageHeader: a spine, a title line and an optional description line, with room for actions on the right. */
+function HeaderSkeleton({
+  titleWidth = "w-56",
+  description = true,
+  children,
+}: {
+  titleWidth?: string;
+  description?: boolean;
+  children?: React.ReactNode;
+}) {
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+      <div className="flex min-w-0 items-stretch gap-3">
+        <span aria-hidden className="w-1 shrink-0 rounded-full bg-muted" />
+        <div className="grid min-w-0 gap-1">
+          <Skeleton className={cn("h-8 max-w-full", titleWidth)} />
+          {description && <Skeleton className="h-4 w-64 max-w-full" />}
+        </div>
+      </div>
+      {children}
+    </header>
+  );
+}
+
 function ProgressRows({ count = 3 }: { count?: number }) {
   return (
     <ul className="grid gap-2">
@@ -51,7 +75,7 @@ function ProgressRows({ count = 3 }: { count?: number }) {
 
 export function DashboardSkeleton() {
   return (
-    <Status label="Loading dashboard" className="grid gap-8">
+    <Status label="Loading dashboard" className="grid gap-6">
       <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="grid gap-1">
           <Skeleton className="h-8 w-56 max-w-full" />
@@ -98,33 +122,35 @@ export function DashboardSkeleton() {
 
 export function CardGridSkeleton({ titleWidth = "w-48" }: { titleWidth?: string }) {
   return (
-    <Status label="Loading page" className="grid gap-4">
-      <Skeleton className={cn("h-8 max-w-full", titleWidth)} />
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }, (_, i) => (
-          <li
-            key={i}
-            className="rounded-xl border border-border bg-card p-4"
-          >
-            <div className="flex items-baseline justify-between gap-3">
-              <Skeleton className="h-5 w-2/3 max-w-48" />
-              <Skeleton className="h-4 w-14" />
-            </div>
-            <Skeleton className="mt-2 h-2 w-full" />
-          </li>
-        ))}
-      </ul>
+    <Status label="Loading page" className="grid gap-6">
+      <HeaderSkeleton titleWidth={titleWidth} />
+      <div className="grid gap-4">
+        <ChipRow count={4} />
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }, (_, i) => (
+            <li
+              key={i}
+              className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 sm:p-5"
+            >
+              <div className="grid min-w-0 flex-1 gap-2">
+                <Skeleton className="h-5 w-2/3 max-w-48" />
+                <Skeleton className="h-4 w-1/2 max-w-32" />
+              </div>
+              <Skeleton className="size-[52px] shrink-0 rounded-full" />
+            </li>
+          ))}
+        </ul>
+      </div>
     </Status>
   );
 }
 
 export function InterviewIndexSkeleton() {
   return (
-    <Status label="Loading page" className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Skeleton className="h-8 w-44" />
+    <Status label="Loading page" className="grid gap-6">
+      <HeaderSkeleton titleWidth="w-44">
         <Skeleton className="h-8 w-32 rounded-md" />
-      </div>
+      </HeaderSkeleton>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <section className="rounded-xl border border-border bg-card p-5">
           <Skeleton className="h-6 w-28" />
@@ -237,19 +263,20 @@ export function QuestionDetailSkeleton() {
 export function SeriesDetailSkeleton() {
   return (
     <Status label="Loading page" className="grid gap-6">
-      <header className="grid gap-1">
+      <div className="grid gap-3">
         <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-8 w-56 max-w-full" />
-        <Skeleton className="h-4 w-36" />
-      </header>
-      <section className="rounded-xl border border-border bg-card p-5">
+        <HeaderSkeleton description={false} />
+        <Skeleton className="h-2 w-full" />
+      </div>
+      <section className="grid gap-3 rounded-xl border border-border bg-card p-5">
         <Skeleton className="h-6 w-28" />
-        <ol className="mt-3 divide-y divide-border">
+        <ol className="grid gap-1">
           {Array.from({ length: 5 }, (_, i) => (
             <li
               key={i}
-              className="flex items-center justify-between gap-3 py-2"
+              className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-2 py-2"
             >
+              <Skeleton className="size-7 rounded-full" />
               <Skeleton className="h-5 w-2/3 max-w-sm" />
               <Skeleton className="h-4 w-12" />
             </li>
@@ -334,7 +361,7 @@ export function QuizPageSkeleton() {
 
 export function GraphDetailSkeleton() {
   return (
-    <Status label="Loading page" className="grid gap-5">
+    <Status label="Loading page" className="grid gap-6">
       <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
         <div className="min-w-0 grid gap-1">
           <Skeleton className="h-8 w-56 max-w-full" />
@@ -377,10 +404,9 @@ export function GraphDetailSkeleton() {
 export function AdminPageSkeleton() {
   return (
     <Status label="Loading admin" className="grid gap-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <Skeleton className="h-8 w-40" />
+      <HeaderSkeleton titleWidth="w-40" description={false}>
         <Skeleton className="h-8 w-28" />
-      </header>
+      </HeaderSkeleton>
       <div className="divide-y divide-border rounded-xl border border-border bg-card">
         {Array.from({ length: 6 }, (_, i) => (
           <div
@@ -407,9 +433,8 @@ export function NarrowStackSkeleton({
   header?: "actions" | "chips";
 }) {
   return (
-    <Status label={label} className="grid w-full gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Skeleton className="h-8 w-48 max-w-full" />
+    <Status label={label} className="grid w-full gap-6">
+      <HeaderSkeleton titleWidth="w-48" description={false}>
         {header === "chips" ? (
           <div className="flex flex-wrap gap-2">
             {Array.from({ length: 6 }, (_, i) => (
@@ -422,7 +447,7 @@ export function NarrowStackSkeleton({
             <Skeleton className="h-8 w-20 rounded-md" />
           </div>
         )}
-      </div>
+      </HeaderSkeleton>
       <section className="grid gap-4 rounded-xl border border-border bg-card p-5">
         <div className="flex justify-between gap-3">
           <Skeleton className="h-3 w-20" />
@@ -455,7 +480,7 @@ export function AppPageSkeleton() {
 
 export function SimplePageSkeleton() {
   return (
-    <Status label="Loading" className="grid w-full gap-4">
+    <Status label="Loading" className="grid w-full gap-6">
       <Skeleton className="mx-auto size-11 rounded-full" />
       <Skeleton className="mx-auto h-8 w-48" />
       <Skeleton className="h-4 w-full" />

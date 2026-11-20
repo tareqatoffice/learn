@@ -280,7 +280,6 @@ html {
   background-clip: padding-box;
 }
 
-
 @media (pointer: coarse) {
   input:not([type="checkbox"], [type="radio"], [type="range"]),
   select,
@@ -555,6 +554,12 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr) {
 }
 main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
   background-color: color-mix(in oklch, var(--muted) 55%, transparent);
+}
+
+/* One card family: hand-rolled rounded-xl cards inside pages share Panel's radius and resting shadow. */
+main :is(section, div, article, li, details, form).rounded-xl.bg-card {
+  border-radius: var(--radius-2xl);
+  box-shadow: 0 1px 2px color-mix(in oklch, var(--foreground) 6%, transparent);
 }
 
 .progress-fill {

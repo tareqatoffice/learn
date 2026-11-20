@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
 import { ProgressBar } from "@/components/ProgressBar";
+import { Badge } from "@/components/ui/badge";
+import { focusRing, trackVar } from "@/components/track";
 import { Markdown } from "@/lib/markdown/Markdown";
-import { pageTitleClass } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL = { got: "Got it", review: "Review" } as const;
@@ -15,12 +17,19 @@ export function BookView({ view }: { view: BookViewData }) {
 
   return (
     <article className="w-full">
-      <BackLink href="/interview">← Interview prep</BackLink>
-      <h1 className={cn("mt-1", pageTitleClass)}>{book.title}</h1>
-      <p className="mt-2 text-sm tabular-nums text-muted-foreground">
-        {mastered} / {questions.length} mastered
-      </p>
-      <ProgressBar value={mastered} max={questions.length} className="mt-2" />
+      <div className="grid gap-3">
+        <BackLink href="/interview">← Interview prep</BackLink>
+        <PageHeader
+          title={book.title}
+          track="interview"
+          description={
+            <span className="tabular-nums">
+              {mastered} / {questions.length} mastered
+            </span>
+          }
+        />
+        <ProgressBar value={mastered} max={questions.length} color={trackVar("interview")} />
+      </div>
 
       {book.intro && (
         <div className="mt-6">
@@ -33,7 +42,7 @@ export function BookView({ view }: { view: BookViewData }) {
           {book.extras.map((extra) => (
             <details
               key={extra.key}
-              className="rounded-lg border border-border bg-card px-4 py-3"
+              className="rounded-xl border border-border bg-card px-4 py-3"
             >
               <summary className="cursor-pointer font-medium">
                 {extra.title}
@@ -53,7 +62,7 @@ export function BookView({ view }: { view: BookViewData }) {
           className="mt-10"
         >
           <div className="flex items-baseline justify-between gap-3">
-            <h2 id={`part-${part.key}`} className="text-xl font-semibold">
+            <h2 id={`part-${part.key}`} className="text-xl font-semibold tracking-tight">
               {part.title}
             </h2>
             <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
@@ -63,6 +72,7 @@ export function BookView({ view }: { view: BookViewData }) {
           <ProgressBar
             value={part.mastered}
             max={part.total}
+            color={trackVar("interview")}
             className="mt-2"
           />
           {part.intro && (
@@ -70,28 +80,23 @@ export function BookView({ view }: { view: BookViewData }) {
               <Markdown source={part.intro} />
             </div>
           )}
-          <ul className="mt-3 divide-y divide-border rounded-lg border border-border bg-card">
+          <ul className="mt-3 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
             {questions
               .filter((q) => q.partKey === part.key)
               .map((q) => (
                 <li key={q.id}>
                   <Link
                     href={`/interview/${book.slug}/${q.id}`}
-                    className="flex items-baseline justify-between gap-3 px-4 py-2.5 hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                    className={cn(
+                      focusRing,
+                      "flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/60 focus-visible:-outline-offset-2",
+                    )}
                   >
                     <span className="min-w-0">
                       <Markdown source={q.question} inline insideLink />
                     </span>
                     {q.status && (
-                      <span
-                        className={
-                          q.status === "got"
-                            ? "shrink-0 text-xs text-ok"
-                            : "shrink-0 text-xs text-track-1"
-                        }
-                      >
-                        {STATUS_LABEL[q.status]}
-                      </span>
+                      <Badge variant={q.status === "got" ? "ok" : "track"}>{STATUS_LABEL[q.status]}</Badge>
                     )}
                   </Link>
                 </li>

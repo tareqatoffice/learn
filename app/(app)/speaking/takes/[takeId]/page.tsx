@@ -31,7 +31,7 @@ export default async function TakePage({ params }: PageProps<"/speaking/takes/[t
 
   if (!storageConfigured()) {
     return (
-      <div className="grid w-full gap-4">
+      <div className="grid w-full gap-6">
         <Link href="/speaking/history" className="text-sm text-muted-foreground hover:underline">
           ← All takes
         </Link>

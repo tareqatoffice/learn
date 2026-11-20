@@ -55,7 +55,7 @@ export function IeltsHistory({
   const rows = attempts.filter((a) => matches(filter, a));
 
   return (
-    <div className="grid w-full gap-4">
+    <div className="grid w-full gap-6">
       <Link href="/ielts" className="text-sm text-muted-foreground hover:underline">
         ← IELTS
       </Link>

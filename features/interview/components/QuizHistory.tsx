@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
+import { Panel } from "@/components/Panel";
 import { buttonVariants } from "@/components/ui/button";
-import { pageTitleClass } from "@/lib/ui";
 import { HISTORY_LIMIT, plural } from "@/features/progress/attempts";
 
 type Session = Awaited<ReturnType<typeof import("@/features/progress/attempts").listAttemptSessions>>[number];
@@ -15,26 +17,24 @@ export function QuizHistory({
   const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short", timeZone });
 
   return (
-    <div className="grid w-full gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <Link href="/interview" className="text-sm text-muted-foreground hover:underline">
-            ← Interview prep
-          </Link>
-          <h1 className={pageTitleClass}>Quiz answers</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Your answers, the reference answers and the coach&apos;s feedback. Download them as Markdown and ask another AI
-            what you are missing.
-          </p>
-        </div>
-        {sessions.length > 0 && (
-          <a href="/interview/history/export" download className={buttonVariants()}>
-            Download all (.md)
-          </a>
-        )}
+    <div className="grid w-full gap-6">
+      <div className="grid gap-3">
+        <BackLink href="/interview">← Interview prep</BackLink>
+        <PageHeader
+          title="Quiz answers"
+          track="interview"
+          description="Your answers, the reference answers and the coach's feedback. Download them as Markdown and ask another AI what you are missing."
+          actions={
+            sessions.length > 0 ? (
+              <a href="/interview/history/export" download className={buttonVariants()}>
+                Download all (.md)
+              </a>
+            ) : undefined
+          }
+        />
       </div>
 
-      <section aria-label="Quizzes" className="rounded-xl border border-border bg-card p-5">
+      <Panel title="Quizzes" track="interview">
         {sessions.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No answers yet. Take a quiz from{" "}
@@ -44,9 +44,12 @@ export function QuizHistory({
             .
           </p>
         ) : (
-          <ul className="divide-y divide-border">
+          <ul className="grid gap-0.5">
             {sessions.map((s) => (
-              <li key={s.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <li
+                key={s.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg px-2 py-3 hover:bg-muted/60"
+              >
                 <span className="min-w-0">
                   <Link href={`/interview/history/${s.id}`} className="block truncate font-medium hover:underline">
                     {s.label}
@@ -73,9 +76,9 @@ export function QuizHistory({
           </ul>
         )}
         {sessions.length >= HISTORY_LIMIT && (
-          <p className="mt-3 text-xs text-muted-foreground">Showing your latest {HISTORY_LIMIT} quizzes.</p>
+          <p className="text-xs text-muted-foreground">Showing your latest {HISTORY_LIMIT} quizzes.</p>
         )}
-      </section>
+      </Panel>
     </div>
   );
 }

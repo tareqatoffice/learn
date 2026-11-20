@@ -6,9 +6,11 @@ import { mins } from "@/features/speaking/components/format";
 import { TimeZoneCookie } from "@/features/speaking/components/TimeZoneCookie";
 import type { Dashboard as DashboardData } from "@/features/progress/dashboard";
 import { TASKS, TASK_LABEL, TASK_SLUG } from "@/features/speaking/tasks";
-import { pageTitleClass } from "@/lib/ui";
+import { pageTitleBase } from "@/lib/ui";
 import { cn } from "@/lib/utils";
-import { focusRing, Panel, Ring, SplitBar, trackVar } from "./parts";
+import { Panel } from "@/components/Panel";
+import { focusRing, trackVar } from "@/components/track";
+import { Ring, SplitBar } from "./parts";
 import { ProgressTabs, type TrackTab } from "./ProgressTabs";
 
 type SpeakingToday = Awaited<ReturnType<typeof import("@/features/speaking/progress").getToday>>;
@@ -231,7 +233,7 @@ export function Dashboard({
       <TimeZoneCookie current={timeZone} />
       <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div>
-          <h1 className={pageTitleClass}>
+          <h1 className={pageTitleBase}>
             {firstVisit ? "Welcome" : "Welcome back"}
             {firstName ? `, ${firstName}` : ""}
           </h1>

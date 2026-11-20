@@ -268,7 +268,7 @@ export function GraphView({ data }: { data: GraphData }) {
   const readIdx = current ? order.findIndex((n) => n.id === current.id) : -1;
 
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-6">
       <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
         <div className="min-w-0">
           <h1 className={cn(pageTitleClass, "text-balance")}>{graph.title}</h1>

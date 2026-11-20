@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useId, useRef, useState } from "react";
 import { ProgressBar } from "@/components/ProgressBar";
 import { cn } from "@/lib/utils";
-import { focusRing, trackVar, type TrackName } from "./parts";
+import { focusRing, trackVar, type TrackName } from "@/components/track";
 
 export type TabRow = { key: string; href: string; label: string; value: number; max: number };
 export type TrackTab = {

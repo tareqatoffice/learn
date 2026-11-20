@@ -1,10 +1,9 @@
-import Link from "next/link";
-import { ProgressBar } from "@/components/ProgressBar";
+import { PageHeader } from "@/components/PageHeader";
+import { TileGrid } from "@/components/TileGrid";
 import { listSeriesWithProgress } from "@/features/content/queries";
 import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
-import { pageTitleClass } from "@/lib/ui";
 
 export const metadata = buildMetadata({
   title: "Notes",
@@ -16,37 +15,28 @@ export default async function NotesPage() {
   const user = await requireUser();
   await connectDb();
   const series = await listSeriesWithProgress(user.userId);
+  const read = series.reduce((n, s) => n + s.read, 0);
+  const total = series.reduce((n, s) => n + s.total, 0);
 
   return (
-    <section aria-labelledby="notes" className="grid gap-4">
-      <h1 id="notes" className={pageTitleClass}>
-        Learning notes
-      </h1>
-      {series.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No notes published yet.</p>
-      ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {series.map((s) => (
-            <li
-              key={s.slug}
-              className="rounded-xl border border-border bg-card p-4"
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <Link
-                  href={`/notes/${s.slug}`}
-                  className="min-w-0 truncate font-medium hover:underline pointer-coarse:py-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                >
-                  {s.title}
-                </Link>
-                <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
-                  {s.read}/{s.total} read
-                </span>
-              </div>
-              <ProgressBar value={s.read} max={s.total} className="mt-2" />
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <div className="grid gap-6">
+      <PageHeader
+        title="Learning notes"
+        track="notes"
+        description={total > 0 ? `${read} of ${total} chapters read across ${series.length} series.` : undefined}
+      />
+      <TileGrid
+        track="notes"
+        empty="No notes published yet."
+        tiles={series.map((s) => ({
+          key: s.slug,
+          href: `/notes/${s.slug}`,
+          title: s.title,
+          value: s.read,
+          max: s.total,
+          stat: `${s.read} of ${s.total} chapters read`,
+        }))}
+      />
+    </div>
   );
 }

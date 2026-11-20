@@ -15,13 +15,14 @@ import { listStudyLogs, STUDY_LOG_DAYS, todayList } from "@/features/ielts/progr
 import { listPending, runChecks } from "@/features/ielts/suggestions";
 import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
-import { pageTitleClass } from "@/lib/ui";
+import { PageHeader } from "@/components/PageHeader";
+import { Panel } from "@/components/Panel";
+import { buttonVariants } from "@/components/ui/button";
 import { StudyLog } from "@/features/ielts/components/StudyLog";
 import { addDays, localDate } from "@/features/speaking/schedule";
 import { readTimeZone } from "@/features/speaking/timezone";
 
-const linkClass =
-  "rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+const linkClass = buttonVariants({ variant: "outline", size: "sm" });
 
 const PRACTICE = [
   ["/ielts/speaking", "Speaking"],
@@ -60,14 +61,14 @@ export async function IeltsHome() {
 
   if (!profile) {
     return (
-      <div className="grid w-full gap-4">
+      <div className="grid w-full gap-6">
         <TimeZoneCookie current={timeZone} />
-        <h1 className={pageTitleClass}>Set up your IELTS plan</h1>
+        <PageHeader
+          title="Set up your IELTS plan"
+          track="ielts"
+          description="Tell us when your test is and what band you want. You will see a preview of the plan before anything is saved. You can also practise any skill or use the band calculator without a plan."
+        />
         <IeltsNav withPlan={false} />
-        <p className="text-sm text-muted-foreground">
-          Tell us when your test is and what band you want. You will see a preview of the plan before anything is saved. You can
-          also practise any skill or use the band calculator without a plan.
-        </p>
         <div className="rounded-xl border border-border bg-card p-5">
           <ProfileForm today={today} />
         </div>
@@ -78,41 +79,34 @@ export async function IeltsHome() {
   const header = (
     <>
       <TimeZoneCookie current={timeZone} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={pageTitleClass}>IELTS</h1>
-        <IeltsNav withPlan />
-      </div>
+      <PageHeader title="IELTS" track="ielts" actions={<IeltsNav withPlan />} />
     </>
   );
 
   if (profile.status === "ended") {
     return (
-      <div className="grid w-full gap-4">
+      <div className="grid w-full gap-6">
         {header}
-        <section className="grid gap-3 rounded-xl border border-border bg-card p-5">
-          <h2 className="text-lg font-semibold">Your IELTS plan has ended</h2>
+        <Panel title="Your IELTS plan has ended" track="ielts" className="p-5">
           <p className="text-sm text-muted-foreground">Your history and band entries are kept. Start a new plan whenever you are ready.</p>
           <div>
             <Link href="/ielts/profile" className={linkClass}>
               Start a new plan
             </Link>
           </div>
-        </section>
+        </Panel>
       </div>
     );
   }
 
   if (testDayStatus(today, profile.testDate) === "passed") {
     return (
-      <div className="grid w-full gap-4">
+      <div className="grid w-full gap-6">
         {header}
-        <section className="grid gap-4 rounded-xl border border-border bg-card p-5">
-          <div className="grid gap-1">
-            <h2 className="text-lg font-semibold">Your test date has passed</h2>
-            <p className="text-sm text-muted-foreground">
-              Enter your official result to keep it in your band history. The overall band is worked out from the four skills.
-            </p>
-          </div>
+        <Panel title="Your test date has passed" track="ielts" className="gap-4 p-5">
+          <p className="-mt-1 text-sm text-muted-foreground">
+            Enter your official result to keep it in your band history. The overall band is worked out from the four skills.
+          </p>
           <BandCalculator today={today} source="official" />
           <div className="flex flex-wrap items-start gap-3 border-t border-border pt-4">
             <Link href="/ielts/profile" className={linkClass}>
@@ -120,7 +114,7 @@ export async function IeltsHome() {
             </Link>
             <EndPlanButton />
           </div>
-        </section>
+        </Panel>
       </div>
     );
   }
@@ -136,7 +130,7 @@ export async function IeltsHome() {
   const week = plan ? weekOn(plan, today) : null;
 
   return (
-    <div className="grid w-full gap-4">
+    <div className="grid w-full gap-6">
       {header}
       <Countdown
         today={today}
@@ -145,17 +139,14 @@ export async function IeltsHome() {
         week={plan && week ? { index: week.index, count: plan.weeks.length } : null}
       />
       {suggestions.length > 0 && (
-        <section aria-labelledby="suggestions-title" className="grid gap-3">
-          <h2 id="suggestions-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Plan suggestions
-          </h2>
+        <Panel title="Plan suggestions" track="ielts">
           <p className="-mt-1 text-sm text-muted-foreground">Your plan stays as it is until you approve a change.</p>
           <ul className="grid gap-3">
             {suggestions.map((s) => (
               <SuggestionCard key={s.id} suggestion={s} />
             ))}
           </ul>
-        </section>
+        </Panel>
       )}
       <TodayList items={items} />
       <StudyLog today={today} minDate={addDays(today, -(STUDY_LOG_DAYS - 1))} entries={studyLogs} />

@@ -9,7 +9,7 @@ type Log = NonNullable<Awaited<ReturnType<typeof import("@/features/progress/att
 
 export function QuizSession({ log }: { log: Log }) {
   return (
-    <div className="grid w-full gap-4">
+    <div className="grid w-full gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link href="/interview/history" className="text-sm text-muted-foreground hover:underline">

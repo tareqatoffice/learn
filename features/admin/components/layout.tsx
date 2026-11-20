@@ -1,5 +1,5 @@
 import { BackLink } from "@/components/BackLink";
-import { pageTitleClass } from "@/lib/ui";
+import { pageTitleBase } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
 
@@ -7,6 +7,9 @@ const WIDTH = {
   full: "",
   narrow: "",
 } as const;
+
+/** Soft top tint shared by admin cards so they read as one family with the app's other panels. */
+const TINT = "linear-gradient(180deg, color-mix(in oklch, var(--ring) 6%, transparent), transparent 4.5rem)";
 
 export function AdminPage({
   title,
@@ -28,7 +31,10 @@ export function AdminPage({
       <header className="grid gap-2">
         {back && <BackLink href={back.href}>← {back.label}</BackLink>}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className={cn("min-w-0", pageTitleClass)}>{title}</h1>
+          <div className="flex min-w-0 items-stretch gap-3">
+            <span aria-hidden className="w-1 shrink-0 rounded-full bg-ring" />
+            <h1 className={cn("min-w-0 text-balance", pageTitleBase)}>{title}</h1>
+          </div>
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </div>
         {description && <div className="max-w-3xl text-sm text-muted-foreground">{description}</div>}
@@ -55,7 +61,7 @@ export function AdminSection({
     <section className={cn("grid gap-3", className)}>
       <div className="grid gap-1">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">{title}</h2>
+          <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </div>
         {description && <div className="text-sm text-muted-foreground">{description}</div>}
@@ -77,11 +83,17 @@ export function AdminCard({
   className?: string;
 }) {
   const body = <div className="grid content-start gap-5">{children}</div>;
-  if (!title) return <div className={cn("rounded-xl border border-border bg-card p-4 sm:p-5", className)}>{body}</div>;
+  if (!title)
+    return (
+      <div className={cn("rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-5", className)}>{body}</div>
+    );
   return (
-    <section className={cn("grid content-start gap-4 rounded-xl border border-border bg-card p-4 sm:p-5", className)}>
+    <section
+      className={cn("grid content-start gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-5", className)}
+      style={{ backgroundImage: TINT }}
+    >
       <div className="grid gap-1">
-        <h2 className="font-semibold">{title}</h2>
+        <h2 className="font-semibold tracking-tight">{title}</h2>
         {description && <div className="text-sm text-muted-foreground">{description}</div>}
       </div>
       {body}
@@ -103,7 +115,10 @@ export function AdminList({
   const hasRows = Array.isArray(children) ? children.flat().some(Boolean) : Boolean(children);
   if (!hasRows && empty) return <EmptyState>{empty}</EmptyState>;
   return (
-    <ul aria-label={label} className={cn("divide-y divide-border rounded-xl border border-border bg-card", className)}>
+    <ul
+      aria-label={label}
+      className={cn("divide-y divide-border rounded-2xl border border-border bg-card shadow-xs", className)}
+    >
       {children}
     </ul>
   );
@@ -111,7 +126,7 @@ export function AdminList({
 
 export function AdminListItem({ children, actions, className }: { children: React.ReactNode; actions?: React.ReactNode; className?: string }) {
   return (
-    <li className={cn("flex flex-wrap items-center justify-between gap-3 px-4 py-2", className)}>
+    <li className={cn("flex flex-wrap items-center justify-between gap-3 px-4 py-2.5", className)}>
       <div className="min-w-0">{children}</div>
       {actions}
     </li>
@@ -120,7 +135,7 @@ export function AdminListItem({ children, actions, className }: { children: Reac
 
 export function EmptyState({ children }: { children: React.ReactNode }) {
   return (
-    <p className="rounded-xl border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+    <p className="rounded-2xl border border-dashed border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
       {children}
     </p>
   );

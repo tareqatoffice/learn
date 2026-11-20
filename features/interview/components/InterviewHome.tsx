@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { ClearProgress } from "@/features/interview/components/ClearProgress";
+import { PageHeader } from "@/components/PageHeader";
+import { Panel } from "@/components/Panel";
 import { ProgressBar } from "@/components/ProgressBar";
+import { TileGrid } from "@/components/TileGrid";
+import { buttonVariants } from "@/components/ui/button";
+import { focusRing, trackVar } from "@/components/track";
 import { DiscardQuizButton } from "@/features/interview/components/DiscardQuizButton";
 import { QuizSetup } from "@/features/interview/components/QuizSetup";
 import type { listBooksWithProgress } from "@/features/content/queries";
 import type { listUnfinished } from "@/features/progress/quiz";
-import { pageTitleClass } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 
 type Book = Awaited<ReturnType<typeof listBooksWithProgress>>[number];
 type Unfinished = Awaited<ReturnType<typeof listUnfinished>>[number];
@@ -17,17 +22,26 @@ export function InterviewHome({
   books: Book[];
   unfinished: Unfinished[];
 }) {
+  const mastered = books.reduce((n, b) => n + b.mastered, 0);
+  const total = books.reduce((n, b) => n + b.total, 0);
+  const review = books.reduce((n, b) => n + b.review, 0);
+
   return (
-    <div className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={pageTitleClass}>Interview prep</h1>
-        <Link
-          href="/interview/history"
-          className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          My quiz answers
-        </Link>
-      </div>
+    <div className="grid gap-6">
+      <PageHeader
+        title="Interview prep"
+        track="interview"
+        description={
+          total > 0
+            ? `${mastered} of ${total} questions mastered${review > 0 ? `, ${review} in the review pile` : ""}.`
+            : undefined
+        }
+        actions={
+          <Link href="/interview/history" className={buttonVariants({ variant: "outline", size: "sm" })}>
+            My quiz answers
+          </Link>
+        }
+      />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <QuizSetup
           books={books.map(({ id, title, parts }) => ({ id, title, parts }))}
@@ -35,23 +49,18 @@ export function InterviewHome({
 
         <div className="grid min-w-0 content-start gap-6">
           {unfinished.length > 0 && (
-            <section
-              aria-labelledby="unfinished"
-              className="min-w-0 rounded-xl border border-border bg-card p-5"
-            >
-              <h2 id="unfinished" className="text-lg font-semibold">
-                Unfinished quizzes
-              </h2>
-              <ul className="mt-3 divide-y divide-border">
+            <Panel title="Unfinished quizzes" track="interview">
+              <ul className="grid gap-1">
                 {unfinished.map((quiz) => (
                   <li
                     key={quiz.id}
-                    className="flex items-center justify-between gap-3 py-2"
+                    className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 hover:bg-muted/60"
                   >
-                    <span className="min-w-0 flex-1">
+                    <span className="grid min-w-0 flex-1 gap-1.5">
                       <span className="block truncate text-sm font-medium">
                         {quiz.label || "Quiz"}
                       </span>
+                      <ProgressBar value={quiz.position} max={quiz.total} color={trackVar("interview")} />
                       <span className="text-xs text-muted-foreground">
                         {quiz.position} / {quiz.total} done
                       </span>
@@ -60,7 +69,7 @@ export function InterviewHome({
                       <DiscardQuizButton sessionId={quiz.id} label={quiz.label || "Quiz"} />
                       <Link
                         href={`/interview/quiz/${quiz.id}`}
-                        className="shrink-0 rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        className={cn(buttonVariants({ variant: "outline", size: "sm" }), focusRing)}
                       >
                         Resume
                       </Link>
@@ -68,50 +77,25 @@ export function InterviewHome({
                   </li>
                 ))}
               </ul>
-            </section>
+            </Panel>
           )}
 
-          <section
-            aria-labelledby="books"
-            className="min-w-0 rounded-xl border border-border bg-card p-5"
-          >
-            <h2 id="books" className="text-lg font-semibold">
-              Question books
-            </h2>
-            {books.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">
-                No books published yet.
-              </p>
-            ) : (
-              <ul className="mt-3 divide-y divide-border">
-                {books.map((book) => (
-                  <li key={book.id} className="py-3">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <Link
-                        href={`/interview/${book.slug}`}
-                        className="min-w-0 truncate font-medium hover:underline pointer-coarse:py-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                      >
-                        {book.title}
-                      </Link>
-                      <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
-                        {book.mastered} / {book.total} mastered
-                      </span>
-                    </div>
-                    <ProgressBar
-                      value={book.mastered}
-                      max={book.total}
-                      className="mt-2"
-                    />
-                    {book.review > 0 && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {book.review} in the review pile
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <Panel title="Question books" track="interview">
+            <TileGrid
+              track="interview"
+              empty="No books published yet."
+              className="sm:grid-cols-1 lg:grid-cols-1"
+              tiles={books.map((book) => ({
+                key: book.id,
+                href: `/interview/${book.slug}`,
+                title: book.title,
+                value: book.mastered,
+                max: book.total,
+                stat: `${book.mastered} / ${book.total} mastered`,
+                meta: book.review > 0 ? `${book.review} in the review pile` : undefined,
+              }))}
+            />
+          </Panel>
 
           {books.length > 0 && (
             <ClearProgress books={books.map(({ id, title }) => ({ id, title }))} />

@@ -26,7 +26,7 @@ export default async function IeltsCalculatorPage() {
     .reverse();
 
   return (
-    <div className="grid w-full gap-4">
+    <div className="grid w-full gap-6">
       <TimeZoneCookie current={timeZone} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>IELTS band calculator</h1>

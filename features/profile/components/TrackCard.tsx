@@ -1,45 +1,16 @@
 import Link from "next/link";
 import { ProgressBar } from "@/components/ProgressBar";
-import { cn } from "@/lib/utils";
+import { trackVar, type TrackName } from "@/components/track";
 
 const linkClass =
   "hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-export function Card({
-  title,
-  children,
-  className,
-  heading: Heading = "h3",
-}: {
-  title: string;
-  children: React.ReactNode;
-  className?: string;
-  heading?: "h2" | "h3";
-}) {
-  const id = `card-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
-  return (
-    <section
-      aria-labelledby={id}
-      className={cn(
-        "card-interactive grid min-w-0 content-start gap-2 overflow-hidden rounded-xl border border-border bg-card p-4",
-        className,
-      )}
-    >
-      <Heading
-        id={id}
-        className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-      >
-        {title}
-      </Heading>
-      {children}
-    </section>
-  );
-}
-
 export function ProgressRows({
   rows,
   empty,
+  track,
 }: {
+  track?: TrackName;
   rows: {
     key: string;
     href: string;
@@ -67,7 +38,12 @@ export function ProgressRows({
           <span className="text-xs tabular-nums text-muted-foreground">
             {r.value}/{r.max}
           </span>
-          <ProgressBar value={r.value} max={r.max} className="col-span-2" />
+          <ProgressBar
+            value={r.value}
+            max={r.max}
+            color={track && r.value < r.max ? trackVar(track) : undefined}
+            className="col-span-2"
+          />
         </li>
       ))}
     </ul>
