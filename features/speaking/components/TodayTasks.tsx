@@ -52,8 +52,8 @@ export function TodayTasks({
   }
 
   return (
-    <div className="grid gap-4">
-      <section aria-labelledby="todays-lesson" className="grid gap-2 rounded-xl border border-border bg-card p-5">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
+      <section aria-labelledby="todays-lesson" className="grid grid-cols-[minmax(0,1fr)] gap-2 rounded-xl border border-border bg-card p-5">
         <h2 id="todays-lesson" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Today&apos;s lesson
         </h2>
@@ -76,7 +76,7 @@ export function TodayTasks({
                 id="lesson-choice"
                 value={choice}
                 onChange={(e) => setChoice(e.target.value)}
-                className="min-w-0 max-w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                className="w-0 min-w-0 flex-[1_1_12rem] truncate rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
               >
                 {!choice && <option value="">Choose a lesson</option>}
                 {lessons.map((l) => (

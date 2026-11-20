@@ -37,7 +37,7 @@ export function SpeakingHome({
   }));
 
   return (
-    <div className="grid w-full gap-6">
+    <div className="grid w-full grid-cols-[minmax(0,1fr)] gap-6">
       <TimeZoneCookie current={timeZone} />
       <PageHeader
         title="Speaking practice"
