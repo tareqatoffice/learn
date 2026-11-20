@@ -59,7 +59,7 @@ export function ChapterView({ view }: { view: ChapterViewData }) {
   );
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[13.75rem_minmax(0,1fr)_12.5rem] lg:gap-6">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[13.75rem_minmax(0,1fr)_12.5rem] lg:gap-6">
       <OverlayMenu
         navLabel={`${view.series.title} chapters`}
         label={
