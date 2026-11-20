@@ -45,7 +45,6 @@ export function CodingGroup({ slug, specs, initial }: { slug: string; specs: Gro
     } finally {
       setRunning(null);
     }
-    // One save per run, after the checks, so saving never delays or interrupts them.
     try {
       const saved = await saveCodingResultsAction({ group: slug, results: finished });
       if (!saved.ok) setError(firstError(saved.errors) ?? SAVE_FAILED);

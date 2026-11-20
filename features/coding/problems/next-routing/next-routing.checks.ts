@@ -1,7 +1,6 @@
 import { fetchPage, routeCheck, until, withFrame } from "../harness";
 import type { Group } from "../harness";
 
-/** loading.tsx streams the page, so notFound() only shows once the client takes over. */
 const showsNotFound = (path: string): Promise<boolean | string> =>
   withFrame(path, async (doc) => {
     const shown = await until(() => doc.body.textContent?.includes("Product not found"), 15000);

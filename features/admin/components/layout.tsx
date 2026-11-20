@@ -8,7 +8,6 @@ const WIDTH = {
   narrow: "",
 } as const;
 
-/** Soft top tint shared by admin cards so they read as one family with the app's other panels. */
 const TINT = "linear-gradient(180deg, color-mix(in oklch, var(--ring) 6%, transparent), transparent 4.5rem)";
 
 export function AdminPage({

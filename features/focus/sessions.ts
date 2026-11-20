@@ -14,7 +14,6 @@ import {
   type FocusArea,
 } from "@/models/focusConstants";
 
-/** How far back a run may have started (long pauses), and how far ahead a client clock may drift. */
 const MAX_START_AGE_MS = 2 * 24 * 60 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
@@ -33,10 +32,6 @@ export type FocusSessionInput = z.infer<typeof focusSessionInput>;
 export type FocusTodayItem = { path: string; label: string; area: FocusArea; seconds: number; sessions: number };
 export type FocusToday = { totalSeconds: number; sessions: number; items: FocusTodayItem[] };
 
-/**
- * Saves a finished run. Idempotent per `runId`: a retry or a second tab saving the same
- * run updates the one document instead of adding another. The day is the run's start day.
- */
 export async function saveFocusSession(
   userId: string,
   input: FocusSessionInput,
@@ -58,7 +53,6 @@ export async function saveFocusSession(
   return ok({ id: String(doc!._id) });
 }
 
-/** Today's focus time, grouped by page, most time first. */
 export async function getFocusToday(userId: string, today: string): Promise<FocusToday> {
   const rows = await FocusSession.aggregate<{ _id: string; label: string; area: FocusArea; seconds: number; sessions: number }>([
     { $match: { userId: new Types.ObjectId(userId), date: today } },

@@ -1,7 +1,3 @@
-// Writes features/coding/groups.ts, the server-safe catalog of the coding-test groups.
-// The registry (features/coding/problems) imports react-dom/client and the starter code,
-// so server pages and actions read this generated list instead.
-// Run after adding or renaming a group or question: npm run coding:groups
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { topics } from "@/features/coding/problems";

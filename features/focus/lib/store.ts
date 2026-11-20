@@ -6,19 +6,16 @@ import type { FocusContext } from "@/features/focus/context";
 import { FOCUS_STORAGE_KEY, type FocusRun, parseRun, pauseRun, resumeRun, startRun } from "@/features/focus/lib/timer";
 
 type FocusState = {
-  /** The session in progress, shared by every tab through localStorage. */
   run: FocusRun | null;
   start: (context: FocusContext, minutes: number | undefined, now?: number) => void;
   pause: (now?: number) => void;
   resume: (now?: number) => void;
-  /** Puts a run back, e.g. paused after a failed save. */
   restore: (run: FocusRun) => void;
   clear: () => void;
 };
 
 type Persisted = Pick<FocusState, "run">;
 
-/** Raw stored JSON; undefined when the browser blocks storage (the store then keeps the run in memory). */
 function readRaw(): string | null | undefined {
   try {
     return window.localStorage.getItem(FOCUS_STORAGE_KEY);
@@ -27,10 +24,6 @@ function readRaw(): string | null | undefined {
   }
 }
 
-/**
- * Stores the bare FocusRun JSON (not zustand's `{ state, version }` envelope) so the format stays
- * what older builds wrote, and validates it with `parseRun` on the way in.
- */
 const storage: PersistStorage<Persisted> = {
   getItem: () => {
     const raw = readRaw();
@@ -41,14 +34,12 @@ const storage: PersistStorage<Persisted> = {
       if (state.run) window.localStorage.setItem(FOCUS_STORAGE_KEY, JSON.stringify(state.run));
       else window.localStorage.removeItem(FOCUS_STORAGE_KEY);
     } catch {
-      // Storage blocked or full: the store still holds the run for this tab.
     }
   },
   removeItem: () => {
     try {
       window.localStorage.removeItem(FOCUS_STORAGE_KEY);
     } catch {
-      // Ignore.
     }
   },
 };
@@ -73,20 +64,17 @@ export const useFocusStore = create<FocusState>()(
       name: FOCUS_STORAGE_KEY,
       storage,
       partialize: ({ run }) => ({ run }),
-      // Hydrated on the client after mount, so the server and first client render agree.
       skipHydration: true,
     },
   ),
 );
 
-/** True while `run` is still the stored session, i.e. no other tab has finished or replaced it. */
 export function isCurrentRun(run: FocusRun): boolean {
   const raw = readRaw();
   const stored = raw === undefined ? useFocusStore.getState().run : parseRun(raw);
   return stored?.id === run.id;
 }
 
-/** Loads the stored run and keeps this tab in sync with other tabs. Returns the cleanup. */
 export function syncFocusStore(): () => void {
   void useFocusStore.persist.rehydrate();
   const onStorage = (e: StorageEvent) => {

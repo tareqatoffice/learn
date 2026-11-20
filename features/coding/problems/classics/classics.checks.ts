@@ -2,13 +2,10 @@ import { groupBy, LRUCache, promisePool, retry } from "./classics";
 import { same, wait } from "../harness";
 import type { Group } from "../harness";
 
-/** Timers may fire a hair early; allow this much slack on lower bounds. */
 const TOLERANCE_MS = 3;
 
 type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown };
 
-/** Await a promise without throwing. Callers start the promise first, so a
- *  synchronous throw from the function under test still surfaces as `threw:`. */
 async function settle<T>(promise: Promise<T>): Promise<Settled<T>> {
   try {
     return { ok: true, value: await promise };
@@ -116,8 +113,6 @@ export const classics: Group = {
               if (gaps[i] < expected[i] - TOLERANCE_MS) {
                 return `gap ${i + 1} was ${gaps[i]} ms, expected at least ${expected[i]} ms (delays should double)`;
               }
-              // Slack for a loaded machine, kept below `base` so that a delay starting
-              // at 2x base (an off-by-one exponent) still fails.
               if (gaps[i] > expected[i] + 80) {
                 return `gap ${i + 1} was ${gaps[i]} ms, expected about ${expected[i]} ms`;
               }
@@ -268,7 +263,6 @@ export const classics: Group = {
           name: 'Handles the keys "constructor", "toString" and "__proto__"',
           run: () => {
             const result = groupBy(["constructor", "toString", "__proto__"], (w: string) => w);
-            // JSON.parse makes "__proto__" an ordinary key; an object literal would not.
             const expected: unknown = JSON.parse(
               '{"constructor":["constructor"],"toString":["toString"],"__proto__":["__proto__"]}',
             );
@@ -323,8 +317,6 @@ export const classics: Group = {
         {
           name: "Starts the next task as soon as one finishes",
           run: async () => {
-            // limit 2: A (50 ms) and B (10 ms) start; C should start when B ends,
-            // long before A ends. A batch-based pool would start C only after A.
             let cStartedAt = -1;
             const start = Date.now();
             const tasks = [
@@ -406,7 +398,6 @@ export const classics: Group = {
           run: async () => {
             const boom = new Error("sync boom");
             let started = 0;
-            // limit 1: the throwing task only starts once the first task has finished.
             const tasks: (() => Promise<number>)[] = [
               async () => {
                 started++;

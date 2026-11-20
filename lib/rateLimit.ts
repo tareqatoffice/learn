@@ -36,11 +36,6 @@ export async function allow(key: string, limit: Limit, now: Date = new Date()): 
   return (row?.count ?? 0) <= limit.max;
 }
 
-/**
- * Client IP for rate limiting. On Vercel, x-vercel-forwarded-for is set by the edge and can't be forged.
- * Elsewhere, the last X-Forwarded-For hop is the one the nearest proxy added (the first is client-supplied).
- * Without a proxy in front, every forwarding header is client-controlled: deploy behind one.
- */
 export function addressFrom(h: Pick<Headers, "get">, { vercel }: { vercel: boolean }): string {
   if (vercel) {
     const edge = h.get("x-vercel-forwarded-for")?.split(",")[0]?.trim();

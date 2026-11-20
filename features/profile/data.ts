@@ -100,7 +100,6 @@ export type FocusHistoryItem = {
 export type FocusData = {
   totalSeconds: number;
   sessions: number;
-  /** Seconds in the last 7 days, today included. */
   weekSeconds: number;
   byArea: { area: FocusArea; seconds: number; sessions: number }[];
   history: FocusHistoryItem[];

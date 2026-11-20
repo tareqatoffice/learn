@@ -12,15 +12,11 @@ export type Tile = {
   key: string;
   href: string;
   title: string;
-  /** Progress numerator and denominator, drawn as the bar and used for the status filter. */
   value: number;
   max: number;
-  /** Text under the title, e.g. "3 of 12 topics done". */
   stat: string;
-  /** Secondary line, e.g. "4 in the review pile". */
   meta?: string;
   badge?: { label: string; tone?: "primary" | "muted" };
-  /** Section heading; tiles with the same group are rendered together. */
   group?: string;
 };
 
@@ -81,7 +77,6 @@ function TileCard({ tile, track }: { tile: Tile; track: TrackName }) {
   );
 }
 
-/** A grid of whole-card links with a progress bar each and a status filter (shown once there are enough tiles to need it). */
 export function TileGrid({
   tiles,
   track,

@@ -55,7 +55,6 @@ export const functional: Group = {
           try {
             fn();
           } catch {
-            // expected
           }
           return fn() === "ok" || "did not retry";
         }),

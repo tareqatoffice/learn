@@ -2,7 +2,6 @@ import { useId } from "react";
 import { cn } from "@/lib/utils";
 import { trackVar, type TrackName } from "@/components/track";
 
-/** Titled card: the one card chrome shared by every page (dashboard, profile, hubs). */
 export function Panel({
   title,
   track,

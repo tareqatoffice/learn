@@ -9,7 +9,6 @@ const checkSchema = new Schema(
   { _id: false },
 );
 
-/** The last check run of one coding-test question, per user. */
 const codingResultSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },

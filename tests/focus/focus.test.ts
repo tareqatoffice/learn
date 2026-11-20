@@ -169,7 +169,6 @@ describe("focus sessions", () => {
     await saveFocusSession(me, { ...run, seconds: 610, completed: true }, opts);
     expect(await FocusSession.countDocuments()).toBe(1);
     expect((await getFocusToday(me, today)).totalSeconds).toBe(610);
-    // Another user may reuse the id without clashing.
     expect((await saveFocusSession(id(), run, opts)).ok).toBe(true);
   });
 

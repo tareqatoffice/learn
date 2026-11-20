@@ -252,7 +252,6 @@ html {
   html {
     scroll-behavior: auto;
   }
-  /* Catch-all: tw-animate `animate-in`, `animate-pulse` and hover transitions don't check this themselves. */
   *,
   ::before,
   ::after {
@@ -265,7 +264,6 @@ html {
   }
 }
 
-/* Small, subtle scrollbars everywhere */
 * {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in oklab, var(--foreground) 25%, transparent)
@@ -567,7 +565,6 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
   background-color: color-mix(in oklch, var(--muted) 55%, transparent);
 }
 
-/* One card family: hand-rolled rounded-xl cards inside pages share Panel's radius and resting shadow. */
 main :is(section, div, article, li, details, form).rounded-xl.bg-card {
   border-radius: var(--radius-2xl);
   box-shadow: 0 1px 2px color-mix(in oklch, var(--foreground) 6%, transparent);

@@ -57,7 +57,6 @@ function AreaDot({ area }: { area: FocusArea }) {
   );
 }
 
-/** Floating focus timer: starts a session about the page the user is on and saves it when done. */
 export function FocusButton() {
   const pathname = usePathname();
   const run = useFocusStore((s) => s.run);
@@ -78,20 +77,16 @@ export function FocusButton() {
     try {
       setToday(await focusTodayAction());
     } catch {
-      // Summary is optional; the timer still works without it.
     }
   }, []);
 
   const finish = useCallback(
     async (current: FocusRun, completed: boolean) => {
       if (finishing.current) return false;
-      // Another tab may have finished this run already. (Saves are idempotent per run id,
-      // so a race between tabs updates one session instead of adding two.)
       if (!isCurrentRun(current)) return false;
       finishing.current = true;
       const finishedAt = Date.now();
       const seconds = elapsedSeconds(current, finishedAt);
-      // On failure, restore the run as it was at the click, without the time spent waiting.
       const restore = () => restoreRun(pauseRun(current, finishedAt));
       const { label } = current.context;
       clear();
@@ -131,7 +126,6 @@ export function FocusButton() {
     [refreshToday, restoreRun, clear],
   );
 
-  // Tick once a second while running, and finish a timed run when it hits zero.
   const runRef = useRef(run);
   useEffect(() => {
     runRef.current = run;
@@ -152,7 +146,6 @@ export function FocusButton() {
     return () => window.clearInterval(id);
   }, [running, finish]);
 
-  // Close the panel on navigation.
   const [shownPath, setShownPath] = useState(pathname);
   if (shownPath !== pathname) {
     setShownPath(pathname);
@@ -188,7 +181,6 @@ export function FocusButton() {
     void refreshToday();
   };
 
-  /** Starts a run about the page as it is now (title and heading may have changed since the panel opened). */
   const startHere = (minutes: number | undefined) => {
     const context = pageContext(pathname);
     const t = Date.now();
@@ -220,7 +212,6 @@ export function FocusButton() {
   const color = colorOf(run?.context.area ?? here?.area ?? "general");
   const elsewhere = run && here && run.context.path !== here.path ? here : null;
 
-  // Only offer a new session inside a study track; a running timer stays visible everywhere.
   if (!run && !offersFocus(pathname)) return null;
 
   return (

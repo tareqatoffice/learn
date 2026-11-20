@@ -18,7 +18,6 @@ type RouteErrorProps = {
 
 const TURBOPACK_MODULE = /__TURBOPACK__imported__module__((?:\$[0-9a-f]+\$|[\w.-])+?)__(?=\.)/gi;
 
-/** Decodes a Turbopack-mangled module id (`$2f$` = `/`) to its source path, e.g. `features/focus/context.ts`. */
 function decodeTurbopackModule(id: string): string {
   return id
     .replace(/\$([0-9a-f]+)\$/gi, (_, hex: string) =>
@@ -30,11 +29,6 @@ function decodeTurbopackModule(id: string): string {
     .trim();
 }
 
-/**
- * Turns dev bundler noise like
- * `(0 , __TURBOPACK__imported__module__$5b$project$5d2f$…__.offersFocus) is not a function`
- * into `"offersFocus" from features/focus/context.ts is not a function`.
- */
 export function readableErrorMessage(message: string): string {
   if (!message.includes("__TURBOPACK__imported__module__")) return message;
   const readable = message

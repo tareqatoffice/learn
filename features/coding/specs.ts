@@ -4,7 +4,6 @@ import { codingGroup } from "./groups";
 
 export interface GroupSpecs {
   intro: string;
-  /** The doc comment above each export, by export name. */
   questions: Record<string, string>;
 }
 
@@ -20,7 +19,6 @@ const cleanDoc = (doc: string): string =>
 
 const EMPTY: GroupSpecs = { intro: "", questions: {} };
 
-// The starter files only change while you solve them locally, so production reads each group once.
 const cache = new Map<string, Promise<GroupSpecs>>();
 
 async function parseSpecs(slug: string): Promise<GroupSpecs> {
@@ -33,12 +31,9 @@ async function parseSpecs(slug: string): Promise<GroupSpecs> {
     for (const [, doc, name] of source.matchAll(EXPORTED_DOC)) questions[name] = cleanDoc(doc);
     return { intro, questions };
   }
-  // Next.js groups have no starter file (their specs live with the checks), and a
-  // deploy may leave the sources out: the page still renders, with the specs the checks carry.
   return EMPTY;
 }
 
-/** The spec for a question lives in the comment above its export, so the page reads it from there. Null for unknown groups. */
 export function readGroupSpecs(slug: string): Promise<GroupSpecs | null> {
   if (!codingGroup(slug)) return Promise.resolve(null);
   if (process.env.NODE_ENV !== "production") return parseSpecs(slug);

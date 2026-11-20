@@ -32,7 +32,6 @@ describe("focus store", () => {
     expect(useFocusStore.getState().run).toEqual(stored);
     expect(isCurrentRun(stored)).toBe(true);
 
-    // Another tab finishes the run.
     window.localStorage.removeItem(FOCUS_STORAGE_KEY);
     window.dispatchEvent(new StorageEvent("storage", { key: FOCUS_STORAGE_KEY }));
     await Promise.resolve();

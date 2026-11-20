@@ -33,7 +33,6 @@ export function isAdminEmail(email: string | null | undefined): boolean {
 const isUnder = (pathname: string, base: string) =>
   pathname === base || pathname.startsWith(`${base}/`);
 
-/** SEO/metadata files crawlers and browsers fetch without a session. */
 const METADATA_FILE =
   /^\/(?:robots\.txt|sitemap\.xml|manifest\.webmanifest|(?:icon|apple-icon|opengraph-image|twitter-image)(?:[-.][\w.-]*)?)$/;
 
@@ -84,10 +83,6 @@ export async function requireUser(): Promise<SessionUser> {
   return user;
 }
 
-/**
- * For route handlers, which return a Response instead of redirecting: the signed-in, approved user,
- * or the 401/403 to send back. Repeats the proxy's status check so a handler stays gated on its own.
- */
 export async function approvedRouteUser(): Promise<{ user: SessionUser } | { response: Response }> {
   const user = await sessionUser();
   if (!user) return { response: new Response("Sign in first", { status: 401 }) };

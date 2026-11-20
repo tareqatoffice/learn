@@ -50,12 +50,6 @@ export const PRODUCTS: readonly Product[] = [
   { id: 40, title: "Power Bank 20000mAh", category: "Accessories", price: 45 },
 ];
 
-/**
- * Provided code, not part of the test. Simulates a search API.
- * Short queries (under 3 characters) are slow (1500 ms), longer ones are fast
- * (200 ms), so responses can arrive out of order. The query "fail" rejects.
- * Aborting the signal rejects with `signal.reason`.
- */
 export function searchProducts(query: string, signal?: AbortSignal): Promise<Product[]> {
   return new Promise<Product[]>((resolve, reject) => {
     if (signal?.aborted) {

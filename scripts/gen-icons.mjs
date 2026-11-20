@@ -1,4 +1,3 @@
-// Generates brand icons, logo and OG images. Run: node scripts/gen-icons.mjs
 import sharp from "sharp";
 import { mkdir, writeFile } from "node:fs/promises";
 
@@ -7,7 +6,6 @@ const CREAM = "#f7f3ea";
 const MUTED = "#a89f8d";
 const ACCENT = "#5b9bf5";
 
-// Mark drawn on a 512 grid: serif "L" + accent node.
 const glyph = `
   <path fill="${CREAM}" d="M118 116h140v26h-30v204h118v-46h30v94H150v-26h30V142h-62z"/>
   <circle cx="352" cy="176" r="30" fill="${ACCENT}"/>`;
@@ -15,7 +13,6 @@ const glyph = `
 const mark = (bg) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">${bg}${glyph}</svg>`;
 const rounded = `<rect width="512" height="512" rx="112" fill="${BG}"/>`;
 const square = `<rect width="512" height="512" fill="${BG}"/>`;
-// Maskable: shrink the mark into the central safe zone.
 const maskable = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">${square}<g transform="translate(76.8 76.8) scale(.7)">${glyph}</g></svg>`;
 
 const png = (svg, size) => sharp(Buffer.from(svg), { density: 384 }).resize(size, size).png().toBuffer();

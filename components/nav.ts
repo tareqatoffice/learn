@@ -16,7 +16,6 @@ export type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
-  /** Track hue for the icon; omitted for areas without a track. */
   track?: TrackName;
 };
 
@@ -30,7 +29,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/coding", label: "Coding", icon: Code, track: "coding" },
 ];
 
-/** Tabs shown in the mobile bottom bar; everything else lives under "More". */
 export const TAB_HREFS = ["/dashboard", "/interview", "/speaking", "/ielts"];
 
 export const ADMIN_ITEM: NavItem = { href: "/admin", label: "Admin", icon: Shield };

@@ -7,7 +7,6 @@ const later = async <T,>(value: T, ms: number): Promise<T> => {
   await wait(ms);
   return value;
 };
-/** Marked as handled, so an unimplemented combinator leaves no unhandled rejection. */
 const fail = (message: string, ms: number): Promise<never> => {
   const promise = wait(ms).then(() => {
     throw new Error(message);

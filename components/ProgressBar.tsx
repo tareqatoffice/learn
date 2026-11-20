@@ -10,7 +10,6 @@ export function ProgressBar({
   value: number;
   secondary?: number;
   max: number;
-  /** CSS color for the main fill; defaults to the "done" green. */
   color?: string;
   className?: string;
 }) {
