@@ -2,17 +2,20 @@ import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server
 import { auth } from "@/auth";
 import { ACCESS_MESSAGES, accessStatusFor } from "@/lib/access";
 import { ACCESS_PATH, isPublicPath, routeAccess } from "@/lib/authz";
-import { buildCsp, newNonce } from "@/lib/csp";
+import { buildCsp, frameOptionsFor, newNonce } from "@/lib/csp";
 import { signInPath } from "@/lib/nextPath";
 
 function nextWithCsp(req: NextRequest): NextResponse {
   const nonce = newNonce();
-  const csp = buildCsp({ nonce, dev: process.env.NODE_ENV === "development" });
+  const { pathname } = req.nextUrl;
+  const csp = buildCsp({ nonce, dev: process.env.NODE_ENV === "development", pathname });
   const headers = new Headers(req.headers);
   headers.set("x-nonce", nonce);
   headers.set("Content-Security-Policy", csp);
   const res = NextResponse.next({ request: { headers } });
   res.headers.set("Content-Security-Policy", csp);
+  // Framing is set here with the CSP so both follow the same path rule (lib/csp.ts).
+  res.headers.set("X-Frame-Options", frameOptionsFor(pathname));
   return res;
 }
 

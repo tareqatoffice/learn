@@ -7,6 +7,7 @@ import { deleteAllIeltsData } from "@/ielts/data";
 import {
   AiConversation,
   AiUsage,
+  CodingResult,
   NodeProgress,
   NoteProgress,
   QuestionProgress,
@@ -41,7 +42,7 @@ export async function deleteUser(id: string): Promise<Result> {
     return { ok: false, errors: { _: "Couldn't delete the user's recordings from storage. Nothing else was removed; try again." } };
   }
   await Promise.all(
-    [QuestionProgress, QuizSession, NodeProgress, NoteProgress, AiConversation, AiUsage, SpeakingUsage, SpeakingProfile, SpeakingDay].map((M) =>
+    [QuestionProgress, QuizSession, NodeProgress, NoteProgress, AiConversation, AiUsage, SpeakingUsage, SpeakingProfile, SpeakingDay, CodingResult].map((M) =>
       M.deleteMany({ userId: id }),
     ),
   );

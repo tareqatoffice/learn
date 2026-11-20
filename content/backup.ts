@@ -7,6 +7,7 @@ import {
   AiConversation,
   AiSettings,
   AiUsage,
+  CodingResult,
   ApiToken,
   Graph,
   GraphNode,
@@ -101,6 +102,7 @@ export const ALL_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["aiusages", AiUsage],
   ["aiconversations", AiConversation],
   ["speakingusages", SpeakingUsage],
+  ["codingresults", CodingResult],
 ];
 
 const countsOf = async (collections: typeof ALL_COLLECTIONS) =>

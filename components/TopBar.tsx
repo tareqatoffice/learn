@@ -20,6 +20,7 @@ const LINKS = [
   { href: "/ielts", label: "IELTS" },
   { href: "/graphs", label: "Graphs" },
   { href: "/notes", label: "Notes" },
+  { href: "/coding", label: "Coding" },
 ];
 const ADMIN_LINK = { href: "/admin", label: "Admin" };
 const PROFILE_LINK = { href: "/profile", label: "Profile" };

@@ -37,6 +37,7 @@ Layering (logic lives outside `app/`):
 - `speaking/` — speaking practice logic; media in R2 via `lib/r2.ts`, transcription via `lib/stt.ts`.
 - `recording/` — shared media, upload and transcription helpers (client code imports `@/recording/mediaCore`, which is mongoose-free).
 - `ielts/` — IELTS Prep: profile, plan, suggestions, bands, progress, history, and `speaking/` (attempts, questions, score, timing).
+- `coding/` — coding tests: questions are code, not DB content (`problems/<group>/<group>.ts` starter files you edit, `*.checks.ts` + `harness.ts` run in the browser on `/coding/[slug]`). Last results per user in `CodingResult` (`progress.ts`; client imports the mongoose-free `checks.ts`). Next.js groups build routes under `app/sandbox/` and `app/api/sandbox/` (fixtures in `coding/lib/`); only `/sandbox` may be framed, same-origin (`lib/csp.ts` `isSandboxPath`).
 - `app/(app)/**` — signed-in pages and Server Actions (`actions.ts` beside pages); `app/(app)/admin/**` admin-only UI; `app/api/content/*` token-authenticated content API (used by `scripts/content.ts`); `app/api/admin/export`.
 - `components/` — UI; `components/admin/` forms.
 
