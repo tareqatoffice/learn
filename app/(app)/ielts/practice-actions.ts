@@ -1,6 +1,6 @@
 "use server";
 
-import { type ActionResult } from "@/admin/result";
+import { type ActionResult } from "@/features/admin/result";
 import {
   claimSection,
   finishSection,
@@ -11,7 +11,7 @@ import {
   type SectionPlay,
   type SubmitResult,
   type TestSkill,
-} from "@/ielts/practice/attempts";
+} from "@/features/ielts/practice/attempts";
 import {
   deleteWritingAttempt,
   saveWritingSelf,
@@ -21,13 +21,13 @@ import {
   writingAiEstimate,
   type SelfInput,
   type WritingAi,
-} from "@/ielts/writing/attempts";
-import type { WritingKind } from "@/ielts/writing/bands";
-import { requireUser } from "@/lib/authz";
+} from "@/features/ielts/writing/attempts";
+import type { WritingKind } from "@/features/ielts/writing/bands";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
-import type { AiResult } from "@/progress/quizAi";
-import { localDate } from "@/speaking/schedule";
-import { readTimeZone } from "@/speaking/timezone";
+import type { AiResult } from "@/features/progress/quizAi";
+import { localDate } from "@/features/speaking/schedule";
+import { readTimeZone } from "@/features/speaking/timezone";
 
 
 async function session(): Promise<string> {

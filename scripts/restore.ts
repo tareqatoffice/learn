@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import mongoose from "mongoose";
-import { restoreAll } from "@/content/backup";
+import { restoreAll } from "@/features/content/backup";
 import { connectDb } from "@/lib/db";
 
 async function main(): Promise<void> {

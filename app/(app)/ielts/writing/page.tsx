@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { WritingHub } from "@/components/ielts/WritingHub";
-import { listWritingAttempts } from "@/ielts/writing/attempts";
-import type { WritingKind } from "@/ielts/writing/bands";
-import { requireUser } from "@/lib/authz";
+import { WritingHub } from "@/features/ielts/components/WritingHub";
+import { listWritingAttempts } from "@/features/ielts/writing/attempts";
+import type { WritingKind } from "@/features/ielts/writing/bands";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
@@ -24,7 +24,7 @@ export default async function IeltsWritingPage() {
   ]);
   const missing: Record<WritingKind, boolean> = { task1: !t1, task2: !t2, full: !t1 || !t2 };
   return (
-    <div className="grid w-full gap-4">
+    <div className="grid w-full gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>Writing practice</h1>
         <Link href="/ielts" className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">

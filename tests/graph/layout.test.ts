@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeTiers, dependentsOf, layoutGraph, prereqMessage, readyNext, unmetPrereqs } from "@/graph/layout";
+import { computeTiers, dependentsOf, layoutGraph, prereqMessage, readyNext, unmetPrereqs } from "@/features/graph/layout";
 
 const abc = [
   { id: "a", prereqIds: [] },

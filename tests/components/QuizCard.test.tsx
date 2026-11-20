@@ -8,8 +8,8 @@ vi.mock("@/components/ConfirmDialog", () => ({
   ConfirmHost: () => null,
 }));
 
-import { type QuizCoach, QuizCard } from "@/components/QuizCard";
-import type { SessionView } from "@/progress/quiz";
+import { type QuizCoach, QuizCard } from "@/features/interview/components/QuizCard";
+import type { SessionView } from "@/features/progress/quiz";
 
 const card = {
   id: "q1",

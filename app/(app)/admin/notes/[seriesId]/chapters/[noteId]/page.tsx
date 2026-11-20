@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { getNoteAdmin, getSeriesAdmin, listSubjects } from "@/admin/queries";
-import { NoteForm } from "@/components/admin/NoteForm";
-import { AdminCard, AdminPage } from "@/components/admin/layout";
+import { getNoteAdmin, getSeriesAdmin, listSubjects } from "@/features/admin/queries";
+import { NoteForm } from "@/features/admin/components/NoteForm";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
 import { connectDb } from "@/lib/db";
 
 export default async function EditChapterPage({

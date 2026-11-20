@@ -1,9 +1,9 @@
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getBookView, getQuestionView, listBooksWithProgress } from "@/content/queries";
+import { getBookView, getQuestionView, listBooksWithProgress } from "@/features/content/queries";
 import { connectDb } from "@/lib/db";
 import { Graph, GraphNode, Question, QuestionBook } from "@/models";
-import { markQuestion } from "@/progress/questions";
+import { markQuestion } from "@/features/progress/questions";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedBook, seedGraph, seedNode, seedQuestions } from "../progress/seed";
 

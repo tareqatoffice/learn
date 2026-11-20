@@ -1,6 +1,6 @@
-import { NotFoundError, pullBook, pullGraph, pullSeries } from "@/content/pull";
+import { NotFoundError, pullBook, pullGraph, pullSeries } from "@/features/content/pull";
 import { SLUG_PATTERN } from "@/lib/ids";
-import { withToken } from "@/lib/tokenAuth";
+import { withToken } from "@/features/auth/lib/tokenAuth";
 
 export function GET(req: Request): Promise<Response> {
   return withToken(req, async () => {

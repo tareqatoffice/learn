@@ -1,5 +1,5 @@
 import mongoose, { Schema, model } from "mongoose";
-import { SKILLS } from "@/ielts/bands";
+import { SKILLS } from "@/models/ieltsConstants";
 
 const adjustmentSchema = new Schema(
   {

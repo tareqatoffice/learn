@@ -13,7 +13,7 @@ vi.mock("@/app/(app)/admin/speaking/actions", () => a);
 vi.mock("@/lib/uploadFile", async (orig) => ({ ...(await orig<typeof import("@/lib/uploadFile")>()), putFile: vi.fn(async () => undefined) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
 
-import { SpeakingLessonForm } from "@/components/admin/SpeakingLessonForm";
+import { SpeakingLessonForm } from "@/features/admin/components/SpeakingLessonForm";
 
 const lesson = {
   id: "64b000000000000000000001",

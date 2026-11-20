@@ -5,8 +5,13 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: STATIC_SECURITY_HEADERS }];
   },
+  // The coding-test pages read question specs from the source files at runtime.
+  outputFileTracingIncludes: {
+    "/coding/[slug]": ["./features/coding/problems/**/*.ts", "./features/coding/problems/**/*.tsx"],
+  },
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },
+    agentUpgrade: "security",
   },
   turbopack: {
     rules: {

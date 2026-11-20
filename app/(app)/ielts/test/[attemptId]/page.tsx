@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { TestReview } from "@/components/ielts/TestReview";
-import { TestRunner } from "@/components/ielts/TestRunner";
-import { getAttempt } from "@/ielts/practice/attempts";
-import { requireUser } from "@/lib/authz";
+import { TestReview } from "@/features/ielts/components/TestReview";
+import { TestRunner } from "@/features/ielts/components/TestRunner";
+import { getAttempt } from "@/features/ielts/practice/attempts";
+import { requireUser } from "@/features/auth/lib/authz";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
 
@@ -23,7 +23,7 @@ export default async function IeltsTestPage({ params }: { params: Promise<{ atte
   if (!got) notFound();
 
   return (
-    <div className="grid w-full gap-4">
+    <div className="grid w-full gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>{got.view.title}</h1>
         <Link

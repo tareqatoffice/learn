@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeNextPath, signInPath } from "@/lib/nextPath";
+import { safeNextPath, signInPath } from "@/features/auth/lib/nextPath";
 
 describe("safeNextPath (F6)", () => {
   it.each(["/dashboard", "/notes/a/b?x=1", "/graphs/js?topic=hooks#t"])("keeps %s", (path) => {

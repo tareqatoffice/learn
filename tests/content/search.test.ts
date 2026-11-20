@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { searchContent } from "@/content/queries/search";
+import { searchContent } from "@/features/content/queries/search";
 import { connectDb } from "@/lib/db";
 import { Question } from "@/models";
 import { resetDb } from "../setup/mongo";

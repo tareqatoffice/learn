@@ -1,6 +1,6 @@
 "use server";
 
-import { adminContext } from "@/admin/action";
+import { adminContext } from "@/features/admin/action";
 import {
   confirmPromptImage,
   confirmSectionAudio,
@@ -18,7 +18,7 @@ import {
   type PublishStatus,
   type TestInput,
   type TestKind,
-} from "@/admin/ieltsTests";
+} from "@/features/admin/ieltsTests";
 
 
 export async function saveTestAction(kind: TestKind, id: string | null, input: TestInput) {

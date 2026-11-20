@@ -1,19 +1,19 @@
 "use server";
 
-import { type ActionResult, fail, ok } from "@/admin/result";
-import { requireUser } from "@/lib/authz";
+import { type ActionResult, fail, ok } from "@/features/admin/result";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
-import type { AiResult } from "@/progress/quizAi";
-import { type BodyFeedback, type SpeechFeedback, bodyFeedback, generateMaterial, speechFeedback } from "@/speaking/coach";
-import { swapLesson } from "@/speaking/lessons";
-import { localDate } from "@/speaking/schedule";
-import { saveProfile, setBodyConsent } from "@/speaking/settings";
-import { type StartTakeInput, confirmTake, deleteAllTakes, deleteTake, getTake, saveSelfRating, startTake } from "@/speaking/takes";
-import { readTimeZone } from "@/speaking/timezone";
+import type { AiResult } from "@/features/progress/quizAi";
+import { type BodyFeedback, type SpeechFeedback, bodyFeedback, generateMaterial, speechFeedback } from "@/features/speaking/coach";
+import { swapLesson } from "@/features/speaking/lessons";
+import { localDate } from "@/features/speaking/schedule";
+import { saveProfile, setBodyConsent } from "@/features/speaking/settings";
+import { type StartTakeInput, confirmTake, deleteAllTakes, deleteTake, getTake, saveSelfRating, startTake } from "@/features/speaking/takes";
+import { readTimeZone } from "@/features/speaking/timezone";
 import { framesInput, objectIdInput, selfRatingInput, shape, takeInput } from "@/lib/actionInput";
 
 const BAD_REQUEST = "That request isn't valid. Reload the page and try again.";
-import { transcribeTake } from "@/speaking/transcribe";
+import { transcribeTake } from "@/features/speaking/transcribe";
 
 
 async function session(): Promise<string> {

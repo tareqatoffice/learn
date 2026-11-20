@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { type AdminIeltsItem, type ItemType, listItemsAdmin } from "@/admin/ielts";
-import { AdminList, AdminListItem, AdminPage, AdminSection } from "@/components/admin/layout";
-import { IeltsGenerateDraftButton } from "@/components/admin/IeltsGenerateDraftButton";
-import { IeltsItemStatusButton } from "@/components/admin/IeltsItemStatusButton";
+import { type AdminIeltsItem, type ItemType, listItemsAdmin } from "@/features/admin/ielts";
+import { AdminList, AdminListItem, AdminPage, AdminSection } from "@/features/admin/components/layout";
+import { IeltsGenerateDraftButton } from "@/features/admin/components/IeltsGenerateDraftButton";
+import { IeltsItemStatusButton } from "@/features/admin/components/IeltsItemStatusButton";
 import { buttonVariants } from "@/components/ui/button";
-import { getAiConfig } from "@/lib/aiSettings";
+import { getAiConfig } from "@/features/ai/lib/aiSettings";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 

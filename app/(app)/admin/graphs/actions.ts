@@ -1,7 +1,7 @@
 "use server";
 
-import { adminContext } from "@/admin/action";
-import { searchNotes, searchQuestions } from "@/admin/queries";
+import { adminContext } from "@/features/admin/action";
+import { searchNotes, searchQuestions } from "@/features/admin/queries";
 import {
   saveGraph,
   saveNode,
@@ -10,7 +10,7 @@ import {
   type GraphInput,
   type NodeInput,
   type Result,
-} from "@/admin/service";
+} from "@/features/admin/service";
 
 export async function saveGraphAction(input: GraphInput): Promise<Result> {
   const user = await adminContext();

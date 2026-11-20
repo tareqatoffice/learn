@@ -1,6 +1,6 @@
-import { listSubjectsAdmin } from "@/admin/queries";
-import { SubjectsEditor } from "@/components/admin/SubjectsEditor";
-import { AdminPage } from "@/components/admin/layout";
+import { listSubjectsAdmin } from "@/features/admin/queries";
+import { SubjectsEditor } from "@/features/admin/components/SubjectsEditor";
+import { AdminPage } from "@/features/admin/components/layout";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 

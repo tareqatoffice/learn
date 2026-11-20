@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { connectDb } from "@/lib/db";
-import { attemptsMarkdown, exportFileName, getAttemptLogs } from "@/progress/attempts";
+import { attemptsMarkdown, exportFileName, getAttemptLogs } from "@/features/progress/attempts";
 
 export async function GET(request: Request): Promise<Response> {
   const session = await auth();

@@ -1,6 +1,6 @@
 "use server";
 
-import { adminContext } from "@/admin/action";
+import { adminContext } from "@/features/admin/action";
 import {
   saveBook,
   saveQuestion,
@@ -9,7 +9,7 @@ import {
   type BookInput,
   type QuestionInput,
   type Result,
-} from "@/admin/service";
+} from "@/features/admin/service";
 
 export async function saveBookAction(input: BookInput): Promise<Result> {
   const user = await adminContext();

@@ -1,11 +1,11 @@
-import { SpeakingHistory } from "@/components/speaking/SpeakingHistory";
-import { requireUser } from "@/lib/authz";
+import { SpeakingHistory } from "@/features/speaking/components/SpeakingHistory";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
-import { getTrends } from "@/speaking/progress";
-import { listTakes } from "@/speaking/takes";
-import { taskFromSlug } from "@/speaking/tasks";
-import { readTimeZone } from "@/speaking/timezone";
+import { getTrends } from "@/features/speaking/progress";
+import { listTakes } from "@/features/speaking/takes";
+import { taskFromSlug } from "@/features/speaking/tasks";
+import { readTimeZone } from "@/features/speaking/timezone";
 
 export const metadata = buildMetadata({
   title: "Speaking history",

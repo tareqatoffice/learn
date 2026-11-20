@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createToken, revokeToken } from "@/admin/tokens";
+import { createToken, revokeToken } from "@/features/admin/tokens";
 import { GET as listContent } from "@/app/api/content/route";
 import { POST as importContent } from "@/app/api/content/import/route";
 import { GET as pullContent } from "@/app/api/content/pull/route";

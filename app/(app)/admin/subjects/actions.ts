@@ -1,7 +1,7 @@
 "use server";
 
-import { adminContext } from "@/admin/action";
-import { deleteSubject, saveSubject, type Result, type SubjectInput } from "@/admin/service";
+import { adminContext } from "@/features/admin/action";
+import { deleteSubject, saveSubject, type Result, type SubjectInput } from "@/features/admin/service";
 
 export async function saveSubjectAction(input: SubjectInput): Promise<Result> {
   const user = await adminContext();

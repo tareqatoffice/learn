@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { WritingReview } from "@/components/ielts/WritingReview";
-import { WritingRunner } from "@/components/ielts/WritingRunner";
-import { getWritingAttempt } from "@/ielts/writing/attempts";
-import { requireUser } from "@/lib/authz";
+import { WritingReview } from "@/features/ielts/components/WritingReview";
+import { WritingRunner } from "@/features/ielts/components/WritingRunner";
+import { getWritingAttempt } from "@/features/ielts/writing/attempts";
+import { requireUser } from "@/features/auth/lib/authz";
 import { presignGet, storageConfigured } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
@@ -24,7 +24,7 @@ export default async function IeltsWritingAttemptPage({ params }: { params: Prom
   if (!view) notFound();
   const imageUrls = storageConfigured() ? await Promise.all(view.tasks.map((t) => (t.imageKey ? presignGet(t.imageKey) : Promise.resolve("")))) : view.tasks.map(() => "");
   return (
-    <div className="grid w-full gap-4">
+    <div className="grid w-full gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>{view.kind === "full" ? "Writing full test" : view.kind === "task1" ? "Writing Task 1" : "Writing Task 2"}</h1>
         <Link href="/ielts/writing" className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">

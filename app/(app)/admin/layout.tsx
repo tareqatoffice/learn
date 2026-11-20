@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { ADMIN_NAV } from "@/admin/nav";
-import { AdminNav } from "@/components/admin/AdminNav";
-import { ForbiddenError, requireAdmin } from "@/lib/authz";
+import { ADMIN_NAV } from "@/features/admin/nav";
+import { AdminNav } from "@/features/admin/components/AdminNav";
+import { ForbiddenError, requireAdmin } from "@/features/auth/lib/authz";
 
 export default async function AdminLayout({
   children,

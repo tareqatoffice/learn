@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { listRevisionsAdmin } from "@/admin/queries";
-import { AdminList, AdminListItem, AdminPage } from "@/components/admin/layout";
+import { listRevisionsAdmin } from "@/features/admin/queries";
+import { AdminList, AdminListItem, AdminPage } from "@/features/admin/components/layout";
 import { connectDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
 import { buildMetadata } from "@/lib/seo";

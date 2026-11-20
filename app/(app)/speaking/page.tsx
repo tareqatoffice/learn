@@ -1,10 +1,10 @@
-import { SpeakingHome } from "@/components/speaking/SpeakingHome";
-import { requireUser } from "@/lib/authz";
+import { SpeakingHome } from "@/features/speaking/components/SpeakingHome";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
-import { listPublishedLessons } from "@/speaking/lessons";
-import { getToday } from "@/speaking/progress";
-import { hasTimeZoneCookie, readTimeZone } from "@/speaking/timezone";
+import { listPublishedLessons } from "@/features/speaking/lessons";
+import { getToday } from "@/features/speaking/progress";
+import { hasTimeZoneCookie, readTimeZone } from "@/features/speaking/timezone";
 
 export const metadata = buildMetadata({
   title: "Speaking practice",

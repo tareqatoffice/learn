@@ -12,7 +12,7 @@ vi.mock("@/lib/stt", () => ({ sttConfigured: vi.fn(() => true) }));
 
 import { connectDb } from "@/lib/db";
 import { SpeakingLesson, SpeakingTake } from "@/models";
-import { MAX_OPEN_TAKES, MAX_TAKES_PER_DAY, OPEN_TAKE_MS, sweepAbandonedTakes, deleteAllTakes, deleteTake, confirmTake, getTake, listTakes, saveSelfRating, startTake } from "@/speaking/takes";
+import { MAX_OPEN_TAKES, MAX_TAKES_PER_DAY, OPEN_TAKE_MS, sweepAbandonedTakes, deleteAllTakes, deleteTake, confirmTake, getTake, listTakes, saveSelfRating, startTake } from "@/features/speaking/takes";
 import * as r2 from "@/lib/r2";
 import * as stt from "@/lib/stt";
 import { resetDb } from "../setup/mongo";

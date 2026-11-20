@@ -1,7 +1,7 @@
 import mongoose, { Types } from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectDb } from "@/lib/db";
-import { listRevisions, restoreRevision, saveWithRevision } from "@/content/revisions";
+import { listRevisions, restoreRevision, saveWithRevision } from "@/features/content/revisions";
 import { Question, QuestionBook, Revision } from "@/models";
 import { resetDb } from "../setup/mongo";
 

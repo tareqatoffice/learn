@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { Countdown } from "@/components/ielts/Countdown";
+import { Countdown } from "@/features/ielts/components/Countdown";
 
 afterEach(cleanup);
 

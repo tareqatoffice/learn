@@ -1,10 +1,10 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MockRunner, type MockActions, type MockQuestions } from "@/components/ielts/MockRunner";
-import type { RecorderResult, RecorderState } from "@/lib/useRecorder";
+import { MockRunner, type MockActions, type MockQuestions } from "@/features/ielts/components/MockRunner";
+import type { RecorderResult, RecorderState } from "@/features/recording/lib/useRecorder";
 
 const rec = vi.hoisted(() => ({ starts: [] as number[], holdAsking: false }));
-vi.mock("@/lib/useRecorder", async () => {
+vi.mock("@/features/recording/lib/useRecorder", async () => {
   const React = await import("react");
   return {
     useRecorder: ({ kind, capSec }: { kind: "audio" | "video"; capSec: number }) => {
@@ -67,7 +67,7 @@ const upload = vi.hoisted(() => {
   class UploadError extends Error {}
   return { UploadError, uploadTake: vi.fn<(url: string, blob: Blob, mime: string) => Promise<void>>(async () => {}) };
 });
-vi.mock("@/lib/uploadTake", () => upload);
+vi.mock("@/features/recording/lib/uploadTake", () => upload);
 
 const push = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh: vi.fn() }) }));

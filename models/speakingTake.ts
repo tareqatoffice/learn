@@ -1,6 +1,6 @@
 import mongoose, { Schema, model } from "mongoose";
-import { bodySchema, mediaSchema } from "@/recording/media";
-import { TASKS } from "@/speaking/tasks";
+import { bodySchema, mediaSchema } from "@/models/mediaSchemas";
+import { TASKS } from "@/models/speakingTasks";
 
 const materialSchema = new Schema(
   { title: String, text: String, prompt: String, generated: { type: Boolean, default: false } },

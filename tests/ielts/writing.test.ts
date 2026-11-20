@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { connectDb } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
 import { AiUsage, IeltsBandEntry, IeltsWritingAttempt, IeltsWritingPrompt } from "@/models";
-import { taskBand, wordCount, writingBand } from "@/ielts/writing/bands";
+import { taskBand, wordCount, writingBand } from "@/features/ielts/writing/bands";
 import {
   deleteWritingAttempt,
   getWritingAttempt,
@@ -13,7 +13,7 @@ import {
   startWritingAttempt,
   submitWriting,
   writingAiEstimate,
-} from "@/ielts/writing/attempts";
+} from "@/features/ielts/writing/attempts";
 import { resetDb } from "../setup/mongo";
 
 const TODAY = "2026-11-12";

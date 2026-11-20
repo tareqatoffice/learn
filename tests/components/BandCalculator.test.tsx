@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BandCalculator } from "@/components/ielts/BandCalculator";
+import { BandCalculator } from "@/features/ielts/components/BandCalculator";
 
 const { saveCalculatorResultAction } = vi.hoisted(() => ({
   saveCalculatorResultAction: vi.fn<(...args: unknown[]) => Promise<object>>(async () => ({ ok: true as const, id: "1" })),

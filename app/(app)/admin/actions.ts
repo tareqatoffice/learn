@@ -1,13 +1,13 @@
 "use server";
 
-import { adminContext } from "@/admin/action";
+import { adminContext } from "@/features/admin/action";
 import {
   moveItem,
   setStatus,
   type OrderedKind,
   type Result,
   type StatusKind,
-} from "@/admin/service";
+} from "@/features/admin/service";
 import type { Status } from "@/models";
 
 export async function moveItemAction(

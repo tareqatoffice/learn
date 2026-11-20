@@ -10,8 +10,8 @@ import { connectDb } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
 import { SpeakingTake, SpeakingUsage } from "@/models";
 import { SttError } from "@/lib/stt";
-import { transcribeTake } from "@/speaking/transcribe";
-import { MAX_TRANSCRIBE_ATTEMPTS, TRANSCRIBE_ATTEMPTS_MESSAGE } from "@/recording/transcribe";
+import { transcribeTake } from "@/features/speaking/transcribe";
+import { MAX_TRANSCRIBE_ATTEMPTS, TRANSCRIBE_ATTEMPTS_MESSAGE } from "@/features/recording/transcribe";
 import * as r2 from "@/lib/r2";
 import { resetDb } from "../setup/mongo";
 

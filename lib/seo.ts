@@ -12,6 +12,8 @@ export function getSiteUrl(): URL {
   );
 }
 
+export const OG_IMAGE = { url: "/og.png", width: 1200, height: 630, alt: `${SITE_NAME} — interview questions, topic graphs and study notes` };
+
 const MAX_DESCRIPTION = 160;
 
 export function toDescription(
@@ -54,8 +56,14 @@ export function buildMetadata({
       url: path,
       siteName: SITE_NAME,
       type: "website",
+      images: [OG_IMAGE],
     },
-    twitter: { card: "summary", title, description: summary },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description: summary,
+      images: [OG_IMAGE.url],
+    },
     ...(noindex && { robots: { index: false, follow: false } }),
   };
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ADMIN_NAV } from "@/admin/nav";
-import { AdminCard, AdminPage } from "@/components/admin/layout";
-import { getAiSettings } from "@/lib/aiSettings";
+import { ADMIN_NAV } from "@/features/admin/nav";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
+import { getAiSettings } from "@/features/ai/lib/aiSettings";
 import { connectDb } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { buildMetadata } from "@/lib/seo";
@@ -51,11 +51,14 @@ export default async function AdminHome() {
           <AdminCard key={group.label} title={group.label}>
             <ul className="grid gap-3">
               {group.links.map((l) => (
-                <li key={l.href} className="grid">
-                  <Link href={hrefOf(l.href)} className="font-medium hover:underline">
-                    {l.label}
+                <li key={l.href}>
+                  <Link
+                    href={hrefOf(l.href)}
+                    className="grid gap-0.5 rounded-lg px-3 py-2 hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  >
+                    <span className="font-medium">{l.label}</span>
+                    <span className="text-sm text-muted-foreground">{detail[l.href] ?? l.description}</span>
                   </Link>
-                  <span className="text-sm text-muted-foreground">{detail[l.href] ?? l.description}</span>
                 </li>
               ))}
             </ul>

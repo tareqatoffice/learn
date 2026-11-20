@@ -5,9 +5,9 @@ import { resetEnvCache } from "@/lib/env";
 import { setR2Client } from "@/lib/r2";
 import { connectDb } from "@/lib/db";
 import { SpeakingTake } from "@/models";
-import { capBytes, keysOf, type MediaDoc } from "@/recording/media";
-import { playbackUrls, prepareUpload, removeMedia, verifyUpload } from "@/recording/upload";
-import { getTake } from "@/speaking/takes";
+import { capBytes, keysOf, type MediaDoc } from "@/features/recording/media";
+import { playbackUrls, prepareUpload, removeMedia, verifyUpload } from "@/features/recording/upload";
+import { getTake } from "@/features/speaking/takes";
 import { resetDb } from "../setup/mongo";
 import { legacyTake, legacyTakeId, legacyUserId } from "./fixtures/legacyTake";
 

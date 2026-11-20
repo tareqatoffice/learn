@@ -1,11 +1,11 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import {
   IBM_Plex_Mono,
   IBM_Plex_Sans,
   Noto_Sans_Bengali,
 } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
-import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
+import { getSiteUrl, OG_IMAGE, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 import "./globals.css";
 import { headers } from "next/headers";
 
@@ -36,8 +36,21 @@ export const metadata: Metadata = {
     type: "website",
     title: SITE_NAME,
     description: SITE_DESCRIPTION,
+    images: [OG_IMAGE],
   },
-  twitter: { card: "summary", title: SITE_NAME, description: SITE_DESCRIPTION },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: [OG_IMAGE.url],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f7f3ea" },
+    { media: "(prefers-color-scheme: dark)", color: "#1c1a17" },
+  ],
 };
 
 const themeScript = `try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;

@@ -1,5 +1,5 @@
 import type { Types } from "mongoose";
-import { withToken } from "@/lib/tokenAuth";
+import { withToken } from "@/features/auth/lib/tokenAuth";
 import { Graph, NoteSeries, QuestionBook } from "@/models";
 
 type Row = { _id: Types.ObjectId; slug: string; title: string; status: string };

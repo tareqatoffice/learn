@@ -11,9 +11,9 @@ import { resetEnvCache } from "@/lib/env";
 import * as r2 from "@/lib/r2";
 import { SpeakingTake, SpeakingUsage } from "@/models";
 import { SttError } from "@/lib/stt";
-import type { MediaDoc } from "@/recording/mediaCore";
-import { TRANSCRIBE_LIMIT_MESSAGE, transcribeMedia } from "@/recording/transcribe";
-import { transcribeTake } from "@/speaking/transcribe";
+import type { MediaDoc } from "@/features/recording/mediaCore";
+import { TRANSCRIBE_LIMIT_MESSAGE, transcribeMedia } from "@/features/recording/transcribe";
+import { transcribeTake } from "@/features/speaking/transcribe";
 import { resetDb } from "../setup/mongo";
 import { legacyTake, legacyTakeId, legacyUserId } from "./fixtures/legacyTake";
 

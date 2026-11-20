@@ -7,8 +7,8 @@ import {
   saveDefaults,
   saveProfile,
   setBodyConsent,
-} from "@/speaking/settings";
-import { DEFAULT_TARGET_MIN } from "@/speaking/tasks";
+} from "@/features/speaking/settings";
+import { DEFAULT_TARGET_MIN } from "@/features/speaking/tasks";
 import { resetDb } from "../setup/mongo";
 
 const user = () => String(new Types.ObjectId());

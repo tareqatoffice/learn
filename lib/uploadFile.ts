@@ -1,4 +1,12 @@
-import { UploadError } from "@/lib/uploadTake";
+export class UploadError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = "UploadError";
+  }
+}
 
 export const UPLOAD_CANCELLED = "The upload was cancelled.";
 

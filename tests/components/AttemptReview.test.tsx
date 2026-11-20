@@ -1,9 +1,9 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AttemptReview } from "@/components/ielts/AttemptReview";
-import { BandCompare } from "@/components/ielts/BandCompare";
-import type { AttemptView } from "@/ielts/speaking/attempts";
+import { AttemptReview } from "@/features/ielts/components/AttemptReview";
+import { BandCompare } from "@/features/ielts/components/BandCompare";
+import type { AttemptView } from "@/features/ielts/speaking/attempts";
 
 const actions = vi.hoisted(() => ({
   saveSelfBandsAction: vi.fn(async () => ({ ok: true as const, band: 6 })),

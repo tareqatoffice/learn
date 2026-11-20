@@ -1,6 +1,6 @@
-import { listSubjects } from "@/admin/queries";
-import { BookForm } from "@/components/admin/BookForm";
-import { AdminCard, AdminPage } from "@/components/admin/layout";
+import { listSubjects } from "@/features/admin/queries";
+import { BookForm } from "@/features/admin/components/BookForm";
+import { AdminCard, AdminPage } from "@/features/admin/components/layout";
 import { connectDb } from "@/lib/db";
 
 export default async function NewBookPage() {

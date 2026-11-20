@@ -1,8 +1,8 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SuggestionCard } from "@/components/ielts/SuggestionCard";
-import type { PlanView } from "@/ielts/profile";
+import { SuggestionCard } from "@/features/ielts/components/SuggestionCard";
+import type { PlanView } from "@/features/ielts/profile";
 
 const { approveSuggestionAction, dismissSuggestionAction } = vi.hoisted(() => ({
   approveSuggestionAction: vi.fn<(...args: unknown[]) => Promise<object>>(async () => ({ ok: true as const, version: 2 })),

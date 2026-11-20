@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
-import { searchContent } from "@/content/queries";
-import { accessStatusFor } from "@/lib/access";
+import { searchContent } from "@/features/content/queries";
+import { accessStatusFor } from "@/features/auth/lib/access";
 import { connectDb } from "@/lib/db";
 import { allow, LIMITS } from "@/lib/rateLimit";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decryptSecret, encryptSecret } from "@/lib/secrets";
+import { decryptSecret, encryptSecret } from "@/features/ai/lib/secrets";
 
 describe("secrets", () => {
   it("round-trips, with a fresh IV each time", () => {

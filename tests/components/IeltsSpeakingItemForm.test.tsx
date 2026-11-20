@@ -10,7 +10,7 @@ const a = vi.hoisted(() => ({
 vi.mock("@/app/(app)/admin/ielts/speaking/actions", () => a);
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
 
-import { IeltsSpeakingItemForm } from "@/components/admin/IeltsSpeakingItemForm";
+import { IeltsSpeakingItemForm } from "@/features/admin/components/IeltsSpeakingItemForm";
 
 afterEach(() => {
   cleanup();

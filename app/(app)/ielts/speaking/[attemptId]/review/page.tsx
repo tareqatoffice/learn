@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AttemptReview } from "@/components/ielts/AttemptReview";
-import { getAttempt } from "@/ielts/speaking/attempts";
-import { getAiConfig } from "@/lib/aiSettings";
-import { requireUser } from "@/lib/authz";
+import { AttemptReview } from "@/features/ielts/components/AttemptReview";
+import { getAttempt } from "@/features/ielts/speaking/attempts";
+import { getAiConfig } from "@/features/ai/lib/aiSettings";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { storageConfigured } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";
-import { getEffectiveSettings } from "@/speaking/settings";
+import { getEffectiveSettings } from "@/features/speaking/settings";
 
 export async function generateMetadata({ params }: PageProps<"/ielts/speaking/[attemptId]/review">): Promise<Metadata> {
   const { attemptId } = await params;

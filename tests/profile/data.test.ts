@@ -2,10 +2,10 @@ import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectDb } from "@/lib/db";
 import { IeltsBandEntry, IeltsSpeakingAttempt, IeltsStudyLog, IeltsTestAttempt, IeltsWritingAttempt, Note, NoteProgress, QuizSession, SpeakingTake } from "@/models";
-import { setNodeStatus } from "@/progress/graph";
-import { openNote, setNoteRead } from "@/progress/notes";
-import { createSession, finishSession, recordResult, type QuizFilter } from "@/progress/quiz";
-import { activityStreak, fillActivity, getProfileData, parseTab, streakOf } from "@/profile/data";
+import { setNodeStatus } from "@/features/progress/graph";
+import { openNote, setNoteRead } from "@/features/progress/notes";
+import { createSession, finishSession, recordResult, type QuizFilter } from "@/features/progress/quiz";
+import { activityStreak, fillActivity, getProfileData, parseTab, streakOf } from "@/features/profile/data";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedBook, seedGraph, seedNode, seedNote, seedQuestions, seedSeries } from "../progress/seed";
 

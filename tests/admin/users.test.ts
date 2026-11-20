@@ -10,7 +10,7 @@ vi.mock("@/lib/r2", () => ({
   getObjectBytes: vi.fn(),
 }));
 
-import { deleteUser } from "@/admin/users";
+import { deleteUser } from "@/features/admin/users";
 import { connectDb } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
 import * as r2 from "@/lib/r2";

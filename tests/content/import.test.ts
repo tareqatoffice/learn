@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectDb } from "@/lib/db";
 import { importKey } from "@/lib/ids";
-import { runImport } from "@/content/import/run";
-import type { ImportSource, ImportTarget } from "@/content/types";
+import { runImport } from "@/features/content/import/run";
+import type { ImportSource, ImportTarget } from "@/features/content/types";
 import { Graph, GraphNode, Note, NoteSeries, Question, QuestionBook, Revision } from "@/models";
 import { resetDb } from "../setup/mongo";
 

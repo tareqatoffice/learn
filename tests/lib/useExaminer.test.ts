@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useExaminer } from "@/lib/useExaminer";
+import { useExaminer } from "@/features/ielts/lib/useExaminer";
 
 class FakeUtterance {
   static last: FakeUtterance | null = null;

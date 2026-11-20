@@ -2,9 +2,9 @@
 
 import { refresh } from "next/cache";
 import { z } from "zod";
-import { requireUser } from "@/lib/authz";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
-import { PrereqNotDoneError, setNodeStatus, type NodeStatus } from "@/progress/graph";
+import { PrereqNotDoneError, setNodeStatus, type NodeStatus } from "@/features/progress/graph";
 
 const input = z.object({
   nodeId: z.string().regex(/^[0-9a-f]{24}$/i),

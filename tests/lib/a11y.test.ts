@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rovingIndex, timeWarning } from "@/lib/a11y";
+import { rovingIndex, timeWarning } from "@/features/ielts/lib/a11y";
 
 describe("a11y helpers (U14)", () => {
   it("announces five minutes and one minute left, once each", () => {

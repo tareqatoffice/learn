@@ -1,5 +1,5 @@
-import { listUsersAdmin } from "@/admin/queries";
-import { UsersPage } from "@/components/admin/UsersPage";
+import { listUsersAdmin } from "@/features/admin/queries";
+import { UsersPage } from "@/features/admin/components/UsersPage";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 

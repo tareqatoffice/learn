@@ -10,8 +10,8 @@ const { saveWritingTextAction, submitWritingAction, refresh } = vi.hoisted(() =>
 vi.mock("@/app/(app)/ielts/practice-actions", () => ({ saveWritingTextAction, submitWritingAction }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
-import { WritingRunner } from "@/components/ielts/WritingRunner";
-import type { WritingView } from "@/ielts/writing/attempts";
+import { WritingRunner } from "@/features/ielts/components/WritingRunner";
+import type { WritingView } from "@/features/ielts/writing/attempts";
 
 const view = (): WritingView => ({
   id: "w1",

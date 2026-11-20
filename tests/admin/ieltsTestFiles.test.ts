@@ -10,7 +10,7 @@ vi.mock("@/lib/r2", () => ({
   getObjectBytes: vi.fn(),
 }));
 
-import { deleteTest } from "@/admin/ieltsTests";
+import { deleteTest } from "@/features/admin/ieltsTests";
 import { connectDb } from "@/lib/db";
 import * as r2 from "@/lib/r2";
 import { IeltsListeningTest, IeltsTestAttempt } from "@/models";

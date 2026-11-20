@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SKILLS } from "@/ielts/bands";
+import { SKILLS } from "@/features/ielts/bands";
 import {
   generatePlan,
   hoursCheck,
@@ -9,8 +9,8 @@ import {
   type Adjustment,
   type PlanInputs,
   type PlanSettings,
-} from "@/ielts/plan";
-import { addDays } from "@/speaking/schedule";
+} from "@/features/ielts/plan";
+import { addDays } from "@/features/speaking/schedule";
 
 const TODAY = "2026-11-11";
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];

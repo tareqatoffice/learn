@@ -6,8 +6,8 @@ const { saveIeltsSettingsAction, refresh } = vi.hoisted(() => ({ saveIeltsSettin
 vi.mock("@/app/(app)/admin/ielts/settings/actions", () => ({ saveIeltsSettingsAction }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
-import { IeltsSettingsForm } from "@/components/admin/IeltsSettingsForm";
-import { DEFAULT_IELTS_SETTINGS } from "@/ielts/settings";
+import { IeltsSettingsForm } from "@/features/admin/components/IeltsSettingsForm";
+import { DEFAULT_IELTS_SETTINGS } from "@/features/ielts/settings";
 
 afterEach(() => {
   cleanup();

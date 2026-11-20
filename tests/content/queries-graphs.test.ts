@@ -1,9 +1,9 @@
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getGraphView, listGraphsWithProgress } from "@/content/queries";
+import { getGraphView, listGraphsWithProgress } from "@/features/content/queries";
 import { connectDb } from "@/lib/db";
 import { Graph, GraphNode, Note, NoteSeries } from "@/models";
-import { setNodeStatus } from "@/progress/graph";
+import { setNodeStatus } from "@/features/progress/graph";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedBook, seedGraph, seedNode, seedQuestions } from "../progress/seed";
 

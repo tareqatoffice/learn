@@ -19,8 +19,8 @@ import * as actions from "@/app/(app)/ielts/actions";
 import { connectDb } from "@/lib/db";
 import * as r2 from "@/lib/r2";
 import { IeltsBandEntry, IeltsPlanSuggestion, IeltsProfile, IeltsSpeakingAttempt, IeltsStudyLog } from "@/models";
-import { getProfile, planHistory } from "@/ielts/profile";
-import { addDays, localDate } from "@/speaking/schedule";
+import { getProfile, planHistory } from "@/features/ielts/profile";
+import { addDays, localDate } from "@/features/speaking/schedule";
 import { resetDb } from "../setup/mongo";
 
 const id = () => String(new Types.ObjectId());

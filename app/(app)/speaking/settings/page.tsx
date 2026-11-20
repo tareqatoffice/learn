@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { DeleteAllTakes } from "@/components/speaking/DeleteAllTakes";
-import { SpeakingSettingsForm } from "@/components/speaking/SpeakingSettingsForm";
-import { requireUser } from "@/lib/authz";
+import { DeleteAllTakes } from "@/features/speaking/components/DeleteAllTakes";
+import { SpeakingSettingsForm } from "@/features/speaking/components/SpeakingSettingsForm";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 import { pageTitleClass } from "@/lib/ui";
-import { getEffectiveSettings } from "@/speaking/settings";
+import { getEffectiveSettings } from "@/features/speaking/settings";
 
 export const metadata = buildMetadata({
   title: "Speaking settings",
@@ -19,7 +19,7 @@ export default async function SpeakingSettingsPage() {
   const settings = await getEffectiveSettings(user.userId);
 
   return (
-    <div className="grid w-full gap-4">
+    <div className="grid w-full gap-6">
       <div>
         <Link href="/speaking" className="text-sm text-muted-foreground hover:underline">
           ← Speaking practice

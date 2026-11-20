@@ -2,9 +2,9 @@
 
 import { refresh } from "next/cache";
 import { z } from "zod";
-import { requireUser } from "@/lib/authz";
+import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
-import { setNoteRead } from "@/progress/notes";
+import { setNoteRead } from "@/features/progress/notes";
 
 const input = z.object({
   noteId: z.string().regex(/^[0-9a-f]{24}$/i),
