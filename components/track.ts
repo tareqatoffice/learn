@@ -1,4 +1,3 @@
-/** Track identity: each area of the app keeps one hue (a `--t-*` token) on every page. */
 export const TRACK = {
   graphs: 0,
   speaking: 1,

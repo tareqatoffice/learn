@@ -3,7 +3,6 @@ import { CheckMark, ProgressRing } from "@/components/ProgressRing";
 import { focusRing, type TrackName } from "@/components/track";
 import { cn } from "@/lib/utils";
 
-/** Circular progress for one speaking task: minutes done against the daily target. */
 export function Ring({
   value,
   max,
@@ -55,7 +54,6 @@ export function Ring({
   );
 }
 
-/** Two-part bar for a quiz: answers you got against those sent to review. */
 export function SplitBar({ got, review }: { got: number; review: number }) {
   const total = got + review;
   if (total === 0) return <div aria-hidden className="h-1.5 rounded-full bg-muted" />;

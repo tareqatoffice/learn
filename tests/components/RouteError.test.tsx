@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   errorDigest,
+  readableErrorMessage,
   RouteError,
   userFacingErrorMessage,
 } from "@/components/RouteError";
@@ -31,6 +32,20 @@ describe("userFacingErrorMessage", () => {
     expect(userFacingErrorMessage(new Error("detail for debug"))).toBe(
       "detail for debug",
     );
+  });
+});
+
+describe("readableErrorMessage", () => {
+  it("decodes Turbopack-mangled module names", () => {
+    const raw =
+      "(0 , __TURBOPACK__imported__module__$5b$project$5d2f$features$2f$focus$2f$context$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__.offersFocus) is not a function";
+    expect(readableErrorMessage(raw)).toMatch(
+      /^"offersFocus" from features\/focus\/context\.ts is not a function\. .*restart the dev server/,
+    );
+  });
+
+  it("leaves ordinary messages alone", () => {
+    expect(readableErrorMessage("plain failure")).toBe("plain failure");
   });
 });
 

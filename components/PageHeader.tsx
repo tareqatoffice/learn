@@ -2,7 +2,6 @@ import { trackVar, type TrackName } from "@/components/track";
 import { pageTitleBase } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
-/** Page title with the area's track colour as a spine, an optional one-line summary and actions on the right. */
 export function PageHeader({
   title,
   description,

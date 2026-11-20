@@ -14,7 +14,6 @@ function nextWithCsp(req: NextRequest): NextResponse {
   headers.set("Content-Security-Policy", csp);
   const res = NextResponse.next({ request: { headers } });
   res.headers.set("Content-Security-Policy", csp);
-  // Framing is set here with the CSP so both follow the same path rule (lib/csp.ts).
   res.headers.set("X-Frame-Options", frameOptionsFor(pathname));
   return res;
 }

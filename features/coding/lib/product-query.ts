@@ -14,11 +14,6 @@ export interface ProductPage {
 
 const PAGE_SIZE = 10;
 
-/**
- * Provided code, not part of the test. Simulates a product API.
- * Takes 800 ms, returns 10 products per page (page is 1-based), and rejects
- * when `q`, trimmed, is "fail". A page outside the range returns empty `items`.
- */
 export function getProducts(query: ProductQuery): Promise<ProductPage> {
   return new Promise<ProductPage>((resolve, reject) => {
     setTimeout(() => {

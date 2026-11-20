@@ -4,13 +4,10 @@ import { Maximize, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactPlayer from "react-player";
 import { Button } from "@/components/ui/button";
+import { clock } from "@/lib/format";
 
 const SPEEDS = [1, 1.25, 1.5, 0.75];
 
-function clock(sec: number): string {
-  const s = Math.max(0, Math.floor(Number.isFinite(sec) ? sec : 0));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
 
 export function MediaPlayer({
   src,

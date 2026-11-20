@@ -3,6 +3,7 @@ import { isValidObjectId, Types } from "mongoose";
 import { listBooksWithProgress, listGraphsWithProgress, listSeriesWithProgress } from "@/features/content/queries";
 import { filterUnder, visibleNodeFilter, visibleNoteFilter } from "@/features/content/visibility";
 import {
+  FocusSession,
   Graph,
   GraphNode,
   IeltsBandEntry,
@@ -21,14 +22,16 @@ import {
 import { labelSessions, quizDate, quizHistoryFilter, sessionCounts, SUMMARY_PROJECTION } from "@/features/progress/quiz";
 import { addDays, localDate } from "@/features/speaking/schedule";
 import { TASK_LABEL, type TaskKey } from "@/features/speaking/tasks";
+import type { FocusArea } from "@/models/focusConstants";
 
 type Id = Types.ObjectId;
 
-export const PROFILE_TABS = ["overview", "notes", "interview", "graphs", "speaking", "ielts"] as const;
+export const PROFILE_TABS = ["overview", "focus", "notes", "interview", "graphs", "speaking", "ielts"] as const;
 export type ProfileTab = (typeof PROFILE_TABS)[number];
 
 export const TAB_LABEL: Record<ProfileTab, string> = {
   overview: "Overview",
+  focus: "Focus",
   notes: "Notes",
   interview: "Interview",
   graphs: "Graphs",
@@ -84,6 +87,23 @@ export type AttemptHistoryItem = {
   band?: number;
   href: string;
 };
+export type FocusHistoryItem = {
+  id: string;
+  date: string;
+  label: string;
+  path: string;
+  area: FocusArea;
+  seconds: number;
+  targetMinutes?: number;
+  completed: boolean;
+};
+export type FocusData = {
+  totalSeconds: number;
+  sessions: number;
+  weekSeconds: number;
+  byArea: { area: FocusArea; seconds: number; sessions: number }[];
+  history: FocusHistoryItem[];
+};
 export type Bands = { listening?: number; reading?: number; writing?: number; speaking?: number };
 export type BandHistoryItem = { date: string; source: string; overall?: number; bands: Bands };
 
@@ -93,6 +113,7 @@ export type ProfileData = {
   joined: string | null;
   streak: number;
   activity: ActivityDay[];
+  focus: FocusData;
   notes: { series: { slug: string; title: string; read: number; total: number }[]; read: number; total: number; history: NotesHistoryItem[] };
   interview: {
     books: { slug: string; title: string; mastered: number; total: number }[];
@@ -269,6 +290,45 @@ async function speakingArea(userId: Id, w: Window) {
   };
 }
 
+const EMPTY_FOCUS: FocusData = { totalSeconds: 0, sessions: 0, weekSeconds: 0, byArea: [], history: [] };
+
+async function focusArea(userId: Id, w: Window, today: string): Promise<FocusData> {
+  const weekStart = addDays(today, -6);
+  const [byArea, days, week, recent] = await Promise.all([
+    FocusSession.aggregate<{ _id: FocusArea; seconds: number; sessions: number }>([
+      { $match: { userId } },
+      { $group: { _id: "$area", seconds: { $sum: "$seconds" }, sessions: { $sum: 1 } } },
+      { $sort: { seconds: -1, _id: 1 } },
+    ]),
+    dayCountsOfDateField(FocusSession as typeof SpeakingTake, { userId }),
+    FocusSession.aggregate<{ n: number }>([
+      { $match: { userId, date: { $gte: weekStart, $lte: today } } },
+      { $group: { _id: null, n: { $sum: "$seconds" } } },
+    ]),
+    FocusSession.find({ userId }, { date: 1, label: 1, path: 1, area: 1, seconds: 1, targetMinutes: 1, completed: 1 })
+      .sort({ startedAt: -1, _id: -1 })
+      .limit(HISTORY_MAX)
+      .lean<{ _id: Id; date: string; label: string; path: string; area: FocusArea; seconds: number; targetMinutes?: number; completed?: boolean }[]>(),
+  ]);
+  addDayRows(w.counts, days);
+  return {
+    totalSeconds: sum(byArea.map((a) => a.seconds)),
+    sessions: sum(byArea.map((a) => a.sessions)),
+    weekSeconds: week[0]?.n ?? 0,
+    byArea: byArea.map((a) => ({ area: a._id, seconds: a.seconds, sessions: a.sessions })),
+    history: recent.map((f) => ({
+      id: String(f._id),
+      date: f.date,
+      label: f.label,
+      path: f.path,
+      area: f.area,
+      seconds: f.seconds,
+      completed: Boolean(f.completed),
+      ...(f.targetMinutes !== undefined ? { targetMinutes: f.targetMinutes } : {}),
+    })),
+  };
+}
+
 type Dated = { _id: Id; date: string; createdAt?: Date };
 const newestFirst = (a: { date: string; at: number }, b: { date: string; at: number }) => (a.date === b.date ? b.at - a.at : a.date < b.date ? 1 : -1);
 
@@ -370,6 +430,7 @@ export async function getProfileData(
       joined: null,
       streak: 0,
       activity: fillActivity(counts, today),
+      focus: EMPTY_FOCUS,
       notes: { series: [], read: 0, total: 0, history: [] },
       interview: { books: [], mastered: 0, total: 0, quizzes: 0, history: [] },
       graphs: { graphs: [], done: 0, total: 0, history: [] },
@@ -379,8 +440,9 @@ export async function getProfileData(
   }
   const uid = new Types.ObjectId(userId);
   const w: Window = { timeZone, counts };
-  const [user, notes, interview, graphs, speaking, ielts] = await Promise.all([
+  const [user, focus, notes, interview, graphs, speaking, ielts] = await Promise.all([
     User.findById(uid, { createdAt: 1 }).lean<{ createdAt?: Date } | null>(),
+    focusArea(uid, w, today),
     notesArea(uid, w),
     interviewArea(uid, w),
     graphsArea(uid, w),
@@ -392,6 +454,7 @@ export async function getProfileData(
     joined: user?.createdAt ? localDate(user.createdAt, timeZone) : null,
     streak: activityStreak(counts, today),
     activity: fillActivity(counts, today),
+    focus,
     notes,
     interview,
     graphs,

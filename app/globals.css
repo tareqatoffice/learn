@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import "./shadcn.css";
 
 @import "./hljs.css";
 
@@ -252,9 +252,18 @@ html {
   html {
     scroll-behavior: auto;
   }
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
-/* Small, subtle scrollbars everywhere */
 * {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in oklab, var(--foreground) 25%, transparent)
@@ -556,7 +565,6 @@ main :is(.divide-y > li, .divide-y > div, tbody > tr):hover {
   background-color: color-mix(in oklch, var(--muted) 55%, transparent);
 }
 
-/* One card family: hand-rolled rounded-xl cards inside pages share Panel's radius and resting shadow. */
 main :is(section, div, article, li, details, form).rounded-xl.bg-card {
   border-radius: var(--radius-2xl);
   box-shadow: 0 1px 2px color-mix(in oklch, var(--foreground) 6%, transparent);

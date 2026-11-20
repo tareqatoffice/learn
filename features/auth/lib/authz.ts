@@ -33,7 +33,6 @@ export function isAdminEmail(email: string | null | undefined): boolean {
 const isUnder = (pathname: string, base: string) =>
   pathname === base || pathname.startsWith(`${base}/`);
 
-/** SEO/metadata files crawlers and browsers fetch without a session. */
 const METADATA_FILE =
   /^\/(?:robots\.txt|sitemap\.xml|manifest\.webmanifest|(?:icon|apple-icon|opengraph-image|twitter-image)(?:[-.][\w.-]*)?)$/;
 
@@ -82,6 +81,15 @@ export async function requireUser(): Promise<SessionUser> {
   if (!status) redirect("/");
   if (status !== "approved") redirect(ACCESS_PATH);
   return user;
+}
+
+export async function approvedRouteUser(): Promise<{ user: SessionUser } | { response: Response }> {
+  const user = await sessionUser();
+  if (!user) return { response: new Response("Sign in first", { status: 401 }) };
+  const status = await cachedStatus(user.userId, user.email);
+  if (!status) return { response: new Response("Sign in first", { status: 401 }) };
+  if (status !== "approved") return { response: new Response("Forbidden", { status: 403 }) };
+  return { user };
 }
 
 export async function requireAdmin(): Promise<SessionUser> {

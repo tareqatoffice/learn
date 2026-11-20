@@ -32,16 +32,13 @@ const START_POINTS = [
   { href: "/ielts", label: "IELTS" },
 ];
 
-/** Opacity steps for the review split on the slab; works in both themes. */
 const SHARE_OPACITY = [1, 0.7, 0.5, 0.35, 0.22];
 const SLAB_FOCUS =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slab-foreground";
-/** Slab-coloured button: the app's primary/secondary variants clash with the slab in one theme or the other. */
 const SLAB_BUTTON = "bg-slab-foreground text-slab hover:bg-slab-foreground/90";
 
 type Share = { slug: string | null; title: string; count: number };
 
-/** Books with reviews due, largest first; everything past the visible steps folds into one "more" entry. */
 function reviewShares(byBook: DashboardData["reviewPile"]["byBook"]): Share[] {
   const books = byBook.filter((b) => b.count > 0).sort((a, b) => b.count - a.count);
   if (books.length <= SHARE_OPACITY.length) return books;

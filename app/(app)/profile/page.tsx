@@ -7,7 +7,7 @@ import { readTimeZone } from "@/features/speaking/timezone";
 
 export const metadata = buildMetadata({
   title: "Profile",
-  description: "Your progress and history across notes, interview questions, graphs, speaking and IELTS.",
+  description: "Your focus time, progress and history across notes, interview questions, graphs, speaking and IELTS.",
   path: "/profile",
 });
 

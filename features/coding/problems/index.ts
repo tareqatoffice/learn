@@ -1,4 +1,3 @@
-// The registry of question groups. You don't need to edit this file.
 import { arrays } from "./arrays/arrays.checks";
 import { asyncFlow } from "./async-flow/async-flow.checks";
 import { caching } from "./caching/caching.checks";

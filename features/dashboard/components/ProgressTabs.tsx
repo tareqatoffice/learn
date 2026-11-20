@@ -13,7 +13,6 @@ export type TrackTab = {
   track: TrackName;
   rows: TabRow[];
   empty: string;
-  /** Sums over `rows`, computed on the server for the tab label. */
   done: number;
   total: number;
 };

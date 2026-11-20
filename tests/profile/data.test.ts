@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectDb } from "@/lib/db";
-import { IeltsBandEntry, IeltsSpeakingAttempt, IeltsStudyLog, IeltsTestAttempt, IeltsWritingAttempt, Note, NoteProgress, QuizSession, SpeakingTake } from "@/models";
+import { FocusSession, IeltsBandEntry, IeltsSpeakingAttempt, IeltsStudyLog, IeltsTestAttempt, IeltsWritingAttempt, Note, NoteProgress, QuizSession, SpeakingTake } from "@/models";
 import { setNodeStatus } from "@/features/progress/graph";
 import { openNote, setNoteRead } from "@/features/progress/notes";
 import { createSession, finishSession, recordResult, type QuizFilter } from "@/features/progress/quiz";
@@ -268,6 +268,23 @@ describe("getProfileData", () => {
       expect(d.ielts.history.find((h) => h.area === "reading")).toMatchObject({ band: 7, done: true, href: expect.stringMatching(/^\/ielts\/test\//) });
       expect(d.activity.slice(-3).map((a) => a.count)).toEqual([1, 1, 1]);
       expect(d.streak).toBe(3);
+    });
+
+    it("sums focus time by area, this week, and lists recent sessions", async () => {
+      const user = newUserId();
+      const base = { userId: user, label: "Closures", path: "/notes/js/closures", area: "notes" };
+      await FocusSession.create({ ...base, runId: "a", startedAt: new Date("2026-11-12T09:00:00Z"), date: "2026-11-12", seconds: 1500, targetMinutes: 25, completed: true });
+      await FocusSession.create({ ...base, runId: "b", startedAt: new Date("2026-11-01T09:00:00Z"), date: "2026-11-01", seconds: 600, label: "Arrays", path: "/coding/arrays", area: "coding" });
+
+      const d = await getProfileData(user, who, "UTC", now);
+      expect(d.focus).toMatchObject({ totalSeconds: 2100, sessions: 2, weekSeconds: 1500 });
+      expect(d.focus.byArea).toEqual([
+        { area: "notes", seconds: 1500, sessions: 1 },
+        { area: "coding", seconds: 600, sessions: 1 },
+      ]);
+      expect(d.focus.history.map((h) => h.label)).toEqual(["Closures", "Arrays"]);
+      expect(d.focus.history[0]).toMatchObject({ completed: true, targetMinutes: 25, date: "2026-11-12" });
+      expect(d.activity.at(-1)?.count).toBe(1);
     });
   });
 });

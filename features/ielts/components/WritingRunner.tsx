@@ -11,12 +11,13 @@ import { Button } from "@/components/ui/button";
 import type { WritingView } from "@/features/ielts/writing/attempts";
 import { MAX_TEXT_CHARS, MIN_WORDS, TASK_LIMIT_SEC, wordCount } from "@/features/ielts/writing/bands";
 import { rovingIndex, timeWarning } from "@/features/ielts/lib/a11y";
+import { clock as mmss } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const SAVE_DELAY_MS = 1500;
 const RETRY_MS = 5000;
 const TIME_SAVE_MS = 30_000;
-const clock = (s: number) => `${Math.floor(Math.abs(s) / 60)}:${String(Math.abs(s) % 60).padStart(2, "0")}`;
+const clock = (s: number) => mmss(Math.abs(s));
 
 export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrls: string[] }) {
   const router = useRouter();

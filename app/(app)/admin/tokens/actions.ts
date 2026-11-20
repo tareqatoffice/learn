@@ -12,7 +12,7 @@ export async function createTokenAction(
   const user = await adminContext();
   const label = typeof name === "string" ? name.trim() : "";
   if (!label) return fail({ name: "Give the token a name" });
-  const scope = options?.scope ?? "write";
+  const scope = options?.scope ?? "read";
   if (!TOKEN_SCOPES.includes(scope)) return fail({ scope: "Choose read only or read and import" });
   const lifetimeDays = options?.lifetimeDays ?? null;
   if (!TOKEN_LIFETIMES.includes(lifetimeDays)) return fail({ lifetimeDays: "Choose when the token expires" });

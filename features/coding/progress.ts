@@ -7,7 +7,6 @@ type ResultDoc = { group: string; question: string; checks: CheckRow[] };
 
 export type QuestionResult = { question: string; checks: CheckRow[] };
 
-/** The user's last results, for every group or just one. */
 export async function getCodingProgress(userId: string, group?: string): Promise<CodingProgress> {
   await connectDb();
   const docs = await CodingResult.find({ userId, ...(group ? { group } : {}) }, { group: 1, question: 1, checks: 1 }).lean<
@@ -20,10 +19,6 @@ export async function getCodingProgress(userId: string, group?: string): Promise
   return progress;
 }
 
-/**
- * Replaces the last results of the given questions, in one write. Only real
- * groups and questions are stored, so each user has at most one row per question.
- */
 export async function saveCodingResults(userId: string, group: string, results: QuestionResult[]): Promise<boolean> {
   const known = codingGroup(group)?.questions;
   if (!known || !results.every((result) => known.includes(result.question))) return false;

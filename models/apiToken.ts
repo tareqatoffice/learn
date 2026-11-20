@@ -10,7 +10,7 @@ const apiTokenSchema = new Schema(
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     lastUsedAt: Date,
     revokedAt: Date,
-    scope: { type: String, enum: TOKEN_SCOPES, default: "write" },
+    scope: { type: String, enum: TOKEN_SCOPES, default: "read" },
     expiresAt: Date,
   },
   { timestamps: true },

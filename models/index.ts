@@ -38,3 +38,4 @@ export { IeltsWritingPrompt } from "./ieltsWritingPrompt";
 export { IeltsTestAttempt } from "./ieltsTestAttempt";
 export { IeltsWritingAttempt } from "./ieltsWritingAttempt";
 export { CodingResult } from "./codingResult";
+export { FocusSession } from "./focusSession";

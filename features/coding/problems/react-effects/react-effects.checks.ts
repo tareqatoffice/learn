@@ -188,7 +188,6 @@ export const reactEffects: Group = {
         check("Calls the latest callback without restarting", async () => {
           const seen: number[] = [];
           const hook = await mountHook((n: number) => useInterval(() => seen.push(n), 60), 1);
-          // Re-render faster than the delay: a restarted timer would never fire.
           for (let i = 2; i < 12; i++) await hook.rerender(i);
           await hook.rerender(12);
           for (let i = 13; i < 30; i++) await hook.rerender(i);

@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils";
 const R = 26;
 const C = 2 * Math.PI * R;
 
-/** Circular progress with its content centred. Draws in once on load (see `.ring-fill`). */
 export function ProgressRing({
   value,
   max,
@@ -18,11 +17,8 @@ export function ProgressRing({
   value: number;
   max: number;
   track: TrackName;
-  /** Finished: the arc turns "done" green regardless of the numbers. */
   done?: boolean;
-  /** Outer size in px. */
   size?: number;
-  /** Arc thickness in viewBox units (the ring is 64 wide). */
   stroke?: number;
   className?: string;
   children?: React.ReactNode;

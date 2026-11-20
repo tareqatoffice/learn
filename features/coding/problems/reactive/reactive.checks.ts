@@ -140,7 +140,6 @@ export const reactive: Group = {
               throw new Error("x");
             });
           } catch {
-            // expected
           }
           return seen;
         }, [1, 2]),

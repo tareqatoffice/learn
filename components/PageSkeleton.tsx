@@ -33,7 +33,6 @@ function ChipRow({ count = 4 }: { count?: number }) {
   );
 }
 
-/** Matches PageHeader: a spine, a title line and an optional description line, with room for actions on the right. */
 function HeaderSkeleton({
   titleWidth = "w-56",
   description = true,
