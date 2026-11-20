@@ -1,4 +1,5 @@
 import { containerClass } from "@/components/AppHeader";
+import { BottomNav } from "@/components/BottomNav";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ConfirmHost } from "@/components/ConfirmDialog";
 import { TopBar } from "@/components/TopBar";
@@ -20,7 +21,8 @@ export default async function AppLayout({
       <TopBar
         user={{ name: user.name, image: user.image, isAdmin: user.isAdmin }}
       />
-      <main id="main" tabIndex={-1} className={cn(containerClass, "min-w-0 flex-1 py-6 focus:outline-none")}>{children}</main>
+      <main id="main" tabIndex={-1} className={cn(containerClass, "min-w-0 flex-1 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))] focus:outline-none md:pb-6")}>{children}</main>
+      <BottomNav isAdmin={user.isAdmin} />
       <CommandPalette />
       <Toaster />
       <ConfirmHost />

@@ -6,11 +6,9 @@ export const containerClass = "mx-auto w-full min-w-0 max-w-[75rem] px-4 sm:px-6
 export function AppHeader({
   logoHref,
   children,
-  below,
 }: {
   logoHref?: string;
   children: React.ReactNode;
-  below?: React.ReactNode;
 }) {
   const logoClass = "mr-3 py-2 text-lg font-bold tracking-tight";
   return (
@@ -31,7 +29,6 @@ export function AppHeader({
         )}
         {children}
       </div>
-      {below}
     </header>
   );
 }
