@@ -71,7 +71,7 @@ type Exercise = {
 };
 ```
 
-Images come from **free-exercise-db** (github.com/yuhonas/free-exercise-db, public domain / Unlicense): pick the bodyweight subset, copy start/end JPGs into `public/exercise/<id>/0.jpg` and `1.jpg` (resized, small). Served statically. The player alternates the two frames every ~0.8s (CSS/JS), respecting `prefers-reduced-motion` (show frame 0 only). *My call:* static `public/` files instead of R2, because `lib/r2.ts` is presigned/private and these are small public assets.
+Images come from **free-exercise-db** (github.com/yuhonas/free-exercise-db, public domain / Unlicense): pick the bodyweight subset, copy start/end JPGs into `public/assets/exercise/<id>/0.jpg` and `1.jpg` (resized, small). Served statically. The player alternates the two frames every ~0.8s (CSS/JS), respecting `prefers-reduced-motion` (show frame 0 only). *My call:* static `public/` files instead of R2, because `lib/r2.ts` is presigned/private and these are small public assets.
 
 ### Goal and safety (code)
 
@@ -98,7 +98,7 @@ Images come from **free-exercise-db** (github.com/yuhonas/free-exercise-db, publ
 ### Data (models)
 
 - `ExerciseProfile` (one active per user, see calls): heightCm, birthYear, sex, level, workoutDays (weekday numbers 0–6), minutesPerSession, startWeightKg, goalWeightKg, startDate, targetDate, status active/ended.
-- `ExercisePlanWeek`: userId, weekStart, days `[{ date, focus, minutes, items: [{ exerciseId, sets, reps?, seconds?, restSec }] }]`, source `ai | code`, coachNote. Unique (userId, weekStart). Weeks are created lazily (current + next), so a changed goal only rewrites future weeks.
+- `ExercisePlanWeek`: userId, weekStart, days `[{ date, focus, minutes, items: [{ exerciseId, sets, reps?, seconds?, restSec }] }]`, source `ai | code`, coachNote. Unique (userId, weekStart). Weeks are created lazily (current week only, so the AI sees last week's real results), so a changed goal only rewrites future weeks.
 - `WorkoutSession`: userId, date, weekStart, status in-progress/done/abandoned, per item `{ exerciseId, setsDone, skipped, feel?: easy|ok|hard }`, startedAt, finishedAt.
 - `WeightEntry`: userId, date, kg. Unique (userId, date); logging again the same day overwrites.
 
@@ -130,7 +130,7 @@ On pace if latest weight (7-day average when ≥3 entries) is within 0.5 kg of t
 
 - Extra setup inputs (height, age, sex, level, days, minutes) for calorie advice and plan sizing.
 - 1 kg/week hard cap, 0.75 warning.
-- Library in code; images from free-exercise-db in `public/exercise/`.
+- Library in code; images from free-exercise-db in `public/assets/exercise/`.
 - Weekly AI fill rather than daily, to keep AI cost low for all users.
 - Units: kg and cm only for v1.
 - **Goal history:** `ExerciseProfile` is one *active* per user (partial unique index on `userId` where `status: "active"`), not one ever. Changing start/goal weight or target date ends the current profile and starts a new one (old weights and sessions stay, tagged with `profileId`); chart goal line starts at the new profile's start. Changing only schedule fields (days, minutes, level) edits in place and rewrites future weeks.
