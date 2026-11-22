@@ -39,11 +39,16 @@ export async function ExerciseHome() {
         title="Exercise"
         track="exercise"
         actions={
-          profile && (
-            <Link href="/exercise/setup" className={buttonVariants({ variant: "outline", size: "sm" })}>
-              Edit goal
+          <>
+            <Link href="/exercise/library" className={buttonVariants({ variant: "outline", size: "sm" })}>
+              Exercise library
             </Link>
-          )
+            {profile && (
+              <Link href="/exercise/setup" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                Edit goal
+              </Link>
+            )}
+          </>
         }
       />
     </>
