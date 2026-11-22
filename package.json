@@ -13,6 +13,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "seed:dev": "tsx scripts/seed-dev.ts",
+    "exercise:images": "tsx scripts/exercise-images.ts",
     "content": "tsx scripts/content.ts",
     "coding:groups": "tsx scripts/coding-groups.ts",
     "backup": "tsx scripts/backup.ts",
