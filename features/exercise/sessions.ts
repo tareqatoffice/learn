@@ -1,6 +1,6 @@
 import { connectDb, retryOnDuplicateKey } from "@/lib/db";
 import { WorkoutSession } from "@/models";
-import type { Feel } from "@/models/exerciseConstants";
+import { FEELS, type Feel } from "@/models/exerciseConstants";
 import { addDays } from "@/features/speaking/schedule";
 import { getActiveProfile } from "./profile";
 import type { PlanDay } from "./plan";
@@ -53,6 +53,8 @@ export async function saveSet(
   index: number,
   action: "done" | "skip" | "back",
 ): Promise<SessionView> {
+  if (!Number.isInteger(index) || index < 0) throw new Error("No such exercise in this session.");
+  if (action !== "done" && action !== "skip" && action !== "back") throw new Error("Unknown set action.");
   await connectDb();
   const session = await WorkoutSession.findOne({ userId, date });
   if (!session) throw new Error("No session started for that day.");
@@ -67,20 +69,33 @@ export async function saveSet(
     item.setsDone = Math.max(0, item.setsDone - 1);
     item.skipped = false;
   }
+  // Once every exercise is finished or skipped the workout counts as done, without waiting for the Finish tap.
+  if (plan && plan.items.every((p, i) => session.items[i]?.skipped || (session.items[i]?.setsDone ?? 0) >= p.sets)) {
+    session.status = "done";
+    session.finishedAt = new Date();
+  }
   await session.save();
   return toView(session.toObject() as SessionView);
 }
 
+/** Records how each exercise felt. Moves an in-progress session to done; on a done session it only updates feels. */
 export async function finishSession(userId: string, date: string, feels: Record<string, Feel>): Promise<SessionView> {
   await connectDb();
   const session = await WorkoutSession.findOne({ userId, date });
   if (!session) throw new Error("No session started for that day.");
+  if (session.status === "abandoned") return toView(session.toObject() as SessionView);
+  const known = new Set(session.items.map((i: { exerciseId: string }) => i.exerciseId));
+  for (const [id, feel] of Object.entries(feels)) {
+    if (!known.has(id) || !FEELS.includes(feel)) throw new Error("Invalid feedback for this workout.");
+  }
   for (const item of session.items) {
     const feel = feels[item.exerciseId];
     if (feel) item.feel = feel;
   }
-  session.status = "done";
-  session.finishedAt = new Date();
+  if (session.status === "inProgress") {
+    session.status = "done";
+    session.finishedAt = new Date();
+  }
   await session.save();
   return toView(session.toObject() as SessionView);
 }
@@ -97,11 +112,12 @@ export function resumePoint(s: SessionView, plan: PlanDay): { item: number; set:
 export async function weekSummary(userId: string, weekStart: string): Promise<{ done: number; planned: number }> {
   await connectDb();
   const end = addDays(weekStart, 6);
-  const [done, profile] = await Promise.all([
-    WorkoutSession.countDocuments({ userId, status: "done", date: { $gte: weekStart, $lte: end } }),
-    getActiveProfile(userId),
-  ]);
-  return { done, planned: profile ? (await plannedDates(userId, profile, weekStart, end)).length : 0 };
+  const profile = await getActiveProfile(userId);
+  if (!profile) return { done: 0, planned: 0 };
+  const planned = await plannedDates(userId, profile, weekStart, end);
+  // Only planned dates count, so done never exceeds planned (e.g. after a mid-week goal replacement).
+  const done = await WorkoutSession.countDocuments({ userId, status: "done", date: { $in: planned } });
+  return { done, planned: planned.length };
 }
 
 export async function streak(userId: string, today: string): Promise<number> {

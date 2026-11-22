@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   activityFactor, addMonths, ageFrom, bmr, calorieAdvice, goalLine, goalReached,
-  paceCheck, paceStatus, safeTargetDate, weeklyPace, weeksBetween, type GoalShape,
+  paceCheck, paceLabel, paceStatus, safeTargetDate, weeklyPace, weeksBetween, type GoalShape,
 } from "@/features/exercise/goal";
 
 const g: GoalShape = { startDate: "2026-01-01", targetDate: "2026-04-11", startWeightKg: 90, goalWeightKg: 80 }; // 100 days
@@ -76,6 +76,17 @@ describe("goal line and status", () => {
     const gain: GoalShape = { ...g, startWeightKg: 60, goalWeightKg: 70 };
     expect(paceStatus(gain, [{ date: today, kg: 66 }], today).status).toBe("ahead");
     expect(paceStatus(gain, [{ date: today, kg: 64 }], today).status).toBe("behind");
+  });
+  it("keep-fit goal reports above/below the goal, not ahead/behind", () => {
+    const keep: GoalShape = { ...g, startWeightKg: 80, goalWeightKg: 80 };
+    const at = (kg: number) => paceStatus(keep, [{ date: today, kg }], today);
+    expect(at(81.2)).toMatchObject({ status: "above", gapKg: 1.2, keep: true });
+    expect(paceLabel(at(81.2))).toBe("1.2 kg above goal");
+    expect(at(78.5)).toMatchObject({ status: "below", gapKg: 1.5 });
+    expect(paceLabel(at(78.5))).toBe("1.5 kg below goal");
+    expect(at(80.4).status).toBe("onPace");
+    expect(paceLabel(at(80.4))).toBe("On target");
+    expect(paceLabel(paceStatus(g, [{ date: today, kg: 85 }], today))).toBe("On pace");
   });
   it("goalReached", () => {
     expect(goalReached(g, 80)).toBe(true);

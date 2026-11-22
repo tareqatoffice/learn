@@ -33,10 +33,10 @@ describe("weights", () => {
     if (!res.ok) expect(res.errors._).toBeTruthy();
   });
 
-  it("rejects 0, -1, 401, NaN and a future date", async () => {
+  it("rejects 0, -1, 29, 301, NaN and a future date", async () => {
     const userId = newUserId();
     await saveProfile(userId, profile, "2026-11-02");
-    for (const kg of [0, -1, 401, Number.NaN]) {
+    for (const kg of [0, -1, 29, 301, Number.NaN]) {
       expect((await logWeight(userId, "2026-11-02", kg, "2026-11-02")).ok).toBe(false);
     }
     expect((await logWeight(userId, "2026-11-03", 80, "2026-11-02")).ok).toBe(false);

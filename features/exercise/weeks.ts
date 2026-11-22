@@ -37,7 +37,7 @@ async function lastWeekOf(userId: string, p: ProfileView, weekStart: string) {
   const sessions = await WorkoutSession.find({ userId, date: { $gte: from, $lte: to } }).lean<
     { status: string; items: LastWeekResult[] }[]
   >();
-  const planned = scheduledDates(p, from, to).length;
+  const planned = (await plannedDates(userId, p, from, to)).length;
   const done = sessions.filter((s) => s.status === "done").length;
   return {
     finishedRatio: planned ? done / planned : 0,

@@ -115,8 +115,22 @@ describe("validateDay", () => {
     expect(validateDay(day, [...good, ...good.slice(0, 2)])).toBeNull();
     expect(validateDay(day, "nope")).toBeNull();
   });
+  it("rejects items whose fields do not match the exercise mode", () => {
+    const withReps = good.findIndex((i) => i.reps !== undefined);
+    const withSeconds = good.findIndex((i) => i.seconds !== undefined);
+    const swap = (idx: number, item: object) => good.map((g, n) => (n === idx ? { ...g, ...item } : g));
+    if (withReps >= 0) {
+      expect(validateDay(day, swap(withReps, { seconds: 30 }))).toBeNull(); // reps move given reps and seconds
+      expect(validateDay(day, good.map((g, n) => (n === withReps ? { ...g, reps: undefined, seconds: 30 } : g)))).toBeNull(); // seconds only
+    }
+    if (withSeconds >= 0) {
+      expect(validateDay(day, swap(withSeconds, { reps: 12 }))).toBeNull(); // time move given both
+      expect(validateDay(day, good.map((g, n) => (n === withSeconds ? { ...g, seconds: undefined, reps: 12 } : g)))).toBeNull(); // reps only
+    }
+    expect(withReps >= 0 || withSeconds >= 0).toBe(true);
+  });
   it("rejects a day longer than the time budget", () => {
-    const long = good.map((i) => ({ ...i, sets: 4, restSec: 180, reps: 30, seconds: 60 }));
+    const long = good.map((i) => (i.seconds !== undefined ? { ...i, sets: 4, restSec: 180, seconds: 60 } : { ...i, sets: 4, restSec: 180, reps: 30 }));
     expect(validateDay({ ...day, minutes: 5 }, long)).toBeNull();
   });
 });

@@ -14,10 +14,11 @@ import { finishIfDone, getActiveProfile, lastEndedProfile } from "@/features/exe
 import { doneDates, streak as streakOf } from "@/features/exercise/sessions";
 import { ensureWeek, plannedDates } from "@/features/exercise/weeks";
 import { listWeights } from "@/features/exercise/weights";
+import { stripDays } from "../lib/strip";
 import { CoachNote } from "./CoachNote";
 import { GoalCard } from "./GoalCard";
 import { PlanFinished } from "./PlanFinished";
-import { WeekStrip, type StripDay } from "./WeekStrip";
+import { WeekStrip } from "./WeekStrip";
 import { WeightPanel, type WeightPoint } from "./WeightPanel";
 
 const RECENT_WEIGHTS = 5;
@@ -88,18 +89,7 @@ export async function ExerciseHome() {
     pace,
   });
 
-  const plan = new Map((week?.days ?? []).map((d) => [d.date, d]));
-  const doneSet = new Set(done);
-  const plannedSet = new Set(planned);
-  const strip: StripDay[] = Array.from({ length: 7 }, (_, i) => {
-    const date = addDays(weekStart, i);
-    const day = plan.get(date);
-    return {
-      date,
-      done: doneSet.has(date),
-      ...(plannedSet.has(date) ? { workout: { focus: day?.focus ?? "workout", minutes: day?.minutes ?? profile.minutesPerSession } } : {}),
-    };
-  });
+  const strip = stripDays({ weekStart, plan: week?.days ?? [], planned, done, defaultMinutes: profile.minutesPerSession });
 
   const dates = [...new Set([profile.startDate, ...weights.map((w) => w.date), profile.targetDate])].sort();
   const byDate = new Map(weights.map((w) => [w.date, w.kg]));

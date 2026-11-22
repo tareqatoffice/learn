@@ -9,6 +9,7 @@ import { TASKS, TASK_LABEL, TASK_SLUG } from "@/features/speaking/tasks";
 import { pageTitleBase } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { Panel } from "@/components/Panel";
+import { paceLabel } from "@/features/exercise/goal";
 import { focusRing, trackVar } from "@/components/track";
 import { Ring, SplitBar } from "./parts";
 import { ProgressTabs, type TrackTab } from "./ProgressTabs";
@@ -376,9 +377,7 @@ export function Dashboard({
                 <p className="text-sm text-muted-foreground">
                   {[
                     dash.exercise.lastKg !== undefined ? `${dash.exercise.lastKg} kg` : null,
-                    dash.exercise.status === "onPace"
-                      ? "On pace"
-                      : `${dash.exercise.gapKg} kg ${dash.exercise.status === "ahead" ? "ahead" : "behind"}`,
+                    paceLabel(dash.exercise),
                     dash.exercise.streak > 0 ? `${dash.exercise.streak} in a row` : null,
                   ]
                     .filter(Boolean)

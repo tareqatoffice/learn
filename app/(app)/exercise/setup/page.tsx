@@ -3,6 +3,8 @@ import { requireUser } from "@/features/auth/lib/authz";
 import { SetupForm } from "@/features/exercise/components/SetupForm";
 import { addMonths } from "@/features/exercise/goal";
 import { type ProfileInput, getActiveProfile, lastEndedProfile } from "@/features/exercise/profile";
+import { TimeZoneCookie } from "@/features/speaking/components/TimeZoneCookie";
+import { readTimeZone } from "@/features/speaking/timezone";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
 
@@ -39,6 +41,7 @@ export default async function ExerciseSetupPage() {
 
   return (
     <div className="grid w-full max-w-2xl gap-6">
+      <TimeZoneCookie current={await readTimeZone()} />
       <PageHeader
         title={active ? "Edit your goal" : "Set your goal"}
         track="exercise"

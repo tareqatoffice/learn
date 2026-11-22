@@ -4,7 +4,7 @@ import { filterUnder, visibleNodeFilter, visibleNoteFilter, visibleQuestionFilte
 import { readyNext as readyIn } from "@/features/graph/layout";
 import { Graph, GraphNode, Note, NodeProgress, NoteProgress, NoteSeries, Question, QuestionBook, QuestionProgress, QuizSession } from "@/models";
 import { getActiveProfile } from "@/features/exercise/profile";
-import { paceStatus } from "@/features/exercise/goal";
+import { type PaceStatus, paceStatus } from "@/features/exercise/goal";
 import { weekStartOf } from "@/features/exercise/plan";
 import { streak, weekSummary } from "@/features/exercise/sessions";
 import { listWeights } from "@/features/exercise/weights";
@@ -26,7 +26,7 @@ export type Dashboard = {
   series: { slug: string; title: string; read: number; total: number }[];
   recentQuizzes: { id: string; label: string; got: number; review: number; finished: boolean; date: string }[];
   ielts?: { daysLeft: number; testDay: TestDayStatus; done: number; total: number };
-  exercise?: { done: number; planned: number; lastKg?: number; status: "onPace" | "ahead" | "behind"; gapKg: number; streak: number };
+  exercise?: { done: number; planned: number; lastKg?: number; status: PaceStatus["status"]; keep?: true; gapKg: number; streak: number };
 };
 
 const READY_NEXT_MAX = 3;
@@ -164,9 +164,9 @@ async function exerciseCard(userId: string, timeZone: string, now: Date): Promis
     listWeights(userId, profile.id),
     streak(userId, today),
   ]);
-  const { status, gapKg } = paceStatus(profile, weights, today);
+  const { status, gapKg, keep } = paceStatus(profile, weights, today);
   const last = weights.at(-1);
-  return { done: week.done, planned: week.planned, ...(last ? { lastKg: last.kg } : {}), status, gapKg, streak: run };
+  return { done: week.done, planned: week.planned, ...(last ? { lastKg: last.kg } : {}), status, ...(keep ? { keep } : {}), gapKg, streak: run };
 }
 
 export async function getDashboard(userId: string, timeZone = "UTC", now = new Date()): Promise<Dashboard> {

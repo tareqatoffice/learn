@@ -11,8 +11,8 @@ export async function logWeight(
   kg: number,
   today: string,
 ): Promise<ActionResult<{ date: string; kg: number }>> {
-  if (!Number.isFinite(kg) || kg <= 0 || kg > 400) return fail({ kg: "Enter a weight between 0 and 400 kg." });
-  if (!DATE.test(date) || date > today) return fail({ date: "Pick today or an earlier day." });
+  if (!Number.isFinite(kg) || kg < 30 || kg > 300) return fail({ kg: "Weight must be between 30 and 300 kg." });
+  if (typeof date !== "string" || !DATE.test(date) || date > today) return fail({ date: "Pick today or an earlier day." });
   const profile = await getActiveProfile(userId);
   if (!profile) return fail("Set a goal before logging your weight.");
   await retryOnDuplicateKey(() =>
@@ -28,6 +28,7 @@ export async function listWeights(userId: string, profileId: string): Promise<{ 
 }
 
 export async function deleteWeight(userId: string, date: string): Promise<ActionResult> {
+  if (typeof date !== "string" || !DATE.test(date)) return fail({ date: "Pick a valid day." });
   await connectDb();
   await WeightEntry.deleteOne({ userId, date });
   return ok();

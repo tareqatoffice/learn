@@ -73,11 +73,26 @@ export function goalLine(g: GoalShape, date: string): number {
   return g.startWeightKg + (g.goalWeightKg - g.startWeightKg) * t;
 }
 
+export type PaceStatus = {
+  status: "onPace" | "ahead" | "behind" | "above" | "below";
+  currentKg: number;
+  gapKg: number;
+  /** Keep-fit goal (start equals goal): "above"/"below" the goal replace "ahead"/"behind". */
+  keep?: true;
+};
+
+export function paceLabel(s: Pick<PaceStatus, "status" | "gapKg" | "keep">): string {
+  if (s.status === "onPace") return s.keep ? "On target" : "On pace";
+  if (s.status === "ahead") return `Ahead by ${s.gapKg} kg`;
+  if (s.status === "behind") return `Behind by ${s.gapKg} kg`;
+  return `${s.gapKg} kg ${s.status} goal`;
+}
+
 export function paceStatus(
   g: GoalShape,
   weights: { date: string; kg: number }[],
   today: string,
-): { status: "onPace" | "ahead" | "behind"; currentKg: number; gapKg: number } {
+): PaceStatus {
   const from = addDays(today, -6);
   const recent = weights.filter((w) => w.date >= from && w.date <= today);
   let currentKg = g.startWeightKg;
@@ -89,7 +104,9 @@ export function paceStatus(
   const diff = currentKg - goalLine(g, today);
   const dir = Math.sign(g.goalWeightKg - g.startWeightKg);
   const gapKg = Math.round(Math.abs(diff) * 10) / 10;
-  if (Math.abs(diff) <= 0.5 + EPS) return { status: "onPace", currentKg, gapKg };
+  const keep = dir === 0;
+  if (Math.abs(diff) <= 0.5 + EPS) return { status: "onPace", currentKg, gapKg, ...(keep ? { keep: true as const } : {}) };
+  if (keep) return { status: diff > 0 ? "above" : "below", currentKg, gapKg, keep: true };
   return { status: diff * dir > 0 ? "ahead" : "behind", currentKg, gapKg };
 }
 

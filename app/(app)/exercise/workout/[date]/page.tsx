@@ -10,7 +10,7 @@ import { formatTarget } from "@/features/exercise/lib/format";
 import { workoutPageMode } from "@/features/exercise/lib/pageMode";
 import { exerciseById } from "@/features/exercise/library";
 import { getSession, resumePoint, startSession } from "@/features/exercise/sessions";
-import { dayPlan } from "@/features/exercise/weeks";
+import { dayPlan, ensureWeek } from "@/features/exercise/weeks";
 import { localDate } from "@/features/speaking/schedule";
 import { readTimeZone } from "@/features/speaking/timezone";
 import { connectDb } from "@/lib/db";
@@ -47,6 +47,8 @@ export default async function WorkoutPage({ params }: { params: Promise<{ date: 
   const user = await requireUser();
   await connectDb();
   const today = localDate(new Date(), await readTimeZone());
+  // A direct link on the first visit of a new week: make sure this week's plan exists first.
+  if (date === today) await ensureWeek(user.userId, today);
   const [plan, existing] = await Promise.all([dayPlan(user.userId, date), getSession(user.userId, date)]);
   const mode = workoutPageMode(date, today, plan, existing);
 

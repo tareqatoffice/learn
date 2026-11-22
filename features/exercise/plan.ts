@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { addDays } from "@/features/speaking/schedule";
 import type { Focus, Level } from "@/models/exerciseConstants";
-import { allowedFor } from "./library";
+import { allowedFor, exerciseById } from "./library";
 
 export type PlanItem = { exerciseId: string; sets: number; reps?: number; seconds?: number; restSec: number };
 export type SkeletonDay = {
@@ -187,6 +187,10 @@ export function validateDay(day: SkeletonDay, items: unknown): PlanItem[] | null
   if (list.length < Math.max(1, day.slots - 1) || list.length > day.slots + 1) return null;
   const allowed = new Set(allowedFor(day.focus, day.maxDifficulty).map((e) => e.id));
   if (!list.every((i) => allowed.has(i.exerciseId))) return null;
+  // Reps-mode moves take reps only, time-mode moves take seconds only.
+  const fitsMode = (i: PlanItem) =>
+    exerciseById(i.exerciseId)?.mode === "time" ? i.seconds !== undefined && i.reps === undefined : i.reps !== undefined && i.seconds === undefined;
+  if (!list.every(fitsMode)) return null;
   const total = list.reduce((sum, i) => sum + itemSeconds(i), 0);
   if (total > day.minutes * 60 * 1.1) return null;
   return list;

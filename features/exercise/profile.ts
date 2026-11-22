@@ -14,6 +14,7 @@ import {
   weeklyPace,
   weeksBetween,
 } from "./goal";
+import { addDays } from "@/features/speaking/schedule";
 import { weekStartOf } from "./plan";
 
 export type ProfileInput = {
@@ -64,9 +65,20 @@ const normalDays = (days: number[]) => [...new Set(days)].sort((a, b) => a - b);
 export function previewGoal(
   input: ProfileInput,
   today: string,
+  active?: GoalShape | null,
 ): { targetDate: string; pace: number; check: "ok" | "warn" | "block"; safeTargetDate?: string; kcal: number } {
-  const targetDate = addMonths(today, input.months);
-  const pace = weeklyPace(input.startWeightKg, input.goalWeightKg, weeksBetween(today, targetDate));
+  // A schedule-only edit keeps the active goal's dates (see saveProfile), so preview those.
+  const kept =
+    active &&
+    active.startWeightKg === input.startWeightKg &&
+    active.goalWeightKg === input.goalWeightKg &&
+    active.targetDate === addMonths(active.startDate, input.months)
+      ? active
+      : null;
+  const targetDate = kept ? kept.targetDate : addMonths(today, input.months);
+  const pace = kept
+    ? weeklyPace(kept.startWeightKg, kept.goalWeightKg, weeksBetween(kept.startDate, kept.targetDate))
+    : weeklyPace(input.startWeightKg, input.goalWeightKg, weeksBetween(today, targetDate));
   const check = paceCheck(pace);
   const kcal = calorieAdvice({
     kg: input.startWeightKg,
@@ -185,8 +197,11 @@ export async function finishIfDone(userId: string, today: string): Promise<{ fin
   if (today > profile.targetDate) {
     reason = "target";
   } else {
-    const weights = await WeightEntry.find({ userId, profileId: profile.id }).select("date kg").lean<{ date: string; kg: number }[]>();
-    if (goalReached(profile, paceStatus(profile, weights, today).currentKg)) reason = "goal";
+    const recent = await WeightEntry.find({ userId, profileId: profile.id, date: { $gte: addDays(today, -6), $lte: today } })
+      .select("kg")
+      .lean<{ kg: number }[]>();
+    // One reading is noise: the goal counts as reached on a 7-day average of at least 3 entries.
+    if (recent.length >= 3 && goalReached(profile, recent.reduce((sum, w) => sum + w.kg, 0) / recent.length)) reason = "goal";
   }
   if (!reason) return { finished: false };
   await ExerciseProfile.updateOne({ _id: profile.id, status: "active" }, { $set: { status: "ended", endedReason: "finished" } });

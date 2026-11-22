@@ -58,4 +58,29 @@ describe("exercise actions", () => {
     expect(fast?.safeTargetDate).toBeTruthy();
     expect(await actions.previewGoalAction(input({ months: Number.NaN }))).toBeNull();
   });
+
+  it("workout actions reject a past or non-string date, a bad action and bad feels", async () => {
+    session.userId = id();
+    const todayUtc = new Date().toISOString().slice(0, 10);
+    await expect(actions.saveSetAction("2020-01-01", 0, "done")).rejects.toThrow();
+    await expect(actions.saveSetAction({ $ne: "" } as never, 0, "done")).rejects.toThrow();
+    await expect(actions.saveSetAction(todayUtc, 0, "finish" as never)).rejects.toThrow();
+    await expect(actions.saveSetAction(todayUtc, -1, "done")).rejects.toThrow();
+    await expect(actions.finishSessionAction("2020-01-01", {})).rejects.toThrow();
+    await expect(actions.finishSessionAction(todayUtc, { a: "great" as never })).rejects.toThrow();
+  });
+
+  it("weight actions reject a non-string date before any query", async () => {
+    session.userId = id();
+    expect((await actions.logWeightAction({ $gt: "" } as never, 80)).ok).toBe(false);
+    expect((await actions.deleteWeightAction({ $gt: "" } as never)).ok).toBe(false);
+  });
+
+  it("previewGoalAction keeps the active target date for a schedule-only edit", async () => {
+    session.userId = id();
+    const saved = await actions.saveProfileAction(input());
+    if (!saved.ok) throw new Error("save failed");
+    const preview = await actions.previewGoalAction(input({ workoutDays: [2, 4] }));
+    expect(preview?.targetDate).toBe(saved.targetDate);
+  });
 });

@@ -40,9 +40,13 @@ export async function deleteUser(id: string): Promise<Result> {
   try {
     await deleteAllTakes(id);
     await deleteAllIeltsData(id);
-    await deleteAllExerciseData(id);
   } catch {
     return { ok: false, errors: { _: "Couldn't delete the user's recordings from storage. Nothing else was removed; try again." } };
+  }
+  try {
+    await deleteAllExerciseData(id);
+  } catch {
+    return { ok: false, errors: { _: "Couldn't delete the user's exercise data. Nothing else was removed; try again." } };
   }
   await Promise.all(
     [QuestionProgress, QuizSession, NodeProgress, NoteProgress, AiConversation, AiUsage, SpeakingUsage, SpeakingProfile, SpeakingDay, CodingResult, FocusSession].map((M) =>
