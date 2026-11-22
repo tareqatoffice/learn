@@ -4,7 +4,7 @@ import { connectDb } from "@/lib/db";
 import { ExercisePlanWeek, ExerciseProfile, WorkoutSession } from "@/models";
 import { getActiveProfile, saveProfile, type ProfileInput } from "@/features/exercise/profile";
 import { dayPlan, ensureWeek, plannedDates } from "@/features/exercise/weeks";
-import { finishSession, resumePoint, saveSet, startSession, streak, weekSummary } from "@/features/exercise/sessions";
+import { doneDates, finishSession, resumePoint, saveSet, startSession, streak, weekSummary } from "@/features/exercise/sessions";
 import { resetDb } from "../setup/mongo";
 import { newUserId } from "../progress/seed";
 
@@ -134,5 +134,13 @@ describe("workout sessions", () => {
     const dates = await plannedDates(userId, profile, "2026-11-02", "2026-11-08");
     expect(dates).toEqual(["2026-11-02", "2026-11-04", "2026-11-06"]);
     for (const d of dates) expect(await dayPlan(userId, d)).not.toBeNull();
+  });
+
+  it("doneDates lists only finished sessions inside the range", async () => {
+    const userId = await setup();
+    await complete(userId, "2026-11-02");
+    await startSession(userId, "2026-11-04");
+    expect(await doneDates(userId, "2026-11-02", "2026-11-08")).toEqual(["2026-11-02"]);
+    expect(await doneDates(userId, "2026-11-03", "2026-11-08")).toEqual([]);
   });
 });

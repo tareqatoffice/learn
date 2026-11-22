@@ -113,3 +113,11 @@ export async function streak(userId: string, today: string): Promise<number> {
   }
   return count;
 }
+
+export async function doneDates(userId: string, from: string, to: string): Promise<string[]> {
+  await connectDb();
+  const rows = await WorkoutSession.find({ userId, status: "done", date: { $gte: from, $lte: to } })
+    .select("date")
+    .lean<{ date: string }[]>();
+  return rows.map((r) => r.date);
+}
