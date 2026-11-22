@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Result } from "@/features/admin/service";
 import { BLOCK_REASON_MAX } from "@/features/auth/lib/access-limits";
 import { isAdminEmail } from "@/features/auth/lib/authz";
+import { deleteAllExerciseData } from "@/features/exercise/data";
 import { deleteAllIeltsData } from "@/features/ielts/data";
 import {
   AiConversation,
@@ -39,6 +40,7 @@ export async function deleteUser(id: string): Promise<Result> {
   try {
     await deleteAllTakes(id);
     await deleteAllIeltsData(id);
+    await deleteAllExerciseData(id);
   } catch {
     return { ok: false, errors: { _: "Couldn't delete the user's recordings from storage. Nothing else was removed; try again." } };
   }

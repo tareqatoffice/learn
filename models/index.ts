@@ -39,3 +39,7 @@ export { IeltsTestAttempt } from "./ieltsTestAttempt";
 export { IeltsWritingAttempt } from "./ieltsWritingAttempt";
 export { CodingResult } from "./codingResult";
 export { FocusSession } from "./focusSession";
+export { ExerciseProfile } from "./exerciseProfile";
+export { ExercisePlanWeek } from "./exercisePlanWeek";
+export { WorkoutSession } from "./workoutSession";
+export { WeightEntry } from "./weightEntry";
