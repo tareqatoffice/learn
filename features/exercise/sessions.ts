@@ -23,6 +23,13 @@ const toView = (s: SessionView): SessionView => ({
   })),
 });
 
+/** The day's session if one exists; never creates one. */
+export async function getSession(userId: string, date: string): Promise<SessionView | null> {
+  await connectDb();
+  const doc = await WorkoutSession.findOne({ userId, date }).lean<SessionView>();
+  return doc ? toView(doc) : null;
+}
+
 export async function startSession(userId: string, date: string): Promise<SessionView | null> {
   await connectDb();
   const existing = await WorkoutSession.findOne({ userId, date }).lean<SessionView>();
