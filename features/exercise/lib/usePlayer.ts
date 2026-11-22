@@ -1,33 +1,58 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import type { PlanDay } from "../plan";
 
-export type PlayerState = { phase: "work" | "rest" | "summary"; item: number; set: number; remaining: number };
+export type PlayerState = {
+  phase: "work" | "rest" | "summary";
+  item: number;
+  set: number;
+  remaining: number;
+  /** Per item, mirroring the saved session: sets done and whether it was skipped. */
+  done: number[];
+  skipped: boolean[];
+};
 export type PlayerEvent =
   | { type: "done" | "skip" | "back" | "tick" | "skipRest" }
   | { type: "addRest"; sec: number };
 export type SetSave = { index: number; action: "done" | "skip" | "back" };
+export type PlayerStart = { item: number; set: number; items?: { setsDone: number; skipped: boolean }[] };
 
-type Position = { item: number; set: number };
+type Progress = Pick<PlayerState, "done" | "skipped">;
 
-/** A work state at `at`; a timed item starts its clock. */
-function workAt(plan: PlanDay, at: Position): PlayerState {
-  const item = plan.items[at.item];
-  if (!item) return { phase: "summary", item: plan.items.length, set: 0, remaining: 0 };
-  return { phase: "work", item: at.item, set: at.set, remaining: item.seconds ?? 0 };
-}
-
-/** The set before `at`, or null at the very start. */
-function previous(plan: PlanDay, at: Position): Position | null {
-  if (at.set > 0) return { item: at.item, set: at.set - 1 };
-  if (at.item > 0) return { item: at.item - 1, set: plan.items[at.item - 1].sets - 1 };
+/** The first item still to do and its next set, exactly as `resumePoint` finds it from the saved state. */
+function resume(plan: PlanDay, p: Progress): { item: number; set: number } | null {
+  for (let i = 0; i < plan.items.length; i++) {
+    if (!p.skipped[i] && p.done[i] < plan.items[i].sets) return { item: i, set: p.done[i] };
+  }
   return null;
 }
 
+/** A work state at the resume point (or the summary); a timed item starts its clock. */
+function workFrom(plan: PlanDay, p: Progress): PlayerState {
+  const at = resume(plan, p);
+  if (!at) return { phase: "summary", item: plan.items.length, set: 0, remaining: 0, ...p };
+  return { phase: "work", ...at, remaining: plan.items[at.item].seconds ?? 0, ...p };
+}
+
+export function initialPlayerState(plan: PlanDay, start: PlayerStart): PlayerState {
+  const done = plan.items.map((it, i) =>
+    start.items ? (start.items[i]?.setsDone ?? 0) : i < start.item ? it.sets : i === start.item ? start.set : 0,
+  );
+  const skipped = plan.items.map((_, i) => start.items?.[i]?.skipped ?? false);
+  return workFrom(plan, { done, skipped });
+}
+
+/** Back applies to this item: the current one after its first set, else the one before. */
+function backTarget(s: PlayerState): number | null {
+  if (s.phase === "summary") return null;
+  if (s.set > 0) return s.item;
+  return s.item > 0 ? s.item - 1 : null;
+}
+
 function completeSet(plan: PlanDay, s: PlayerState): PlayerState {
-  const item = plan.items[s.item];
-  const next: Position = s.set + 1 < item.sets ? { item: s.item, set: s.set + 1 } : { item: s.item + 1, set: 0 };
-  if (next.item >= plan.items.length) return workAt(plan, next);
-  return { phase: "rest", ...next, remaining: item.restSec };
+  const done = s.done.map((n, i) => (i === s.item ? Math.min(plan.items[i].sets, n + 1) : n));
+  const next = workFrom(plan, { done, skipped: s.skipped });
+  if (next.phase === "summary") return next;
+  return { ...next, phase: "rest", remaining: plan.items[s.item].restSec };
 }
 
 export function playerReducer(plan: PlanDay, s: PlayerState, e: PlayerEvent): PlayerState {
@@ -36,17 +61,27 @@ export function playerReducer(plan: PlanDay, s: PlayerState, e: PlayerEvent): Pl
     case "done":
       return s.phase === "work" ? completeSet(plan, s) : s;
     case "skip":
-      return s.phase === "work" ? workAt(plan, { item: s.item + 1, set: 0 }) : s;
+      return s.phase === "work"
+        ? workFrom(plan, { done: s.done, skipped: s.skipped.map((k, i) => k || i === s.item) })
+        : s;
     case "back": {
-      const prev = previous(plan, s);
-      return prev ? workAt(plan, prev) : s;
+      const target = backTarget(s);
+      if (target === null) return s;
+      return workFrom(plan, {
+        done: s.done.map((n, i) => (i === target ? Math.max(0, n - 1) : n)),
+        skipped: s.skipped.map((k, i) => k && i !== target),
+      });
     }
     case "skipRest":
-      return s.phase === "rest" ? workAt(plan, s) : s;
+      return s.phase === "rest" ? { ...s, phase: "work", remaining: plan.items[s.item].seconds ?? 0 } : s;
     case "addRest":
       return s.phase === "rest" ? { ...s, remaining: s.remaining + e.sec } : s;
     case "tick":
-      if (s.phase === "rest") return s.remaining <= 1 ? workAt(plan, s) : { ...s, remaining: s.remaining - 1 };
+      if (s.phase === "rest") {
+        return s.remaining <= 1
+          ? { ...s, phase: "work", remaining: plan.items[s.item].seconds ?? 0 }
+          : { ...s, remaining: s.remaining - 1 };
+      }
       if (!plan.items[s.item].seconds) return s;
       return s.remaining <= 1 ? completeSet(plan, s) : { ...s, remaining: s.remaining - 1 };
   }
@@ -60,19 +95,19 @@ export function saveFor(plan: PlanDay, s: PlayerState, e: PlayerEvent): SetSave 
     if (e.type === "tick" && plan.items[s.item].seconds && s.remaining <= 1) return { index: s.item, action: "done" };
   }
   if (e.type === "back") {
-    const prev = previous(plan, s);
-    return prev ? { index: prev.item, action: "back" } : null;
+    const target = backTarget(s);
+    return target === null ? null : { index: target, action: "back" };
   }
   return null;
 }
 
 export function usePlayer(
   plan: PlanDay,
-  start: Position,
+  start: PlayerStart,
   onSave?: (save: SetSave) => void,
 ): PlayerState & { dispatch(e: PlayerEvent): void } {
   const [state, apply] = useReducer((s: PlayerState, e: PlayerEvent) => playerReducer(plan, s, e), start, (st) =>
-    workAt(plan, st),
+    initialPlayerState(plan, st),
   );
   const current = useRef(state);
 

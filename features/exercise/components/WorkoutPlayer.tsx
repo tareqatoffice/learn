@@ -5,7 +5,7 @@ import { finishSessionAction, saveSetAction } from "@/app/(app)/exercise/actions
 import { Button } from "@/components/ui/button";
 import type { Feel } from "@/models/exerciseConstants";
 import { formatTarget } from "../lib/format";
-import { usePlayer, type SetSave } from "../lib/usePlayer";
+import { usePlayer, type PlayerStart, type SetSave } from "../lib/usePlayer";
 import { exerciseById } from "../library";
 import type { PlanDay } from "../plan";
 import { ExerciseFrames } from "./ExerciseFrames";
@@ -53,7 +53,7 @@ export function WorkoutPlayer({
   date: string;
   plan: PlanDay;
   /** The first set still to do; an item index past the end opens the summary. */
-  start: { item: number; set: number };
+  start: PlayerStart;
 }) {
   const onSave = useCallback((save: SetSave) => void persist(date, save), [date]);
   const player = usePlayer(plan, start, onSave);

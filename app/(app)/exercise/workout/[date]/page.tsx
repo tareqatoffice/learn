@@ -94,7 +94,7 @@ export default async function WorkoutPage({ params }: { params: Promise<{ date: 
   const at = resumePoint(session, plan) ?? { item: plan.items.length, set: 0 };
   return (
     <div className="mx-auto w-full max-w-md">
-      <WorkoutPlayer date={date} plan={plan} start={at} />
+      <WorkoutPlayer date={date} plan={plan} start={{ ...at, items: session.items }} />
     </div>
   );
 }
