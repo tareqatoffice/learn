@@ -85,3 +85,22 @@ export async function dayPlan(userId: string, date: string): Promise<PlanDay | n
   if (!week) return null;
   return toView(week).days.find((d) => d.date === date) ?? null;
 }
+
+/** Workout dates in [from, to]: a week's stored plan when it exists, else the profile's current schedule. */
+export async function plannedDates(userId: string, profile: ProfileView, from: string, to: string): Promise<string[]> {
+  await connectDb();
+  const first = weekStartOf(from);
+  const weekStarts: string[] = [];
+  for (let w = first; w <= to; w = addDays(w, 7)) weekStarts.push(w);
+  const stored = await ExercisePlanWeek.find({ userId, profileId: profile.id, weekStart: { $in: weekStarts } })
+    .select("weekStart days.date")
+    .lean<{ weekStart: string; days: { date: string }[] }[]>();
+  const byWeek = new Map(stored.map((w) => [w.weekStart, w.days.map((d) => d.date)]));
+  const dates = new Set<string>();
+  for (const w of weekStarts) {
+    for (const d of byWeek.get(w) ?? scheduledDates(profile, w, addDays(w, 6))) {
+      if (d >= from && d <= to) dates.add(d);
+    }
+  }
+  return [...dates].sort();
+}

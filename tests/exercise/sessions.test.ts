@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectDb } from "@/lib/db";
 import { ExercisePlanWeek, ExerciseProfile, WorkoutSession } from "@/models";
-import { saveProfile, type ProfileInput } from "@/features/exercise/profile";
-import { dayPlan, ensureWeek } from "@/features/exercise/weeks";
+import { getActiveProfile, saveProfile, type ProfileInput } from "@/features/exercise/profile";
+import { dayPlan, ensureWeek, plannedDates } from "@/features/exercise/weeks";
 import { finishSession, resumePoint, saveSet, startSession, streak, weekSummary } from "@/features/exercise/sessions";
 import { resetDb } from "../setup/mongo";
 import { newUserId } from "../progress/seed";
@@ -119,5 +119,20 @@ describe("workout sessions", () => {
     await complete(userId, "2026-11-02");
     await complete(userId, "2026-11-16");
     expect(await streak(userId, "2026-11-16")).toBe(1);
+  });
+
+  it("changing workoutDays mid-week keeps earlier sessions in the streak and the week summary consistent", async () => {
+    const userId = await setup();
+    await complete(userId, "2026-11-02");
+    await complete(userId, "2026-11-04");
+    await saveProfile(userId, input({ workoutDays: [2, 4] }), "2026-11-04");
+    expect(await streak(userId, "2026-11-04")).toBe(2);
+    const summary = await weekSummary(userId, "2026-11-02");
+    expect(summary).toEqual({ done: 2, planned: 3 });
+    expect(summary.done).toBeLessThanOrEqual(summary.planned);
+    const profile = (await getActiveProfile(userId))!;
+    const dates = await plannedDates(userId, profile, "2026-11-02", "2026-11-08");
+    expect(dates).toEqual(["2026-11-02", "2026-11-04", "2026-11-06"]);
+    for (const d of dates) expect(await dayPlan(userId, d)).not.toBeNull();
   });
 });

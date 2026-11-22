@@ -3,8 +3,8 @@ import { WorkoutSession } from "@/models";
 import type { Feel } from "@/models/exerciseConstants";
 import { addDays } from "@/features/speaking/schedule";
 import { getActiveProfile } from "./profile";
-import { type PlanDay, scheduledDates } from "./plan";
-import { dayPlan } from "./weeks";
+import type { PlanDay } from "./plan";
+import { dayPlan, plannedDates } from "./weeks";
 
 export type SessionView = {
   date: string;
@@ -94,13 +94,13 @@ export async function weekSummary(userId: string, weekStart: string): Promise<{ 
     WorkoutSession.countDocuments({ userId, status: "done", date: { $gte: weekStart, $lte: end } }),
     getActiveProfile(userId),
   ]);
-  return { done, planned: profile ? scheduledDates(profile, weekStart, end).length : 0 };
+  return { done, planned: profile ? (await plannedDates(userId, profile, weekStart, end)).length : 0 };
 }
 
 export async function streak(userId: string, today: string): Promise<number> {
   const profile = await getActiveProfile(userId);
   if (!profile) return 0;
-  const dates = scheduledDates(profile, profile.startDate, today);
+  const dates = await plannedDates(userId, profile, profile.startDate, today);
   if (!dates.length) return 0;
   const rows = await WorkoutSession.find({ userId, status: "done", date: { $gte: dates[0], $lte: today } })
     .select("date")
