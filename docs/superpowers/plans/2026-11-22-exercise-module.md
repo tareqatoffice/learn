@@ -14,7 +14,9 @@
 
 - Follow CLAUDE.md layering: logic in `features/exercise/`, UI in `features/exercise/components/`, pages + `actions.ts` in `app/(app)/exercise/`, models in `models/` exported from `@/models`; models never import `features/`. Tests under `tests/exercise/` (component tests in `tests/components/exercise/`).
 - Read `node_modules/next/dist/docs/` before writing page/route code (Next 16 breaking changes).
-- Dates are local `YYYY-MM-DD` strings; use `localDate`, `addDays` from `@/features/speaking/schedule` and `readTimeZone` from `@/features/speaking/timezone`. Week starts Monday.
+- Dates are local `YYYY-MM-DD` strings; use `localDate`, `addDays` from `@/features/speaking/schedule` and `readTimeZone` from `@/features/speaking/timezone`. Week starts Monday. Pages and actions both compute today as `localDate(new Date(), await readTimeZone())`; services take `today` as a parameter and never read the clock.
+- Exercise images live under `public/assets/exercise/<id>/0.jpg|1.jpg` (served at `/assets/exercise/...`), never under `public/exercise/`, which would collide with the `/exercise` app routes.
+- "Scheduled workout dates" (week strip missed days, streak, week summary) come from the profile (`workoutDays` between `startDate` and `targetDate`) via `scheduledDates`, never from which plan-week docs exist, so weeks the user never opened still count as missed.
 - Units: kg and cm only.
 - Pace caps: |pace| > 1 kg/week blocks save; > 0.75 kg/week warns.
 - Calorie floor: 1,200 kcal female, 1,500 kcal male and "prefer not to say".
@@ -27,7 +29,7 @@
 
 ## Review Focus
 
-1. **Day boundary across time zones** — "today" (week strip, workout page, weight log) must use the user's time zone, not UTC. Test in Task 6: `ensureWeeks` with a 23:30 UTC time in UTC+6 uses the local date's week.
+1. **Day boundary across time zones** — "today" (week strip, workout page, weight log) must use the user's time zone, not UTC. Test in Task 6: `ensureWeek` with a 23:30 UTC time in UTC+6 uses the local date's week.
 2. **Reload mid-workout** — reopening `/exercise/workout/[date]` resumes at the first unfinished set, not from the start. Tests in Task 6 (`resumePoint`) and Task 8 (player starts at given index).
 3. **AI returns junk** — unknown ids, strings for numbers, missing days, prose around JSON: only the bad days fall back, and the week still has every workout day. Test in Task 5.
 4. **Pace with no or few weights** — no entries uses start weight; under 3 entries in 7 days uses the latest; status never throws. Test in Task 2.
@@ -98,17 +100,17 @@
 ### Task 3: Exercise library and images
 
 **Files:**
-- Create: `features/exercise/library.ts`, `scripts/exercise-images.ts`, `public/exercise/<id>/0.jpg`, `1.jpg`, `public/exercise/placeholder.svg`, `public/exercise/README.md`
+- Create: `features/exercise/library.ts`, `scripts/exercise-images.ts`, `public/assets/exercise/<id>/0.jpg`, `1.jpg`, `public/assets/exercise/placeholder.svg`, `public/assets/exercise/README.md`
 - Modify: `package.json` (script `"exercise:images": "tsx scripts/exercise-images.ts"`)
 - Test: `tests/exercise/library.test.ts`
 
 **Interfaces:**
-- Produces: `type Exercise = { id: string; name: string; focus: Focus[]; type: "strength"|"cardio"|"hiit"|"stretch"; difficulty: 1|2|3; mode: "reps"|"time"; equipment: "none"; cues: string[]; frames: [string, string] | null }` (`null` → `/exercise/placeholder.svg`).
+- Produces: `type Exercise = { id: string; name: string; focus: Focus[]; type: "strength"|"cardio"|"hiit"|"stretch"; difficulty: 1|2|3; mode: "reps"|"time"; equipment: "none"; cues: string[]; frames: [string, string] | null }` (`null` → `/assets/exercise/placeholder.svg`).
 - Produces: `EXERCISES: readonly Exercise[]`, `exerciseById(id: string): Exercise | undefined`, `allowedFor(focus: Focus, maxDifficulty: 1|2|3): Exercise[]`, `exerciseImage(e: Exercise, frame: 0|1): string`.
 
 - [ ] **Step 1: Write failing tests:** `"ids are unique kebab-case"`; `"every exercise has 1–3 cues and equipment none"`; `"each focus has at least 3 exercises at difficulty 1"`; `"at least 30 exercises total"`; `"every frames path exists under public/"`.
 - [ ] **Step 2: Run** `npx vitest run tests/exercise/library.test.ts` — Expected: FAIL.
-- [ ] **Step 3: Write `scripts/exercise-images.ts`:** takes the path of a local clone of `yuhonas/free-exercise-db`, reads its exercises JSON, keeps entries with equipment `"body only"` or none, copies start/end images for a chosen id list to `public/exercise/<id>/0.jpg|1.jpg` (resize to ≤ 480 px wide only if `sharp` is already installed), prints a count per focus. Run it once; commit images, not the clone. README states source + Unlicense.
+- [ ] **Step 3: Write `scripts/exercise-images.ts`:** takes the path of a local clone of `yuhonas/free-exercise-db`, reads its exercises JSON, keeps entries with equipment `"body only"` or none, copies start/end images for a chosen id list to `public/assets/exercise/<id>/0.jpg|1.jpg` (resize to ≤ 480 px wide only if `sharp` is already installed), prints a count per focus. Run it once; commit images, not the clone. README states source + Unlicense.
 - [ ] **Step 4: Fill `EXERCISES`** (30–70 moves). Moves with no public-domain photo get `frames: null`. Cues in your own words.
 - [ ] **Step 5: Run** test — Expected: PASS.
 - [ ] **Step 6: Commit** `feat(exercise): add bodyweight exercise library and images`
@@ -128,9 +130,10 @@
   - `type SkeletonInput = { level: Level; workoutDays: number[]; minutesPerSession: number; startDate: string; targetDate: string; direction: "lose"|"gain"|"keep" }`
   - `weekStartOf(date: string): string` (Monday)
   - `weekIndex(startDate: string, weekStart: string): number` (0-based from `weekStartOf(startDate)`)
-  - `skeletonWeek(p: SkeletonInput, weekStart: string, history: { finishedRatio: number }): SkeletonDay[]` — only dates in `[startDate, targetDate]` whose weekday is in `workoutDays`. Focus rotation over the week's workout days in order: `full, lower, upper, cardio, core, full`; if ≥ 3 workout days the last is `stretch`. `"gain"` swaps `cardio` for `full`. Level defaults: beginner sets 2 / rest 45 / maxDifficulty 1; intermediate 3 / 35 / 2; advanced 3 / 25 / 3. `maxDifficulty + 1` (cap 3) when week index ≥ 4 and `finishedRatio ≥ 0.8`. Week index 3, 7, 11… is deload: sets − 1 (min 1) and week-0 volume. `slots = max(3, floor(minutes / 3))`. `reps`/`seconds` from `baseVolume`.
+  - `skeletonWeek(p: SkeletonInput, weekStart: string, history: { finishedRatio: number }): SkeletonDay[]` — only dates in `[startDate, targetDate]` whose weekday is in `workoutDays`. Focus rotation over the week's workout days in order: `full, lower, upper, cardio, core, full`; if ≥ 3 workout days the last is `stretch`. `"gain"` swaps `cardio` for `full`. Level defaults: beginner sets 2 / rest 45 / maxDifficulty 1; intermediate 3 / 35 / 2; advanced 3 / 25 / 3. `maxDifficulty + 1` (cap 3) when week index ≥ 4 and `finishedRatio ≥ 0.8`. Week index 3, 7, 11… is deload: sets − 1 (min 1) and week-0 volume. `reps`/`seconds` from `baseVolume`. Slots are sized from time so they always fit: `perItem = sets × max(reps × 3, seconds) + (sets − 1) × restSec + 30`, `slots = clamp(floor(minutes × 60 / perItem), 3, 12)`.
+  - `scheduledDates(p: Pick<SkeletonInput, "workoutDays"|"startDate"|"targetDate">, from: string, to: string): string[]` — every date in `[max(from, startDate), min(to, targetDate)]` whose weekday is in `workoutDays`, ascending.
   - `baseVolume(level: Level, weekIdx: number): { reps: number; seconds: number }` — beginner 8 / 20, intermediate 12 / 30, advanced 15 / 40; × 1.1 per week compounding, rounded, clamped to reps 5–30 / seconds 15–60.
-  - `fillDay(day: SkeletonDay, seed: string): PlanDay` — `day.slots` picks from `allowedFor(day.focus, day.maxDifficulty)` via seeded shuffle (string hash of `seed`), cycling if too few; reps or seconds by exercise `mode`; then drops items from the end until `validateDay` passes.
+  - `fillDay(day: SkeletonDay, seed: string): PlanDay` — `day.slots` picks from `allowedFor(day.focus, day.maxDifficulty)` via seeded shuffle (string hash of `seed`), cycling if too few; reps or seconds by exercise `mode`; exactly `day.slots` items (which fit by construction).
   - `itemSeconds(i: PlanItem): number` = `sets × (seconds ?? reps × 3) + (sets − 1) × restSec`
   - `validateDay(day: SkeletonDay, items: unknown): PlanItem[] | null` — zod shape + every AI limit in Global Constraints; null when invalid.
 
@@ -138,7 +141,8 @@
   - `workoutDays [1,3,5]` beginner → 3 days, focus `full, lower, stretch`, sets 2.
   - Week index 3 → sets 1 (beginner); week index 4 with `finishedRatio 0.9` → maxDifficulty 2.
   - Days after `targetDate` are left out; a week fully after it → `[]`.
-  - `fillDay` same seed → equal output; other seed → different; output passes `validateDay`.
+  - `fillDay` same seed → equal output; other seed → different; output passes `validateDay` for every level at week index 0 and 12 with minutes 10 and 60 (guards slot/time mismatch).
+  - `scheduledDates({workoutDays:[1,3,5],startDate:"2026-11-25",targetDate:"2026-12-31"}, "2026-11-23", "2026-11-29")` → `["2026-11-25","2026-11-27"]`.
   - `validateDay` → null for unknown id, `reps: 40`, `sets: 0`, `slots + 2` items, total over `minutes × 60 × 1.1`; returns items for a valid list.
 - [ ] **Step 2: Run** `npx vitest run tests/exercise/plan.test.ts` — Expected: FAIL.
 - [ ] **Step 3: Implement** `features/exercise/plan.ts`.
@@ -187,7 +191,7 @@ Behaviour: empty skeleton → `{ days: [], source: "code", coachNote: codeNote(.
   - `startKeepFit(userId: string, today: string): Promise<ActionResult<ProfileView>>` — new profile from `lastEndedProfile` with start = goal = its current kg, months 3.
 - Produces (`weeks.ts`):
   - `type PlanWeekView = { weekStart: string; days: PlanDay[]; source: "ai"|"code"; coachNote: string }`
-  - `ensureWeeks(userId: string, today: string): Promise<{ current: PlanWeekView | null; next: PlanWeekView | null }>` — for the active profile, creates current and next week if missing (unique index + `retryOnDuplicateKey`); `finishedRatio` and `lastWeek` from the previous week's `WorkoutSession`s. No active profile → both null.
+  - `ensureWeek(userId: string, today: string, fetch?: typeof fetch): Promise<PlanWeekView | null>` — for the active profile, creates the **current week only** if missing (unique index + `retryOnDuplicateKey`), so the AI always sees last week's real results (`finishedRatio`, `lastWeek` from the previous week's `WorkoutSession`s). One AI call per user per week at most. No active profile → null. The AI call happens during the home page render; `loading.tsx` covers the wait.
   - `dayPlan(userId: string, date: string): Promise<PlanDay | null>`
 - Produces (`weights.ts`): `logWeight(userId: string, date: string, kg: number, today: string): Promise<ActionResult<{ date: string; kg: number }>>` (reject non-finite, ≤ 0, > 400, `date > today`; upsert by (userId, date), set `profileId` to active); `listWeights(userId: string, profileId: string): Promise<{ date: string; kg: number }[]>` (date asc); `deleteWeight(userId: string, date: string): Promise<ActionResult<null>>`.
 - Produces (`sessions.ts`):
@@ -197,11 +201,14 @@ Behaviour: empty skeleton → `{ days: [], source: "code", coachNote: codeNote(.
   - `finishSession(userId: string, date: string, feels: Record<string, Feel>): Promise<SessionView>`
   - `resumePoint(s: SessionView, plan: PlanDay): { item: number; set: number } | null` (first item not skipped with `setsDone < sets`; null when none)
   - `weekSummary(userId: string, weekStart: string): Promise<{ done: number; planned: number }>`
-  - `streak(userId: string, today: string): Promise<number>` — walk scheduled workout dates from plan weeks backwards from today: today done +1, today not done skipped; each earlier scheduled date with a `done` session +1; stop at the first earlier one without.
+  - `streak(userId: string, today: string): Promise<number>` — walk `scheduledDates(activeProfile, startDate, today)` backwards: today done +1, today not done skipped; each earlier date with a `done` session +1; stop at the first earlier one without (a week never opened counts as missed).
+  - `weekSummary` `planned` = `scheduledDates` count for that week, not plan-week items.
 
 - [ ] **Step 1: Write failing tests** (DB tests; AI off):
   - profile: `"blocks a goal faster than 1 kg/week and suggests a safe date"`; `"warns but saves at 0.8 kg/week"`; `"changing goal weight ends the old profile and keeps its weights"`; `"changing only workoutDays keeps the profile id and rewrites future weeks only"`; `"finishIfDone ends the profile after targetDate"`.
-  - weeks: `"ensureWeeks creates current and next week once"` (two calls → 2 docs); `"uses the local date in UTC+6"` (`localDate(new Date("2026-11-22T23:30:00Z"), "Asia/Dhaka") === "2026-11-23"` → current `weekStart "2026-11-23"`); `"no weeks after the profile ends"`.
+  - weeks: `"ensureWeek creates the current week once"` (two calls → 1 doc); `"uses the local date in UTC+6"` (`localDate(new Date("2026-11-22T23:30:00Z"), "Asia/Dhaka") === "2026-11-23"` → `weekStart "2026-11-23"`); `"no week after the profile ends"`.
+  - sessions: `"streak breaks across a week the user never opened"` (done Mon wk1, no docs wk2, done Mon wk3 → streak 1).
+  - weights: `"logWeight fails with a form message when there is no active profile"`.
   - weights: rejects `0`, `-1`, `401`, `NaN`, tomorrow; `"logging twice on one day overwrites"`.
   - sessions: `"resumes at the first unfinished set after reload"` (2 sets done of 3 → `{ item: 0, set: 2 }`); `"streak counts done workouts in a row; rest days don't break it; a missed one does"`; `"today not done yet does not break the streak"`.
 - [ ] **Step 2: Run** `npx vitest run tests/exercise` — Expected: new files FAIL.
@@ -220,7 +227,7 @@ Behaviour: empty skeleton → `{ days: [], source: "code", coachNote: codeNote(.
 **Interfaces:**
 - Consumes: Task 6 services; `paceStatus`, `calorieAdvice`, `goalLine` (Task 2); `LineChart` (`points`, `series: LineSeries<P>[]`, `yDomain`, `xLabel`, `refLines`, `ariaLabel`; see `features/ielts/components/BandCharts.tsx`).
 - Produces (`actions.ts`, `"use server"`, each starts with `requireUser()` + `connectDb()`, today from `localDate(new Date(), await readTimeZone())`, like `app/(app)/ielts/actions.ts`): `previewGoalAction(input: ProfileInput)`, `saveProfileAction(input: ProfileInput)`, `logWeightAction(date: string, kg: number)`, `deleteWeightAction(date: string)`, `startKeepFitAction()`, `startSessionAction(date: string)`, `saveSetAction(date: string, index: number, action: "done"|"skip"|"back")`, `finishSessionAction(date: string, feels: Record<string, Feel>)`.
-- Home: no active profile and no ended one → redirect `/exercise/setup`. Calls `finishIfDone` then `ensureWeeks`. Just finished / no active but an ended one → `PlanFinished` (result, "New goal" → setup, "Keep fit" → `startKeepFitAction`). Otherwise `GoalCard` (start → goal, target date, "On pace" / "Ahead by X kg" / "Behind by X kg", "≈ N kcal/day (advice)"), `WeightPanel` (LineChart of weights + goal-line series, log input defaulting to today), `WeekStrip` (Mon–Sun; workout days show focus + minutes; done ✓; past without done = "Missed"; today highlighted with Start link `/exercise/workout/<date>`), `CoachNote`, streak count.
+- Home: no active profile and no ended one → redirect `/exercise/setup`. Calls `finishIfDone` then `ensureWeek`; week strip uses `scheduledDates` + sessions for done/missed. Just finished / no active but an ended one → `PlanFinished` (result, "New goal" → setup, "Keep fit" → `startKeepFitAction`). Otherwise `GoalCard` (start → goal, target date, "On pace" / "Ahead by X kg" / "Behind by X kg", "≈ N kcal/day (advice)"), `WeightPanel` (LineChart of weights + goal-line series, log input defaulting to today), `WeekStrip` (Mon–Sun; workout days show focus + minutes; done ✓; past without done = "Missed"; today highlighted with Start link `/exercise/workout/<date>`), `CoachNote`, streak count.
 - Setup form: all `ProfileInput` fields, weekday toggles Mon–Sun, debounced `previewGoalAction` showing target date, pace, warn/block text with safe date, kcal; Save disabled on block; disclaimer verbatim from Global Constraints; prefilled when editing.
 
 - [ ] **Step 1: Write failing tests:**
@@ -244,11 +251,13 @@ Behaviour: empty skeleton → `{ days: [], source: "code", coachNote: codeNote(.
 - Consumes: `dayPlan`, `startSession`, `resumePoint` (Task 6); `saveSetAction`, `finishSessionAction` (Task 7); `exerciseById`, `exerciseImage` (Task 3).
 - Produces: `type PlayerState = { phase: "work"|"rest"|"summary"; item: number; set: number; remaining: number }`, `type PlayerEvent = { type: "done"|"skip"|"back"|"tick"|"skipRest" } | { type: "addRest"; sec: number }`, `playerReducer(plan: PlanDay, s: PlayerState, e: PlayerEvent): PlayerState`, `usePlayer(plan: PlanDay, start: { item: number; set: number }): PlayerState & { dispatch(e: PlayerEvent): void }` (1 s interval while `rest`, or `work` on a timed item; timed work reaching 0 acts as `done`).
 - `ExerciseFrames({ exercise, size })`: swaps frame 0/1 every 800 ms; `prefers-reduced-motion` → frame 0 only; `frames null` → placeholder.
-- Page: `date` is not a planned workout day or is after today → message "No workout planned for this day." + link home. Otherwise `startSession`; done → `WorkoutSummary` read-only; else `WorkoutPlayer` at `resumePoint`.
+- Page: no plan for `date` → "No workout planned for this day." + link home. A done session → `WorkoutSummary` read-only. Only **today** is playable (missed workouts are never made up, per spec); a past date without a done session shows "Missed" + link home; a future date shows the day's list read-only. Today → `startSession`, `WorkoutPlayer` at `resumePoint`.
+- `saveSetAction` index is the item the change applies to: for `back` that crosses into the previous item, the client sends the previous item's index.
 - Player UI (mockup A): header "<Focus> · n of N", frames, name, big "15 reps" or "0:30", "Set 2 of 3", first cue, Back / Done set / Skip, progress bar. `RestScreen`: "Rest", countdown, "Up next: <name> · <reps or seconds>", small frames, "+15s", "Skip rest". Each done/skip/back calls `saveSetAction` (retry once on failure, no blocking). After the last set → `WorkoutSummary` with easy/ok/hard per exercise → `finishSessionAction` → link home. Request `navigator.wakeLock?.request("screen")` while playing; ignore if unsupported.
 
 - [ ] **Step 1: Write failing tests:**
   - `playerReducer`: done on set 1 of 3 → `rest`; `tick` to 0 in rest → `work` set 2; done on last set of last item → `summary`; `back` at set 0 of item 2 → item 1 last set; `addRest 15` adds 15.
+  - page logic (extract `workoutPageMode(date, today, plan, session): "player"|"summary"|"missed"|"preview"|"none"` into `features/exercise/lib/pageMode.ts`, test in `tests/exercise/pageMode.test.ts`): past + no done → `"missed"`; future → `"preview"`; today → `"player"`.
   - `WorkoutPlayer` (jsdom, fake timers): `"starts at the resume point"` (start `{item:1,set:1}` → item 2 name, "Set 2 of 3"); `"timed item counts down and moves to rest at 0"`; `"shows the placeholder when frames are null"`; `"calls saveSetAction on Done set"`.
 - [ ] **Step 2: Run** `npx vitest run tests/components/exercise/WorkoutPlayer.test.tsx tests/exercise/usePlayer.test.ts` — Expected: FAIL.
 - [ ] **Step 3: Implement** reducer/hook, components, page (`generateMetadata` → `buildMetadata` path `/exercise/workout/${date}`).
