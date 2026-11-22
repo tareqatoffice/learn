@@ -1,0 +1,110 @@
+import mongoose from "mongoose";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { connectDb } from "@/lib/db";
+import { ExercisePlanWeek, ExerciseProfile, WeightEntry } from "@/models";
+import { finishIfDone, getActiveProfile, previewGoal, saveProfile, startKeepFit, type ProfileInput } from "@/features/exercise/profile";
+import { ensureWeek } from "@/features/exercise/weeks";
+import { logWeight } from "@/features/exercise/weights";
+import { resetDb } from "../setup/mongo";
+import { newUserId } from "../progress/seed";
+
+const input = (over: Partial<ProfileInput> = {}): ProfileInput => ({
+  heightCm: 175,
+  birthYear: 1990,
+  sex: "male",
+  level: "beginner",
+  workoutDays: [1, 3, 5],
+  minutesPerSession: 30,
+  startWeightKg: 80,
+  goalWeightKg: 72,
+  months: 3,
+  ...over,
+});
+
+describe("exercise profile", () => {
+  beforeAll(async () => {
+    await connectDb();
+    await Promise.all([ExerciseProfile.init(), ExercisePlanWeek.init(), WeightEntry.init()]);
+  });
+  beforeEach(resetDb);
+  afterAll(() => mongoose.disconnect());
+
+  it("blocks a goal faster than 1 kg/week and suggests a safe date", async () => {
+    const userId = newUserId();
+    const res = await saveProfile(userId, input({ goalWeightKg: 60, months: 1 }), "2026-11-02");
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.errors.months).toMatch(/faster than 1 kg a week.*earliest safe date is \d{4}-\d{2}-\d{2}/);
+    expect(await getActiveProfile(userId)).toBeNull();
+    expect(previewGoal(input({ goalWeightKg: 60, months: 1 }), "2026-11-02")).toMatchObject({ check: "block" });
+  });
+
+  it("rejects out-of-range fields with field messages", async () => {
+    const res = await saveProfile(newUserId(), input({ heightCm: 100, workoutDays: [1, 1], minutesPerSession: 5 }), "2026-11-02");
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(Object.keys(res.errors).sort()).toEqual(["heightCm", "minutesPerSession", "workoutDays"]);
+  });
+
+  it("warns but saves at 0.8 kg/week", async () => {
+    const userId = newUserId();
+    const i = input({ goalWeightKg: 76.6, months: 1 });
+    expect(previewGoal(i, "2026-11-02").check).toBe("warn");
+    const res = await saveProfile(userId, i, "2026-11-02");
+    expect(res.ok).toBe(true);
+    expect(await getActiveProfile(userId)).toMatchObject({ startDate: "2026-11-02", targetDate: "2026-12-02", goalWeightKg: 76.6 });
+  });
+
+  it("changing goal weight ends the old profile and keeps its weights", async () => {
+    const userId = newUserId();
+    const first = await saveProfile(userId, input(), "2026-11-02");
+    if (!first.ok) throw new Error("save failed");
+    expect((await logWeight(userId, "2026-11-02", 80, "2026-11-02")).ok).toBe(true);
+    const second = await saveProfile(userId, input({ goalWeightKg: 70 }), "2026-11-03");
+    if (!second.ok) throw new Error("save failed");
+    expect(second.id).not.toBe(first.id);
+    const old = await ExerciseProfile.findById(first.id).lean<{ status: string; endedReason: string }>();
+    expect(old).toMatchObject({ status: "ended", endedReason: "replaced" });
+    expect(await WeightEntry.countDocuments({ userId, profileId: first.id })).toBe(1);
+    expect(await ExerciseProfile.countDocuments({ userId, status: "active" })).toBe(1);
+  });
+
+  it("changing only workoutDays keeps the profile id and rewrites future weeks only", async () => {
+    const userId = newUserId();
+    const first = await saveProfile(userId, input(), "2026-11-02");
+    if (!first.ok) throw new Error("save failed");
+    for (const weekStart of ["2026-11-02", "2026-11-09", "2026-11-16"]) {
+      await ExercisePlanWeek.create({ userId, profileId: first.id, weekStart, days: [], source: "code", coachNote: "" });
+    }
+    const second = await saveProfile(userId, input({ workoutDays: [2, 4] }), "2026-11-04");
+    if (!second.ok) throw new Error("save failed");
+    expect(second.id).toBe(first.id);
+    expect(second.workoutDays).toEqual([2, 4]);
+    const weeks = await ExercisePlanWeek.find({ userId }).sort({ weekStart: 1 }).lean<{ weekStart: string }[]>();
+    expect(weeks.map((w) => w.weekStart)).toEqual(["2026-11-02"]);
+  });
+
+  it("finishIfDone ends the profile after targetDate", async () => {
+    const userId = newUserId();
+    await saveProfile(userId, input({ goalWeightKg: 77, months: 1 }), "2026-11-02");
+    expect(await finishIfDone(userId, "2026-12-02")).toEqual({ finished: false });
+    expect(await finishIfDone(userId, "2026-12-03")).toEqual({ finished: true, reason: "target" });
+    expect(await getActiveProfile(userId)).toBeNull();
+    expect(await ensureWeek(userId, "2026-12-03")).toBeNull();
+  });
+
+  it("finishIfDone ends the profile when the goal weight is reached", async () => {
+    const userId = newUserId();
+    await saveProfile(userId, input(), "2026-11-02");
+    await logWeight(userId, "2026-11-03", 71.5, "2026-11-03");
+    expect(await finishIfDone(userId, "2026-11-03")).toEqual({ finished: true, reason: "goal" });
+  });
+
+  it("startKeepFit continues from the current weight with a 3 month maintenance goal", async () => {
+    const userId = newUserId();
+    await saveProfile(userId, input(), "2026-11-02");
+    await logWeight(userId, "2026-11-03", 71.5, "2026-11-03");
+    await finishIfDone(userId, "2026-11-03");
+    const res = await startKeepFit(userId, "2026-11-04");
+    expect(res.ok).toBe(true);
+    expect(await getActiveProfile(userId)).toMatchObject({ startWeightKg: 71.5, goalWeightKg: 71.5, targetDate: "2027-02-04" });
+  });
+});
