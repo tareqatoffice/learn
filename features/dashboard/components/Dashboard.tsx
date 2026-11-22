@@ -215,7 +215,7 @@ export function Dashboard({
   const nothingToDo =
     dash.reviewPile.total === 0 && !dash.continueReading && dash.readyNext.length === 0;
   const firstVisit =
-    nothingToDo && dash.recentQuizzes.length === 0 && dash.learningNow.length === 0 && speaking.best === 0 && !dash.ielts;
+    nothingToDo && dash.recentQuizzes.length === 0 && dash.learningNow.length === 0 && speaking.best === 0 && !dash.ielts && !dash.exercise;
 
   const tabs = [
     makeTab("graphs", "Graphs", dash.graphs.map((g) => ({ key: g.slug, href: `/graphs/${g.slug}`, label: g.title, value: g.done, max: g.total })), "No graphs published yet."),
@@ -360,6 +360,41 @@ export function Dashboard({
                   Set up a study plan
                 </Link>{" "}
                 from your test date and target band, or practise any skill without one.
+              </p>
+            )}
+          </Panel>
+
+          <Panel title="Exercise" track="exercise">
+            {dash.exercise ? (
+              <div className="grid gap-2">
+                <Link
+                  href="/exercise"
+                  className={cn("rounded-lg font-medium underline-offset-4 hover:underline", focusRing)}
+                >
+                  {dash.exercise.done} of {plural(dash.exercise.planned, "workout")} this week
+                </Link>
+                <p className="text-sm text-muted-foreground">
+                  {[
+                    dash.exercise.lastKg !== undefined ? `${dash.exercise.lastKg} kg` : null,
+                    dash.exercise.status === "onPace"
+                      ? "On pace"
+                      : `${dash.exercise.gapKg} kg ${dash.exercise.status === "ahead" ? "ahead" : "behind"}`,
+                    dash.exercise.streak > 0 ? `${dash.exercise.streak} in a row` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                {dash.exercise.planned > 0 && (
+                  <ProgressBar value={dash.exercise.done} max={dash.exercise.planned} color={trackVar("exercise")} />
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Want a workout plan?{" "}
+                <Link href="/exercise" className="font-medium text-foreground underline">
+                  Set a weight goal
+                </Link>{" "}
+                and get a weekly schedule.
               </p>
             )}
           </Panel>
