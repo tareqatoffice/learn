@@ -48,6 +48,7 @@ const speakingTakeSchema = new Schema(
     lessonId: { type: Schema.Types.ObjectId, ref: "SpeakingLesson" },
     material: { type: materialSchema, default: () => ({}) },
     media: { type: mediaSchema, required: true },
+    clipRate: Number,
     transcript: String,
     transcriptStatus: { type: String, enum: ["none", "pending", "running", "done", "failed", "unavailable"], default: "none" },
     transcribeStartedAt: Date,

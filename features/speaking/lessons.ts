@@ -8,7 +8,7 @@ export type LessonView = {
   id: string;
   title: string;
   order: number;
-  shadow: { audioKey?: string; audioUrl?: string; durationSec?: number; text?: string } | null;
+  shadow: { audioKey?: string; audioUrl?: string; durationSec?: number; text?: string; marks?: number[] } | null;
   passage: string;
   prompt: string;
 };
@@ -17,7 +17,7 @@ type LessonDoc = {
   _id: unknown;
   title: string;
   order: number;
-  shadow?: { audioKey?: string; audioUrl?: string; durationSec?: number; text?: string };
+  shadow?: { audioKey?: string; audioUrl?: string; durationSec?: number; text?: string; marks?: number[] };
   passage?: string;
   prompt?: string;
 };
@@ -25,7 +25,7 @@ type LessonDoc = {
 function toView(doc: LessonDoc): LessonView {
   const s = doc.shadow;
   const shadow = s && (s.audioKey || s.audioUrl || s.text)
-    ? { audioKey: s.audioKey, audioUrl: s.audioUrl, durationSec: s.durationSec, text: s.text }
+    ? { audioKey: s.audioKey, audioUrl: s.audioUrl, durationSec: s.durationSec, text: s.text, marks: s.marks?.length ? [...s.marks] : undefined }
     : null;
   return { id: String(doc._id), title: doc.title, order: doc.order, shadow, passage: doc.passage ?? "", prompt: doc.prompt ?? "" };
 }

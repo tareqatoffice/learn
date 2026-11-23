@@ -68,6 +68,7 @@ export default async function TaskPage({ params }: PageProps<"/speaking/[task]">
       material={material}
       sourceAudioUrl={sourceAudioUrl}
       clipSec={task === "shadowing" ? lesson?.shadow?.durationSec : undefined}
+      clipMarks={task === "shadowing" ? lesson?.shadow?.marks : undefined}
       videoDefault={today.settings.video[task]}
       storage={today.storage}
       aiOn={ai.settings.active}

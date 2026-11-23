@@ -7,6 +7,7 @@ import { sttConfigured } from "@/lib/stt";
 import type { MediaDoc } from "@/features/recording/media";
 import { playbackUrls, prepareUpload, removeMedia, verifyUpload } from "@/features/recording/upload";
 import { takeCapSec } from "./schedule";
+import { isClipRate } from "./shadowText";
 import { TASKS, TASK_LABEL, type TaskKey } from "./tasks";
 
 const MAX_TEXT = 5000;
@@ -30,6 +31,7 @@ export type StartTakeInput = {
   audioMime?: string;
   size: number;
   audioSize?: number;
+  clipRate?: number;
 };
 
 export async function sweepAbandonedTakes(userId: string, now: Date = new Date()): Promise<number> {
@@ -85,7 +87,9 @@ export async function startTake(
       ? await SpeakingLesson.findOne({ _id: input.lessonId, status: "published" }).select("shadow.durationSec").lean<{ _id: Types.ObjectId; shadow?: { durationSec?: number } }>()
       : null;
   const lessonId = lesson ? lesson._id : null;
-  const capSec = takeCapSec(input.task, input.task === "shadowing" ? lesson?.shadow?.durationSec : undefined);
+  const clipRate = input.task === "shadowing" && isClipRate(input.clipRate) && input.clipRate !== 1 ? input.clipRate : undefined;
+  const clipSec = input.task === "shadowing" ? lesson?.shadow?.durationSec : undefined;
+  const capSec = takeCapSec(input.task, clipSec ? clipSec / (clipRate ?? 1) : undefined);
 
   const _id = new Types.ObjectId();
   const takeId = String(_id);
@@ -109,6 +113,7 @@ export async function startTake(
     lessonId,
     material: { title: m.title, text: m.text, prompt: m.prompt, generated: Boolean(m.generated) },
     media,
+    ...(clipRate ? { clipRate } : {}),
   });
 
   return ok({ takeId, uploadUrl, ...(audioUploadUrl ? { audioUploadUrl } : {}), maxBytes, capSec });
@@ -122,6 +127,7 @@ type TakeDoc = {
   lessonId?: Types.ObjectId | null;
   material?: { title?: string; text?: string; prompt?: string; generated?: boolean };
   media: MediaDoc;
+  clipRate?: number;
   deletingAt?: Date;
   transcript?: string;
   transcriptStatus?: string;
@@ -186,6 +192,9 @@ export type TakeView = {
   mediaUrl: string;
   audioUrl?: string;
   sourceAudioUrl?: string;
+  clipRate: number;
+  sourceMarks?: number[];
+  sourceDurationSec?: number;
 };
 
 export async function getTake(userId: string, takeId: string): Promise<TakeView | null> {
@@ -194,10 +203,14 @@ export async function getTake(userId: string, takeId: string): Promise<TakeView 
   const { media } = take;
 
   let sourceAudioUrl: string | undefined;
+  let sourceMarks: number[] | undefined;
+  let sourceDurationSec: number | undefined;
   if (take.task === "shadowing" && take.lessonId) {
     const lesson = await SpeakingLesson.findById(take.lessonId)
       .select("shadow")
-      .lean<{ shadow?: { audioKey?: string; audioUrl?: string } }>();
+      .lean<{ shadow?: { audioKey?: string; audioUrl?: string; marks?: number[]; durationSec?: number; text?: string } }>();
+    if (lesson?.shadow?.text === take.material?.text && lesson?.shadow?.marks?.length) sourceMarks = [...lesson.shadow.marks];
+    sourceDurationSec = lesson?.shadow?.durationSec;
     if (lesson?.shadow?.audioKey) sourceAudioUrl = await presignGet(lesson.shadow.audioKey);
     else if (lesson?.shadow?.audioUrl) sourceAudioUrl = lesson.shadow.audioUrl;
   }
@@ -229,6 +242,9 @@ export async function getTake(userId: string, takeId: string): Promise<TakeView 
     mediaUrl: urls.url,
     audioUrl: urls.audioUrl,
     sourceAudioUrl,
+    clipRate: isClipRate(take.clipRate) ? take.clipRate : 1,
+    ...(sourceMarks ? { sourceMarks } : {}),
+    ...(sourceDurationSec ? { sourceDurationSec } : {}),
   };
 }
 

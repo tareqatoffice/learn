@@ -8,7 +8,7 @@ import type { TaskKey } from "@/features/speaking/tasks";
 import { TASK_LABEL, TASK_SLUG } from "@/features/speaking/tasks";
 
 const HINT = {
-  shadowing: "Play the clip and speak along with it. One pass of the clip is one take.",
+  shadowing: "Practise the clip, then record a take: speak along with it as it plays. One pass of the clip is one take.",
   readAloud: "Read the passage aloud at a steady pace. One reading is one take.",
   recordReview: "Answer the prompt as if someone asked you. One answer is one take.",
 } as const;
@@ -25,6 +25,7 @@ export function SpeakingTask({
   material,
   sourceAudioUrl,
   clipSec,
+  clipMarks,
   videoDefault,
   storage,
   aiOn,
@@ -40,6 +41,7 @@ export function SpeakingTask({
   material: Material | null;
   sourceAudioUrl?: string;
   clipSec?: number;
+  clipMarks?: number[];
   videoDefault: boolean;
   storage: boolean;
   aiOn: boolean;
@@ -84,6 +86,7 @@ export function SpeakingTask({
           material={material}
           sourceAudioUrl={sourceAudioUrl}
           clipSec={clipSec}
+          clipMarks={clipMarks}
           videoDefault={videoDefault}
           storage={storage}
           aiOn={aiOn}

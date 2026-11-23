@@ -121,6 +121,34 @@ describe("speaking takes", () => {
     expect(noLesson.capSec).toBe(600);
   });
 
+  it("startTake stores a slowed shadowing clip rate and stretches the cap; ignores bad or other-task rates", async () => {
+    const lesson = await SpeakingLesson.create({
+      title: "L",
+      order: 1,
+      status: "published",
+      shadow: { durationSec: 90, text: "One. Two.", marks: [0, 4], audioKey: "lessons/x/a.mp3" },
+    });
+    const u = user();
+    const slow = await start(u, { task: "shadowing", lessonId: String(lesson._id), clipRate: 0.5, material: { text: "One. Two.", generated: false } });
+    expect(slow.capSec).toBe(360);
+    expect((await SpeakingTake.findById(slow.takeId).lean<{ clipRate?: number }>())?.clipRate).toBe(0.5);
+
+    const odd = await start(u, { task: "shadowing", lessonId: String(lesson._id), clipRate: 0.3 });
+    expect(odd.capSec).toBe(180);
+    expect((await SpeakingTake.findById(odd.takeId).lean<{ clipRate?: number }>())?.clipRate).toBeUndefined();
+
+    const other = await start(u, { clipRate: 0.5 });
+    expect((await SpeakingTake.findById(other.takeId).lean<{ clipRate?: number }>())?.clipRate).toBeUndefined();
+
+    await confirmTake(u, slow.takeId, 100);
+    const view = await getTake(u, slow.takeId);
+    expect(view).toMatchObject({ clipRate: 0.5, sourceMarks: [0, 4], sourceDurationSec: 90 });
+    await confirmTake(u, odd.takeId, 100);
+    const plain = await getTake(u, odd.takeId);
+    expect(plain?.clipRate).toBe(1);
+    expect(plain?.sourceMarks).toBeUndefined();
+  });
+
   it("startTake refuses a fourth unconfirmed take, but not once older ones count as abandoned (S3)", async () => {
     const u = user();
     for (let i = 0; i < MAX_OPEN_TAKES; i++) await start(u);

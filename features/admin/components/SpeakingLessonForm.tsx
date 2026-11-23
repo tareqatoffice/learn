@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   confirmLessonAudioAction,
   createLessonAction,
@@ -18,6 +18,8 @@ import { MediaPlayer } from "@/components/MediaPlayer";
 import { FileDropzone } from "@/components/ui/FileDropzone";
 import { audioDuration } from "@/features/admin/lib/audioDuration";
 import { putFile, UploadError } from "@/lib/uploadFile";
+import { splitSentences } from "@/features/speaking/shadowText";
+import { clock } from "@/lib/format";
 
 const EMPTY: AdminLesson = {
   id: "",
@@ -29,6 +31,7 @@ const EMPTY: AdminLesson = {
   shadowAudioUrl: "",
   shadowAudioKey: "",
   shadowDurationSec: 0,
+  shadowMarks: [],
   passage: "",
   prompt: "",
 };
@@ -106,6 +109,92 @@ function AudioUpload({
   );
 }
 
+export function SentenceTimer({
+  text,
+  src,
+  marks,
+  onChange,
+  cleared = false,
+}: {
+  text: string;
+  src?: string;
+  marks: number[];
+  onChange: (marks: number[]) => void;
+  cleared?: boolean;
+}) {
+  const audio = useRef<HTMLAudioElement>(null);
+  const sentences = splitSentences(text);
+  const stale = marks.length > sentences.length;
+  const done = !stale && marks.length === sentences.length && sentences.length > 0;
+
+  if (!sentences.length) return null;
+
+  const begin = () => {
+    const el = audio.current;
+    if (!el) return;
+    onChange([]);
+    el.currentTime = 0;
+    void el.play()?.catch(() => {});
+  };
+  const mark = () => {
+    const el = audio.current;
+    if (!el || marks.length >= sentences.length) return;
+    const t = Math.round(el.currentTime * 10) / 10;
+    if (marks.length && t <= marks[marks.length - 1]) return;
+    const next = [...marks, t];
+    onChange(next);
+    if (next.length === sentences.length) el.pause();
+  };
+
+  return (
+    <Field label="Sentence timing (optional)" group>
+      <div className="grid gap-2">
+        <p className="text-xs text-muted-foreground">
+          Learners see each sentence light up as the clip plays. Without timings the app guesses them from sentence length. To
+          set them, press Start, then press Mark each time a new sentence begins (the first one too). Save the lesson after.
+        </p>
+        {!src ? (
+          <p className="text-sm text-muted-foreground">Add the audio first.</p>
+        ) : (
+          <>
+            <audio ref={audio} src={src} controls preload="auto" className="w-full" />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={begin}>
+                Start
+              </Button>
+              <Button type="button" size="sm" onClick={mark} disabled={marks.length >= sentences.length}>
+                Mark sentence {Math.min(marks.length + 1, sentences.length)}
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => onChange([])} disabled={!marks.length}>
+                Clear timings
+              </Button>
+              <span role="status" className="text-sm text-muted-foreground">
+                {stale
+                  ? "The text changed, so these timings no longer fit. Clear them and mark again."
+                  : cleared && !marks.length
+                    ? "The text or audio changed, so the timings were cleared. Mark again, or leave them for the app to guess."
+                    : done
+                    ? `All ${sentences.length} sentences timed.`
+                    : `${marks.length} of ${sentences.length} sentences timed.`}
+              </span>
+            </div>
+          </>
+        )}
+        <ol className="grid gap-1 text-sm">
+          {sentences.map((s, i) => (
+            <li key={i} className="flex gap-3">
+              <span className="w-12 shrink-0 font-mono tabular-nums text-muted-foreground">
+                {marks[i] !== undefined && !stale ? clock(marks[i]) : "—"}
+              </span>
+              <span>{s}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </Field>
+  );
+}
+
 export function SpeakingLessonForm({
   lesson = EMPTY,
   subjects,
@@ -129,16 +218,21 @@ export function SpeakingLessonForm({
     setDurationText(String(lesson.shadowDurationSec));
   }
 
+  const [marksCleared, setMarksCleared] = useState(false);
   const set = <K extends keyof AdminLesson>(key: K, value: AdminLesson[K]) => {
     touch();
-    setDraft((d) => ({ ...d, [key]: value }));
+    const resetsTiming = (key === "shadowText" || key === "shadowAudioUrl") && draft.shadowMarks.length > 0;
+    if (resetsTiming) setMarksCleared(true);
+    else if (key === "shadowMarks") setMarksCleared(false);
+    setDraft((d) => ({ ...d, [key]: value, ...(resetsTiming ? { shadowMarks: [] } : {}) }));
   };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const { id, title, status, subjectIds, shadowText, shadowAudioUrl, passage, prompt } = draft;
     const shadowDurationSec = durationText.trim() === "" ? 0 : Number(durationText);
-    const input = { title, status, subjectIds, shadowText, shadowAudioUrl, shadowDurationSec, passage, prompt };
+    const shadowMarks = draft.shadowMarks.length === splitSentences(shadowText).length ? draft.shadowMarks : [];
+    const input = { title, status, subjectIds, shadowText, shadowAudioUrl, shadowDurationSec, shadowMarks, passage, prompt };
     if (id) run(() => updateLessonAction(id, input));
     else run(() => createLessonAction(input), { refresh: false, onSuccess: (r) => router.push(`/admin/speaking/${r.id}`) });
   };
@@ -177,6 +271,14 @@ export function SpeakingLessonForm({
           />
         </Field>
 
+        <SentenceTimer
+          text={draft.shadowText}
+          src={audioPreviewUrl || draft.shadowAudioUrl || undefined}
+          marks={draft.shadowMarks}
+          onChange={(m) => set("shadowMarks", m)}
+          cleared={marksCleared}
+        />
+
         <Field label="Read-aloud passage" error={errors.passage}>
           <textarea className={inputClass} rows={6} value={draft.passage} onChange={(e) => set("passage", e.target.value)} />
         </Field>
@@ -210,7 +312,10 @@ export function SpeakingLessonForm({
         currentKey={lesson.shadowAudioKey}
         previewUrl={audioPreviewUrl}
         storageReady={storageReady}
-        onConfirmed={(sec) => setDurationText(String(sec))}
+        onConfirmed={(sec) => {
+          setDurationText(String(sec));
+          setDraft((d) => ({ ...d, shadowMarks: [] }));
+        }}
       />
     </div>
   );

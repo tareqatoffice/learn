@@ -26,9 +26,9 @@ export async function startTakeAction(input: StartTakeInput) {
   const userId = await session();
   const valid = shape(takeInput, input);
   if (!valid) return fail(BAD_REQUEST);
-  const { task, lessonId, material, kind, mime, audioMime, size, audioSize } = valid as unknown as StartTakeInput;
+  const { task, lessonId, material, kind, mime, audioMime, size, audioSize, clipRate } = valid as unknown as StartTakeInput;
   const date = localDate(new Date(), await readTimeZone());
-  return startTake(userId, { task, date, lessonId: lessonId ?? null, material, kind, mime, audioMime, size, audioSize });
+  return startTake(userId, { task, date, lessonId: lessonId ?? null, material, kind, mime, audioMime, size, audioSize, clipRate });
 }
 
 export async function confirmTakeAction(takeId: string, durationSec: number): Promise<ActionResult> {

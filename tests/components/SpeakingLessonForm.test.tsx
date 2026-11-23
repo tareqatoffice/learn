@@ -25,6 +25,7 @@ const lesson = {
   shadowAudioUrl: "",
   shadowAudioKey: "",
   shadowDurationSec: 5,
+  shadowMarks: [],
   passage: "",
   prompt: "",
 };
@@ -36,6 +37,22 @@ afterEach(() => {
 });
 
 describe("SpeakingLessonForm", () => {
+  it("clears sentence timings when the shadowing text or audio link changes", async () => {
+    render(
+      <SpeakingLessonForm
+        lesson={{ ...lesson, shadowText: "A. B.", shadowAudioUrl: "https://x.test/a.mp3", shadowMarks: [0, 2] }}
+        subjects={[]}
+        storageReady
+      />,
+    );
+    expect(screen.getByText("All 2 sentences timed.")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Shadowing text/), { target: { value: "A. C." } });
+    expect(screen.getByText(/timings were cleared/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save lesson" }));
+    await waitFor(() => expect(a.updateLessonAction).toHaveBeenCalled());
+    expect((a.updateLessonAction.mock.calls[0] as unknown[])[1]).toMatchObject({ shadowMarks: [] });
+  });
+
   it("keeps the uploaded audio's length so the next save doesn't overwrite it", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true })));
     vi.stubGlobal(
