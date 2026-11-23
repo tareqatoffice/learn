@@ -88,6 +88,34 @@ describe("TaskRecorder", () => {
     expect(recorder.value.start).toHaveBeenCalled();
   });
 
+  it("shows the practice player for shadowing and saves the chosen clip speed with the take", async () => {
+    const user = userEvent.setup();
+    const props = {
+      ...base,
+      task: "shadowing" as const,
+      material: { title: "Lesson 1", text: "Hello there. Bye now.", generated: false },
+      sourceAudioUrl: "https://example.test/clip.mp3",
+      clipSec: 30,
+    };
+    const { rerender } = render(<TaskRecorder {...props} />);
+    expect(screen.getByRole("region", { name: "Practise the clip" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Bye now." })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "0.75×" }));
+    expect(screen.getByText("The clip plays at 0.75× in this take.")).toBeTruthy();
+    await user.click(screen.getByRole("checkbox", { name: /i'm wearing headphones/i }));
+    await user.click(screen.getByRole("button", { name: /start \(plays the clip\)/i }));
+
+    recorder.value = { ...recorder.value, state: "recording" };
+    rerender(<TaskRecorder {...props} />);
+    expect(screen.queryByRole("region", { name: "Practise the clip" })).toBeNull();
+    expect(screen.getByRole("list", { name: "Clip transcript" })).toBeTruthy();
+
+    recorder.value = { ...recorder.value, state: "stopped", result: { blob: new Blob(["x"]), mime: "audio/webm", durationSec: 40 } };
+    rerender(<TaskRecorder {...props} />);
+    await waitFor(() => expect(actions.startTakeAction).toHaveBeenCalled());
+    expect(actions.startTakeAction.mock.calls[0][0]).toMatchObject({ task: "shadowing", clipRate: 0.75 });
+  });
+
   it("does not ask about headphones for read aloud", () => {
     render(<TaskRecorder {...base} task="readAloud" material={{ title: "P", text: "Read me.", generated: false }} />);
     expect(screen.queryByRole("checkbox", { name: /headphones/i })).toBeNull();

@@ -1,0 +1,296 @@
+import mongoose from "mongoose";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { connectDb } from "@/lib/db";
+import { ExercisePlanWeek, ExerciseProfile, WorkoutSession } from "@/models";
+import { getActiveProfile, saveProfile, type ProfileInput } from "@/features/exercise/profile";
+import { dayPlan, ensureWeek, plannedDates } from "@/features/exercise/weeks";
+import { doneDates, finishSession, resumePoint, saveSet, startSession, streak, weekSummary } from "@/features/exercise/sessions";
+import { resetDb } from "../setup/mongo";
+import { newUserId } from "../progress/seed";
+
+const input = (over: Partial<ProfileInput> = {}): ProfileInput => ({
+  heightCm: 175,
+  birthYear: 1990,
+  sex: "male",
+  level: "intermediate",
+  workoutDays: [1, 3, 5],
+  minutesPerSession: 45,
+  startWeightKg: 80,
+  goalWeightKg: 72,
+  months: 3,
+  ...over,
+});
+
+async function setup(over: Partial<ProfileInput> = {}, weeks: string[] = ["2026-11-02"]) {
+  const userId = newUserId();
+  await saveProfile(userId, input(over), "2026-11-02");
+  for (const w of weeks) await ensureWeek(userId, w);
+  return userId;
+}
+
+async function getSessionStatus(userId: string, date: string) {
+  return (await WorkoutSession.findOne({ userId, date }))?.status;
+}
+
+async function complete(userId: string, date: string) {
+  await startSession(userId, date);
+  await saveSet(userId, date, 0, "done");
+  await finishSession(userId, date, {});
+}
+
+describe("workout sessions", () => {
+  beforeAll(async () => {
+    await connectDb();
+    await Promise.all([ExerciseProfile.init(), ExercisePlanWeek.init(), WorkoutSession.init()]);
+  });
+  beforeEach(resetDb);
+  afterAll(() => mongoose.disconnect());
+
+  it("startSession is idempotent and null on a rest day", async () => {
+    const userId = await setup();
+    const a = await startSession(userId, "2026-11-02");
+    await saveSet(userId, "2026-11-02", 0, "done");
+    const b = await startSession(userId, "2026-11-02");
+    expect(a?.items.length).toBeGreaterThan(0);
+    expect(b?.items[0].setsDone).toBe(1);
+    expect(await WorkoutSession.countDocuments({ userId })).toBe(1);
+    expect(await startSession(userId, "2026-11-03")).toBeNull();
+  });
+
+  it("saveSet caps at sets, skips, and goes back", async () => {
+    const userId = await setup();
+    const plan = (await dayPlan(userId, "2026-11-02"))!;
+    await startSession(userId, "2026-11-02");
+    let s = await saveSet(userId, "2026-11-02", 0, "back");
+    expect(s.items[0].setsDone).toBe(0);
+    for (let i = 0; i < plan.items[0].sets + 2; i++) s = await saveSet(userId, "2026-11-02", 0, "done");
+    expect(s.items[0].setsDone).toBe(plan.items[0].sets);
+    s = await saveSet(userId, "2026-11-02", 1, "skip");
+    expect(s.items[1].skipped).toBe(true);
+    s = await saveSet(userId, "2026-11-02", 1, "back");
+    expect(s.items[1].skipped).toBe(false);
+  });
+
+  it("resumes at the first unfinished set after reload", async () => {
+    const userId = await setup();
+    const plan = (await dayPlan(userId, "2026-11-02"))!;
+    expect(plan.items[0].sets).toBe(3);
+    await startSession(userId, "2026-11-02");
+    await saveSet(userId, "2026-11-02", 0, "done");
+    await saveSet(userId, "2026-11-02", 0, "done");
+    const reloaded = (await startSession(userId, "2026-11-02"))!;
+    expect(resumePoint(reloaded, plan)).toEqual({ item: 0, set: 2 });
+    await saveSet(userId, "2026-11-02", 0, "skip");
+    expect(resumePoint((await startSession(userId, "2026-11-02"))!, plan)).toEqual({ item: 1, set: 0 });
+  });
+
+  it("resumePoint is null when everything is done or skipped", () => {
+    const plan = { date: "d", focus: "full" as const, minutes: 30, items: [{ exerciseId: "a", sets: 2, reps: 8, restSec: 30 }, { exerciseId: "b", sets: 2, reps: 8, restSec: 30 }] };
+    const s = { date: "d", status: "inProgress" as const, items: [{ exerciseId: "a", setsDone: 2, skipped: false }, { exerciseId: "b", setsDone: 0, skipped: true }] };
+    expect(resumePoint(s, plan)).toBeNull();
+  });
+
+  it("finishSession stores feels and marks the session done", async () => {
+    const userId = await setup();
+    const s = (await startSession(userId, "2026-11-02"))!;
+    await saveSet(userId, "2026-11-02", 0, "done");
+    const done = await finishSession(userId, "2026-11-02", { [s.items[0].exerciseId]: "hard" });
+    expect(done.status).toBe("done");
+    expect(done.items[0].feel).toBe("hard");
+  });
+
+  it("saving the last set marks the day done and counts in the streak without tapping Finish", async () => {
+    const userId = await setup();
+    const date = "2026-11-02";
+    const plan = (await dayPlan(userId, date))!;
+    await startSession(userId, date);
+    let s!: Awaited<ReturnType<typeof saveSet>>;
+    for (let i = 0; i < plan.items.length; i++) {
+      if (i === plan.items.length - 1) {
+        expect((await WorkoutSession.findOne({ userId, date }))!.status).toBe("inProgress");
+      }
+      for (let n = 0; n < plan.items[i].sets; n++) s = await saveSet(userId, date, i, "done");
+    }
+    expect(s.status).toBe("done");
+    expect(await streak(userId, date)).toBe(1);
+    expect(await doneDates(userId, date, date)).toEqual([date]);
+  });
+
+  it("skipping every exercise with no set done abandons the day and earns no credit", async () => {
+    const userId = await setup();
+    const date = "2026-11-02";
+    const plan = (await dayPlan(userId, date))!;
+    await startSession(userId, date);
+    for (let i = 0; i < plan.items.length - 1; i++) await saveSet(userId, date, i, "skip");
+    expect((await saveSet(userId, date, plan.items.length - 1, "skip")).status).toBe("abandoned");
+    expect(await streak(userId, date)).toBe(0);
+    expect(await doneDates(userId, date, date)).toEqual([]);
+    expect(await weekSummary(userId, "2026-11-02")).toMatchObject({ done: 0 });
+    expect((await finishSession(userId, date, {})).status).toBe("abandoned");
+    expect((await WorkoutSession.findOne({ userId, date }))!.status).toBe("abandoned");
+  });
+
+  it("one set done with the rest skipped completes the day and counts", async () => {
+    const userId = await setup();
+    const date = "2026-11-02";
+    const plan = (await dayPlan(userId, date))!;
+    await startSession(userId, date);
+    await saveSet(userId, date, 0, "done");
+    for (let i = 0; i < plan.items.length; i++) await saveSet(userId, date, i, "skip");
+    expect(await getSessionStatus(userId, date)).toBe("done");
+    expect(await streak(userId, date)).toBe(1);
+    expect(await doneDates(userId, date, date)).toEqual([date]);
+  });
+
+  it("finishSession on a done session only updates feels and keeps finishedAt", async () => {
+    const userId = await setup();
+    const s = (await startSession(userId, "2026-11-02"))!;
+    await saveSet(userId, "2026-11-02", 0, "done");
+    await finishSession(userId, "2026-11-02", {});
+    const before = (await WorkoutSession.findOne({ userId }))!.finishedAt;
+    const again = await finishSession(userId, "2026-11-02", { [s.items[0].exerciseId]: "easy" });
+    expect(again.status).toBe("done");
+    expect(again.items[0].feel).toBe("easy");
+    expect((await WorkoutSession.findOne({ userId }))!.finishedAt).toEqual(before);
+  });
+
+  it("finishSession never touches an abandoned session", async () => {
+    const userId = await setup();
+    const s = (await startSession(userId, "2026-11-02"))!;
+    await WorkoutSession.updateOne({ userId }, { $set: { status: "abandoned" } });
+    const res = await finishSession(userId, "2026-11-02", { [s.items[0].exerciseId]: "hard" });
+    expect(res.status).toBe("abandoned");
+    expect(res.items[0].feel).toBeUndefined();
+    expect((await WorkoutSession.findOne({ userId }))!.status).toBe("abandoned");
+  });
+
+  it("finishSession rejects feels for exercises outside the session or unknown values", async () => {
+    const userId = await setup();
+    const s = (await startSession(userId, "2026-11-02"))!;
+    await expect(finishSession(userId, "2026-11-02", { nope: "easy" })).rejects.toThrow();
+    await expect(finishSession(userId, "2026-11-02", { [s.items[0].exerciseId]: "great" as never })).rejects.toThrow();
+    expect((await WorkoutSession.findOne({ userId }))!.status).toBe("inProgress");
+  });
+
+  it("saveSet rejects a bad index or action", async () => {
+    const userId = await setup();
+    await startSession(userId, "2026-11-02");
+    await expect(saveSet(userId, "2026-11-02", -1, "done")).rejects.toThrow();
+    await expect(saveSet(userId, "2026-11-02", 1.5, "done")).rejects.toThrow();
+    await expect(saveSet(userId, "2026-11-02", 99, "done")).rejects.toThrow();
+    await expect(saveSet(userId, "2026-11-02", 0, "finish" as never)).rejects.toThrow();
+  });
+
+  it("weekSummary never reports more done than planned after a mid-week goal replacement", async () => {
+    const userId = await setup();
+    await complete(userId, "2026-11-02");
+    await complete(userId, "2026-11-04");
+    const replaced = await saveProfile(userId, input({ goalWeightKg: 70, workoutDays: [2, 4] }), "2026-11-04");
+    expect(replaced.ok).toBe(true);
+    const summary = await weekSummary(userId, "2026-11-02");
+    expect(summary.done).toBeLessThanOrEqual(summary.planned);
+  });
+
+  it("weekSummary counts done sessions against scheduled days", async () => {
+    const userId = await setup();
+    await complete(userId, "2026-11-02");
+    expect(await weekSummary(userId, "2026-11-02")).toEqual({ done: 1, planned: 3 });
+  });
+
+  it("streak counts done workouts in a row; rest days don't break it; a missed one does", async () => {
+    const userId = await setup({}, ["2026-11-02", "2026-11-09"]);
+    for (const d of ["2026-11-02", "2026-11-04", "2026-11-09", "2026-11-11"]) await complete(userId, d);
+    expect(await streak(userId, "2026-11-11")).toBe(2);
+    await complete(userId, "2026-11-06");
+    expect(await streak(userId, "2026-11-11")).toBe(5);
+    expect(await streak(userId, "2026-11-12")).toBe(5);
+  });
+
+  it("today not done yet does not break the streak", async () => {
+    const userId = await setup({}, ["2026-11-02", "2026-11-09"]);
+    for (const d of ["2026-11-02", "2026-11-04", "2026-11-06"]) await complete(userId, d);
+    expect(await streak(userId, "2026-11-09")).toBe(3);
+  });
+
+  it("streak breaks across a week the user never opened", async () => {
+    const userId = await setup({ workoutDays: [1] }, ["2026-11-02", "2026-11-16"]);
+    await complete(userId, "2026-11-02");
+    await complete(userId, "2026-11-16");
+    expect(await streak(userId, "2026-11-16")).toBe(1);
+  });
+
+  it("changing workoutDays mid-week keeps earlier sessions in the streak and the week summary consistent", async () => {
+    const userId = await setup();
+    await complete(userId, "2026-11-02");
+    await complete(userId, "2026-11-04");
+    await saveProfile(userId, input({ workoutDays: [2, 4] }), "2026-11-04");
+    expect(await streak(userId, "2026-11-04")).toBe(2);
+    const summary = await weekSummary(userId, "2026-11-02");
+    expect(summary).toEqual({ done: 2, planned: 3 });
+    expect(summary.done).toBeLessThanOrEqual(summary.planned);
+    const profile = (await getActiveProfile(userId))!;
+    const dates = await plannedDates(userId, profile, "2026-11-02", "2026-11-08");
+    expect(dates).toEqual(["2026-11-02", "2026-11-04", "2026-11-06"]);
+    for (const d of dates) expect(await dayPlan(userId, d)).not.toBeNull();
+  });
+
+  it("doneDates lists only finished sessions inside the range", async () => {
+    const userId = await setup();
+    await complete(userId, "2026-11-02");
+    await startSession(userId, "2026-11-04");
+    expect(await doneDates(userId, "2026-11-02", "2026-11-08")).toEqual(["2026-11-02"]);
+    expect(await doneDates(userId, "2026-11-03", "2026-11-08")).toEqual([]);
+  });
+
+  it("finishSession with no set done abandons the session and earns no credit", async () => {
+    const userId = await setup();
+    const date = "2026-11-02";
+    await startSession(userId, date);
+    const res = await finishSession(userId, date, {});
+    expect(res.status).toBe("abandoned");
+    expect(await streak(userId, date)).toBe(0);
+    expect(await doneDates(userId, date, date)).toEqual([]);
+  });
+
+  it("replacing the goal deletes today's in-progress session but keeps a done one", async () => {
+    const userId = await setup();
+    const date = "2026-11-02";
+    await startSession(userId, date);
+    await saveSet(userId, date, 0, "done");
+    const replaced = await saveProfile(userId, input({ goalWeightKg: 70 }), date);
+    expect(replaced.ok).toBe(true);
+    expect(await WorkoutSession.countDocuments({ userId, date })).toBe(0);
+    await ensureWeek(userId, date);
+    const fresh = (await startSession(userId, date))!;
+    expect(fresh.items.every((i) => i.setsDone === 0)).toBe(true);
+    await saveSet(userId, date, 0, "done");
+    expect((await finishSession(userId, date, {})).status).toBe("done");
+
+    const other = await setup();
+    await complete(other, date);
+    await saveProfile(other, input({ goalWeightKg: 70 }), date);
+    expect(await getSessionStatus(other, date)).toBe("done");
+  });
+
+  it("startSession re-seeds an in-progress session whose items no longer match the plan", async () => {
+    const userId = await setup();
+    const date = "2026-11-02";
+    const plan = (await dayPlan(userId, date))!;
+    await startSession(userId, date);
+    await WorkoutSession.updateOne({ userId, date }, { $set: { items: [{ exerciseId: "gone", setsDone: 2, skipped: false }] } });
+    const s = (await startSession(userId, date))!;
+    expect(s.status).toBe("inProgress");
+    expect(s.items.map((i) => i.exerciseId)).toEqual(plan.items.map((i) => i.exerciseId));
+    expect(s.items.every((i) => i.setsDone === 0 && !i.skipped)).toBe(true);
+    await saveSet(userId, date, 0, "done");
+    expect((await finishSession(userId, date, {})).status).toBe("done");
+  });
+
+  it("startSession leaves a done session's own items alone", async () => {
+    const userId = await setup();
+    const date = "2026-11-02";
+    await complete(userId, date);
+    await WorkoutSession.updateOne({ userId, date }, { $set: { "items.0.exerciseId": "old-move" } });
+    expect((await startSession(userId, date))!.items[0].exerciseId).toBe("old-move");
+  });
+});

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="img" aria-label="No photo available">
+  <rect width="480" height="360" fill="#e5e7eb"/>
+  <g fill="none" stroke="#9ca3af" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="240" cy="110" r="26"/>
+    <path d="M240 140v90M240 170l-55 40M240 170l55 40M240 230l-45 70M240 230l45 70"/>
+  </g>
+</svg>

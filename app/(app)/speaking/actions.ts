@@ -10,11 +10,11 @@ import { localDate } from "@/features/speaking/schedule";
 import { saveProfile, setBodyConsent } from "@/features/speaking/settings";
 import { type StartTakeInput, confirmTake, deleteAllTakes, deleteTake, getTake, saveSelfRating, startTake } from "@/features/speaking/takes";
 import { readTimeZone } from "@/features/speaking/timezone";
+import { transcribeTake } from "@/features/speaking/transcribe";
 import { framesInput, objectIdInput, selfRatingInput, shape, takeInput } from "@/lib/actionInput";
 
 const BAD_REQUEST = "That request isn't valid. Reload the page and try again.";
-import { transcribeTake } from "@/features/speaking/transcribe";
-
+const MIDNIGHT_GRACE_MS = 30 * 60 * 1000;
 
 async function session(): Promise<string> {
   const user = await requireUser();
@@ -26,9 +26,14 @@ export async function startTakeAction(input: StartTakeInput) {
   const userId = await session();
   const valid = shape(takeInput, input);
   if (!valid) return fail(BAD_REQUEST);
-  const { task, lessonId, material, kind, mime, audioMime, size, audioSize } = valid as unknown as StartTakeInput;
-  const date = localDate(new Date(), await readTimeZone());
-  return startTake(userId, { task, date, lessonId: lessonId ?? null, material, kind, mime, audioMime, size, audioSize });
+  const { task, lessonId, material, kind, mime, audioMime, size, audioSize, clipRate } = valid as unknown as StartTakeInput;
+  const timeZone = await readTimeZone();
+  const today = localDate(new Date(), timeZone);
+  // A take recorded just before midnight and saved just after still counts for the day it was
+  // recorded; outside that window takes always count for today.
+  const graceDay = localDate(new Date(Date.now() - MIDNIGHT_GRACE_MS), timeZone);
+  const date = valid.date === graceDay ? graceDay : today;
+  return startTake(userId, { task, date, lessonId: lessonId ?? null, material, kind, mime, audioMime, size, audioSize, clipRate });
 }
 
 export async function confirmTakeAction(takeId: string, durationSec: number): Promise<ActionResult> {

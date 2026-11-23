@@ -17,6 +17,7 @@ export const takeInput = recordingInput.extend({
   task: text(30),
   date: text(10).optional(),
   lessonId: objectIdInput.nullable().optional(),
+  clipRate: z.number().finite().optional(),
   material: z
     .object({ title: text(5000).optional(), text: text(5000).optional(), prompt: text(5000).optional(), generated: z.boolean().optional() })
     .optional(),

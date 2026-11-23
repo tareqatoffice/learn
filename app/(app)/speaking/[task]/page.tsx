@@ -5,9 +5,8 @@ import { SpeakingTask } from "@/features/speaking/components/SpeakingTask";
 import { getAiConfig } from "@/features/ai/lib/aiSettings";
 import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
-import { presignGet } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";
-import { lessonHasPart } from "@/features/speaking/lessons";
+import { lessonAudioUrl, lessonHasPart } from "@/features/speaking/lessons";
 import { getToday } from "@/features/speaking/progress";
 import { TASK_LABEL, taskFromSlug } from "@/features/speaking/tasks";
 import { hasTimeZoneCookie, readTimeZone } from "@/features/speaking/timezone";
@@ -46,8 +45,7 @@ export default async function TaskPage({ params }: PageProps<"/speaking/[task]">
   if (lesson) {
     if (task === "shadowing") {
       material = { title: lesson.title, text: lesson.shadow?.text, generated: false };
-      const key = lesson.shadow?.audioKey;
-      sourceAudioUrl = key ? (today.storage ? await presignGet(key) : undefined) : lesson.shadow?.audioUrl;
+      sourceAudioUrl = lesson.shadow ? await lessonAudioUrl(lesson.shadow) : undefined;
     } else if (task === "readAloud") {
       material = { title: lesson.title, text: lesson.passage, generated: false };
     } else {
@@ -68,6 +66,7 @@ export default async function TaskPage({ params }: PageProps<"/speaking/[task]">
       material={material}
       sourceAudioUrl={sourceAudioUrl}
       clipSec={task === "shadowing" ? lesson?.shadow?.durationSec : undefined}
+      clipMarks={task === "shadowing" ? lesson?.shadow?.marks : undefined}
       videoDefault={today.settings.video[task]}
       storage={today.storage}
       aiOn={ai.settings.active}

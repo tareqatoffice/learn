@@ -67,7 +67,7 @@ export function TopBar({ user }: { user: TopBarUser }) {
 				aria-label="Main"
 				className="hidden min-w-0 flex-1 gap-1 self-stretch overflow-x-auto overflow-y-hidden lg:flex"
 			>
-				{NAV_ITEMS.map(({ href, label, icon: Glyph, track }) => {
+				{NAV_ITEMS.filter((i) => i.href !== '/dashboard').map(({ href, label, icon: Glyph, track }) => {
 					const active = isActivePath(pathname, href);
 					return (
 						<div

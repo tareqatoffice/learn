@@ -2,7 +2,7 @@
 
 import { Circle, Square } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { confirmTakeAction, deleteTakeAction, generateMaterialAction, startTakeAction } from "@/app/(app)/speaking/actions";
 import { firstError } from "@/features/admin/result";
 import { confirm } from "@/components/ConfirmDialog";
@@ -13,7 +13,10 @@ import { type RecorderResult, useRecorder } from "@/features/recording/lib/useRe
 import { useLeaveGuard } from "@/lib/useLeaveGuard";
 import { localDate, takeCapSec } from "@/features/speaking/schedule";
 import type { TaskKey } from "@/features/speaking/tasks";
+import { type ClipRate, sentenceAt, timeline } from "@/features/speaking/shadowText";
 import { clock } from "./format";
+import { ShadowPractice } from "./ShadowPractice";
+import { ShadowText } from "./ShadowText";
 
 export type Material = { title?: string; text?: string; prompt?: string; generated: boolean };
 
@@ -67,6 +70,7 @@ export function TaskRecorder({
   material: initialMaterial,
   sourceAudioUrl,
   clipSec,
+  clipMarks,
   videoDefault,
   storage,
   aiOn = true,
@@ -78,6 +82,7 @@ export function TaskRecorder({
   material: Material | null;
   sourceAudioUrl?: string;
   clipSec?: number;
+  clipMarks?: number[];
   videoDefault: boolean;
   storage: boolean;
   aiOn?: boolean;
@@ -92,12 +97,18 @@ export function TaskRecorder({
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState("");
   const [clipError, setClipError] = useState("");
+  const [rate, setRate] = useState<ClipRate>(1);
+  const [clipTime, setClipTime] = useState(0);
+  const [loadedSec, setLoadedSec] = useState(0);
 
   const kind = video ? "video" : "audio";
-  const capSec = takeCapSec(task, clipSec);
+  const capSec = takeCapSec(task, task === "shadowing" && clipSec ? clipSec / rate : clipSec);
   const rec = useRecorder({ kind, capSec });
   const shadowing = task === "shadowing";
   const resetRecorder = rec.reset;
+  const clipText = shadowing ? (material?.text ?? "") : "";
+  const clipLength = clipSec || loadedSec;
+  const sentences = useMemo(() => (clipText ? timeline(clipText, clipLength, clipMarks) : []), [clipText, clipLength, clipMarks]);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
@@ -107,6 +118,7 @@ export function TaskRecorder({
   const clipTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const clipPlaying = useRef(false);
   const takeDate = useRef(date);
+  const takeRate = useRef<ClipRate>(1);
 
   useEffect(() => {
     if (previewRef.current) previewRef.current.srcObject = rec.stream;
@@ -120,6 +132,8 @@ export function TaskRecorder({
       clipPlaying.current = true;
       audio.muted = false;
       audio.currentTime = 0;
+      audio.defaultPlaybackRate = takeRate.current;
+      audio.playbackRate = takeRate.current;
       void audio.play()?.catch(() => {
         clipPlaying.current = false;
         setClipError(CLIP_FAILED);
@@ -166,6 +180,7 @@ export function TaskRecorder({
             date: takeDate.current,
             lessonId,
             material: material ?? { generated: false },
+            ...(task === "shadowing" ? { clipRate: takeRate.current } : {}),
             kind: result.mime.startsWith("video/") ? "video" : "audio",
             mime: result.mime,
             audioMime: result.audioMime,
@@ -249,6 +264,8 @@ export function TaskRecorder({
       });
     }
     takeDate.current = todayHere(date);
+    takeRate.current = rate;
+    setClipTime(0);
     setClipError("");
     setSave({ phase: "idle" });
     void rec.start();
@@ -295,11 +312,19 @@ export function TaskRecorder({
   }
 
   const idle = rec.state === "idle" || rec.state === "error";
+  const practising = shadowing && sourceAudioUrl && idle && save.phase === "idle" && !rec.result;
   const canStart = idle && (material !== null || !shadowing) && (!shadowing || headphones) && save.phase === "idle";
 
   return (
     <div className="grid gap-4">
-      {material ? (
+      {practising && material ? (
+        <ShadowPractice src={sourceAudioUrl} sentences={sentences} rate={rate} onRate={setRate} />
+      ) : shadowing && material && sentences.length ? (
+        <section aria-label="Practice material" className="grid gap-2 rounded-xl border border-border bg-card p-5">
+          {material.title && <h2 className="text-lg font-semibold">{material.title}</h2>}
+          <ShadowText sentences={sentences} active={rec.state === "recording" ? sentenceAt(sentences, clipTime) : -1} />
+        </section>
+      ) : material ? (
         <MaterialView task={task} material={material} />
       ) : (
         <section className="grid gap-3 rounded-xl border border-border bg-card p-5">
@@ -333,6 +358,11 @@ export function TaskRecorder({
           src={sourceAudioUrl}
           preload="auto"
           playsInline
+          onTimeUpdate={(e) => setClipTime(e.currentTarget.currentTime)}
+          onLoadedMetadata={(e) => {
+            const d = e.currentTarget.duration;
+            if (Number.isFinite(d) && d > 0) setLoadedSec(d);
+          }}
           onEnded={() => {
             if (!clipPlaying.current) return;
             clearTimeout(clipTimer.current);
@@ -366,6 +396,9 @@ export function TaskRecorder({
             </label>
           )}
         </div>
+        {shadowing && rate !== 1 && idle && (
+          <p className="text-xs text-muted-foreground">The clip plays at {rate}× in this take.</p>
+        )}
         {shadowing && !headphones && idle && (
           <p className="text-xs text-muted-foreground">
             The clip plays while you record, so wear headphones or the microphone picks it up.

@@ -5,6 +5,7 @@ export const TRACK = {
   interview: 3,
   ielts: 4,
   coding: 5,
+  exercise: 6,
 } as const;
 export type TrackName = keyof typeof TRACK;
 

@@ -150,4 +150,20 @@ describe("admin speaking lessons", () => {
     const doc = await SpeakingLesson.findById(id).lean<{ shadow: { audioKey: string; durationSec: number } }>();
     expect(doc?.shadow).toMatchObject({ audioKey: second, durationSec: 45 });
   });
+
+  it("saves sentence timings, refuses ones that go backwards, and clears them when new audio is confirmed", async () => {
+    const id = await make();
+    expect((await updateLesson(id, input({ shadowText: "A. B.", shadowMarks: [0, 2.5] }))).ok).toBe(true);
+    let doc = await SpeakingLesson.findById(id).lean<{ shadow: { marks: number[] } }>();
+    expect(doc?.shadow.marks).toEqual([0, 2.5]);
+
+    const bad = await updateLesson(id, input({ shadowText: "A. B.", shadowMarks: [3, 1] }));
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors.shadowMarks).toBeTruthy();
+
+    expect((await confirmLessonAudio(id, `lessons/${id}/new.mp3`, 20)).ok).toBe(true);
+    doc = await SpeakingLesson.findById(id).lean<{ shadow: { marks: number[] } }>();
+    expect(doc?.shadow.marks).toEqual([]);
+  });
+
 });

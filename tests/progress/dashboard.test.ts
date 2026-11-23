@@ -2,6 +2,10 @@ import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectDb } from "@/lib/db";
 import { Graph, GraphNode, Note, NoteProgress, Question } from "@/models";
+import { saveProfile as saveExerciseProfile } from "@/features/exercise/profile";
+import { finishSession, saveSet, startSession } from "@/features/exercise/sessions";
+import { logWeight } from "@/features/exercise/weights";
+import { ensureWeek } from "@/features/exercise/weeks";
 import { endPlan, saveProfile } from "@/features/ielts/profile";
 import { getDashboard } from "@/features/progress/dashboard";
 import { setNodeStatus } from "@/features/progress/graph";
@@ -165,5 +169,40 @@ describe("getDashboard", () => {
     expect((await getDashboard(user, "UTC", new Date("2026-11-11T12:00:00Z"))).ielts).toMatchObject({ testDay: "upcoming" });
     expect((await getDashboard(user, "UTC", new Date("2026-12-11T12:00:00Z"))).ielts).toMatchObject({ daysLeft: 0, testDay: "today" });
     expect((await getDashboard(user, "UTC", new Date("2026-12-14T12:00:00Z"))).ielts).toMatchObject({ testDay: "passed" });
+  });
+
+  it("omits exercise when there is no active profile", async () => {
+    expect((await getDashboard(newUserId(), "UTC", new Date("2026-11-11T12:00:00Z"))).exercise).toBeUndefined();
+  });
+
+  it("retires an expired goal before building the exercise card", async () => {
+    const user = newUserId();
+    await saveExerciseProfile(
+      user,
+      { heightCm: 175, birthYear: 1990, sex: "male", level: "beginner", workoutDays: [1, 3, 5], minutesPerSession: 30, startWeightKg: 80, goalWeightKg: 77, months: 1 },
+      "2026-11-02",
+    );
+    expect((await getDashboard(user, "UTC", new Date("2026-12-20T12:00:00Z"))).exercise).toBeUndefined();
+  });
+
+  it("reports this week's done/planned, last weight and streak", async () => {
+    const user = newUserId();
+    const res = await saveExerciseProfile(
+      user,
+      { heightCm: 175, birthYear: 1990, sex: "male", level: "intermediate", workoutDays: [1, 3, 5], minutesPerSession: 45, startWeightKg: 80, goalWeightKg: 72, months: 3 },
+      "2026-11-02",
+    );
+    expect(res.ok).toBe(true);
+    for (const w of ["2026-11-02", "2026-11-09"]) await ensureWeek(user, w);
+    for (const d of ["2026-11-02", "2026-11-04", "2026-11-06", "2026-11-09"]) {
+      await startSession(user, d);
+      await saveSet(user, d, 0, "done");
+      await finishSession(user, d, {});
+    }
+    await logWeight(user, "2026-11-10", 79.6, "2026-11-11");
+    const card = (await getDashboard(user, "UTC", new Date("2026-11-11T12:00:00Z"))).exercise;
+    expect(card).toMatchObject({ done: 1, planned: 3, lastKg: 79.6, streak: 4 });
+    expect(["onPace", "ahead", "behind"]).toContain(card!.status);
+    expect(card!.gapKg).toBeGreaterThanOrEqual(0);
   });
 });
