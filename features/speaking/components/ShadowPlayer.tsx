@@ -34,7 +34,6 @@ export function ShadowPlayer({
   const [error, setError] = useState("");
   const live = useRef(false);
   const active = part !== null;
-  // A renewed link replaces the take's source only between plays, so playback never restarts.
   const [shownTakeUrl, setShownTakeUrl] = useState(takeUrl);
   if (!active && shownTakeUrl !== takeUrl) setShownTakeUrl(takeUrl);
 

@@ -6,7 +6,6 @@ export type PlayerState = {
   item: number;
   set: number;
   remaining: number;
-  /** Per item, mirroring the saved session: sets done and whether it was skipped. */
   done: number[];
   skipped: boolean[];
 };
@@ -18,7 +17,6 @@ export type PlayerStart = { item: number; set: number; items?: { setsDone: numbe
 
 type Progress = Pick<PlayerState, "done" | "skipped">;
 
-/** The first item still to do and its next set, exactly as `resumePoint` finds it from the saved state. */
 function resume(plan: PlanDay, p: Progress): { item: number; set: number } | null {
   for (let i = 0; i < plan.items.length; i++) {
     if (!p.skipped[i] && p.done[i] < plan.items[i].sets) return { item: i, set: p.done[i] };
@@ -26,7 +24,6 @@ function resume(plan: PlanDay, p: Progress): { item: number; set: number } | nul
   return null;
 }
 
-/** A work state at the resume point (or the summary); a timed item starts its clock. */
 function workFrom(plan: PlanDay, p: Progress): PlayerState {
   const at = resume(plan, p);
   if (!at) return { phase: "summary", item: plan.items.length, set: 0, remaining: 0, ...p };
@@ -41,7 +38,6 @@ export function initialPlayerState(plan: PlanDay, start: PlayerStart): PlayerSta
   return workFrom(plan, { done, skipped });
 }
 
-/** Back applies to this item: the current one after its first set, else the one before. */
 function backTarget(s: PlayerState): number | null {
   if (s.phase === "summary") return null;
   if (s.set > 0) return s.item;
@@ -87,7 +83,6 @@ export function playerReducer(plan: PlanDay, s: PlayerState, e: PlayerEvent): Pl
   }
 }
 
-/** The change to persist for an event, naming the item it applies to; null when nothing is saved. */
 export function saveFor(plan: PlanDay, s: PlayerState, e: PlayerEvent): SetSave | null {
   if (s.phase === "summary") return null;
   if (s.phase === "work") {
@@ -115,7 +110,6 @@ export function usePlayer(
     (e: PlayerEvent) => {
       const save = saveFor(plan, current.current, e);
       if (save) onSave?.(save);
-      // Keep the ref in step synchronously so several events before a re-render still see each other.
       current.current = playerReducer(plan, current.current, e);
       apply(e);
     },

@@ -16,7 +16,6 @@ export function Notice({
 }: {
   tone?: keyof typeof TONE;
   as?: "p" | "span";
-  /** Error tone only: false drops role="alert" (per-field errors, so several don't announce at once). */
   alert?: boolean;
   id?: string;
   className?: string;

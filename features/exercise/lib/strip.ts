@@ -2,10 +2,6 @@ import { addDays } from "@/features/speaking/schedule";
 import type { PlanDay } from "../plan";
 import type { StripDay } from "../components/WeekStrip";
 
-/**
- * The seven days of a week for the home strip. A day with a done session always shows as a workout,
- * even if the current profile does not plan it (e.g. trained before a mid-week goal change).
- */
 export function stripDays(p: {
   weekStart: string;
   plan: Pick<PlanDay, "date" | "focus" | "minutes">[];

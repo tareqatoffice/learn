@@ -11,7 +11,6 @@ const aiSettingsSchema = new Schema(
     apiKeyEncrypted: String,
     apiKeyHint: String,
     apiKeyUpdatedAt: Date,
-    /** Admin overrides of the editable prompt texts, keyed by prompt key (see features/ai/lib/prompts.ts). */
     prompts: { type: Map, of: String, default: undefined },
     updatedBy: { type: Schema.Types.ObjectId, ref: "User" },
   },

@@ -23,7 +23,6 @@ export type SkeletonInput = {
   startDate: string;
   targetDate: string;
   direction: "lose" | "gain" | "keep";
-  /** Order of workout focuses (Admin → General settings); defaults to DEFAULT_ROTATION. */
   rotation?: readonly Focus[];
 };
 
@@ -44,12 +43,10 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 const weekday = (date: string) => new Date(`${date}T00:00:00Z`).getUTCDay();
 const mondayFirst = (d: number) => (d + 6) % 7;
 
-/** Monday of the week containing `date`. */
 export function weekStartOf(date: string): string {
   return addDays(date, -mondayFirst(weekday(date)));
 }
 
-/** 0-based week number of `weekStart`, counted from the week holding `startDate`. */
 export function weekIndex(startDate: string, weekStart: string): number {
   const ms = Date.parse(`${weekStart}T00:00:00Z`) - Date.parse(`${weekStartOf(startDate)}T00:00:00Z`);
   return Math.round(ms / WEEK_MS);
@@ -90,7 +87,6 @@ function focusFor(
   return direction === "gain" && focus === "cardio" ? "full" : focus;
 }
 
-/** Upper bound on a day's length, used to trim volume when the minimum slot count overruns. */
 function worstCaseSeconds(slots: number, sets: number, reps: number, seconds: number, restSec: number): number {
   return slots * (sets * Math.max(reps * 3, seconds) + (sets - 1) * restSec);
 }
@@ -109,7 +105,6 @@ export function skeletonWeek(p: SkeletonInput, weekStart: string, history: { fin
   const perItem = sets * Math.max(reps * 3, seconds) + (sets - 1) * restSec + 30;
   const slots = clamp(Math.floor((p.minutesPerSession * 60) / perItem), 3, 12);
 
-  // The 3-slot minimum can overrun a short session; trim volume until it fits.
   while (worstCaseSeconds(slots, sets, reps, seconds, restSec) > p.minutesPerSession * 60) {
     if (reps > 5 || seconds > 15) {
       reps = Math.max(5, Math.floor(reps * 0.85));
@@ -158,7 +153,6 @@ function rng(seed: string): () => number {
   };
 }
 
-/** A day never repeats an exercise, so it holds at most as many items as there are allowed exercises. */
 export function slotsFor(day: SkeletonDay, pool: readonly Exercise[]): number {
   return Math.min(day.slots, allowedFor(pool, day.focus, day.maxDifficulty).length);
 }
@@ -203,7 +197,6 @@ export function validateDay(day: SkeletonDay, items: unknown, pool: readonly Exe
   if (new Set(list.map((i) => i.exerciseId)).size !== list.length) return null;
   const allowed = new Map(allowedList.map((e) => [e.id, e]));
   if (!list.every((i) => allowed.has(i.exerciseId))) return null;
-  // Reps-mode moves take reps only, time-mode moves take seconds only.
   const fitsMode = (i: PlanItem) =>
     allowed.get(i.exerciseId)?.mode === "time" ? i.seconds !== undefined && i.reps === undefined : i.reps !== undefined && i.seconds === undefined;
   if (!list.every(fitsMode)) return null;

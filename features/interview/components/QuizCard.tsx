@@ -77,7 +77,6 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
   const [endFailed, setEndFailed] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
 
-  // Live is keyed by position, so this runs once per card: move focus to each card after the first.
   const later = view.position > 0;
   useEffect(() => {
     if (later) heading.current?.focus();

@@ -25,9 +25,7 @@ export function WorkoutSummary({
   exercises: ExerciseMap;
   plan: PlanDay;
   feels: Partial<Record<string, Feel>>;
-  /** Exercise ids that were skipped: shown as skipped, with no feel buttons. */
   skipped?: string[];
-  /** Omit for a finished workout shown read-only. */
   onFeel?(exerciseId: string, feel: Feel): void;
   onFinish?(): void;
   saving?: boolean;

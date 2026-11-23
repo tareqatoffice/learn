@@ -108,7 +108,6 @@ export function CoachPanel({
     try {
       let frames: string[];
       try {
-        // The page's signed link expires after ten minutes; ask for a fresh one.
         const fresh = await takeMediaUrlsAction(takeId).catch(() => null);
         frames = await framesOf(fresh?.media ?? mediaUrl);
       } catch {

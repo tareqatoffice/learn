@@ -1,7 +1,6 @@
 import { PHOTO_CONTENT_TYPE, PHOTO_KEY } from "@/features/exercise/catalog";
 import { getObjectBytes, storageConfigured } from "@/lib/r2";
 
-/** Serves exercise photos from R2. Keys are random per upload, so a response never changes and caches for a year. */
 export async function GET(_request: Request, { params }: { params: Promise<{ key: string[] }> }) {
   const key = (await params).key.join("/");
   if (!PHOTO_KEY.test(key) || !storageConfigured()) return new Response("Not found", { status: 404 });

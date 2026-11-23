@@ -7,7 +7,6 @@ import type { ExerciseMap } from "../catalog";
 import type { PlanDay } from "../plan";
 import { WorkoutSummary } from "./WorkoutSummary";
 
-/** A done session opened later: still rateable until feels have been saved, read-only after. */
 export function DoneWorkoutSummary({
   exercises,
   date,
@@ -18,7 +17,6 @@ export function DoneWorkoutSummary({
 }: {
   exercises: ExerciseMap;
   date: string;
-  /** The user's current day: only that day's workout can still be rated. */
   today: string;
   plan: PlanDay;
   initialFeels: Partial<Record<string, Feel>>;

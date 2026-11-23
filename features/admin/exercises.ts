@@ -79,7 +79,6 @@ async function quietDelete(keys: string[]) {
   try {
     await deleteObjects(list);
   } catch {
-    // An orphaned photo only costs a little storage; the save already happened.
   }
 }
 
@@ -111,7 +110,6 @@ export async function setExerciseArchived(slug: string, archived: boolean): Prom
   return res.matchedCount ? ok() : fail(NOT_FOUND);
 }
 
-/** Whether any saved plan or workout names this exercise. */
 export async function exerciseInUse(slug: string): Promise<boolean> {
   await connectDb();
   const [plan, session] = await Promise.all([
@@ -121,7 +119,6 @@ export async function exerciseInUse(slug: string): Promise<boolean> {
   return Boolean(plan || session);
 }
 
-/** Deletes an exercise and its photos; one that plans or workouts name can only be archived. */
 export async function deleteExercise(slug: string): Promise<ActionResult> {
   await connectDb();
   if (await exerciseInUse(slug)) return fail("Plans or workouts use this exercise, so it can't be deleted. Archive it instead.");
@@ -148,7 +145,6 @@ export async function startPhotoUpload(
   return ok({ uploadUrl: await presignPut(key, type, size), key });
 }
 
-/** Points a photo slot at an uploaded file, then deletes the photo it replaces. */
 export async function confirmPhoto(slug: string, slot: PhotoSlot, key: string): Promise<ActionResult<{ url: string }>> {
   if (!PHOTO_SLOTS.includes(slot)) return fail("Unknown photo.");
   if (typeof key !== "string" || !PHOTO_KEY.test(key) || !key.startsWith(`exercise/${slug}/`)) {
@@ -166,7 +162,6 @@ export async function confirmPhoto(slug: string, slot: PhotoSlot, key: string): 
     await quietDelete([key]);
     return fail("Photos can be 5 MB at most.");
   }
-  // The photo replaced is the one this write swapped out, not the one read above.
   const before = await Exercise.findOneAndUpdate({ slug }, { $set: { [slot]: key } }).lean<ExerciseRow>();
   if (!before) return fail(NOT_FOUND);
   const previous = before[slot] ?? "";
@@ -176,7 +171,6 @@ export async function confirmPhoto(slug: string, slot: PhotoSlot, key: string): 
 
 const otherSlot = (slot: PhotoSlot): PhotoSlot => (slot === "startPhoto" ? "endPhoto" : "startPhoto");
 
-/** Clears a photo slot and deletes the file from storage. */
 export async function removePhoto(slug: string, slot: PhotoSlot): Promise<ActionResult> {
   if (!PHOTO_SLOTS.includes(slot)) return fail("Unknown photo.");
   await connectDb();
@@ -228,7 +222,6 @@ export async function getExerciseAdmin(slug: string): Promise<AdminExercise | nu
   return doc ? toAdmin(doc) : null;
 }
 
-/** The next free order number, so a new exercise lands at the end of the library. */
 export async function nextExerciseOrder(): Promise<number> {
   await connectDb();
   const last = await Exercise.findOne({}, { order: 1 }).sort({ order: -1 }).lean<{ order?: number }>();

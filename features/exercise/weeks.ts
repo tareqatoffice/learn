@@ -56,7 +56,6 @@ export async function ensureWeek(userId: string, today: string, fetchFn?: typeof
   const existing = await ExercisePlanWeek.findOne({ profileId: profile.id, weekStart }).lean<WeekDoc>();
   if (existing) return toView(existing);
 
-  // No exercises yet (library not seeded, or all archived): build nothing rather than store an empty week.
   const exercises = await activeExercises();
   if (!exercises.length) return null;
   const { finishedRatio, lastWeek } = await lastWeekOf(userId, profile, weekStart);
@@ -93,7 +92,6 @@ export async function dayPlan(userId: string, date: string): Promise<PlanDay | n
   return toView(week).days.find((d) => d.date === date) ?? null;
 }
 
-/** Workout dates in [from, to]: a week's stored plan when it exists, else the profile's current schedule. */
 export async function plannedDates(userId: string, profile: ProfileView, from: string, to: string): Promise<string[]> {
   await connectDb();
   const first = weekStartOf(from);

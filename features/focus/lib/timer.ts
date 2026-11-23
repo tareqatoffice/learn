@@ -8,11 +8,9 @@ export type FocusRun = {
   targetMinutes?: number;
   elapsedMs: number;
   startedAt: number | null;
-  /** When the site was last hidden (tab switched, app backgrounded, page closed); cleared on return. */
   awayAt?: number;
 };
 
-/** Away longer than this and the run stops at the moment you left. */
 export const AWAY_LIMIT_MS = 60_000;
 
 export const FOCUS_STORAGE_KEY = "learn:focus:v1";
@@ -62,7 +60,6 @@ export const resumeRun = (run: FocusRun, now: number): FocusRun =>
 export const markAway = (run: FocusRun, now: number): FocusRun =>
   run.awayAt === undefined ? { ...run, awayAt: now } : run;
 
-/** On return: a short absence keeps the run going; a long one stops it (paused) at the moment you left. */
 export function backFromAway(run: FocusRun, now: number): { run: FocusRun; left: boolean } {
   if (run.awayAt === undefined) return { run, left: false };
   const { awayAt, ...rest } = run;

@@ -154,7 +154,7 @@ export const classics: Group = {
               { retries: 3, baseDelayMs: 500, signal: controller.signal },
             );
             const settled = settle(promise);
-            await wait(50); // first call has failed; retry is now waiting 500 ms
+            await wait(50);
             const abortedAt = Date.now();
             controller.abort(reason);
             const result = await settled;
@@ -162,7 +162,7 @@ export const classics: Group = {
             if (result.ok) return "expected a rejection, but it resolved";
             if (result.error !== reason) return "did not reject with signal.reason";
             if (elapsed > 250) return `took ${elapsed} ms to reject after abort; it should not wait out the delay`;
-            await wait(600); // long enough for a leaked timer to fire
+            await wait(600);
             return calls === 1 || `expected 1 call, got ${calls}`;
           },
         },
@@ -373,7 +373,7 @@ export const classics: Group = {
             const result = await settle(promisePool(tasks, 2));
             if (result.ok) return "expected a rejection, but it resolved";
             if (result.error !== boom) return "did not reject with the task's error";
-            await wait(80); // let the other in-flight task finish; nothing new may start
+            await wait(80);
             return started === 2 || `expected 2 tasks started, got ${started}`;
           },
         },
@@ -415,7 +415,7 @@ export const classics: Group = {
             const result = await settle(promisePool(tasks, 1));
             if (result.ok) return "expected a rejection, but it resolved";
             if (result.error !== boom) return "did not reject with the thrown error";
-            await wait(20); // nothing new may start after the rejection
+            await wait(20);
             return started === 2 || `expected 2 tasks started, got ${started}`;
           },
         },
@@ -483,7 +483,7 @@ export const classics: Group = {
             cache.set("a", 10);
             if (cache.size !== 2) return `expected size 2, got ${cache.size}`;
             if (!cache.has("b")) return '"b" was evicted by an update of "a"';
-            time = 130; // "a" was set 70 ms ago, "b" 130 ms ago
+            time = 130;
             if (cache.get("a") !== 10) return 'expected "a" to be 10 and still alive after its TTL restarted';
             return !cache.has("b") || '"b" should have expired';
           },
@@ -522,8 +522,8 @@ export const classics: Group = {
             cache.set("a", 1);
             time = 60;
             cache.set("b", 2);
-            cache.get("a"); // "a" is now more recent than "b", but "a" expires first
-            time = 100; // "a" expired (set at 0), "b" alive (set at 60)
+            cache.get("a");
+            time = 100;
             cache.set("c", 3);
             if (!cache.has("b")) return '"b" is live and was evicted; the expired "a" should have gone first';
             if (!cache.has("c")) return '"c" should be cached';

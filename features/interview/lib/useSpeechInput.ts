@@ -24,7 +24,6 @@ function recognitionCtor(): RecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-// Browser support never changes, so there is nothing to subscribe to; the server snapshot says "unsupported".
 const noSubscribe = () => () => {};
 const hasRecognition = () => recognitionCtor() !== null;
 const noRecognition = () => false;

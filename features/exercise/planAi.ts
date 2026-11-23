@@ -13,7 +13,6 @@ export type FillWeekInput = {
   weekIdx: number;
   profileSummary: string;
   lastWeek: LastWeekResult[];
-  /** Active exercises the plan may use. */
   exercises: readonly Exercise[];
   fetch?: typeof fetch;
 };

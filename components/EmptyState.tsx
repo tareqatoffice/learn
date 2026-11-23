@@ -1,7 +1,6 @@
 import { Card } from "@/components/Card";
 import { cn } from "@/lib/utils";
 
-/** Muted message in a card box, for empty lists and "not set up yet" states. */
 export function EmptyState({
   role,
   className,

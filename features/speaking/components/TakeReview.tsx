@@ -130,7 +130,6 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
   const [compareUrl, setCompareUrl] = useState(take.audioUrl ?? take.mediaUrl);
   useEffect(() => {
     if (take.task !== "shadowing" || !take.sourceAudioUrl) return;
-    // The take's signed link lasts ten minutes; renew it so the compare player keeps working.
     const timer = setInterval(async () => {
       const fresh = await takeMediaUrlsAction(take.id).catch(() => null);
       if (fresh) setCompareUrl(fresh.audio ?? fresh.media);

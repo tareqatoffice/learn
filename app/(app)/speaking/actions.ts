@@ -29,8 +29,6 @@ export async function startTakeAction(input: StartTakeInput) {
   const { task, lessonId, material, kind, mime, audioMime, size, audioSize, clipRate } = valid as unknown as StartTakeInput;
   const timeZone = await readTimeZone();
   const today = localDate(new Date(), timeZone);
-  // A take recorded just before midnight and saved just after still counts for the day it was
-  // recorded; outside that window takes always count for today.
   const graceDay = localDate(new Date(Date.now() - MIDNIGHT_GRACE_MS), timeZone);
   const date = valid.date === graceDay ? graceDay : today;
   return startTake(userId, { task, date, lessonId: lessonId ?? null, material, kind, mime, audioMime, size, audioSize, clipRate });

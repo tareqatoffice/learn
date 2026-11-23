@@ -9,8 +9,7 @@ const plugins = [...rehypePlugins, rehypeHighlight] as React.ComponentProps<
 
 const unwrap = ({ children }: { children?: React.ReactNode }) => <>{children}</>;
 function MdLink({ href, ...props }: React.ComponentProps<"a"> & { node?: unknown }) {
-  delete props.node; // react-markdown's AST node, not a DOM attribute
-  // Same-page #anchors stay native so the browser moves focus to the target.
+  delete props.node;
   return href && !href.startsWith("#") ? <Link href={href} {...props} /> : <a href={href} {...props} />;
 }
 const blockComponents = { a: MdLink };

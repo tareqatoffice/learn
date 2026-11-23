@@ -201,7 +201,6 @@ export function GraphView({ data }: { data: GraphData }) {
     window.history.back();
   }
 
-  // A topic linked into on load (not read mode): on narrow screens, bring its panel into view once.
   const [linkedOnLoad] = useState(() => current !== null && !reading);
   useEffect(() => {
     if (!linkedOnLoad || typeof window.matchMedia !== "function" || wide()) return;

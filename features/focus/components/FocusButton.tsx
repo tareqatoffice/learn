@@ -152,9 +152,8 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
     return () => window.clearInterval(id);
   }, [running, finish]);
 
-  // Stop the run when you leave the site for a while, or move to a different module.
   const runId = run?.id;
-  const runAwayAt = run?.awayAt; // another open tab of the site clears it: you're still here
+  const runAwayAt = run?.awayAt;
   useEffect(() => {
     const reconcile = () => {
       if (document.visibilityState !== "visible" || finishing.current) return;
@@ -174,7 +173,6 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
     };
     const away = () => {
       const current = useFocusStore.getState().run;
-      // A run you paused on purpose survives leaving; only a running one is stopped.
       if (current && !isPaused(current)) restoreRun(markAway(current, Date.now()));
     };
     const onVisibility = () => (document.visibilityState === "hidden" ? away() : reconcile());
@@ -265,7 +263,7 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
     const vh = window.innerHeight;
     const inset = screenInsets();
     const gap = 8;
-    const btnHeight = 48; // h-12
+    const btnHeight = 48;
     const x = Math.max(16, Math.min(pos.x, vw - 320 - 16));
     const above = pos.bottom + btnHeight / 2 < vh / 2;
     panelStyle = above

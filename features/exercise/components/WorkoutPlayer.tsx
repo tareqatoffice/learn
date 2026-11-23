@@ -16,19 +16,16 @@ import { ProgressBar } from "@/components/ProgressBar";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** One save with a single retry; never throws, so a failure cannot stall the queue behind it. */
 async function persist(date: string, { index, action }: SetSave) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       await saveSetAction(date, index, action);
       return;
     } catch {
-      // retry once
     }
   }
 }
 
-/** Holds the screen awake while playing; the browser drops the lock when the tab is hidden, so ask again on return. */
 function useWakeLock(active: boolean) {
   useEffect(() => {
     if (!active) return;
@@ -62,15 +59,11 @@ export function WorkoutPlayer({
   plan,
   start,
 }: {
-  /** The moves this plan names, by id. */
   exercises: ExerciseMap;
   date: string;
   plan: PlanDay;
-  /** The first set still to do; an item index past the end opens the summary. */
   start: PlayerStart;
 }) {
-  // Saves run one after another so a retried set can never land after a later one.
-  // An idle queue starts the save at once; a busy one appends to the chain.
   const tail = useRef<Promise<void> | null>(null);
   const onSave = useCallback(
     (save: SetSave) => {
@@ -91,7 +84,6 @@ export function WorkoutPlayer({
 
   useWakeLock(player.phase !== "summary");
 
-  // After a phase change the main action is the next thing to press, so keep focus there.
   const root = useRef<HTMLDivElement>(null);
   const seen = useRef(`${player.phase}/${player.item}/${player.set}`);
   useEffect(() => {
@@ -105,7 +97,6 @@ export function WorkoutPlayer({
     setFinishing(true);
     setError(undefined);
     try {
-      // Pending set saves land first, so the session is complete when it is finished.
       await tail.current;
       await finishSessionAction(date, feels as Record<string, Feel>);
       setFinished(true);
@@ -126,7 +117,6 @@ export function WorkoutPlayer({
   );
 
   if (player.phase === "summary") {
-    // Every exercise skipped: the server counted nothing, so there is nothing to rate.
     if (!player.done.some((n) => n > 0)) {
       return (
         <div className="grid gap-5">
@@ -168,7 +158,6 @@ export function WorkoutPlayer({
         <Button
           size="lg"
           onClick={() => {
-            // A rest in front of the missing move has to end before it can be skipped.
             if (player.phase === "rest") dispatch({ type: "skipRest" });
             dispatch({ type: "skip" });
           }}

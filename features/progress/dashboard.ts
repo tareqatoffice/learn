@@ -157,7 +157,6 @@ async function ieltsCard(userId: string, timeZone: string, now: Date): Promise<D
 
 async function exerciseCard(userId: string, timeZone: string, now: Date): Promise<Dashboard["exercise"]> {
   const today = localDate(now, timeZone);
-  // Retire an expired or reached goal first, so the card never shows a finished one.
   await finishIfDone(userId, today);
   const profile = await getActiveProfile(userId);
   if (!profile) return undefined;

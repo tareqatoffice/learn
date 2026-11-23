@@ -57,7 +57,6 @@ export async function ExerciseHome() {
 
   if (!profile) {
     const ended = await lastEndedProfile(userId);
-    // No goal yet: show the form here instead of redirecting, which would show the loading state twice.
     if (!ended) return <ExerciseSetup userId={userId} />;
     const weights = await listWeights(userId, ended.id);
     const finalKg = Math.round(paceStatus(ended, weights, today).currentKg * 10) / 10;
