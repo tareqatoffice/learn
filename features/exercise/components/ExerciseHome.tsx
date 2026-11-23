@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { Panel } from "@/components/Panel";
 import { buttonVariants } from "@/components/ui/button";
@@ -16,6 +15,7 @@ import { ensureWeek, plannedDates } from "@/features/exercise/weeks";
 import { listWeights } from "@/features/exercise/weights";
 import { stripDays } from "../lib/strip";
 import { CoachNote } from "./CoachNote";
+import { ExerciseSetup } from "./ExerciseSetup";
 import { GoalCard } from "./GoalCard";
 import { PlanFinished } from "./PlanFinished";
 import { WeekStrip } from "./WeekStrip";
@@ -57,7 +57,8 @@ export async function ExerciseHome() {
 
   if (!profile) {
     const ended = await lastEndedProfile(userId);
-    if (!ended) redirect("/exercise/setup");
+    // No goal yet: show the form here instead of redirecting, which would show the loading state twice.
+    if (!ended) return <ExerciseSetup userId={userId} />;
     const weights = await listWeights(userId, ended.id);
     const finalKg = Math.round(paceStatus(ended, weights, today).currentKg * 10) / 10;
     return (
