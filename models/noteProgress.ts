@@ -8,6 +8,7 @@ const noteProgressSchema = new Schema(
     read: { type: Boolean, default: false },
     readAt: Date,
     lastOpenedAt: Date,
+    lastAnchor: { type: String, maxlength: 200 },
   },
   { timestamps: true },
 );

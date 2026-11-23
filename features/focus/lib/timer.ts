@@ -1,5 +1,5 @@
 import { type FocusContext, isAppPath } from "@/features/focus/context";
-import { FOCUS_AREAS, FOCUS_MAX_SECONDS } from "@/models/focusConstants";
+import { FOCUS_AREAS, FOCUS_MAX_DRIFTS, FOCUS_MAX_SECONDS } from "@/models/focusConstants";
 
 export type FocusRun = {
   id: string;
@@ -9,9 +9,12 @@ export type FocusRun = {
   elapsedMs: number;
   startedAt: number | null;
   awayAt?: number;
+  drifts?: number;
 };
 
 export const AWAY_LIMIT_MS = 60_000;
+export const MIN_DRIFT_MS = 3_000;
+export const CHECKIN_MIN_SECONDS = 5 * 60;
 
 export const FOCUS_STORAGE_KEY = "learn:focus:v1";
 export const FOCUS_PRESETS = [15, 25, 50] as const;
@@ -60,11 +63,13 @@ export const resumeRun = (run: FocusRun, now: number): FocusRun =>
 export const markAway = (run: FocusRun, now: number): FocusRun =>
   run.awayAt === undefined ? { ...run, awayAt: now } : run;
 
-export function backFromAway(run: FocusRun, now: number): { run: FocusRun; left: boolean } {
-  if (run.awayAt === undefined) return { run, left: false };
+export function backFromAway(run: FocusRun, now: number): { run: FocusRun; left: boolean; drifted: boolean } {
+  if (run.awayAt === undefined) return { run, left: false, drifted: false };
   const { awayAt, ...rest } = run;
-  if (now - awayAt > AWAY_LIMIT_MS) return { run: pauseRun(rest, awayAt), left: true };
-  return { run: rest, left: false };
+  const away = now - awayAt;
+  if (away > AWAY_LIMIT_MS) return { run: pauseRun(rest, awayAt), left: true, drifted: false };
+  if (away < MIN_DRIFT_MS) return { run: rest, left: false, drifted: false };
+  return { run: { ...rest, drifts: Math.min((rest.drifts ?? 0) + 1, FOCUS_MAX_DRIFTS) }, left: false, drifted: true };
 }
 
 export function parseRun(raw: string | null): FocusRun | null {
@@ -84,7 +89,8 @@ export function parseRun(raw: string | null): FocusRun | null {
       typeof v.elapsedMs !== "number" ||
       !(v.startedAt === null || typeof v.startedAt === "number") ||
       !(v.targetMinutes === undefined || typeof v.targetMinutes === "number") ||
-      !(v.awayAt === undefined || typeof v.awayAt === "number")
+      !(v.awayAt === undefined || typeof v.awayAt === "number") ||
+      !(v.drifts === undefined || (Number.isInteger(v.drifts) && v.drifts >= 0 && v.drifts <= FOCUS_MAX_DRIFTS))
     )
       return null;
     return {
@@ -95,6 +101,7 @@ export function parseRun(raw: string | null): FocusRun | null {
       elapsedMs: v.elapsedMs,
       startedAt: v.startedAt,
       ...(v.awayAt !== undefined && { awayAt: v.awayAt }),
+      ...(v.drifts !== undefined && { drifts: v.drifts }),
     };
   } catch {
     return null;

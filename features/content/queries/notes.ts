@@ -1,7 +1,7 @@
 import { isValidObjectId, type Types } from "mongoose";
 import { visibleNodeFilter, visibleNoteFilter } from "@/features/content/visibility";
 import { Graph, GraphNode, Note, NoteProgress, NoteSeries } from "@/models";
-import { getSeriesProgress } from "@/features/progress/notes";
+import { getNotePosition, getSeriesProgress } from "@/features/progress/notes";
 
 type Id = Types.ObjectId;
 type SeriesRow = { _id: Id; slug: string; title: string; description?: string };
@@ -79,6 +79,7 @@ export async function getChapterView(
   next?: { slug: string; title: string };
   toc: TocEntry[];
   read: boolean;
+  resume?: { anchor: string; text: string };
   relatedTopics: { graphSlug: string; nodeSlug: string; title: string }[];
 } | null> {
   const [series] = await visibleSeries(seriesSlug);
@@ -93,7 +94,13 @@ export async function getChapterView(
   }>();
   if (!note) return null;
 
-  const [chapters, relatedTopics] = await Promise.all([chaptersOf(series._id), topicsLinking(note._id)]);
+  const [chapters, relatedTopics, lastAnchor] = await Promise.all([
+    chaptersOf(series._id),
+    topicsLinking(note._id),
+    getNotePosition(userId, String(note._id)),
+  ]);
+  const toc = (note.toc ?? []).map(({ depth, text, anchor }) => ({ depth, text, anchor }));
+  const resumeEntry = lastAnchor ? toc.find((t) => t.anchor === lastAnchor) : undefined;
   const progress = await getSeriesProgress(userId, String(series._id), chapters.map((c) => c._id));
   const at = chapters.findIndex((c) => String(c._id) === String(note._id));
   const prev = chapters[at - 1];
@@ -108,8 +115,9 @@ export async function getChapterView(
     chapter: { id: String(note._id), slug: note.slug, title: note.title, body: note.body ?? "", readMinutes: note.readMinutes ?? 1 },
     ...(prev ? { prev: { slug: prev.slug, title: prev.title } } : {}),
     ...(next ? { next: { slug: next.slug, title: next.title } } : {}),
-    toc: (note.toc ?? []).map(({ depth, text, anchor }) => ({ depth, text, anchor })),
+    toc,
     read: progress[String(note._id)]?.read ?? false,
+    ...(resumeEntry ? { resume: { anchor: resumeEntry.anchor, text: resumeEntry.text } } : {}),
     relatedTopics,
   };
 }

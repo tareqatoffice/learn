@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type CSSProperties, useCallback, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
-import { focusTodayAction, saveFocusSessionAction } from "@/app/(app)/focus-actions";
+import { focusTodayAction, rateFocusSessionAction, saveFocusSessionAction } from "@/app/(app)/focus-actions";
 import { confirm } from "@/components/ConfirmDialog";
 import { ProgressBar } from "@/components/ProgressBar";
 import { focusRing, trackVar } from "@/components/track";
@@ -24,6 +24,7 @@ import type { FocusToday } from "@/features/focus/sessions";
 import { screenInsets, useDragPosition } from "@/features/focus/lib/position";
 import {
   backFromAway,
+  CHECKIN_MIN_SECONDS,
   elapsedSeconds,
   FOCUS_PRESETS,
   type FocusRun,
@@ -37,7 +38,15 @@ import {
 } from "@/features/focus/lib/timer";
 import { isCurrentRun, syncFocusStore, useFocusStore } from "@/features/focus/lib/store";
 import { cn } from "@/lib/utils";
-import type { FocusArea } from "@/models/focusConstants";
+import {
+  FOCUS_DISTRACTIONS,
+  FOCUS_RATING_MAX,
+  FOCUS_RATING_MIN,
+  type FocusArea,
+  type FocusDistraction,
+} from "@/models/focusConstants";
+
+const RATINGS = Array.from({ length: FOCUS_RATING_MAX - FOCUS_RATING_MIN + 1 }, (_, i) => FOCUS_RATING_MIN + i);
 
 const colorOf = (area: FocusArea) => (area === "general" ? "var(--primary)" : trackVar(area));
 
@@ -72,6 +81,10 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
   const [target, setTarget] = useState<number | undefined>(() => (presets.includes(25) ? 25 : presets[0]));
   const [today, setToday] = useState<FocusToday | null>(null);
   const [saving, setSaving] = useState(false);
+  const [checkin, setCheckin] = useState<{ runId: string; label: string } | null>(null);
+  const [rating, setRating] = useState<number | null>(null);
+  const [distraction, setDistraction] = useState<FocusDistraction | null>(null);
+  const [ratingSaving, setRatingSaving] = useState(false);
   const finishing = useRef(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -107,6 +120,7 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
           seconds,
           targetMinutes: current.targetMinutes,
           completed,
+          ...(current.drifts ? { drifts: current.drifts } : {}),
         });
         if (!res.ok) {
           restore();
@@ -118,6 +132,12 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
           { description: note },
         );
         void refreshToday();
+        if (seconds >= CHECKIN_MIN_SECONDS) {
+          setRating(null);
+          setDistraction(null);
+          setOpen(false);
+          setCheckin({ runId: current.id, label });
+        }
         return true;
       } catch {
         restore();
@@ -162,6 +182,7 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
       const t = Date.now();
       const back = backFromAway(current, t);
       if (back.run !== current) restoreRun(back.run);
+      if (back.drifted) toast("Welcome back. Noticing a drift and returning is the rep.", { duration: 3000 });
       if (back.left) {
         void finish(back.run, isCompleted(back.run, t), "Stopped when you left the site.");
         return;
@@ -234,7 +255,41 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
   const switchHere = async () => {
     if (!run) return;
     const minutes = run.targetMinutes;
-    if (await finish(run, false)) startHere(minutes);
+    if (await finish(run, false)) {
+      setCheckin(null);
+      setOpen(true);
+      startHere(minutes);
+    }
+  };
+
+  useEffect(() => {
+    if (!checkin) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCheckin(null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [checkin]);
+
+  const submitCheckin = async () => {
+    if (!checkin || rating === null) return;
+    setRatingSaving(true);
+    try {
+      const res = await rateFocusSessionAction({
+        runId: checkin.runId,
+        rating,
+        ...(distraction ? { distraction } : {}),
+      });
+      if (!res.ok) {
+        toast.error(firstError(res.errors) ?? "Couldn't save your rating.");
+        return;
+      }
+      setCheckin(null);
+    } catch {
+      toast.error("Couldn't save your rating. Try again.");
+    } finally {
+      setRatingSaving(false);
+    }
   };
 
   const discard = async () => {
@@ -277,6 +332,69 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
 
   return (
     <>
+      {checkin && !open && !run && (
+        <div
+          role="dialog"
+          aria-label="Rate your focus"
+          className={cn(
+            "fixed z-30 grid w-80 max-w-[calc(100vw-2rem)] gap-3 rounded-2xl border border-border bg-card p-4 shadow-lg animate-in fade-in-0 duration-200",
+            !pos && "right-4 bottom-[calc(8rem+env(safe-area-inset-bottom))] lg:bottom-22",
+          )}
+          style={panelStyle}
+        >
+          <div className="grid gap-1">
+            <p className="text-sm font-semibold">How was your focus?</p>
+            <p className="truncate text-xs text-muted-foreground">{checkin.label}</p>
+          </div>
+          <div role="radiogroup" aria-label="Focus rating, 1 to 5" className="grid grid-cols-5 gap-1.5">
+            {RATINGS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                role="radio"
+                aria-checked={rating === n}
+                onClick={() => setRating(n)}
+                className={cn(
+                  "rounded-lg border px-2 py-1.5 text-sm font-medium tabular-nums transition-colors",
+                  focusRing,
+                  rating === n ? "border-primary bg-primary/15 text-foreground" : "border-border text-muted-foreground hover:bg-muted",
+                )}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <div className="grid gap-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Main distraction (optional)</p>
+            <div role="radiogroup" aria-label="Main distraction" className="flex flex-wrap gap-1.5">
+              {FOCUS_DISTRACTIONS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  role="radio"
+                  aria-checked={distraction === d}
+                  onClick={() => setDistraction(distraction === d ? null : d)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors",
+                    focusRing,
+                    distraction === d ? "border-primary bg-primary/15 text-foreground" : "border-border text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button className="flex-1" disabled={rating === null || ratingSaving} onClick={() => void submitCheckin()}>
+              Save
+            </Button>
+            <Button variant="ghost" onClick={() => setCheckin(null)}>
+              Skip
+            </Button>
+          </div>
+        </div>
+      )}
       {open && (
         <div
           ref={panelRef}
@@ -284,7 +402,7 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
           role="dialog"
           aria-label="Focus"
           className={cn(
-            "fixed z-30 grid w-80 max-w-[calc(100vw-2rem)] gap-4 overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-lg animate-in fade-in-0 duration-200",
+            "fixed z-30 grid w-80 max-w-[calc(100vw-2rem)] grid-cols-1 gap-4 overflow-x-hidden overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-lg animate-in fade-in-0 duration-200",
             !pos && "right-4 bottom-[calc(8rem+env(safe-area-inset-bottom))] slide-in-from-bottom-2 lg:bottom-22",
           )}
           style={{
@@ -311,8 +429,8 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
           </div>
 
           {run ? (
-            <div className="grid gap-3">
-              <div className="grid gap-1">
+            <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 gap-1">
                 <p className="text-xs font-medium text-muted-foreground">
                   {areaLabel(run.context.area)} · {isPaused(run) ? "Paused" : run.targetMinutes ? "Time left" : "Elapsed"}
                 </p>
@@ -371,8 +489,8 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
             </div>
           ) : (
             here && (
-              <div className="grid gap-3">
-                <div className="grid gap-1">
+              <div className="grid grid-cols-1 gap-3">
+                <div className="grid grid-cols-1 gap-1">
                   <p className="text-xs font-medium text-muted-foreground">Focus on this page · {areaLabel(here.area)}</p>
                   <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
                     <AreaDot area={here.area} />
@@ -418,14 +536,14 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
           )}
 
           {today && today.sessions > 0 && (
-            <div className="grid gap-2 border-t border-border pt-3">
+            <div className="grid grid-cols-1 gap-2 border-t border-border pt-3">
               <p className="flex items-baseline justify-between text-xs font-medium text-muted-foreground">
                 <span>Today</span>
                 <span>
                   {formatDuration(today.totalSeconds)} · {today.sessions} {today.sessions === 1 ? "session" : "sessions"}
                 </span>
               </p>
-              <ul className="grid gap-1">
+              <ul className="grid grid-cols-1 gap-1">
                 {today.items.slice(0, 4).map((item) => (
                   <li key={item.path}>
                     <Link

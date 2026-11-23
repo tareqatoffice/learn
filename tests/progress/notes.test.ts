@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { ForbiddenError } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { Note, NoteProgress } from "@/models";
-import { getSeriesProgress, openNote, setNoteRead } from "@/features/progress/notes";
+import { getNotePosition, getSeriesProgress, openNote, setNotePosition, setNoteRead } from "@/features/progress/notes";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedNote, seedSeries } from "./seed";
 
@@ -62,6 +62,25 @@ describe("note progress", () => {
     const doc = await NoteProgress.findOne({ userId: user, noteId: note }).lean<Row>();
     expect(doc).toMatchObject({ read: true });
     expect(String(doc!.seriesId)).toBe(seriesId);
+  });
+
+  it("saves a reading position per user and note, keeping it through read toggles", async () => {
+    const user = newUserId();
+    const note = await seedNote(await seedSeries("s"), "n");
+    expect(await getNotePosition(user, note)).toBeUndefined();
+
+    await setNotePosition(user, note, "intro");
+    await setNotePosition(user, note, "details");
+    await setNoteRead(user, note, true);
+
+    expect(await getNotePosition(user, note)).toBe("details");
+    expect(await getNotePosition(newUserId(), note)).toBeUndefined();
+    expect(await NoteProgress.countDocuments()).toBe(1);
+    expect(await getNotePosition(user, "not-an-id")).toBeUndefined();
+
+    await setNotePosition(user, note, null);
+    expect(await getNotePosition(user, note)).toBeUndefined();
+    expect((await NoteProgress.findOne({ userId: user, noteId: note }).lean<Row>())?.read).toBe(true);
   });
 
   it("rejects notes that are not visible", async () => {

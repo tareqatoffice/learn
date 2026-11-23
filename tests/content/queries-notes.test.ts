@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getChapterView, getSeriesView, listSeriesWithProgress } from "@/features/content/queries";
 import { connectDb } from "@/lib/db";
 import { GraphNode, Note, NoteSeries } from "@/models";
-import { setNoteRead } from "@/features/progress/notes";
+import { setNotePosition, setNoteRead } from "@/features/progress/notes";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedGraph, seedNode } from "../progress/seed";
 
@@ -88,6 +88,21 @@ describe("getChapterView", () => {
     const first = await getChapterView(user, "docker", "one");
     expect(first?.prev).toBeUndefined();
     expect(first?.next).toEqual({ slug: "two", title: "two title" });
+  });
+
+  it("offers a resume point only for a saved heading that still exists", async () => {
+    const user = newUserId();
+    const s = await series("docker");
+    const note = await chapter(s, "one", 0);
+
+    expect((await getChapterView(user, "docker", "one"))?.resume).toBeUndefined();
+
+    await setNotePosition(user, note, "one-heading");
+    expect((await getChapterView(user, "docker", "one"))?.resume).toEqual({ anchor: "one-heading", text: "one heading" });
+    expect((await getChapterView(newUserId(), "docker", "one"))?.resume).toBeUndefined();
+
+    await setNotePosition(user, note, "removed-heading");
+    expect((await getChapterView(user, "docker", "one"))?.resume).toBeUndefined();
   });
 
   it("returns null for a draft chapter or a chapter of another series", async () => {

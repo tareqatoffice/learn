@@ -1,6 +1,7 @@
 import { headingId } from "@/lib/markdown/pipeline";
 import Link from "next/link";
 import { MarkReadButton } from "@/features/notes/components/NoteReader";
+import { ReadingPosition } from "@/features/notes/components/ReadingPosition";
 import { OverlayMenu } from "@/components/OverlayMenu";
 import { Markdown } from "@/lib/markdown/Markdown";
 import { cn } from "@/lib/utils";
@@ -122,6 +123,21 @@ export function ChapterView({ view }: { view: ChapterViewData }) {
             </>
           }
         />
+
+        {view.resume && (
+          <p className="mt-4 text-sm">
+            <a href={`#${headingId(view.resume.anchor)}`} className={cn("underline", linkClass)}>
+              Resume where you stopped: {view.resume.text}
+            </a>
+          </p>
+        )}
+        {view.toc.length > 0 && (
+          <ReadingPosition
+            noteId={view.chapter.id}
+            initialAnchor={view.resume?.anchor}
+            headings={view.toc.map((t) => ({ anchor: t.anchor, id: headingId(t.anchor) }))}
+          />
+        )}
 
         <div className="mt-6">
           <Markdown source={view.chapter.body} />

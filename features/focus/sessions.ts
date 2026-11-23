@@ -6,10 +6,14 @@ import { localDate } from "@/features/speaking/schedule";
 import { FocusSession } from "@/models";
 import {
   FOCUS_AREAS,
+  FOCUS_DISTRACTIONS,
   FOCUS_LABEL_MAX,
+  FOCUS_MAX_DRIFTS,
   FOCUS_MAX_SECONDS,
   FOCUS_MAX_TARGET_MINUTES,
   FOCUS_PATH_MAX,
+  FOCUS_RATING_MAX,
+  FOCUS_RATING_MIN,
   FOCUS_RUN_ID_MAX,
   type FocusArea,
 } from "@/models/focusConstants";
@@ -26,8 +30,16 @@ export const focusSessionInput = z.object({
   seconds: z.number().int().min(1).max(FOCUS_MAX_SECONDS),
   targetMinutes: z.number().int().min(1).max(FOCUS_MAX_TARGET_MINUTES).optional(),
   completed: z.boolean().optional(),
+  drifts: z.number().int().min(0).max(FOCUS_MAX_DRIFTS).optional(),
 });
 export type FocusSessionInput = z.infer<typeof focusSessionInput>;
+
+export const focusCheckinInput = z.object({
+  runId: z.string().trim().min(1).max(FOCUS_RUN_ID_MAX),
+  rating: z.number().int().min(FOCUS_RATING_MIN).max(FOCUS_RATING_MAX),
+  distraction: z.enum(FOCUS_DISTRACTIONS).optional(),
+});
+export type FocusCheckinInput = z.infer<typeof focusCheckinInput>;
 
 export type FocusTodayItem = { path: string; label: string; area: FocusArea; seconds: number; sessions: number };
 export type FocusToday = { totalSeconds: number; sessions: number; items: FocusTodayItem[] };
@@ -51,6 +63,16 @@ export async function saveFocusSession(
     { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
   ).lean<{ _id: Types.ObjectId }>();
   return ok({ id: String(doc!._id) });
+}
+
+export async function rateFocusSession(userId: string, input: FocusCheckinInput): Promise<ActionResult> {
+  const parsed = focusCheckinInput.safeParse(input);
+  if (!parsed.success) return fail("That rating isn't valid, so it wasn't saved.");
+  const { runId, rating, distraction } = parsed.data;
+  const update = distraction ? { $set: { rating, distraction } } : { $set: { rating }, $unset: { distraction: 1 } };
+  const doc = await FocusSession.findOneAndUpdate({ userId, runId }, update, { runValidators: true }).lean();
+  if (!doc) return fail("That focus session wasn't found.");
+  return ok();
 }
 
 export async function getFocusToday(userId: string, today: string): Promise<FocusToday> {

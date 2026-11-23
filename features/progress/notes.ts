@@ -25,6 +25,16 @@ export async function openNote(userId: string, noteId: string): Promise<void> {
   await upsertNoteProgress(userId, noteId, { $set: { lastOpenedAt: new Date() } });
 }
 
+export async function setNotePosition(userId: string, noteId: string, anchor: string | null): Promise<void> {
+  await upsertNoteProgress(userId, noteId, anchor ? { $set: { lastAnchor: anchor.slice(0, 200) } } : { $unset: { lastAnchor: 1 } });
+}
+
+export async function getNotePosition(userId: string, noteId: string): Promise<string | undefined> {
+  if (!isValidObjectId(noteId)) return undefined;
+  const row = await NoteProgress.findOne({ userId, noteId }, { lastAnchor: 1 }).lean<{ lastAnchor?: string }>();
+  return row?.lastAnchor || undefined;
+}
+
 export async function setNoteRead(userId: string, noteId: string, read: boolean): Promise<void> {
   const update = read ? { $set: { read, readAt: new Date() } } : { $set: { read }, $unset: { readAt: 1 } };
   await upsertNoteProgress(userId, noteId, update);
