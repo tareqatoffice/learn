@@ -10,9 +10,12 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "U
 import * as actions from "@/app/(app)/focus-actions";
 import { areaFor, focusContextFor, formatClock, formatDuration, isAppPath, offersFocus } from "@/features/focus/context";
 import {
+  AWAY_LIMIT_MS,
+  backFromAway,
   elapsedSeconds,
   isCompleted,
   isDone,
+  markAway,
   parseRun,
   pauseRun,
   remainingSeconds,
@@ -122,6 +125,27 @@ describe("focus timer", () => {
     expect(parseRun(JSON.stringify({ ...run, elapsedMs: "1" }))).toBeNull();
     expect(parseRun(JSON.stringify({ ...run, id: undefined }))).toBeNull();
     expect(parseRun(JSON.stringify({ ...run, context: { ...ctx, path: "//evil.test" } }))).toBeNull();
+    expect(parseRun(JSON.stringify({ ...run, awayAt: 500 }))?.awayAt).toBe(500);
+    expect(parseRun(JSON.stringify({ ...run, awayAt: "500" }))).toBeNull();
+  });
+
+  it("keeps the run after a short absence", () => {
+    const run = markAway(startRun(ctx, 25, 0), 60_000);
+    expect(markAway(run, 90_000).awayAt).toBe(60_000);
+    const back = backFromAway(run, 60_000 + AWAY_LIMIT_MS);
+    expect(back.left).toBe(false);
+    expect(back.run.awayAt).toBeUndefined();
+    expect(elapsedSeconds(back.run, 60_000 + AWAY_LIMIT_MS)).toBe(60 + AWAY_LIMIT_MS / 1000);
+  });
+
+  it("stops the run at the moment you left after a long absence", () => {
+    const run = markAway(startRun(ctx, 25, 0), 5 * 60_000);
+    const back = backFromAway(run, 5 * 60_000 + AWAY_LIMIT_MS + 1);
+    expect(back.left).toBe(true);
+    expect(back.run.startedAt).toBeNull();
+    expect(back.run.awayAt).toBeUndefined();
+    expect(elapsedSeconds(back.run, Date.now())).toBe(5 * 60);
+    expect(backFromAway(startRun(ctx, 25, 0), 1e9).left).toBe(false);
   });
 });
 

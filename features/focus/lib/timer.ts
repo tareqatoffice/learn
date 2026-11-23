@@ -8,7 +8,12 @@ export type FocusRun = {
   targetMinutes?: number;
   elapsedMs: number;
   startedAt: number | null;
+  /** When the site was last hidden (tab switched, app backgrounded, page closed); cleared on return. */
+  awayAt?: number;
 };
+
+/** Away longer than this and the run stops at the moment you left. */
+export const AWAY_LIMIT_MS = 60_000;
 
 export const FOCUS_STORAGE_KEY = "learn:focus:v1";
 export const FOCUS_PRESETS = [15, 25, 50] as const;
@@ -54,6 +59,17 @@ export function pauseRun(run: FocusRun, now: number): FocusRun {
 export const resumeRun = (run: FocusRun, now: number): FocusRun =>
   run.startedAt === null ? { ...run, startedAt: now } : run;
 
+export const markAway = (run: FocusRun, now: number): FocusRun =>
+  run.awayAt === undefined ? { ...run, awayAt: now } : run;
+
+/** On return: a short absence keeps the run going; a long one stops it (paused) at the moment you left. */
+export function backFromAway(run: FocusRun, now: number): { run: FocusRun; left: boolean } {
+  if (run.awayAt === undefined) return { run, left: false };
+  const { awayAt, ...rest } = run;
+  if (now - awayAt > AWAY_LIMIT_MS) return { run: pauseRun(rest, awayAt), left: true };
+  return { run: rest, left: false };
+}
+
 export function parseRun(raw: string | null): FocusRun | null {
   if (!raw) return null;
   try {
@@ -70,7 +86,8 @@ export function parseRun(raw: string | null): FocusRun | null {
       !(FOCUS_AREAS as readonly string[]).includes(c.area as string) ||
       typeof v.elapsedMs !== "number" ||
       !(v.startedAt === null || typeof v.startedAt === "number") ||
-      !(v.targetMinutes === undefined || typeof v.targetMinutes === "number")
+      !(v.targetMinutes === undefined || typeof v.targetMinutes === "number") ||
+      !(v.awayAt === undefined || typeof v.awayAt === "number")
     )
       return null;
     return {
@@ -80,6 +97,7 @@ export function parseRun(raw: string | null): FocusRun | null {
       targetMinutes: v.targetMinutes,
       elapsedMs: v.elapsedMs,
       startedAt: v.startedAt,
+      ...(v.awayAt !== undefined && { awayAt: v.awayAt }),
     };
   } catch {
     return null;

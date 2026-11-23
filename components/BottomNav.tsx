@@ -126,6 +126,7 @@ export function BottomNav() {
       )}
       <nav
         aria-label="Primary"
+        data-bottom-nav
         className="fixed inset-x-0 bottom-0 z-50 flex h-[calc(3.5rem+env(safe-area-inset-bottom))] border-t border-border bg-card pb-[env(safe-area-inset-bottom)]"
       >
         {tabs.map((item) => {

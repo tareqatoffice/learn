@@ -3,7 +3,7 @@
 import { Pause, Play, Square, Target, Timer, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { focusTodayAction, saveFocusSessionAction } from "@/app/(app)/focus-actions";
 import { confirm } from "@/components/ConfirmDialog";
@@ -12,6 +12,7 @@ import { focusRing, trackVar } from "@/components/track";
 import { Button } from "@/components/ui/button";
 import { firstError } from "@/features/admin/result";
 import {
+  areaFor,
   areaLabel,
   type FocusContext,
   focusContextFor,
@@ -20,13 +21,16 @@ import {
   offersFocus,
 } from "@/features/focus/context";
 import type { FocusToday } from "@/features/focus/sessions";
+import { screenInsets, useDragPosition } from "@/features/focus/lib/position";
 import {
+  backFromAway,
   elapsedSeconds,
   FOCUS_PRESETS,
   type FocusRun,
   isCompleted,
   isDone,
   isPaused,
+  markAway,
   MIN_SAVE_SECONDS,
   pauseRun,
   remainingSeconds,
@@ -81,7 +85,7 @@ export function FocusButton() {
   }, []);
 
   const finish = useCallback(
-    async (current: FocusRun, completed: boolean) => {
+    async (current: FocusRun, completed: boolean, note?: string) => {
       if (finishing.current) return false;
       if (!isCurrentRun(current)) return false;
       finishing.current = true;
@@ -92,7 +96,7 @@ export function FocusButton() {
       clear();
       try {
         if (seconds < MIN_SAVE_SECONDS) {
-          toast(`Focus under ${MIN_SAVE_SECONDS}s, not saved.`);
+          toast(`Focus under ${MIN_SAVE_SECONDS}s, not saved.`, { description: note });
           return true;
         }
         setSaving(true);
@@ -111,6 +115,7 @@ export function FocusButton() {
         }
         toast.success(
           completed ? `Focus done: ${formatDuration(seconds)} on ${label}` : `Saved ${formatDuration(seconds)} on ${label}`,
+          { description: note },
         );
         void refreshToday();
         return true;
@@ -134,6 +139,7 @@ export function FocusButton() {
   useEffect(() => {
     if (!running) return;
     const id = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
       const t = Date.now();
       setNow(t);
       const current = runRef.current;
@@ -145,6 +151,43 @@ export function FocusButton() {
     }, 1000);
     return () => window.clearInterval(id);
   }, [running, finish]);
+
+  // Stop the run when you leave the site for a while, or move to a different module.
+  const runId = run?.id;
+  const runAwayAt = run?.awayAt; // another open tab of the site clears it: you're still here
+  useEffect(() => {
+    const reconcile = () => {
+      if (document.visibilityState !== "visible" || finishing.current) return;
+      const current = useFocusStore.getState().run;
+      if (!current) return;
+      const t = Date.now();
+      const back = backFromAway(current, t);
+      if (back.run !== current) restoreRun(back.run);
+      if (back.left) {
+        void finish(back.run, isCompleted(back.run, t), "Stopped when you left the site.");
+        return;
+      }
+      const area = areaFor(pathname);
+      if (area !== "general" && area !== back.run.context.area) {
+        void finish(back.run, isCompleted(back.run, t), `Stopped when you moved to ${areaLabel(area)}.`);
+      }
+    };
+    const away = () => {
+      const current = useFocusStore.getState().run;
+      // A run you paused on purpose survives leaving; only a running one is stopped.
+      if (current && !isPaused(current)) restoreRun(markAway(current, Date.now()));
+    };
+    const onVisibility = () => (document.visibilityState === "hidden" ? away() : reconcile());
+    reconcile();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", away);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", away);
+    };
+  }, [pathname, runId, runAwayAt, finish, restoreRun]);
+
+  const { pos, wasDragged, handlers: dragHandlers } = useDragPosition(buttonRef);
 
   const [shownPath, setShownPath] = useState(pathname);
   if (shownPath !== pathname) {
@@ -174,6 +217,7 @@ export function FocusButton() {
   }, [open]);
 
   const toggle = () => {
+    if (wasDragged()) return;
     if (open) return setOpen(false);
     setHere(pageContext(pathname));
     setNow(Date.now());
@@ -214,6 +258,25 @@ export function FocusButton() {
 
   if (!run && !offersFocus(pathname)) return null;
 
+  const buttonStyle: CSSProperties | undefined = pos ? { [pos.side]: pos.x, bottom: pos.bottom } : undefined;
+  let panelStyle: CSSProperties | undefined;
+  if (pos) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const inset = screenInsets();
+    const gap = 8;
+    const btnHeight = 48; // h-12
+    const x = Math.max(16, Math.min(pos.x, vw - 320 - 16));
+    const above = pos.bottom + btnHeight / 2 < vh / 2;
+    panelStyle = above
+      ? {
+          [pos.side]: x,
+          bottom: pos.bottom + btnHeight + gap,
+          maxHeight: vh - pos.bottom - btnHeight - 2 * gap - inset.top,
+        }
+      : { [pos.side]: x, top: vh - pos.bottom + gap, maxHeight: pos.bottom - 2 * gap - inset.bottom };
+  }
+
   return (
     <>
       {open && (
@@ -222,8 +285,14 @@ export function FocusButton() {
           id={panelId}
           role="dialog"
           aria-label="Focus"
-          className="fixed right-4 bottom-[calc(8rem+env(safe-area-inset-bottom))] z-30 grid w-80 max-w-[calc(100vw-2rem)] gap-4 rounded-2xl border border-border bg-card p-4 shadow-lg animate-in fade-in-0 slide-in-from-bottom-2 duration-200 lg:bottom-22"
-          style={{ backgroundImage: `linear-gradient(180deg, color-mix(in oklch, ${color} 10%, transparent), transparent 6rem)` }}
+          className={cn(
+            "fixed z-30 grid w-80 max-w-[calc(100vw-2rem)] gap-4 overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-lg animate-in fade-in-0 duration-200",
+            !pos && "right-4 bottom-[calc(8rem+env(safe-area-inset-bottom))] slide-in-from-bottom-2 lg:bottom-22",
+          )}
+          style={{
+            ...panelStyle,
+            backgroundImage: `linear-gradient(180deg, color-mix(in oklch, ${color} 10%, transparent), transparent 6rem)`,
+          }}
         >
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
@@ -378,17 +447,21 @@ export function FocusButton() {
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         aria-label={run ? `Focus: ${clock} on ${run.context.label}` : "Start focus"}
+        title="Focus (drag to move)"
         onClick={toggle}
+        {...dragHandlers}
         className={cn(
-          "fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 flex h-12 items-center gap-2 rounded-full border border-border bg-card text-sm font-semibold shadow-lg transition-transform hover:-translate-y-0.5 lg:bottom-6",
+          "fixed z-30 flex h-12 touch-none select-none items-center gap-2 rounded-full border border-border bg-card text-sm font-semibold shadow-lg transition-transform hover:-translate-y-0.5",
+          !pos && "right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-6",
           focusRing,
           run ? "px-4" : "w-12 justify-center",
         )}
-        style={
-          run
-            ? { boxShadow: `0 0 0 2px ${color}, 0 10px 24px -8px color-mix(in oklch, ${color} 50%, transparent)` }
-            : undefined
-        }
+        style={{
+          ...buttonStyle,
+          ...(run && {
+            boxShadow: `0 0 0 2px ${color}, 0 10px 24px -8px color-mix(in oklch, ${color} 50%, transparent)`,
+          }),
+        }}
       >
         {run ? (
           <>
