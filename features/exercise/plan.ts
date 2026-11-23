@@ -23,6 +23,8 @@ export type SkeletonInput = {
   startDate: string;
   targetDate: string;
   direction: "lose" | "gain" | "keep";
+  /** Order of workout focuses (Admin → General settings); defaults to DEFAULT_ROTATION. */
+  rotation?: readonly Focus[];
 };
 
 const LEVEL_DEFAULTS: Record<Level, { sets: number; restSec: number; maxDifficulty: 1 | 2 | 3 }> = {
@@ -35,7 +37,7 @@ const BASE_VOLUME: Record<Level, { reps: number; seconds: number }> = {
   intermediate: { reps: 12, seconds: 30 },
   advanced: { reps: 15, seconds: 40 },
 };
-const ROTATION: Focus[] = ["full", "lower", "upper", "cardio", "core", "full"];
+export const DEFAULT_ROTATION: readonly Focus[] = ["full", "lower", "upper", "cardio", "core", "full"];
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -76,9 +78,15 @@ export function scheduledDates(
   return out;
 }
 
-function focusFor(position: number, count: number, direction: SkeletonInput["direction"]): Focus {
+function focusFor(
+  position: number,
+  count: number,
+  direction: SkeletonInput["direction"],
+  rotation: readonly Focus[] = DEFAULT_ROTATION,
+): Focus {
   if (count >= 3 && position === count - 1) return "stretch";
-  const focus = ROTATION[position % ROTATION.length];
+  const order = rotation.length ? rotation : DEFAULT_ROTATION;
+  const focus = order[position % order.length];
   return direction === "gain" && focus === "cardio" ? "full" : focus;
 }
 
@@ -117,7 +125,7 @@ export function skeletonWeek(p: SkeletonInput, weekStart: string, history: { fin
     if (date < p.startDate || date > p.targetDate) return;
     days.push({
       date,
-      focus: focusFor(position, order.length, p.direction),
+      focus: focusFor(position, order.length, p.direction, p.rotation),
       minutes: p.minutesPerSession,
       maxDifficulty,
       slots,

@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { z } from "zod";
 import { getAiConfig, modelChain } from "@/features/ai/lib/aiSettings";
+import { systemPrompt } from "@/features/ai/lib/prompts";
 import { connectDb } from "@/lib/db";
 import { AiError, type ChatMessage, type ChatOptions, chatCompletion, extractJson } from "@/features/ai/lib/openrouter";
 import { SpeakingTake } from "@/models";
@@ -98,31 +99,18 @@ export function parseBodyFeedback(reply: string): BodyFeedback | null {
   return parsed.success ? parsed.data : null;
 }
 
-const SPEECH_PROMPT = [
-  "You are a warm, practical English speaking coach for a B2-level learner. You get the transcript of",
-  "one spoken take (and, for shadowing or reading aloud, the reference text they tried to say).",
-  "The transcript comes from automatic speech recognition, so ignore punctuation and small recognition slips.",
-  "Rate fluency, vocabulary and grammar from 1 (weak) to 5 (excellent). Address the learner as \"you\" and keep every item short.",
-  SPEAKING_SAFETY,
+const SPEECH_FORMAT = [
   "Reply with only a JSON object with these keys: fluency, vocabulary, grammar (integers 1-5),",
   "summary (two or three sentences), strengths (up to 3 strings), workOn (up to 3 strings: concrete things to practise),",
   "missedWords (words from the reference text that were skipped or misread; empty when there is no reference).",
 ].join(" ");
 
-const BODY_PROMPT = [
-  "You are a supportive presentation coach. You get a few still frames taken at intervals from a video of",
-  "a learner speaking English. Judge only what is visible: confidence of posture and expression, eye contact with the",
-  "camera, and use of gestures, each from 1 (weak) to 5 (excellent). Never comment on appearance, age, ethnicity,",
-  "health or attractiveness, and never try to identify the person. Stills cannot show motion, so be modest.",
-  SPEAKING_SAFETY,
+const BODY_FORMAT = [
   "Reply with only a JSON object with these keys: confidence, eyeContact, gestures (integers 1-5),",
   "suggestions (up to 3 short, kind, actionable strings).",
 ].join(" ");
 
-const MATERIAL_PROMPT = [
-  "You write practice material for a B2-level (upper intermediate) learner of English: natural, everyday",
-  "English, no rare idioms, no lists of facts. Reply with only a JSON object.",
-].join(" ");
+const JSON_ONLY = "Reply with only a JSON object.";
 
 type TakeDoc = {
   task: TaskKey;
@@ -176,11 +164,11 @@ export async function speechFeedback(userId: string, takeId: string, deps: Deps 
     .filter(Boolean)
     .join("\n\n");
 
-  return guarded(userId, async ({ settings, apiKey }) => {
+  return guarded(userId, async ({ settings, apiKey, prompts }) => {
     const { text: reply, model } = await metered(userId, settings, () =>
       chatCompletion(
         [
-          { role: "system", content: SPEECH_PROMPT },
+          { role: "system", content: systemPrompt(prompts.speakingSpeech, SPEAKING_SAFETY, SPEECH_FORMAT) },
           { role: "user", content: user },
         ],
         {
@@ -237,7 +225,6 @@ export async function runBodyFeedback(
     return fail("Send between 1 and 6 JPEG frames, each under 200 KB.");
 
   const messages: ChatMessage[] = [
-    { role: "system", content: BODY_PROMPT },
     {
       role: "user",
       content: [
@@ -249,9 +236,10 @@ export async function runBodyFeedback(
 
   return guarded(
     userId,
-    async ({ settings, apiKey }) => {
+    async ({ settings, apiKey, prompts }) => {
+      const system: ChatMessage = { role: "system", content: systemPrompt(prompts.speakingBody, SPEAKING_SAFETY, BODY_FORMAT) };
       const { text: reply, model } = await metered(userId, settings, () =>
-        chatCompletion(messages, {
+        chatCompletion([system, ...messages], {
           ...deps,
           apiKey,
           models: settings.visionModel ? [settings.visionModel] : modelChain(settings),
@@ -320,11 +308,11 @@ export async function generateMaterial(
           },
         };
 
-  return guarded(userId, async ({ settings, apiKey }) => {
+  return guarded(userId, async ({ settings, apiKey, prompts }) => {
     const { text: reply } = await metered(userId, settings, () =>
       chatCompletion(
         [
-          { role: "system", content: MATERIAL_PROMPT },
+          { role: "system", content: systemPrompt(prompts.speakingMaterial, JSON_ONLY) },
           { role: "user", content: instruction },
         ],
         {

@@ -1,5 +1,5 @@
 import type { Types } from "mongoose";
-import { INSTRUCTIONS, JSON_SCHEMAS, SYSTEM_PROMPT, draftFromRaw, type ItemType } from "@/features/admin/ielts";
+import { INSTRUCTIONS, JSON_SCHEMAS, draftFromRaw, type ItemType, speakingDraftSystem } from "@/features/admin/ielts";
 import { getAiConfig, modelChain } from "@/features/ai/lib/aiSettings";
 import { connectDb } from "@/lib/db";
 import { AiError, type ChatOptions, chatCompletion, extractJson } from "@/features/ai/lib/openrouter";
@@ -171,13 +171,13 @@ export async function generateQuestions(
   deps: Deps = {},
 ): Promise<AiResult<QuestionSet>> {
   try {
-    const { settings, apiKey } = await getAiConfig();
+    const { settings, apiKey, prompts } = await getAiConfig();
     if (!settings.active) return { ok: false, error: TURNED_OFF };
     const user = kind === "mock" ? MOCK_INSTRUCTIONS : kind === "part3" && cue ? INSTRUCTIONS.part3 + cardBlock(cue) : INSTRUCTIONS[kind];
     const { text } = await metered(userId, settings, () =>
       chatCompletion(
         [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: speakingDraftSystem(prompts.ieltsSpeakingQuestions) },
           { role: "user", content: user },
         ],
         {

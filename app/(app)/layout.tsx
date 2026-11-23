@@ -6,6 +6,7 @@ import { TopBar } from "@/components/TopBar";
 import { Toaster } from "@/components/ui/sonner";
 import { requireUser } from "@/features/auth/lib/authz";
 import { FocusButton } from "@/features/focus/components/FocusButton";
+import { getAppSettings } from "@/lib/appSettings";
 import { cn } from "@/lib/utils";
 import type { Metadata } from "next";
 
@@ -16,7 +17,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await requireUser();
+  const [user, { focusPresets }] = await Promise.all([requireUser(), getAppSettings()]);
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <TopBar
@@ -24,7 +25,7 @@ export default async function AppLayout({
       />
       <main id="main" tabIndex={-1} className={cn(containerClass, "min-w-0 flex-1 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))] focus:outline-none lg:pb-6")}>{children}</main>
       <BottomNav />
-      <FocusButton />
+      <FocusButton presets={focusPresets} />
       <CommandPalette />
       <Toaster />
       <ConfirmHost />

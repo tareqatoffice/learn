@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { AiKeyForm } from "@/features/admin/components/AiKeyForm";
+import { AiPromptsForm } from "@/features/admin/components/AiPromptsForm";
+import { AI_PROMPTS, PROMPT_KEYS } from "@/features/ai/lib/prompts";
 import { AiSettingsForm } from "@/features/admin/components/AiSettingsForm";
 import { AdminCard, AdminPage } from "@/features/admin/components/layout";
 import { getAiConfig } from "@/features/ai/lib/aiSettings";
@@ -16,7 +18,7 @@ export const metadata = buildMetadata({
 
 export default async function AiSettingsPage() {
   await connectDb();
-  const { settings, apiKey } = await getAiConfig();
+  const { settings, apiKey, prompts } = await getAiConfig();
   const catalog = await listCatalog({ apiKey });
   return (
     <AdminPage
@@ -55,6 +57,21 @@ export default async function AiSettingsPage() {
           keyConfigured={settings.keyConfigured}
           catalog={catalog.models}
           catalogError={catalog.error}
+        />
+      </AdminCard>
+      <AdminCard
+        title="Prompts"
+        description="The instructions each AI feature starts from. The safety rules and the reply format the app reads are always added in code, so editing these changes tone and guidance, not what the app can parse."
+      >
+        <AiPromptsForm
+          rows={PROMPT_KEYS.map((key) => ({
+            key,
+            area: AI_PROMPTS[key].area,
+            label: AI_PROMPTS[key].label,
+            help: AI_PROMPTS[key].help,
+            text: prompts[key],
+            defaultText: AI_PROMPTS[key].default,
+          }))}
         />
       </AdminCard>
     </AdminPage>

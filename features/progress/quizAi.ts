@@ -3,6 +3,7 @@ import { z } from "zod";
 import { visibleQuestionFilter } from "@/features/content/visibility";
 import { AI_ANSWER_MAX, AI_HISTORY_MAX, AI_MESSAGE_MAX, AI_REPLY_MAX, AI_STORED_MAX } from "@/features/ai/lib/ai-limits";
 import { type AiSettingsView, getAiConfig, modelChain } from "@/features/ai/lib/aiSettings";
+import { systemPrompt } from "@/features/ai/lib/prompts";
 import { retryOnDuplicateKey } from "@/lib/db";
 import { AiError, type ChatMessage, type ChatOptions, chatCompletion, extractJson } from "@/features/ai/lib/openrouter";
 import { AiConversation, AiUsage, Question, QuizSession } from "@/models";
@@ -148,12 +149,7 @@ export function parseFeedback(reply: string): AiFeedback | null {
   };
 }
 
-const GRADER_PROMPT = [
-  "You are a friendly, rigorous technical interview coach. Grade the learner's answer against the",
-  "reference answer. Judge substance, not wording: an answer is correct when it covers the key ideas",
-  "an interviewer would expect, partial when it has the right idea but misses or muddles important",
-  'points, and incorrect otherwise. Address the learner as "you" and keep every item short.',
-  SAFETY,
+const GRADER_FORMAT = [
   'Reply with only a JSON object with these keys: verdict ("correct" | "partial" | "incorrect"),',
   "score (integer 0-100), summary (one or two sentences), strengths (up to 3 strings),",
   "missing (up to 3 strings: key points left out or wrong), followUp (one probing follow-up question",
@@ -169,14 +165,14 @@ export async function gradeAnswer(
 ): Promise<AiGrade> {
   const answer = learnerAnswer.trim().slice(0, AI_ANSWER_MAX);
   if (!answer) throw new AiError("Type an answer first.");
-  const [card, { settings, apiKey }] = await Promise.all([loadCoachCard(userId, sessionId, questionId), getAiConfig()]);
+  const [card, { settings, apiKey, prompts }] = await Promise.all([loadCoachCard(userId, sessionId, questionId), getAiConfig()]);
   if (!card) throw new AiError("This question is no longer available.");
   if (!settings.active) throw new AiError("The AI coach is turned off.");
 
   const { text: reply, model } = await metered(userId, settings, () =>
     chatCompletion(
       [
-        { role: "system", content: GRADER_PROMPT },
+        { role: "system", content: systemPrompt(prompts.quizGrader, SAFETY, GRADER_FORMAT) },
         { role: "user", content: cardBlock(card, answer) },
       ],
       {
@@ -219,7 +215,7 @@ export async function askFollowUp(
 ): Promise<AiReply> {
   const message = input.message.trim().slice(0, AI_MESSAGE_MAX);
   if (!message) throw new AiError("Type a message first.");
-  const [card, { settings, apiKey }] = await Promise.all([loadCoachCard(userId, sessionId, questionId), getAiConfig()]);
+  const [card, { settings, apiKey, prompts }] = await Promise.all([loadCoachCard(userId, sessionId, questionId), getAiConfig()]);
   if (!card) throw new AiError("This question is no longer available.");
   if (!settings.active) throw new AiError("The AI coach is turned off.");
 
@@ -236,14 +232,7 @@ export async function askFollowUp(
   const messages: ChatMessage[] = [
     {
       role: "system",
-      content: [
-        "You are a friendly, rigorous technical interview coach helping a learner study the question below.",
-        "Answer their follow-up questions, or evaluate their answers to your follow-up questions, concisely",
-        "(usually under 150 words) using Markdown. Stay on the topic of the question and politely decline",
-        "anything unrelated; when it helps, end with one short question that checks their understanding.",
-        SAFETY,
-        "\n\n" + cardBlock(card, answer),
-      ].join(" "),
+      content: systemPrompt(prompts.quizChat, SAFETY, "\n\n" + cardBlock(card, answer)),
     },
     ...history.map((m) => ({ role: m.role, content: m.content })),
     { role: "user", content: message },

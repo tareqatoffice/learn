@@ -61,7 +61,7 @@ function AreaDot({ area }: { area: FocusArea }) {
   );
 }
 
-export function FocusButton() {
+export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly number[] }) {
   const pathname = usePathname();
   const run = useFocusStore((s) => s.run);
   const { start, pause, resume, restore: restoreRun, clear } = useFocusStore.getState();
@@ -69,7 +69,7 @@ export function FocusButton() {
   const [now, setNow] = useState(() => Date.now());
   const [open, setOpen] = useState(false);
   const [here, setHere] = useState<FocusContext | null>(null);
-  const [target, setTarget] = useState<number | undefined>(25);
+  const [target, setTarget] = useState<number | undefined>(() => (presets.includes(25) ? 25 : presets[0]));
   const [today, setToday] = useState<FocusToday | null>(null);
   const [saving, setSaving] = useState(false);
   const finishing = useRef(false);
@@ -381,8 +381,13 @@ export function FocusButton() {
                     <span className="truncate">{here.label}</span>
                   </p>
                 </div>
-                <div role="radiogroup" aria-label="Session length" className="grid grid-cols-4 gap-1.5">
-                  {[...FOCUS_PRESETS, undefined].map((m) => {
+                <div
+                  role="radiogroup"
+                  aria-label="Session length"
+                  className="grid gap-1.5"
+                  style={{ gridTemplateColumns: `repeat(${presets.length + 1}, minmax(0, 1fr))` }}
+                >
+                  {[...presets, undefined].map((m) => {
                     const selected = target === m;
                     return (
                       <button

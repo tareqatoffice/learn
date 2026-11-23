@@ -57,6 +57,11 @@ describe("skeletonWeek", () => {
     const lose = { ...four, direction: "lose" as const };
     expect(skeletonWeek(lose, "2026-11-23", history)[3].focus).toBe("cardio");
   });
+  it("follows a custom rotation and still ends a 3+ day week with a stretch", () => {
+    const four = { ...base, workoutDays: [1, 2, 3, 4, 5], rotation: ["core", "cardio"] as const };
+    expect(skeletonWeek(four, "2026-11-23", history).map((d) => d.focus)).toEqual(["core", "cardio", "core", "cardio", "stretch"]);
+    expect(skeletonWeek({ ...four, rotation: [] }, "2026-11-23", history)[1].focus).toBe("lower");
+  });
   it("deloads on week index 3", () => {
     expect(skeletonWeek(base, "2026-12-14", history)[0].sets).toBe(1);
   });

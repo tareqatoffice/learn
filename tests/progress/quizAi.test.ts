@@ -1,13 +1,22 @@
 import mongoose from "mongoose";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { AI_REPLY_MAX } from "@/features/ai/lib/ai-limits";
-import { clearAiKey, getAiConfig, getAiSettings, saveAiKey, saveAiSettings } from "@/features/ai/lib/aiSettings";
+import {
+  clearAiKey,
+  getAiConfig,
+  getAiSettings,
+  resetPrompt,
+  saveAiKey,
+  saveAiSettings,
+  savePrompt,
+} from "@/features/ai/lib/aiSettings";
+import { AI_PROMPTS } from "@/features/ai/lib/prompts";
 import { connectDb } from "@/lib/db";
 import { DEFAULT_OPENROUTER_MODEL, resetEnvCache } from "@/lib/env";
 import { AiError } from "@/features/ai/lib/openrouter";
 import { AiConversation, AiSettings, AiUsage, Question, QuizSession } from "@/models";
 import { createSession, recordResult } from "@/features/progress/quiz";
-import { askFollowUp, consumeAiCall, gradeAnswer, loadCoachCard, parseFeedback, tagSafe } from "@/features/progress/quizAi";
+import { askFollowUp, consumeAiCall, gradeAnswer, loadCoachCard, parseFeedback, SAFETY, tagSafe } from "@/features/progress/quizAi";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedBook, seedQuestions } from "./seed";
 
@@ -211,6 +220,26 @@ describe("quiz coach", () => {
     expect(await loadCoachCard(user, "bad", questionId)).toBeNull();
     await Question.updateOne({ _id: questionId }, { status: "draft" });
     expect(await loadCoachCard(user, sessionId, questionId)).toBeNull();
+  });
+
+  it("uses the admin's edited grader prompt but keeps the safety rules and reply format", async () => {
+    const admin = newUserId();
+    expect(await savePrompt("quizGrader", "short", admin)).toMatchObject({ ok: false, errors: { text: expect.any(String) } });
+    expect(await savePrompt("nope", "A long enough prompt for the grader.", admin)).toMatchObject({ ok: false });
+    expect(await savePrompt("quizGrader", "  Be a strict senior interviewer. Grade harshly.  ", admin)).toEqual({ ok: true });
+    expect((await getAiConfig()).prompts.quizGrader).toBe("Be a strict senior interviewer. Grade harshly.");
+
+    const { user, sessionId, questionId } = await setup();
+    const fetch = vi.fn(async () => reply(JSON.stringify(FEEDBACK)));
+    await gradeAnswer(user, sessionId, questionId, "It keeps scope", { fetch });
+    const system = bodyOf(fetch).messages[0].content as string;
+    expect(system.startsWith("Be a strict senior interviewer. Grade harshly.")).toBe(true);
+    expect(system).not.toContain("friendly, rigorous");
+    expect(system).toContain(SAFETY);
+    expect(system).toContain("Reply with only a JSON object");
+
+    expect(await resetPrompt("quizGrader", admin)).toEqual({ ok: true });
+    expect((await getAiConfig()).prompts.quizGrader).toBe(AI_PROMPTS.quizGrader.default);
   });
 
   it("defuses data tags inside learner text so it can't break out of <learner_answer> (S10)", async () => {
