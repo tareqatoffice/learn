@@ -15,6 +15,8 @@ import { ShadowPlayer } from "./ShadowPlayer";
 import { ShadowText } from "./ShadowText";
 import { sentenceAt, timeline } from "@/features/speaking/shadowText";
 
+const REFRESH_MS = 8 * 60 * 1000;
+
 export function TakeTranscript({ takeId, status, transcript }: { takeId: string; status: string; transcript?: string }) {
   const router = useRouter();
   const [text, setText] = useState(transcript);
@@ -124,6 +126,16 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [urls] = useState({ media: take.mediaUrl, audio: take.audioUrl, source: take.sourceAudioUrl });
+  const [compareUrl, setCompareUrl] = useState(take.audioUrl ?? take.mediaUrl);
+  useEffect(() => {
+    if (take.task !== "shadowing" || !take.sourceAudioUrl) return;
+    // The take's signed link lasts ten minutes; renew it so the compare player keeps working.
+    const timer = setInterval(async () => {
+      const fresh = await takeMediaUrlsAction(take.id).catch(() => null);
+      if (fresh) setCompareUrl(fresh.audio ?? fresh.media);
+    }, REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [take.id, take.task, take.sourceAudioUrl]);
   const video = take.kind === "video";
   const reference = take.task === "recordReview" ? take.material.prompt : take.material.text;
   const [sourceTime, setSourceTime] = useState<number | null>(null);
@@ -176,7 +188,7 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
             }}
           />
           {take.task === "shadowing" && urls.source && (
-            <ShadowPlayer sourceUrl={urls.source} takeUrl={urls.audio ?? urls.media} rate={take.clipRate} onSourceTime={setSourceTime} />
+            <ShadowPlayer sourceUrl={urls.source} takeUrl={compareUrl} rate={take.clipRate} onSourceTime={setSourceTime} />
           )}
         </section>
 

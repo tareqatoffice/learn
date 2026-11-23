@@ -1,10 +1,12 @@
 import { Types } from "mongoose";
-import { connectDb } from "@/lib/db";
-import { SpeakingLesson, SpeakingTake } from "@/models";
+import { connectDb, retryOnDuplicateKey } from "@/lib/db";
+import { SpeakingLesson, SpeakingTake, SpeakingTakeUsage } from "@/models";
 import { type ActionResult, fail, ok } from "@/features/admin/result";
-import { presignGet, storageConfigured } from "@/lib/r2";
+import { storageConfigured } from "@/lib/r2";
 import { sttConfigured } from "@/lib/stt";
 import type { MediaDoc } from "@/features/recording/media";
+import { plausibleSec } from "@/features/recording/mediaCore";
+import { lessonAudioUrl } from "./lessons";
 import { playbackUrls, prepareUpload, removeMedia, verifyUpload } from "@/features/recording/upload";
 import { takeCapSec } from "./schedule";
 import { isClipRate } from "./shadowText";
@@ -42,16 +44,43 @@ export async function sweepAbandonedTakes(userId: string, now: Date = new Date()
     .limit(50)
     .lean<{ _id: Types.ObjectId; media: MediaDoc }[]>();
   if (!stale.length) return 0;
-  const ids = stale.map((t) => t._id);
-  await SpeakingTake.updateMany({ _id: { $in: ids }, "media.stored": false }, { $set: { deletingAt: now } });
+  await SpeakingTake.updateMany({ _id: { $in: stale.map((t) => t._id) }, "media.stored": false }, { $set: { deletingAt: now } });
+  // Only takes this sweep marked: one confirmed after the find above keeps its files.
+  const marked = await SpeakingTake.find({ _id: { $in: stale.map((t) => t._id) }, "media.stored": false, deletingAt: now })
+    .select("media")
+    .lean<{ _id: Types.ObjectId; media: MediaDoc }[]>();
+  if (!marked.length) return 0;
+  const ids = marked.map((t) => t._id);
   try {
-    await removeMedia(stale.map((t) => t.media));
+    await removeMedia(marked.map((t) => t.media));
   } catch {
     await SpeakingTake.updateMany({ _id: { $in: ids } }, { $unset: { deletingAt: 1 } });
     return 0;
   }
   const res = await SpeakingTake.deleteMany({ _id: { $in: ids }, userId, "media.stored": false });
   return res.deletedCount ?? 0;
+}
+
+const OPEN_LIMIT = "You have recordings that haven't finished uploading. Wait a moment, or reload the page, then try again.";
+
+function openTakes(userId: string): Promise<number> {
+  return SpeakingTake.countDocuments({ userId, "media.stored": false, createdAt: { $gte: new Date(Date.now() - OPEN_TAKE_MS) } });
+}
+
+// Counts takes started per UTC day; deleting takes doesn't give the count back.
+async function consumeTake(userId: string, now: Date = new Date()): Promise<(() => Promise<void>) | null> {
+  const day = now.toISOString().slice(0, 10);
+  const row = await retryOnDuplicateKey(() =>
+    SpeakingTakeUsage.findOneAndUpdate({ userId, day }, { $inc: { count: 1 } }, { upsert: true, returnDocument: "after" }).lean<{ count: number }>(),
+  );
+  const refund = async () => {
+    await SpeakingTakeUsage.updateOne({ userId, day, count: { $gt: 0 } }, { $inc: { count: -1 } });
+  };
+  if ((row?.count ?? 0) > MAX_TAKES_PER_DAY) {
+    await refund();
+    return null;
+  }
+  return refund;
 }
 
 export async function startTake(
@@ -75,12 +104,9 @@ export async function startTake(
 
   await connectDb();
   await sweepAbandonedTakes(userId).catch(() => 0);
-  const [open, recent] = await Promise.all([
-    SpeakingTake.countDocuments({ userId, "media.stored": false, createdAt: { $gte: new Date(Date.now() - OPEN_TAKE_MS) } }),
-    SpeakingTake.countDocuments({ userId, createdAt: { $gte: new Date(Date.now() - 86_400_000) } }),
-  ]);
-  if (open >= MAX_OPEN_TAKES) return fail("You have recordings that haven't finished uploading. Wait a moment, or reload the page, then try again.");
-  if (recent >= MAX_TAKES_PER_DAY) return fail(`You've made ${MAX_TAKES_PER_DAY} recordings in the last day, the most allowed. Try again tomorrow.`);
+  if ((await openTakes(userId)) >= MAX_OPEN_TAKES) return fail(OPEN_LIMIT);
+  const refund = await consumeTake(userId);
+  if (!refund) return fail(`You've made ${MAX_TAKES_PER_DAY} recordings today, the most allowed. It resets at midnight UTC.`);
 
   const lesson =
     input.lessonId && isId(input.lessonId)
@@ -102,7 +128,10 @@ export async function startTake(
     audioSize: input.audioSize,
     capSec,
   });
-  if (!upload.ok) return upload;
+  if (!upload.ok) {
+    await refund();
+    return upload;
+  }
   const { media, uploadUrl, audioUploadUrl, maxBytes } = upload;
 
   await SpeakingTake.create({
@@ -115,6 +144,16 @@ export async function startTake(
     media,
     ...(clipRate ? { clipRate } : {}),
   });
+  // Parallel starts can each pass the check above; the newest ones past the limit back out.
+  const newest = await SpeakingTake.find({ userId, "media.stored": false, createdAt: { $gte: new Date(Date.now() - OPEN_TAKE_MS) } })
+    .sort({ _id: 1 })
+    .select("_id")
+    .lean<{ _id: Types.ObjectId }[]>();
+  if (newest.findIndex((t) => String(t._id) === takeId) >= MAX_OPEN_TAKES) {
+    await SpeakingTake.deleteOne({ _id, userId });
+    await refund();
+    return fail(OPEN_LIMIT);
+  }
 
   return ok({ takeId, uploadUrl, ...(audioUploadUrl ? { audioUploadUrl } : {}), maxBytes, capSec });
 }
@@ -165,7 +204,7 @@ export async function confirmTake(userId: string, takeId: string, durationSec: n
       $set: {
         "media.stored": true,
         "media.size": main.size,
-        "media.durationSec": Math.min(durationSec, media.capSec),
+        "media.durationSec": Math.min(durationSec, media.capSec, plausibleSec(main.size)),
         transcriptStatus: sttConfigured() ? "pending" : "unavailable",
       },
     },
@@ -211,8 +250,7 @@ export async function getTake(userId: string, takeId: string): Promise<TakeView 
       .lean<{ shadow?: { audioKey?: string; audioUrl?: string; marks?: number[]; durationSec?: number; text?: string } }>();
     if (lesson?.shadow?.text === take.material?.text && lesson?.shadow?.marks?.length) sourceMarks = [...lesson.shadow.marks];
     sourceDurationSec = lesson?.shadow?.durationSec;
-    if (lesson?.shadow?.audioKey) sourceAudioUrl = await presignGet(lesson.shadow.audioKey);
-    else if (lesson?.shadow?.audioUrl) sourceAudioUrl = lesson.shadow.audioUrl;
+    sourceAudioUrl = lesson?.shadow ? await lessonAudioUrl(lesson.shadow) : undefined;
   }
 
   const ai = take.ai ? JSON.parse(JSON.stringify(take.ai)) : undefined;

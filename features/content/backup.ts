@@ -44,6 +44,7 @@ import {
   SpeakingSettings,
   SpeakingTake,
   SpeakingUsage,
+  SpeakingTakeUsage,
   Subject,
   User,
 } from "@/models";
@@ -111,6 +112,7 @@ export const ALL_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["aiusages", AiUsage],
   ["aiconversations", AiConversation],
   ["speakingusages", SpeakingUsage],
+  ["speakingtakeusages", SpeakingTakeUsage],
   ["codingresults", CodingResult],
   ["focussessions", FocusSession],
 ];

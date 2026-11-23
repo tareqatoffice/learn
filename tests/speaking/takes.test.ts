@@ -5,13 +5,13 @@ vi.mock("@/lib/r2", () => ({
   storageConfigured: vi.fn(() => true),
   presignPut: vi.fn(async (key: string) => `https://r2.test/put/${key}`),
   presignGet: vi.fn(async (key: string) => `https://r2.test/get/${key}`),
-  headObject: vi.fn(async () => ({ size: 1000, contentType: "" })),
+  headObject: vi.fn(async () => ({ size: 1_000_000, contentType: "" })),
   deleteObjects: vi.fn(async () => undefined),
 }));
 vi.mock("@/lib/stt", () => ({ sttConfigured: vi.fn(() => true) }));
 
 import { connectDb } from "@/lib/db";
-import { SpeakingLesson, SpeakingTake } from "@/models";
+import { SpeakingLesson, SpeakingTake, SpeakingTakeUsage } from "@/models";
 import { MAX_OPEN_TAKES, MAX_TAKES_PER_DAY, OPEN_TAKE_MS, sweepAbandonedTakes, deleteAllTakes, deleteTake, confirmTake, getTake, listTakes, saveSelfRating, startTake } from "@/features/speaking/takes";
 import * as r2 from "@/lib/r2";
 import * as stt from "@/lib/stt";
@@ -44,7 +44,7 @@ describe("speaking takes", () => {
     vi.clearAllMocks();
     vi.mocked(r2.storageConfigured).mockReturnValue(true);
     vi.mocked(stt.sttConfigured).mockReturnValue(true);
-    vi.mocked(r2.headObject).mockResolvedValue({ size: 1000, contentType: "" });
+    vi.mocked(r2.headObject).mockResolvedValue({ size: 1_000_000, contentType: "" });
   });
   afterAll(() => mongoose.disconnect());
 
@@ -184,19 +184,33 @@ describe("speaking takes", () => {
     expect((await confirmTake(u, t.takeId, 3)).ok).toBe(false);
   });
 
-  it("startTake refuses past the daily limit (S3)", async () => {
+  it("startTake refuses past the daily limit, and deleting takes doesn't give it back (S3)", async () => {
     const u = user();
-    const day = Array.from({ length: MAX_TAKES_PER_DAY }, () => ({
-      userId: new Types.ObjectId(u),
-      date: base.date,
-      task: "readAloud",
-      media: { kind: "audio", key: "k", mime: "audio/webm", stored: true, capSec: 600 },
-      createdAt: new Date(Date.now() - 60_000),
-    }));
-    await SpeakingTake.collection.insertMany(day);
+    const day = new Date().toISOString().slice(0, 10);
+    await SpeakingTakeUsage.create({ userId: u, day, count: MAX_TAKES_PER_DAY - 1 });
+    const last = await start(u);
+    await deleteTake(u, last.takeId);
     const refused = await startTake(u, base);
     expect(refused.ok).toBe(false);
-    if (!refused.ok) expect(refused.errors._).toMatch(/last day/);
+    if (!refused.ok) expect(refused.errors._).toMatch(/today/);
+    expect((await SpeakingTakeUsage.findOne({ userId: u, day }).lean<{ count: number }>())?.count).toBe(MAX_TAKES_PER_DAY);
+    expect((await startTake(user(), base)).ok).toBe(true);
+  });
+
+  it("parallel starts never leave more than the open-take limit", async () => {
+    const u = user();
+    const results = await Promise.all(Array.from({ length: MAX_OPEN_TAKES + 3 }, () => startTake(u, base)));
+    expect(results.filter((r) => r.ok).length).toBeLessThanOrEqual(MAX_OPEN_TAKES);
+    expect(await SpeakingTake.countDocuments({ userId: u })).toBeLessThanOrEqual(MAX_OPEN_TAKES);
+  });
+
+  it("confirmTake credits no more time than the file could hold", async () => {
+    const u = user();
+    const { takeId } = await start(u);
+    vi.mocked(r2.headObject).mockResolvedValue({ size: 18_000, contentType: "" });
+    expect((await confirmTake(u, takeId, 600)).ok).toBe(true);
+    const doc = await SpeakingTake.findById(takeId).lean<{ media: { durationSec: number } }>();
+    expect(doc!.media.durationSec).toBe(18);
   });
 
   it("confirmTake rejects missing object", async () => {
@@ -244,7 +258,7 @@ describe("speaking takes", () => {
       transcriptStatus: string;
     }>();
     expect(doc!.media.stored).toBe(true);
-    expect(doc!.media.size).toBe(1000);
+    expect(doc!.media.size).toBe(1_000_000);
     expect(doc!.media.durationSec).toBe(capSec);
     expect(doc!.transcriptStatus).toBe("pending");
   });

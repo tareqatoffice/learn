@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { bodyFeedbackAction, setBodyConsentAction, speechFeedbackAction } from "@/app/(app)/speaking/actions";
+import { bodyFeedbackAction, setBodyConsentAction, speechFeedbackAction, takeMediaUrlsAction } from "@/app/(app)/speaking/actions";
 import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { framesOf } from "@/lib/media";
@@ -108,7 +108,9 @@ export function CoachPanel({
     try {
       let frames: string[];
       try {
-        frames = await framesOf(mediaUrl);
+        // The page's signed link expires after ten minutes; ask for a fresh one.
+        const fresh = await takeMediaUrlsAction(takeId).catch(() => null);
+        frames = await framesOf(fresh?.media ?? mediaUrl);
       } catch {
         return setError("Couldn't read stills from the video. Reload the page and try again.");
       }

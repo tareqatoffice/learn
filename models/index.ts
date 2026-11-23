@@ -24,6 +24,7 @@ export { SpeakingSettings } from "./speakingSettings";
 export { SpeakingProfile } from "./speakingProfile";
 export { SpeakingDay } from "./speakingDay";
 export { SpeakingUsage } from "./speakingUsage";
+export { SpeakingTakeUsage } from "./speakingTakeUsage";
 export { IeltsProfile } from "./ieltsProfile";
 export { IeltsPlan } from "./ieltsPlan";
 export { IeltsPlanSuggestion } from "./ieltsPlanSuggestion";
