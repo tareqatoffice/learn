@@ -19,7 +19,7 @@ export function AppHeader({
 }) {
   const logoClass = "mr-3 py-2 text-lg font-bold tracking-tight";
   return (
-    <header className="min-w-0 overflow-x-clip border-b border-border bg-card sticky top-0 z-40">
+    <header data-app-header className="min-w-0 overflow-x-clip border-b border-border bg-card sticky top-0 z-40">
       <div className={cn(containerClass, "flex h-14 min-w-0 items-center gap-2")}>
         {logoHref ? (
           <Link
