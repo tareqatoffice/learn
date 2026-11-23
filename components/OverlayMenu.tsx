@@ -87,7 +87,7 @@ export function OverlayMenu({
   }, [open]);
 
   return (
-    <div ref={rootRef} className="relative z-30 lg:hidden">
+    <div ref={rootRef} data-reading-hide className="relative z-30 lg:hidden">
       <button
         ref={buttonRef}
         type="button"

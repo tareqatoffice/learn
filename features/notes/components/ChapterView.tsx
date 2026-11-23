@@ -1,6 +1,7 @@
 import { headingId } from "@/lib/markdown/pipeline";
 import Link from "next/link";
 import { MarkReadButton } from "@/features/notes/components/NoteReader";
+import { ReadingMode } from "@/features/notes/components/ReadingMode";
 import { ReadingPosition } from "@/features/notes/components/ReadingPosition";
 import { OverlayMenu } from "@/components/OverlayMenu";
 import { Markdown } from "@/lib/markdown/Markdown";
@@ -60,7 +61,10 @@ export function ChapterView({ view }: { view: ChapterViewData }) {
   );
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[13.75rem_minmax(0,1fr)_12.5rem] lg:gap-6">
+    <div
+      data-reading-grid
+      className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[13.75rem_minmax(0,1fr)_12.5rem] lg:gap-6"
+    >
       <OverlayMenu
         navLabel={`${view.series.title} chapters`}
         label={
@@ -86,7 +90,7 @@ export function ChapterView({ view }: { view: ChapterViewData }) {
         </OverlayMenu>
       )}
 
-      <nav aria-label={`${view.series.title} chapters`} className={sideClass}>
+      <nav aria-label={`${view.series.title} chapters`} data-reading-hide className={sideClass}>
         <Link
           href={`/notes/${view.series.slug}`}
           className={cn("font-semibold", linkClass)}
@@ -124,6 +128,9 @@ export function ChapterView({ view }: { view: ChapterViewData }) {
           }
         />
 
+        <div className="mt-4">
+          <ReadingMode headings={view.toc.map((t) => ({ id: headingId(t.anchor), text: t.text }))} />
+        </div>
         {view.resume && (
           <p className="mt-4 text-sm">
             <a href={`#${headingId(view.resume.anchor)}`} className={cn("underline", linkClass)}>
@@ -167,7 +174,7 @@ export function ChapterView({ view }: { view: ChapterViewData }) {
       </article>
 
       {view.toc.length > 0 && (
-        <nav aria-label="On this page" className={sideClass}>
+        <nav aria-label="On this page" data-reading-hide className={sideClass}>
           <p className="font-semibold text-muted-foreground">On this page</p>
           {tocList()}
         </nav>
