@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { buttonVariants } from "@/components/ui/button";
 import { requireUser } from "@/features/auth/lib/authz";
 import { WorkoutPlayer } from "@/features/exercise/components/WorkoutPlayer";
-import { WorkoutSummary } from "@/features/exercise/components/WorkoutSummary";
+import { DoneWorkoutSummary } from "@/features/exercise/components/DoneWorkoutSummary";
 import { formatTarget } from "@/features/exercise/lib/format";
 import { workoutPageMode } from "@/features/exercise/lib/pageMode";
 import { exerciseById } from "@/features/exercise/library";
@@ -57,12 +57,19 @@ export default async function WorkoutPage({ params }: { params: Promise<{ date: 
 
   const title = `${plan.focus.charAt(0).toUpperCase()}${plan.focus.slice(1)} · ${plan.minutes} min`;
 
+  if (mode === "skipped") return <Notice title="Workout skipped">You skipped every exercise, so this workout does not count.</Notice>;
+
   if (mode === "summary") {
     const feels = Object.fromEntries((existing?.items ?? []).flatMap((i) => (i.feel ? [[i.exerciseId, i.feel]] : [])));
     return (
       <div className="mx-auto grid w-full max-w-md gap-5">
         <PageHeader title={title} track="exercise" />
-        <WorkoutSummary plan={plan} feels={feels} />
+        <DoneWorkoutSummary
+          date={date}
+          plan={plan}
+          initialFeels={feels}
+          skipped={(existing?.items ?? []).filter((i) => i.skipped).map((i) => i.exerciseId)}
+        />
       </div>
     );
   }

@@ -71,7 +71,8 @@ export async function saveSet(
   }
   // Once every exercise is finished or skipped the workout counts as done, without waiting for the Finish tap.
   if (plan && plan.items.every((p, i) => session.items[i]?.skipped || (session.items[i]?.setsDone ?? 0) >= p.sets)) {
-    session.status = "done";
+    // A workout where every exercise was skipped and no set was done earns no credit.
+    session.status = session.items.some((i: { setsDone: number }) => i.setsDone > 0) ? "done" : "abandoned";
     session.finishedAt = new Date();
   }
   await session.save();

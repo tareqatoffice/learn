@@ -28,6 +28,10 @@ async function setup(over: Partial<ProfileInput> = {}, weeks: string[] = ["2026-
   return userId;
 }
 
+async function getSessionStatus(userId: string, date: string) {
+  return (await WorkoutSession.findOne({ userId, date }))?.status;
+}
+
 async function complete(userId: string, date: string) {
   await startSession(userId, date);
   await finishSession(userId, date, {});
@@ -110,13 +114,30 @@ describe("workout sessions", () => {
     expect(await doneDates(userId, date, date)).toEqual([date]);
   });
 
-  it("a skipped final exercise also completes the day", async () => {
+  it("skipping every exercise with no set done abandons the day and earns no credit", async () => {
     const userId = await setup();
     const date = "2026-11-02";
     const plan = (await dayPlan(userId, date))!;
     await startSession(userId, date);
     for (let i = 0; i < plan.items.length - 1; i++) await saveSet(userId, date, i, "skip");
-    expect((await saveSet(userId, date, plan.items.length - 1, "skip")).status).toBe("done");
+    expect((await saveSet(userId, date, plan.items.length - 1, "skip")).status).toBe("abandoned");
+    expect(await streak(userId, date)).toBe(0);
+    expect(await doneDates(userId, date, date)).toEqual([]);
+    expect(await weekSummary(userId, "2026-11-02")).toMatchObject({ done: 0 });
+    expect((await finishSession(userId, date, {})).status).toBe("abandoned");
+    expect((await WorkoutSession.findOne({ userId, date }))!.status).toBe("abandoned");
+  });
+
+  it("one set done with the rest skipped completes the day and counts", async () => {
+    const userId = await setup();
+    const date = "2026-11-02";
+    const plan = (await dayPlan(userId, date))!;
+    await startSession(userId, date);
+    await saveSet(userId, date, 0, "done");
+    for (let i = 0; i < plan.items.length; i++) await saveSet(userId, date, i, "skip");
+    expect(await getSessionStatus(userId, date)).toBe("done");
+    expect(await streak(userId, date)).toBe(1);
+    expect(await doneDates(userId, date, date)).toEqual([date]);
   });
 
   it("finishSession on a done session only updates feels and keeps finishedAt", async () => {

@@ -13,6 +13,7 @@ const LABEL: Record<Feel, string> = { easy: "Easy", ok: "OK", hard: "Hard" };
 export function WorkoutSummary({
   plan,
   feels,
+  skipped = [],
   onFeel,
   onFinish,
   saving,
@@ -20,6 +21,8 @@ export function WorkoutSummary({
 }: {
   plan: PlanDay;
   feels: Partial<Record<string, Feel>>;
+  /** Exercise ids that were skipped: shown as skipped, with no feel buttons. */
+  skipped?: string[];
   /** Omit for a finished workout shown read-only. */
   onFeel?(exerciseId: string, feel: Feel): void;
   onFinish?(): void;
@@ -48,7 +51,9 @@ export function WorkoutSummary({
                   · {item.sets} × {formatTarget(item)}
                 </span>
               </p>
-              {readOnly ? (
+              {skipped.includes(item.exerciseId) ? (
+                <p className="text-sm text-muted-foreground">Skipped</p>
+              ) : readOnly ? (
                 <p className="text-sm text-muted-foreground">{feel ? LABEL[feel] : "Not rated"}</p>
               ) : (
                 <div role="group" aria-label={`${exercise?.name ?? item.exerciseId} difficulty`} className="flex gap-2">

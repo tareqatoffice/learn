@@ -79,12 +79,14 @@ export function WorkoutPlayer({
   }
 
   if (player.phase === "summary") {
+    const skipped = plan.items.flatMap((it, i) => (player.skipped[i] ? [it.exerciseId] : []));
     return finished ? (
-      <WorkoutSummary plan={plan} feels={feels} />
+      <WorkoutSummary plan={plan} feels={feels} skipped={skipped} />
     ) : (
       <WorkoutSummary
         plan={plan}
         feels={feels}
+        skipped={skipped}
         onFeel={(id, feel) => setFeels((f) => ({ ...f, [id]: feel }))}
         onFinish={finish}
         saving={finishing}

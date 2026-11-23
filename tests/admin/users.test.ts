@@ -10,6 +10,12 @@ vi.mock("@/lib/r2", () => ({
   getObjectBytes: vi.fn(),
 }));
 
+vi.mock("@/features/exercise/data", async (orig) => ({
+  ...(await orig<typeof import("@/features/exercise/data")>()),
+  deleteAllExerciseData: vi.fn(),
+}));
+
+import { deleteAllExerciseData } from "@/features/exercise/data";
 import { deleteUser } from "@/features/admin/users";
 import { connectDb } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
@@ -25,6 +31,8 @@ beforeEach(async () => {
   vi.stubEnv("ADMIN_EMAILS", "owner@example.test");
   resetEnvCache();
   vi.mocked(r2.deleteObjects).mockReset().mockResolvedValue(undefined);
+  const real = (await vi.importActual<typeof import("@/features/exercise/data")>("@/features/exercise/data")).deleteAllExerciseData;
+  vi.mocked(deleteAllExerciseData).mockReset().mockImplementation(real);
 });
 afterAll(() => mongoose.disconnect());
 
@@ -59,5 +67,17 @@ describe("deleteUser (F23)", () => {
     expect(await User.exists({ _id: id })).toBeTruthy();
     const admin = await User.create({ email: "owner@example.test", name: "Owner" });
     expect((await deleteUser(String(admin._id))).ok).toBe(false);
+  });
+
+  it("says what was already removed when the exercise data delete fails", async () => {
+    const id = await userWithData("a@example.test");
+    vi.mocked(deleteAllExerciseData).mockRejectedValueOnce(new Error("db down"));
+    expect(await deleteUser(id)).toEqual({
+      ok: false,
+      errors: {
+        _: "Couldn't delete the user's exercise data. Their recordings and IELTS data were already removed. Try again to finish deleting the user.",
+      },
+    });
+    expect(await User.exists({ _id: id })).toBeTruthy();
   });
 });

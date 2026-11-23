@@ -21,6 +21,10 @@ describe("workoutPageMode", () => {
     expect(workoutPageMode("2026-11-22", "2026-11-22", plan, null)).toBe("player");
     expect(workoutPageMode("2026-11-22", "2026-11-22", plan, session("inProgress"))).toBe("player");
   });
+  it("shows a skipped note for today's abandoned session and missed for a past one", () => {
+    expect(workoutPageMode("2026-11-22", "2026-11-22", plan, session("abandoned"))).toBe("skipped");
+    expect(workoutPageMode("2026-11-20", "2026-11-22", plan, session("abandoned"))).toBe("missed");
+  });
   it("is the summary for any done session", () => {
     expect(workoutPageMode("2026-11-22", "2026-11-22", plan, session("done"))).toBe("summary");
     expect(workoutPageMode("2026-11-20", "2026-11-22", plan, session("done"))).toBe("summary");

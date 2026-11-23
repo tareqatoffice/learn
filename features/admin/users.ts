@@ -46,7 +46,7 @@ export async function deleteUser(id: string): Promise<Result> {
   try {
     await deleteAllExerciseData(id);
   } catch {
-    return { ok: false, errors: { _: "Couldn't delete the user's exercise data. Nothing else was removed; try again." } };
+    return { ok: false, errors: { _: "Couldn't delete the user's exercise data. Their recordings and IELTS data were already removed. Try again to finish deleting the user." } };
   }
   await Promise.all(
     [QuestionProgress, QuizSession, NodeProgress, NoteProgress, AiConversation, AiUsage, SpeakingUsage, SpeakingProfile, SpeakingDay, CodingResult, FocusSession].map((M) =>
