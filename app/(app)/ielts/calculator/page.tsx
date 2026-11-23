@@ -9,6 +9,7 @@ import { localDate } from "@/features/speaking/schedule";
 import { readTimeZone } from "@/features/speaking/timezone";
 import { BackLink } from "@/components/BackLink";
 import { PageHeader } from "@/components/PageHeader";
+import { Card } from "@/components/Card";
 
 export const metadata = buildMetadata({
   title: "IELTS band calculator",
@@ -32,9 +33,9 @@ export default async function IeltsCalculatorPage() {
         <BackLink href="/ielts">← IELTS</BackLink>
         <PageHeader title="IELTS band calculator" track="ielts" />
       </div>
-      <div className="rounded-xl border border-border bg-card p-5">
+      <Card>
         <BandCalculator today={today} />
-      </div>
+      </Card>
       <section aria-labelledby="saved-title" className="grid gap-3">
         <h2 id="saved-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Saved results

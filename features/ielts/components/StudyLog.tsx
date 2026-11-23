@@ -7,6 +7,7 @@ import { useAdminAction } from "@/features/admin/components/useAdminAction";
 import { Button } from "@/components/ui/button";
 import type { Skill } from "@/features/ielts/bands";
 import type { StudyLogEntry } from "@/features/ielts/progress";
+import { Card } from "@/components/Card";
 
 const LOGGED: Skill[] = ["listening", "reading", "writing"];
 const NAME: Record<Skill, string> = { listening: "Listening", reading: "Reading", writing: "Writing", speaking: "Speaking" };
@@ -20,7 +21,7 @@ export function StudyLog({ today, minDate, entries }: { today: string; minDate: 
   const del = useAdminAction();
 
   return (
-    <section aria-labelledby="study-log" className="grid gap-3 rounded-xl border border-border bg-card p-5">
+    <Card as="section" aria-labelledby="study-log" className="grid gap-3">
       <h2 id="study-log" className="font-semibold">
         Log study
       </h2>
@@ -78,6 +79,6 @@ export function StudyLog({ today, minDate, entries }: { today: string; minDate: 
         </ul>
       )}
       <ActionStatus saved={false} errors={del.errors} />
-    </section>
+    </Card>
   );
 }

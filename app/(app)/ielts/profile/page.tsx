@@ -9,6 +9,7 @@ import { localDate } from "@/features/speaking/schedule";
 import { readTimeZone } from "@/features/speaking/timezone";
 import { BackLink } from "@/components/BackLink";
 import { PageHeader } from "@/components/PageHeader";
+import { Card } from "@/components/Card";
 
 export const metadata = buildMetadata({
   title: "IELTS profile",
@@ -36,12 +37,12 @@ export default async function IeltsProfilePage() {
       {profile && testDayStatus(today, profile.testDate) === "passed" && profile.status === "active" && (
         <p className="text-sm text-muted-foreground">Your test date has passed. Pick a new test date to rebuild your plan.</p>
       )}
-      <div className="rounded-xl border border-border bg-card p-5">
+      <Card>
         <ProfileForm today={today} initial={profile ?? undefined} />
-      </div>
+      </Card>
 
       {profile && (
-        <section aria-labelledby="data-title" className="grid gap-3 rounded-xl border border-border bg-card p-5">
+        <Card as="section" aria-labelledby="data-title" className="grid gap-3">
           <h2 id="data-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Your data
           </h2>
@@ -62,7 +63,7 @@ export default async function IeltsProfilePage() {
               <DeleteIeltsDataButton />
             </div>
           </div>
-        </section>
+        </Card>
       )}
     </div>
   );

@@ -11,6 +11,7 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { Button } from "@/components/ui/button";
 import { TASK_LABEL, TASK_SLUG, type TaskKey } from "@/features/speaking/tasks";
 import { mins } from "./format";
+import { Card } from "@/components/Card";
 
 export type TodayTask = {
   task: TaskKey;
@@ -53,7 +54,7 @@ export function TodayTasks({
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
-      <section aria-labelledby="todays-lesson" className="grid grid-cols-[minmax(0,1fr)] gap-2 rounded-xl border border-border bg-card p-5">
+      <Card as="section" aria-labelledby="todays-lesson" className="grid grid-cols-[minmax(0,1fr)] gap-2">
         <h2 id="todays-lesson" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Today&apos;s lesson
         </h2>
@@ -98,9 +99,9 @@ export function TodayTasks({
             </Button>
           ))}
         {error && <Notice>{error}</Notice>}
-      </section>
+      </Card>
 
-      <section aria-labelledby="todays-tasks" className="rounded-xl border border-border bg-card p-5">
+      <Card as="section" aria-labelledby="todays-tasks">
         <h2 id="todays-tasks" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Today&apos;s tasks
         </h2>
@@ -140,7 +141,7 @@ export function TodayTasks({
             ))}
           </ul>
         )}
-      </section>
+      </Card>
     </div>
   );
 }

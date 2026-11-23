@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { TOO_FAR } from "@/features/exercise/goal";
 import type { ProfileInput } from "@/features/exercise/profile";
 import { LEVELS, SEXES } from "@/models/exerciseConstants";
+import { Card } from "@/components/Card";
 
 export const DISCLAIMER = "This is not medical advice. If you have a health condition or injury, check with a doctor before starting.";
 
@@ -102,7 +103,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 
 function PreviewNote({ preview }: { preview: Preview }) {
   return (
-    <div className="grid gap-1 rounded-xl border border-border bg-card p-4 text-sm" aria-live="polite">
+    <Card className="grid gap-1 p-4 text-sm" aria-live="polite">
       <p>
         Target date <strong>{preview.targetDate}</strong>, about {Math.abs(preview.pace).toFixed(2)} kg a week.
       </p>
@@ -116,7 +117,7 @@ function PreviewNote({ preview }: { preview: Preview }) {
           <Notice>{TOO_FAR}</Notice>
         ))}
       <p className="text-muted-foreground">About {preview.kcal.toLocaleString("en-US")} kcal a day.</p>
-    </div>
+    </Card>
   );
 }
 

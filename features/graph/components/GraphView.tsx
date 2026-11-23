@@ -15,6 +15,7 @@ import { dependentsOf, layoutGraph, LBL, NH, NW, readyNext, unmetPrereqs } from 
 import type { NodeStatus } from "@/features/progress/graph";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
+import { Card } from "@/components/Card";
 
 const statusOf = (progress: GraphData["progress"], id: string): NodeStatus => progress[id] ?? "none";
 
@@ -492,12 +493,12 @@ export function GraphView({ data }: { data: GraphData }) {
           </div>
         </div>
 
-        <div
+        <Card
           ref={panelRef}
           tabIndex={-1}
           onKeyDown={onPanelKey}
           aria-label="Topic details"
-          className="rounded-xl border border-border bg-card p-5 outline-none lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-auto"
+          className="outline-none lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-auto"
         >
           {topicProps ? (
             <TopicPanel
@@ -520,7 +521,7 @@ export function GraphView({ data }: { data: GraphData }) {
               )}
             </div>
           )}
-        </div>
+        </Card>
       </div>
 
       {topicProps && current && (

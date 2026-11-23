@@ -14,6 +14,7 @@ import { SelfRatingForm, type SelfRating } from "./SelfRatingForm";
 import { ShadowPlayer } from "./ShadowPlayer";
 import { ShadowText } from "./ShadowText";
 import { sentenceAt, timeline } from "@/features/speaking/shadowText";
+import { Card } from "@/components/Card";
 
 const REFRESH_MS = 8 * 60 * 1000;
 
@@ -109,13 +110,13 @@ export function TakeTranscript({ takeId, status, transcript }: { takeId: string;
   }
 
   return (
-    <section aria-labelledby="transcript" className="grid gap-2 rounded-xl border border-border bg-card p-5">
+    <Card as="section" aria-labelledby="transcript" className="grid gap-2">
       <h2 id="transcript" className="font-semibold">
         Transcript
       </h2>
       {body}
       {error && <Notice>{error}</Notice>}
-    </section>
+    </Card>
   );
 }
 
@@ -176,7 +177,7 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <div className="grid content-start gap-4">
-        <section aria-label="Playback" className="grid gap-3 rounded-xl border border-border bg-card p-5">
+        <Card as="section" aria-label="Playback" className="grid gap-3">
           <MediaPlayer
             src={urls.media}
             video={video}
@@ -190,29 +191,29 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
           {take.task === "shadowing" && urls.source && (
             <ShadowPlayer sourceUrl={urls.source} takeUrl={compareUrl} rate={take.clipRate} onSourceTime={setSourceTime} />
           )}
-        </section>
+        </Card>
 
         <TakeTranscript takeId={take.id} status={take.transcriptStatus} transcript={take.transcript} />
 
         {sentences.length > 0 && take.sourceDurationSec ? (
-          <section aria-labelledby="practised" className="grid gap-2 rounded-xl border border-border bg-card p-5">
+          <Card as="section" aria-labelledby="practised" className="grid gap-2">
             <h2 id="practised" className="font-semibold">
               The text you practised
             </h2>
             <ShadowText sentences={sentences} active={sourceTime === null ? -1 : sentenceAt(sentences, sourceTime)} />
-          </section>
+          </Card>
         ) : reference && (
-          <details className="rounded-xl border border-border bg-card p-5">
+          <Card as="details">
             <summary className="cursor-pointer font-semibold">
               {take.task === "recordReview" ? "The prompt" : "The text you practised"}
             </summary>
             <p className="mt-2 whitespace-pre-line text-sm leading-relaxed">{reference}</p>
-          </details>
+          </Card>
         )}
       </div>
 
       <div className="grid content-start gap-4">
-        <section aria-labelledby="self-rating" className="grid gap-3 rounded-xl border border-border bg-card p-5">
+        <Card as="section" aria-labelledby="self-rating" className="grid gap-3">
           <h2 id="self-rating" className="font-semibold">
             Rate yourself
           </h2>
@@ -226,9 +227,9 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
             onSaved={setSelf}
             onSeek={seek}
           />
-        </section>
+        </Card>
 
-        <section aria-labelledby="coach" className="grid gap-3 rounded-xl border border-border bg-card p-5">
+        <Card as="section" aria-labelledby="coach" className="grid gap-3">
           <h2 id="coach" className="font-semibold">
             AI coach
           </h2>
@@ -242,7 +243,7 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
             bodyConsent={bodyConsent}
             initialAi={take.ai as CoachAi | undefined}
           />
-        </section>
+        </Card>
 
         <div className="grid gap-2">
           <Button variant="destructive" className="justify-self-start" onClick={remove} disabled={deleting}>

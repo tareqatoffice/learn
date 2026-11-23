@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { RemoveAdjustmentButton } from "./PlanActions";
 import { PHASE_LABEL, SKILL_LABEL, adjustmentLabel, dateLabel, shortDate, weekMinutes } from "./format";
 import { ProgressBar } from "@/components/ProgressBar";
+import { Card } from "@/components/Card";
 
 const PHASE_TONE = { foundation: "bg-muted", skills: "bg-secondary", mocks: "bg-primary/20" } as const;
 const UPCOMING_WEEKS = 6;
@@ -48,7 +49,7 @@ export function PlanTimeline({
 
   return (
     <div className="grid gap-4">
-      <section aria-labelledby="phases-title" className="grid gap-3 rounded-xl border border-border bg-card p-5">
+      <Card as="section" aria-labelledby="phases-title" className="grid gap-3">
         <h2 id="phases-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Phases
         </h2>
@@ -72,9 +73,9 @@ export function PlanTimeline({
             </li>
           ))}
         </ul>
-      </section>
+      </Card>
 
-      <section aria-labelledby="week-title" className="grid gap-3 rounded-xl border border-border bg-card p-5">
+      <Card as="section" aria-labelledby="week-title" className="grid gap-3">
         <h2 id="week-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           This week{week ? ` (${shortDate(week.start)} to ${shortDate(week.end)})` : ""}
         </h2>
@@ -98,10 +99,10 @@ export function PlanTimeline({
             </p>
           </>
         )}
-      </section>
+      </Card>
 
       {ahead.length > 0 && (
-        <section aria-labelledby="ahead-title" className="grid gap-2 rounded-xl border border-border bg-card p-5">
+        <Card as="section" aria-labelledby="ahead-title" className="grid gap-2">
           <h2 id="ahead-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Coming weeks
           </h2>
@@ -117,11 +118,11 @@ export function PlanTimeline({
               </li>
             ))}
           </ul>
-        </section>
+        </Card>
       )}
 
       {plan.adjustments.length > 0 && (
-        <section aria-labelledby="changes-title" className="grid gap-2 rounded-xl border border-border bg-card p-5">
+        <Card as="section" aria-labelledby="changes-title" className="grid gap-2">
           <h2 id="changes-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Changes you approved
           </h2>
@@ -133,10 +134,10 @@ export function PlanTimeline({
               </li>
             ))}
           </ul>
-        </section>
+        </Card>
       )}
 
-      <section aria-labelledby="versions-title" className="grid gap-2 rounded-xl border border-border bg-card p-5">
+      <Card as="section" aria-labelledby="versions-title" className="grid gap-2">
         <h2 id="versions-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Plan versions
         </h2>
@@ -152,7 +153,7 @@ export function PlanTimeline({
             </li>
           ))}
         </ol>
-      </section>
+      </Card>
     </div>
   );
 }

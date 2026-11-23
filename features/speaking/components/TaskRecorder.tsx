@@ -18,6 +18,7 @@ import { clock } from "./format";
 import { ShadowPractice } from "./ShadowPractice";
 import { ShadowText } from "./ShadowText";
 import { EmptyState } from "@/components/EmptyState";
+import { Card } from "@/components/Card";
 
 export type Material = { title?: string; text?: string; prompt?: string; generated: boolean };
 
@@ -56,11 +57,11 @@ const AFTER_CLIP_MS = 1500;
 function MaterialView({ task, material }: { task: TaskKey; material: Material }) {
   const body = task === "recordReview" ? material.prompt : material.text;
   return (
-    <section aria-label="Practice material" className="grid gap-2 rounded-xl border border-border bg-card p-5">
+    <Card as="section" aria-label="Practice material" className="grid gap-2">
       {material.title && <h2 className="text-lg font-semibold">{material.title}</h2>}
       {material.generated && <p className="text-xs text-muted-foreground">Written by the AI coach</p>}
       <p className="whitespace-pre-line text-base leading-relaxed">{body}</p>
-    </section>
+    </Card>
   );
 }
 
@@ -321,14 +322,14 @@ export function TaskRecorder({
       {practising && material ? (
         <ShadowPractice src={sourceAudioUrl} sentences={sentences} rate={rate} onRate={setRate} />
       ) : shadowing && material && sentences.length ? (
-        <section aria-label="Practice material" className="grid gap-2 rounded-xl border border-border bg-card p-5">
+        <Card as="section" aria-label="Practice material" className="grid gap-2">
           {material.title && <h2 className="text-lg font-semibold">{material.title}</h2>}
           <ShadowText sentences={sentences} active={rec.state === "recording" ? sentenceAt(sentences, clipTime) : -1} />
-        </section>
+        </Card>
       ) : material ? (
         <MaterialView task={task} material={material} />
       ) : (
-        <section className="grid gap-3 rounded-xl border border-border bg-card p-5">
+        <Card as="section" className="grid gap-3">
           <p className="text-sm text-muted-foreground">
             {hasLesson ? "Today's lesson has nothing for this task." : "No speaking lessons are published yet."}{" "}
             {aiOn ? "The AI coach can write some practice material for you, or you" : "You"} can record a free practice
@@ -342,7 +343,7 @@ export function TaskRecorder({
               {generateError && <Notice>{generateError}</Notice>}
             </div>
           )}
-        </section>
+        </Card>
       )}
       {material?.generated && aiOn && idle && save.phase === "idle" && (
         <div className="flex flex-wrap items-center gap-3">
@@ -372,7 +373,7 @@ export function TaskRecorder({
         />
       )}
 
-      <section aria-label="Recorder" className="grid gap-4 rounded-xl border border-border bg-card p-5">
+      <Card as="section" aria-label="Recorder" className="grid gap-4">
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -481,7 +482,7 @@ export function TaskRecorder({
           </div>
         )}
         {save.phase === "saved" && <Notice tone="ok">Saved. Opening the review…</Notice>}
-      </section>
+      </Card>
     </div>
   );
 }

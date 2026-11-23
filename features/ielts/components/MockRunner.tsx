@@ -15,6 +15,7 @@ import { useLeaveGuard } from "@/lib/useLeaveGuard";
 import { UploadError, uploadTake } from "@/features/recording/lib/uploadTake";
 import { type RecorderResult, useRecorder } from "@/features/recording/lib/useRecorder";
 import { PartTimer } from "./PartTimer";
+import { Card } from "@/components/Card";
 
 type Marker = { atSec: number; label: string };
 
@@ -403,7 +404,7 @@ export function MockRunner({
       )}
 
       {stage === "ready" && (
-        <section className="grid gap-4 rounded-xl border border-border bg-card p-5">
+        <Card as="section" className="grid gap-4">
           <ul className="grid gap-1.5 text-sm text-muted-foreground">
             {parts.includes("p1") && <li>Part 1: short questions about you, for 4 to 5 minutes.</li>}
             {parts.includes("p2") && <li>Part 2: one minute to prepare a topic, then talk for up to 2 minutes.</li>}
@@ -430,11 +431,11 @@ export function MockRunner({
           <Button size="lg" className="w-full sm:w-auto" disabled={needHeadphones && !headphones} onClick={() => enter(parts[0])}>
             <Circle className="fill-current text-destructive" /> {mock ? "Start the test" : "Start"}
           </Button>
-        </section>
+        </Card>
       )}
 
       {stage === "prep" && cue && (
-        <section aria-label="Part 2 preparation" className="grid gap-4 rounded-xl border border-border bg-card p-5">
+        <Card as="section" aria-label="Part 2 preparation" className="grid gap-4">
           <h2 className="text-sm font-medium text-muted-foreground">Part 2: prepare</h2>
           <CueCard cue={cue} />
           <PartTimer label="Preparation" elapsedSec={P2_PREP_SEC - prepLeftSec} totalSec={P2_PREP_SEC} countdown />
@@ -464,11 +465,11 @@ export function MockRunner({
               </Button>
             )}
           </div>
-        </section>
+        </Card>
       )}
 
       {stage === "live" && (
-        <section aria-label={NAME[part]} className="grid gap-4 rounded-xl border border-border bg-card p-5">
+        <Card as="section" aria-label={NAME[part]} className="grid gap-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-medium text-muted-foreground">{NAME[part]}</h2>
             {recording && (
@@ -538,11 +539,11 @@ export function MockRunner({
               </Button>
             </div>
           )}
-        </section>
+        </Card>
       )}
 
       {stage === "between" && stopped && (
-        <section className="grid gap-3 rounded-xl border border-border bg-card p-5">
+        <Card as="section" className="grid gap-3">
           <p className="text-sm">
             {stopped.reason === "paused" ? `Paused. ${NAME[stopped.part]} is kept up to here.` : `${NAME[stopped.part]} stopped. What was recorded is kept.`}
           </p>
@@ -556,11 +557,11 @@ export function MockRunner({
               {nextOf(stopped.part) ? "Finish now" : "Finish"}
             </Button>
           </div>
-        </section>
+        </Card>
       )}
 
       {stage === "finishing" && (
-        <section className="grid gap-3 rounded-xl border border-border bg-card p-5" role="status">
+        <Card as="section" className="grid gap-3" role="status">
           <p className="text-sm">
             {hasFailed ? "Some parts haven't saved yet." : finishError ? "" : "Saving your recordings…"}
           </p>
@@ -582,7 +583,7 @@ export function MockRunner({
               Finish without them
             </Button>
           )}
-        </section>
+        </Card>
       )}
 
       {savedList.length > 0 && (

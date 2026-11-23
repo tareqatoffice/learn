@@ -5,6 +5,7 @@ import { ANSWER_MODE_LABEL } from "@/lib/quiz-answer";
 import { MARK_LABEL, plural, VERDICT_LABEL } from "@/features/progress/attempts";
 import { BackLink } from "@/components/BackLink";
 import { PageHeader } from "@/components/PageHeader";
+import { Card } from "@/components/Card";
 
 type Log = NonNullable<Awaited<ReturnType<typeof import("@/features/progress/attempts").getAttemptLogs>>[number]>;
 
@@ -40,7 +41,7 @@ export function QuizSession({ log }: { log: Log }) {
       {log.items.length === 0 && <p className="text-sm text-muted-foreground">No cards marked in this quiz yet.</p>}
       <ol className="grid gap-4">
         {log.items.map((item, i) => (
-          <li key={i} className="rounded-xl border border-border bg-card p-5">
+          <Card as="li" key={i}>
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>{item.question ? [item.question.bookTitle, item.question.partTitle].filter(Boolean).join(" · ") : ""}</span>
               <span>
@@ -105,7 +106,7 @@ export function QuizSession({ log }: { log: Log }) {
                 </div>
               </details>
             )}
-          </li>
+          </Card>
         ))}
       </ol>
     </div>

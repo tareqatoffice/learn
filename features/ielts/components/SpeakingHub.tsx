@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import type { AttemptSummary } from "@/features/ielts/speaking/attempts";
 import type { Kind } from "@/features/ielts/speaking/questions";
 import { cn } from "@/lib/utils";
+import { cardClass, cardRowLinkClass } from "@/components/Card";
 
 export type HubOption = { kind: Kind; title: string; blurb: string; exhausted: boolean; missing: boolean };
 
@@ -48,7 +49,7 @@ function Option({ option, aiOn, storage, highlight }: { option: HubOption; aiOn:
     <li
       aria-label={option.title}
       data-highlight={highlight ? "true" : undefined}
-      className={cn("grid content-start gap-3 rounded-xl border bg-card p-5", highlight ? "border-primary ring-2 ring-primary/30" : "border-border")}
+      className={cn(cardClass, "grid content-start gap-3", highlight && "border-primary ring-2 ring-primary/30")}
     >
       <div className="grid gap-1">
         <h3 className="font-semibold">
@@ -134,7 +135,7 @@ export function SpeakingHub({
               <li key={a.id}>
                 <Link
                   href={`/ielts/speaking/${a.id}/review`}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  className={cardRowLinkClass}
                 >
                   <span>
                     <span className="font-medium">{NAME[a.kind]}</span>{" "}

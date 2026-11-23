@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { cardClass } from "@/components/Card";
 
 export type StripDay = {
   date: string;
@@ -24,8 +25,9 @@ export function WeekStrip({ today, days }: { today: string; days: StripDay[] }) 
             key={d.date}
             aria-current={isToday ? "date" : undefined}
             className={cn(
-              "grid min-h-24 content-start gap-1 rounded-xl border bg-card p-3 text-sm",
-              isToday ? "border-2 border-[var(--t-6)]" : "border-border",
+              cardClass,
+              "grid min-h-24 content-start gap-1 p-3 text-sm",
+              isToday && "border-2 border-[var(--t-6)]",
               !d.workout && "text-muted-foreground",
             )}
           >

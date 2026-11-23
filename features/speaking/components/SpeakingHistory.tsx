@@ -7,6 +7,7 @@ import type { TaskKey } from "@/features/speaking/tasks";
 import { TASKS, TASK_LABEL, TASK_SLUG } from "@/features/speaking/tasks";
 import { BackLink } from "@/components/BackLink";
 import { PageHeader } from "@/components/PageHeader";
+import { Card } from "@/components/Card";
 
 const LIMIT = 100;
 const DATE = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" });
@@ -35,11 +36,11 @@ export function SpeakingHistory({
         <PageHeader title="Speaking history" track="speaking" />
       </div>
 
-      <section aria-label="Last 30 days" className="rounded-xl border border-border bg-card p-5">
+      <Card as="section" aria-label="Last 30 days">
         <TrendChart days={trends} />
-      </section>
+      </Card>
 
-      <section aria-labelledby="takes" className="grid gap-3 rounded-xl border border-border bg-card p-5">
+      <Card as="section" aria-labelledby="takes" className="grid gap-3">
         <h2 id="takes" className="font-semibold">
           Takes
         </h2>
@@ -103,7 +104,7 @@ export function SpeakingHistory({
             )}
           </nav>
         )}
-      </section>
+      </Card>
     </div>
   );
 }

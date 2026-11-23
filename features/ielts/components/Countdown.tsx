@@ -1,5 +1,6 @@
 import { PHASE_LABEL, dateLabel } from "./format";
 import type { PhaseName } from "@/features/ielts/plan";
+import { Card } from "@/components/Card";
 
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 
@@ -17,14 +18,14 @@ export function Countdown({
   const days = daysBetween(today, testDate);
   if (days <= 0) {
     return (
-      <section aria-label="Countdown" className="grid gap-1 rounded-xl border border-border bg-card p-5">
+      <Card as="section" aria-label="Countdown" className="grid gap-1">
         <p className="text-3xl font-semibold tracking-tight">Your test is today</p>
         <p className="text-sm text-muted-foreground">Good luck. Rest, eat well and trust the work you have put in.</p>
-      </section>
+      </Card>
     );
   }
   return (
-    <section aria-label="Countdown" className="grid gap-1 rounded-xl border border-border bg-card p-5">
+    <Card as="section" aria-label="Countdown" className="grid gap-1">
       <p className="text-3xl font-semibold tracking-tight tabular-nums">
         {days} {days === 1 ? "day" : "days"}
         <span className="ml-2 text-base font-normal text-muted-foreground">to your test ({dateLabel(testDate)})</span>
@@ -40,6 +41,6 @@ export function Countdown({
           )}
         </p>
       )}
-    </section>
+    </Card>
   );
 }

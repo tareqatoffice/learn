@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { FileDropzone } from "@/components/ui/FileDropzone";
 import type { ImportReport } from "@/features/content/types";
 import { Notice } from "@/components/Notice";
+import { Card } from "@/components/Card";
 
 type Kind = "book" | "series" | "graph";
 type Files = { name: string; size: number; content: string }[];
@@ -143,7 +144,7 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
       </div>
 
       {report && (
-        <section aria-label="Import report" className="grid gap-2 rounded-xl border border-border bg-card p-4 text-sm">
+        <Card as="section" aria-label="Import report" className="grid gap-2 p-4 text-sm">
           <p className="font-medium">
             {report.dryRun ? "Preview — nothing written yet" : committed ? "Committed" : "Not committed — nothing was written"}
             {report.createdTarget ? " · creates the target" : ""}
@@ -171,7 +172,7 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
                 </li>
               ))}
           </ul>
-        </section>
+        </Card>
       )}
     </div>
   );

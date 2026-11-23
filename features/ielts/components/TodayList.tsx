@@ -10,6 +10,7 @@ import { Notice } from "@/components/Notice";
 import { Button, buttonVariants } from "@/components/ui/button";
 import type { TodayItem } from "@/features/ielts/progress";
 import { cn } from "@/lib/utils";
+import { Card } from "@/components/Card";
 
 function LogMinutes({ item }: { item: TodayItem }) {
   const router = useRouter();
@@ -61,7 +62,7 @@ function LogMinutes({ item }: { item: TodayItem }) {
 export function TodayList({ items }: { items: TodayItem[] }) {
   const doneCount = items.filter((i) => i.done).length;
   return (
-    <section aria-labelledby="today-title" className="grid gap-3 rounded-xl border border-border bg-card p-5">
+    <Card as="section" aria-labelledby="today-title" className="grid gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="today-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Today
@@ -111,6 +112,6 @@ export function TodayList({ items }: { items: TodayItem[] }) {
           ))}
         </ul>
       )}
-    </section>
+    </Card>
   );
 }

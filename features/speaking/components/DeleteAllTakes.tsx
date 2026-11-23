@@ -5,12 +5,13 @@ import { deleteAllTakesAction } from "@/app/(app)/speaking/actions";
 import { ActionStatus } from "@/features/admin/components/SaveBar";
 import { useAdminAction } from "@/features/admin/components/useAdminAction";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/Card";
 
 export function DeleteAllTakes() {
   const { run, pending, errors } = useAdminAction();
   const [done, setDone] = useState<number | null>(null);
   return (
-    <section aria-labelledby="delete-recordings" className="grid gap-2 rounded-xl border border-border bg-card p-5">
+    <Card as="section" aria-labelledby="delete-recordings" className="grid gap-2">
       <h2 id="delete-recordings" className="font-semibold">
         Your recordings
       </h2>
@@ -36,6 +37,6 @@ export function DeleteAllTakes() {
         </p>
       )}
       <ActionStatus saved={false} errors={errors} />
-    </section>
+    </Card>
   );
 }

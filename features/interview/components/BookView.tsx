@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { focusRing, trackVar } from "@/components/track";
 import { Markdown } from "@/lib/markdown/Markdown";
 import { cn } from "@/lib/utils";
+import { cardClass } from "@/components/Card";
 
 const STATUS_LABEL = { got: "Got it", review: "Review" } as const;
 
@@ -42,7 +43,7 @@ export function BookView({ view }: { view: BookViewData }) {
           {book.extras.map((extra) => (
             <details
               key={extra.key}
-              className="rounded-xl border border-border bg-card px-4 py-3"
+              className={cn(cardClass, "px-4 py-3")}
             >
               <summary className="cursor-pointer font-medium">
                 {extra.title}

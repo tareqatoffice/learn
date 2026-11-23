@@ -8,6 +8,7 @@ import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import type { EffectiveSettings } from "@/features/speaking/settings";
 import { TASKS, TASK_LABEL, type TaskKey } from "@/features/speaking/tasks";
+import { Card } from "@/components/Card";
 
 const fieldClass =
   "w-20 rounded-lg border border-border bg-background px-2 py-1.5 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-invalid:border-destructive";
@@ -73,7 +74,7 @@ export function SpeakingSettingsForm({ settings }: { settings: EffectiveSettings
 
   return (
     <div className="grid gap-4">
-      <form onSubmit={submit} noValidate className="grid gap-4 rounded-xl border border-border bg-card p-5">
+      <Card as="form" onSubmit={submit} noValidate className="grid gap-4">
         <h2 className="font-semibold">Daily tasks</h2>
         <ul className="grid gap-4">
           {TASKS.map((t) => (
@@ -127,9 +128,9 @@ export function SpeakingSettingsForm({ settings }: { settings: EffectiveSettings
           </Button>
           {message && <Notice tone={message.tone}>{message.text}</Notice>}
         </div>
-      </form>
+      </Card>
 
-      <section aria-labelledby="body-consent" className="grid gap-3 rounded-xl border border-border bg-card p-5">
+      <Card as="section" aria-labelledby="body-consent" className="grid gap-3">
         <h2 id="body-consent" className="font-semibold">
           Body language feedback
         </h2>
@@ -149,7 +150,7 @@ export function SpeakingSettingsForm({ settings }: { settings: EffectiveSettings
           </p>
         )}
         {consentMessage && <Notice tone={consentMessage.tone}>{consentMessage.text}</Notice>}
-      </section>
+      </Card>
     </div>
   );
 }

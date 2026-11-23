@@ -1,3 +1,4 @@
+import { Card } from "@/components/Card";
 import { cn } from "@/lib/utils";
 
 /** Muted message in a card box, for empty lists and "not set up yet" states. */
@@ -11,8 +12,8 @@ export function EmptyState({
   children: React.ReactNode;
 }) {
   return (
-    <p role={role} className={cn("rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground", className)}>
+    <Card as="p" role={role} className={cn("text-sm text-muted-foreground", className)}>
       {children}
-    </p>
+    </Card>
   );
 }

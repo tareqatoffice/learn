@@ -21,6 +21,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { StudyLog } from "@/features/ielts/components/StudyLog";
 import { addDays, localDate } from "@/features/speaking/schedule";
 import { readTimeZone } from "@/features/speaking/timezone";
+import { Card } from "@/components/Card";
 
 const linkClass = buttonVariants({ variant: "outline", size: "sm" });
 
@@ -69,9 +70,9 @@ export async function IeltsHome() {
           description="Tell us when your test is and what band you want. You will see a preview of the plan before anything is saved. You can also practise any skill or use the band calculator without a plan."
         />
         <IeltsNav withPlan={false} />
-        <div className="rounded-xl border border-border bg-card p-5">
+        <Card>
           <ProfileForm today={today} />
-        </div>
+        </Card>
       </div>
     );
   }

@@ -8,6 +8,7 @@ import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import type { SuggestionView } from "@/features/ielts/suggestions";
 import { PlanPreview } from "./PlanPreview";
+import { Card } from "@/components/Card";
 
 export function SuggestionCard({ suggestion }: { suggestion: SuggestionView }) {
   const router = useRouter();
@@ -25,7 +26,7 @@ export function SuggestionCard({ suggestion }: { suggestion: SuggestionView }) {
   }
 
   return (
-    <li className="grid gap-3 rounded-xl border border-border bg-card p-4">
+    <Card as="li" className="grid gap-3 p-4">
       <p className="text-sm">{suggestion.reason}</p>
       {showPreview && <PlanPreview {...suggestion.preview} />}
       <div className="flex flex-wrap items-center gap-2">
@@ -40,6 +41,6 @@ export function SuggestionCard({ suggestion }: { suggestion: SuggestionView }) {
         </Button>
       </div>
       {error && <Notice>{error}</Notice>}
-    </li>
+    </Card>
   );
 }

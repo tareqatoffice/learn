@@ -14,6 +14,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
 import { Notice } from "@/components/Notice";
+import { Card } from "@/components/Card";
 
 const DETAIL_MAX = 2000;
 const SAVE_FAILED = "The results show here but weren't saved. Check your connection and run again.";
@@ -89,7 +90,7 @@ export function CodingGroup({ slug, specs, initial }: { slug: string; specs: Gro
           const rows = results[question.name];
           const spec: string | undefined = question.spec ?? specs.questions[question.name];
           return (
-            <li key={question.name} className="grid gap-4 rounded-xl border border-border bg-card p-4">
+            <Card as="li" key={question.name} className="grid gap-4 p-4">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="font-mono font-semibold">
                   {number + 1}. {question.name}
@@ -130,7 +131,7 @@ export function CodingGroup({ slug, specs, initial }: { slug: string; specs: Gro
                   );
                 })}
               </ul>
-            </li>
+            </Card>
           );
         })}
       </ol>

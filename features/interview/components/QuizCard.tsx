@@ -14,6 +14,7 @@ import type { SessionView } from "@/features/progress/quiz";
 import type { AiGrade, AiReply, AiResult } from "@/features/progress/quizAi";
 import { cn } from "@/lib/utils";
 import { ProgressBar } from "@/components/ProgressBar";
+import { Card } from "@/components/Card";
 
 type Card = NonNullable<SessionView["current"]>;
 
@@ -182,7 +183,7 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
   const label = [card.bookTitle, card.partTitle].filter(Boolean).join(" · ");
 
   return (
-    <section aria-label="Quiz card" className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
+    <Card as="section" aria-label="Quiz card" className="shadow-sm sm:p-6">
       <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
         <span>{label}</span>
         <span className="tabular-nums">
@@ -296,7 +297,7 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
           {ending ? "Ending…" : "End quiz"}
         </Button>
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -307,7 +308,7 @@ function Done({ view }: { view: SessionView }) {
     [view.counts.skip, "Skipped"],
   ];
   return (
-    <section aria-label="Quiz result" className="rounded-xl border border-border bg-card p-6 text-center shadow-sm">
+    <Card as="section" aria-label="Quiz result" className="p-6 text-center shadow-sm">
       <h1 className="text-2xl font-semibold">Quiz complete</h1>
       <div className="mt-5 flex justify-center gap-8">
         {stats.map(([count, label]) => (
@@ -325,6 +326,6 @@ function Done({ view }: { view: SessionView }) {
           Review my answers
         </Link>
       </div>
-    </section>
+    </Card>
   );
 }
