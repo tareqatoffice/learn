@@ -76,7 +76,7 @@ export function WeightPanel({ points, recent, today }: { points: WeightPoint[]; 
       >
         <label className="grid gap-1 text-sm font-medium">
           Weight (kg)
-          <input type="number" inputMode="decimal" step={0.1} min={1} value={kg} onChange={(e) => setKg(e.target.value)} className={`w-28 ${inputClass}`} />
+          <input type="number" inputMode="decimal" step={0.1} min={30} max={300} value={kg} onChange={(e) => setKg(e.target.value)} className={`w-28 ${inputClass}`} />
         </label>
         <label className="grid gap-1 text-sm font-medium">
           Date

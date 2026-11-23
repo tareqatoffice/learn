@@ -40,7 +40,7 @@ describe("WeekStrip", () => {
     );
     expect(within(screen.getByText("Wed").closest("li")!).getByText("Missed")).toBeTruthy();
     const mon = screen.getByText("Mon").closest("li")!;
-    expect(within(mon).getByLabelText("Done")).toBeTruthy();
+    expect(within(mon).getByText("Done")).toBeTruthy();
     expect(within(mon).queryByText("Missed")).toBeNull();
     expect(screen.queryAllByRole("link")).toHaveLength(0);
   });

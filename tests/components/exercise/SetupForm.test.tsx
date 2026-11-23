@@ -8,7 +8,7 @@ vi.mock("@/app/(app)/exercise/actions", () => ({
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 
-import { SetupForm } from "@/features/exercise/components/SetupForm";
+import { SetupForm, REPLACES_NOTE } from "@/features/exercise/components/SetupForm";
 
 afterEach(() => {
   cleanup();
@@ -47,5 +47,34 @@ describe("SetupForm", () => {
     preview.mockResolvedValue(null);
     render(<SetupForm />);
     expect(screen.getByText("This is not medical advice. If you have a health condition or injury, check with a doctor before starting.")).toBeTruthy();
+  });
+
+  it("labels the weight field Start weight when editing", async () => {
+    preview.mockResolvedValue(null);
+    const { unmount } = render(<SetupForm initial={initial} editing />);
+    expect(screen.getByLabelText("Start weight (kg)")).toBeTruthy();
+    unmount();
+    render(<SetupForm initial={initial} />);
+    expect(screen.getByLabelText("Current weight (kg)")).toBeTruthy();
+  });
+
+  it("warns above Save that a replaced goal starts over", async () => {
+    preview.mockResolvedValue({ targetDate: "2027-03-22", pace: -0.3, check: "ok", kcal: 2250, replaces: true });
+    render(<SetupForm initial={{ ...initial, goalWeightKg: 76, months: 4 }} editing />);
+    expect(await screen.findByText(REPLACES_NOTE)).toBeTruthy();
+    expect(REPLACES_NOTE).toBe("Saving starts a new goal. Your logged weights are kept, and your streak starts again.");
+  });
+
+  it("shows no replace note when saving keeps the goal", async () => {
+    preview.mockResolvedValue({ targetDate: "2027-03-22", pace: -0.3, check: "ok", kcal: 2250, replaces: false });
+    render(<SetupForm initial={{ ...initial, goalWeightKg: 76, months: 4 }} editing />);
+    await screen.findByText(/2,250 kcal/);
+    expect(screen.queryByText(REPLACES_NOTE)).toBeNull();
+  });
+
+  it("says a goal beyond 24 months is too far instead of a date", async () => {
+    preview.mockResolvedValue({ targetDate: "2026-12-22", pace: -9, check: "block", tooFar: true, kcal: 1500, replaces: false });
+    render(<SetupForm initial={initial} />);
+    expect(await screen.findByText(/more than 24 months at a safe pace/)).toBeTruthy();
   });
 });

@@ -6,6 +6,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { requireUser } from "@/features/auth/lib/authz";
 import { WorkoutPlayer } from "@/features/exercise/components/WorkoutPlayer";
 import { DoneWorkoutSummary } from "@/features/exercise/components/DoneWorkoutSummary";
+import { isRealDate } from "@/features/exercise/date";
+import { summaryPlan } from "@/features/exercise/lib/summaryPlan";
 import { formatTarget } from "@/features/exercise/lib/format";
 import { workoutPageMode } from "@/features/exercise/lib/pageMode";
 import { exerciseById } from "@/features/exercise/library";
@@ -15,8 +17,6 @@ import { localDate } from "@/features/speaking/schedule";
 import { readTimeZone } from "@/features/speaking/timezone";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
-
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function generateMetadata({ params }: { params: Promise<{ date: string }> }): Promise<Metadata> {
   const { date } = await params;
@@ -43,7 +43,7 @@ function Notice({ title, children }: { title: string; children: React.ReactNode 
 
 export default async function WorkoutPage({ params }: { params: Promise<{ date: string }> }) {
   const { date } = await params;
-  if (!DATE.test(date)) notFound();
+  if (!isRealDate(date)) notFound();
   const user = await requireUser();
   await connectDb();
   const today = localDate(new Date(), await readTimeZone());
@@ -66,7 +66,8 @@ export default async function WorkoutPage({ params }: { params: Promise<{ date: 
         <PageHeader title={title} track="exercise" />
         <DoneWorkoutSummary
           date={date}
-          plan={plan}
+          today={today}
+          plan={summaryPlan(plan, existing ?? { items: [] })}
           initialFeels={feels}
           skipped={(existing?.items ?? []).filter((i) => i.skipped).map((i) => i.exerciseId)}
         />
@@ -79,8 +80,8 @@ export default async function WorkoutPage({ params }: { params: Promise<{ date: 
       <div className="mx-auto grid w-full max-w-md gap-5">
         <PageHeader title={title} description={`Planned for ${date}. It opens on the day.`} track="exercise" />
         <ol className="grid gap-2">
-          {plan.items.map((item) => (
-            <li key={item.exerciseId} className="rounded-xl border border-border bg-card p-3 text-sm">
+          {plan.items.map((item, index) => (
+            <li key={index} className="rounded-xl border border-border bg-card p-3 text-sm">
               <span className="font-medium">{exerciseById(item.exerciseId)?.name ?? item.exerciseId}</span>
               <span className="text-muted-foreground">
                 {" "}

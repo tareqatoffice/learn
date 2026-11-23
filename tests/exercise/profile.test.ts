@@ -68,7 +68,7 @@ describe("exercise profile", () => {
     expect(await ExerciseProfile.countDocuments({ userId, status: "active" })).toBe(1);
   });
 
-  it("changing only workoutDays keeps the profile id and rewrites future weeks only", async () => {
+  it("changing only workoutDays keeps the profile id and leaves stored weeks alone", async () => {
     const userId = newUserId();
     const first = await saveProfile(userId, input(), "2026-11-02");
     if (!first.ok) throw new Error("save failed");
@@ -80,7 +80,7 @@ describe("exercise profile", () => {
     expect(second.id).toBe(first.id);
     expect(second.workoutDays).toEqual([2, 4]);
     const weeks = await ExercisePlanWeek.find({ userId }).sort({ weekStart: 1 }).lean<{ weekStart: string }[]>();
-    expect(weeks.map((w) => w.weekStart)).toEqual(["2026-11-02"]);
+    expect(weeks.map((w) => w.weekStart)).toEqual(["2026-11-02", "2026-11-09", "2026-11-16"]);
   });
 
   it("finishIfDone ends the profile after targetDate", async () => {
@@ -128,5 +128,23 @@ describe("exercise profile", () => {
     const res = await startKeepFit(userId, "2026-11-06");
     expect(res.ok).toBe(true);
     expect(await getActiveProfile(userId)).toMatchObject({ startWeightKg: 71.5, goalWeightKg: 71.5, targetDate: "2027-02-06" });
+  });
+
+  it("previewGoal says whether saving would replace the active goal", () => {
+    const active = { startDate: "2026-11-02", targetDate: "2027-02-02", startWeightKg: 80, goalWeightKg: 72 };
+    expect(previewGoal(input({ workoutDays: [2, 4] }), "2026-11-04", active).replaces).toBe(false);
+    expect(previewGoal(input({ goalWeightKg: 70 }), "2026-11-04", active).replaces).toBe(true);
+    expect(previewGoal(input({ months: 4 }), "2026-11-04", active).replaces).toBe(true);
+    expect(previewGoal(input(), "2026-11-04", null).replaces).toBe(false);
+  });
+
+  it("a goal needing over 24 months says so instead of naming a far date", async () => {
+    const hard = input({ startWeightKg: 300, goalWeightKg: 30, months: 1 });
+    const preview = previewGoal(hard, "2026-11-02");
+    expect(preview).toMatchObject({ check: "block", tooFar: true });
+    expect(preview.safeTargetDate).toBeUndefined();
+    const res = await saveProfile(newUserId(), hard, "2026-11-02");
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.errors.months).toBe("That goal needs more than 24 months at a safe pace. Pick a goal closer to your current weight.");
   });
 });

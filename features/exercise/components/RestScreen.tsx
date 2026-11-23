@@ -35,7 +35,9 @@ export function RestScreen({
         <Button variant="outline" onClick={onAdd}>
           +15s
         </Button>
-        <Button onClick={onSkip}>Skip rest</Button>
+        <Button data-primary onClick={onSkip}>
+          Skip rest
+        </Button>
       </div>
     </div>
   );

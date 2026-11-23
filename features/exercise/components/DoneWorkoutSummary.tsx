@@ -9,16 +9,19 @@ import { WorkoutSummary } from "./WorkoutSummary";
 /** A done session opened later: still rateable until feels have been saved, read-only after. */
 export function DoneWorkoutSummary({
   date,
+  today,
   plan,
   initialFeels,
   skipped,
 }: {
   date: string;
+  /** The user's current day: only that day's workout can still be rated. */
+  today: string;
   plan: PlanDay;
   initialFeels: Partial<Record<string, Feel>>;
   skipped: string[];
 }) {
-  const [editable, setEditable] = useState(Object.keys(initialFeels).length === 0);
+  const [editable, setEditable] = useState(date === today && Object.keys(initialFeels).length === 0);
   const [feels, setFeels] = useState(initialFeels);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();

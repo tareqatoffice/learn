@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { previewGoalAction, saveProfileAction } from "@/app/(app)/exercise/actions";
 import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
+import { TOO_FAR } from "@/features/exercise/goal";
 import type { ProfileInput } from "@/features/exercise/profile";
 import { LEVELS, SEXES } from "@/models/exerciseConstants";
 
@@ -108,15 +109,20 @@ function PreviewNote({ preview }: { preview: Preview }) {
       {preview.check === "warn" && (
         <p className="text-muted-foreground">That is a fast pace (over 0.75 kg a week). More time makes it easier to keep up.</p>
       )}
-      {preview.check === "block" && (
-        <Notice>That is faster than 1 kg a week. The earliest safe date is {preview.safeTargetDate}. Choose more months to continue.</Notice>
-      )}
+      {preview.check === "block" &&
+        (preview.safeTargetDate ? (
+          <Notice>That is faster than 1 kg a week. The earliest safe date is {preview.safeTargetDate}. Choose more months to continue.</Notice>
+        ) : (
+          <Notice>{TOO_FAR}</Notice>
+        ))}
       <p className="text-muted-foreground">About {preview.kcal.toLocaleString("en-US")} kcal a day.</p>
     </div>
   );
 }
 
-export function SetupForm({ initial }: { initial?: Partial<ProfileInput> }) {
+export const REPLACES_NOTE = "Saving starts a new goal. Your logged weights are kept, and your streak starts again.";
+
+export function SetupForm({ initial, editing = false }: { initial?: Partial<ProfileInput>; editing?: boolean }) {
   const router = useRouter();
   const [s, setS] = useState(() => initialState(initial));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -201,7 +207,7 @@ export function SetupForm({ initial }: { initial?: Partial<ProfileInput> }) {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        {text("startWeightKg", "Current weight (kg)", { min: 30, max: 300, step: 0.1 })}
+        {text("startWeightKg", editing ? "Start weight (kg)" : "Current weight (kg)", { min: 30, max: 300, step: 0.1 })}
         {text("goalWeightKg", "Goal weight (kg)", { min: 30, max: 300, step: 0.1 })}
         {text("months", "Months to reach it", { min: 1, max: 24, step: 1 })}
       </div>
@@ -242,11 +248,12 @@ export function SetupForm({ initial }: { initial?: Partial<ProfileInput> }) {
         {errors.workoutDays && <Notice>{errors.workoutDays}</Notice>}
       </fieldset>
 
+      {preview?.replaces && <p className="text-sm text-muted-foreground">{REPLACES_NOTE}</p>}
+
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={saving || blocked}>
           Save goal
         </Button>
-        {errors.months && <Notice>{errors.months}</Notice>}
         {errors._ && <Notice>{errors._}</Notice>}
       </div>
     </form>

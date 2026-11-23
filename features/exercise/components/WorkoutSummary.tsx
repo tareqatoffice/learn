@@ -39,17 +39,19 @@ export function WorkoutSummary({
         </p>
       </div>
       <ul className="grid gap-3">
-        {plan.items.map((item) => {
+        {plan.items.map((item, index) => {
           const exercise = exerciseById(item.exerciseId);
           const feel = feels[item.exerciseId];
           return (
-            <li key={item.exerciseId} className="grid gap-2 rounded-xl border border-border bg-card p-3">
+            <li key={index} className="grid gap-2 rounded-xl border border-border bg-card p-3">
               <p className="text-sm font-medium">
                 {exercise?.name ?? item.exerciseId}
-                <span className="font-normal text-muted-foreground">
-                  {" "}
-                  · {item.sets} × {formatTarget(item)}
-                </span>
+                {(item.reps || item.seconds) && (
+                  <span className="font-normal text-muted-foreground">
+                    {" "}
+                    · {item.sets} × {formatTarget(item)}
+                  </span>
+                )}
               </p>
               {skipped.includes(item.exerciseId) ? (
                 <p className="text-sm text-muted-foreground">Skipped</p>

@@ -3,6 +3,7 @@
 import { type ActionResult, fail } from "@/features/admin/result";
 import { requireUser } from "@/features/auth/lib/authz";
 import { type ProfileInput, getActiveProfile, previewGoal, saveProfile, startKeepFit } from "@/features/exercise/profile";
+import { isRealDate } from "@/features/exercise/date";
 import { finishSession, saveSet } from "@/features/exercise/sessions";
 import { deleteWeight, logWeight } from "@/features/exercise/weights";
 import { localDate } from "@/features/speaking/schedule";
@@ -20,19 +21,16 @@ async function today(): Promise<string> {
   return localDate(new Date(), await readTimeZone());
 }
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const isDate = (v: unknown): v is string => typeof v === "string" && DATE.test(v);
-
 /** A workout can only be saved on the user's own current day. */
 async function workoutDay(date: unknown): Promise<string> {
-  if (!isDate(date) || date !== (await today())) throw new Error("Workouts can only be saved for today.");
+  if (!isRealDate(date) || date !== (await today())) throw new Error("Workouts can only be saved for today.");
   return date;
 }
 
 const usable = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
 
 export async function previewGoalAction(input: ProfileInput) {
-  await session();
+  const userId = await session();
   const ok =
     usable(input?.heightCm) &&
     usable(input.birthYear) &&
@@ -43,7 +41,6 @@ export async function previewGoalAction(input: ProfileInput) {
     input.months <= 24 &&
     Array.isArray(input.workoutDays);
   if (!ok) return null;
-  const userId = await session();
   return previewGoal(input, await today(), await getActiveProfile(userId));
 }
 
@@ -53,13 +50,13 @@ export async function saveProfileAction(input: ProfileInput) {
 
 export async function logWeightAction(date: string, kg: number): Promise<ActionResult> {
   const userId = await session();
-  if (!isDate(date)) return fail({ date: "Pick today or an earlier day." });
+  if (!isRealDate(date)) return fail({ date: "Pick today or an earlier day." });
   return logWeight(userId, date, kg, await today());
 }
 
 export async function deleteWeightAction(date: string): Promise<ActionResult> {
   const userId = await session();
-  if (!isDate(date)) return fail({ date: "Pick a valid day." });
+  if (!isRealDate(date)) return fail({ date: "Pick a valid day." });
   return deleteWeight(userId, date);
 }
 

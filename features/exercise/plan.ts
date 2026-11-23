@@ -150,6 +150,11 @@ function rng(seed: string): () => number {
   };
 }
 
+/** A day never repeats an exercise, so it holds at most as many items as there are allowed exercises. */
+export function slotsFor(day: SkeletonDay): number {
+  return Math.min(day.slots, allowedFor(day.focus, day.maxDifficulty).length);
+}
+
 export function fillDay(day: SkeletonDay, seed: string): PlanDay {
   const shuffled = [...allowedFor(day.focus, day.maxDifficulty)];
   const random = rng(seed);
@@ -157,12 +162,13 @@ export function fillDay(day: SkeletonDay, seed: string): PlanDay {
     const j = Math.floor(random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  const items: PlanItem[] = Array.from({ length: day.slots }, (_, i) => {
-    const ex = shuffled[i % shuffled.length];
-    return ex.mode === "time"
-      ? { exerciseId: ex.id, sets: day.sets, seconds: day.seconds, restSec: day.restSec }
-      : { exerciseId: ex.id, sets: day.sets, reps: day.reps, restSec: day.restSec };
-  });
+  const items: PlanItem[] = shuffled
+    .slice(0, slotsFor(day))
+    .map((ex) =>
+      ex.mode === "time"
+        ? { exerciseId: ex.id, sets: day.sets, seconds: day.seconds, restSec: day.restSec }
+        : { exerciseId: ex.id, sets: day.sets, reps: day.reps, restSec: day.restSec },
+    );
   return { date: day.date, focus: day.focus, minutes: day.minutes, items };
 }
 
@@ -184,7 +190,9 @@ export function validateDay(day: SkeletonDay, items: unknown): PlanItem[] | null
   const parsed = z.array(itemSchema).safeParse(items);
   if (!parsed.success) return null;
   const list = parsed.data;
-  if (list.length < Math.max(1, day.slots - 1) || list.length > day.slots + 1) return null;
+  const pool = allowedFor(day.focus, day.maxDifficulty).length;
+  if (list.length < Math.max(1, slotsFor(day) - 1) || list.length > Math.min(day.slots + 1, pool)) return null;
+  if (new Set(list.map((i) => i.exerciseId)).size !== list.length) return null;
   const allowed = new Set(allowedFor(day.focus, day.maxDifficulty).map((e) => e.id));
   if (!list.every((i) => allowed.has(i.exerciseId))) return null;
   // Reps-mode moves take reps only, time-mode moves take seconds only.

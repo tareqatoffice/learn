@@ -5,6 +5,7 @@ import {
   baseVolume,
   fillDay,
   scheduledDates,
+  slotsFor,
   skeletonWeek,
   validateDay,
   weekIndex,
@@ -83,6 +84,14 @@ describe("fillDay", () => {
     const outputs = ["a", "b", "c", "d", "e"].map((s) => JSON.stringify(fillDay(day, s)));
     expect(new Set(outputs).size).toBeGreaterThan(1);
   });
+  it("never repeats an exercise in a beginner 30 min full day", () => {
+    const full = { ...day, focus: "full" as const };
+    for (const seed of ["a", "b", "c", "d"]) {
+      const filled = fillDay(full, seed);
+      expect(new Set(filled.items.map((i) => i.exerciseId)).size).toBe(filled.items.length);
+      expect(validateDay(full, filled.items)).not.toBeNull();
+    }
+  });
   it("always passes validation, whatever the level, week and length", () => {
     for (const level of LEVELS) {
       for (const idx of [0, 12]) {
@@ -92,7 +101,8 @@ describe("fillDay", () => {
           expect(days.length).toBeGreaterThan(0);
           for (const d of days) {
             const filled = fillDay(d, `${level}-${idx}-${minutes}`);
-            expect(filled.items).toHaveLength(d.slots);
+            expect(filled.items).toHaveLength(slotsFor(d));
+            expect(new Set(filled.items.map((i) => i.exerciseId)).size).toBe(filled.items.length);
             expect(validateDay(d, filled.items), `${level} week ${idx} ${minutes}m`).not.toBeNull();
           }
         }
@@ -114,6 +124,9 @@ describe("validateDay", () => {
     expect(validateDay(day, [{ ...first, sets: 0 }, ...good.slice(1)])).toBeNull();
     expect(validateDay(day, [...good, ...good.slice(0, 2)])).toBeNull();
     expect(validateDay(day, "nope")).toBeNull();
+  });
+  it("rejects a day with a repeated exercise", () => {
+    expect(validateDay(day, [good[0], { ...good[0] }, ...good.slice(2)])).toBeNull();
   });
   it("rejects items whose fields do not match the exercise mode", () => {
     const withReps = good.findIndex((i) => i.reps !== undefined);

@@ -1,5 +1,5 @@
 import { connectDb, inTransaction, retryOnDuplicateKey } from "@/lib/db";
-import { ExercisePlanWeek, ExerciseProfile, WeightEntry } from "@/models";
+import { ExerciseProfile, WeightEntry, WorkoutSession } from "@/models";
 import { LEVELS, SEXES, type Level, type Sex } from "@/models/exerciseConstants";
 import { type ActionResult, type FieldErrors, fail, ok } from "@/features/admin/result";
 import {
@@ -9,13 +9,13 @@ import {
   goalReached,
   paceCheck,
   paceStatus,
-  safeTargetDate,
+  safeTargetWithin,
+  TOO_FAR,
   type GoalShape,
   weeklyPace,
   weeksBetween,
 } from "./goal";
 import { addDays } from "@/features/speaking/schedule";
-import { weekStartOf } from "./plan";
 
 export type ProfileInput = {
   heightCm: number;
@@ -60,21 +60,33 @@ function toView(doc: ProfileDoc): ProfileView {
 }
 
 const inRange = (n: number, lo: number, hi: number) => Number.isFinite(n) && n >= lo && n <= hi;
+/** True when the input changes the goal itself (weights or length), not just the schedule. */
+function goalChanged(active: GoalShape | null | undefined, input: ProfileInput): boolean {
+  return (
+    !active ||
+    active.startWeightKg !== input.startWeightKg ||
+    active.goalWeightKg !== input.goalWeightKg ||
+    active.targetDate !== addMonths(active.startDate, input.months)
+  );
+}
 const normalDays = (days: number[]) => [...new Set(days)].sort((a, b) => a - b);
 
 export function previewGoal(
   input: ProfileInput,
   today: string,
   active?: GoalShape | null,
-): { targetDate: string; pace: number; check: "ok" | "warn" | "block"; safeTargetDate?: string; kcal: number } {
+): {
+  targetDate: string;
+  pace: number;
+  check: "ok" | "warn" | "block";
+  safeTargetDate?: string;
+  tooFar?: true;
+  /** Saving would end the active goal and start a new one. */
+  replaces: boolean;
+  kcal: number;
+} {
   // A schedule-only edit keeps the active goal's dates (see saveProfile), so preview those.
-  const kept =
-    active &&
-    active.startWeightKg === input.startWeightKg &&
-    active.goalWeightKg === input.goalWeightKg &&
-    active.targetDate === addMonths(active.startDate, input.months)
-      ? active
-      : null;
+  const kept = active && !goalChanged(active, input) ? active : null;
   const targetDate = kept ? kept.targetDate : addMonths(today, input.months);
   const pace = kept
     ? weeklyPace(kept.startWeightKg, kept.goalWeightKg, weeksBetween(kept.startDate, kept.targetDate))
@@ -88,11 +100,14 @@ export function previewGoal(
     daysPerWeek: input.workoutDays.length,
     pace,
   });
+  const safe = check === "block" ? safeTargetWithin(today, input.startWeightKg, input.goalWeightKg) : null;
   return {
     targetDate,
     pace,
     check,
-    ...(check === "block" ? { safeTargetDate: safeTargetDate(today, input.startWeightKg, input.goalWeightKg) } : {}),
+    ...(safe ? { safeTargetDate: safe } : {}),
+    ...(check === "block" && !safe ? { tooFar: true as const } : {}),
+    replaces: Boolean(active) && !kept,
     kcal,
   };
 }
@@ -148,24 +163,19 @@ export async function saveProfile(userId: string, input: ProfileInput, today: st
   const active = await ExerciseProfile.findOne({ userId, status: "active" });
   const targetDate = addMonths(today, input.months);
 
-  const goalChanged =
-    !active ||
-    active.startWeightKg !== input.startWeightKg ||
-    active.goalWeightKg !== input.goalWeightKg ||
-    active.targetDate !== addMonths(active.startDate, input.months);
+  const changed = goalChanged(active, input);
 
-  if (goalChanged) {
+  if (changed) {
     const pace = weeklyPace(input.startWeightKg, input.goalWeightKg, weeksBetween(today, targetDate));
     if (paceCheck(pace) === "block") {
-      const safe = safeTargetDate(today, input.startWeightKg, input.goalWeightKg);
-      return fail({ months: `That's faster than 1 kg a week. The earliest safe date is ${safe}.` });
+      const safe = safeTargetWithin(today, input.startWeightKg, input.goalWeightKg);
+      return fail({ months: safe ? `That's faster than 1 kg a week. The earliest safe date is ${safe}.` : TOO_FAR });
     }
   }
 
-  if (active && !goalChanged) {
+  if (active && !changed) {
     Object.assign(active, fields);
     await active.save();
-    await ExercisePlanWeek.deleteMany({ userId, profileId: active._id, weekStart: { $gt: weekStartOf(today) } });
     return ok(toView(active.toObject() as ProfileDoc));
   }
 
@@ -182,6 +192,8 @@ export async function saveProfile(userId: string, input: ProfileInput, today: st
     inTransaction(async (session) => {
       if (active) {
         await ExerciseProfile.updateOne({ _id: active._id }, { $set: { status: "ended", endedReason: "replaced" } }, { session });
+        // Today's unfinished workout belongs to the replaced plan.
+        await WorkoutSession.deleteOne({ userId, date: today, status: "inProgress" }, { session });
       }
       const [doc] = await ExerciseProfile.create([fresh], { session });
       return doc;

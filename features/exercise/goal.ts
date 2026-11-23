@@ -39,6 +39,14 @@ export function safeTargetDate(start: string, startKg: number, goalKg: number): 
   return addMonths(start, 600);
 }
 
+/** The earliest safe target date within `maxMonths`, or null when the goal needs longer than that. */
+export function safeTargetWithin(start: string, startKg: number, goalKg: number, maxMonths = 24): string | null {
+  const safe = safeTargetDate(start, startKg, goalKg);
+  return safe <= addMonths(start, maxMonths) ? safe : null;
+}
+
+export const TOO_FAR = "That goal needs more than 24 months at a safe pace. Pick a goal closer to your current weight.";
+
 export function ageFrom(birthYear: number, today: string): number {
   return Number(today.slice(0, 4)) - birthYear;
 }

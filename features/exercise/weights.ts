@@ -1,9 +1,8 @@
 import { connectDb, retryOnDuplicateKey } from "@/lib/db";
 import { WeightEntry } from "@/models";
 import { type ActionResult, fail, ok } from "@/features/admin/result";
+import { isRealDate } from "./date";
 import { getActiveProfile } from "./profile";
-
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function logWeight(
   userId: string,
@@ -12,11 +11,13 @@ export async function logWeight(
   today: string,
 ): Promise<ActionResult<{ date: string; kg: number }>> {
   if (!Number.isFinite(kg) || kg < 30 || kg > 300) return fail({ kg: "Weight must be between 30 and 300 kg." });
-  if (typeof date !== "string" || !DATE.test(date) || date > today) return fail({ date: "Pick today or an earlier day." });
+  if (!isRealDate(date) || date > today) return fail({ date: "Pick today or an earlier day." });
   const profile = await getActiveProfile(userId);
   if (!profile) return fail("Set a goal before logging your weight.");
+  if (date < profile.startDate) return fail({ date: `Pick ${profile.startDate} or later: that is when this goal started.` });
+  // An existing entry keeps the goal it was logged under.
   await retryOnDuplicateKey(() =>
-    WeightEntry.updateOne({ userId, date }, { $set: { kg, profileId: profile.id } }, { upsert: true }),
+    WeightEntry.updateOne({ userId, date }, { $set: { kg }, $setOnInsert: { profileId: profile.id } }, { upsert: true }),
   );
   return ok({ date, kg });
 }
@@ -28,7 +29,7 @@ export async function listWeights(userId: string, profileId: string): Promise<{ 
 }
 
 export async function deleteWeight(userId: string, date: string): Promise<ActionResult> {
-  if (typeof date !== "string" || !DATE.test(date)) return fail({ date: "Pick a valid day." });
+  if (!isRealDate(date)) return fail({ date: "Pick a valid day." });
   await connectDb();
   await WeightEntry.deleteOne({ userId, date });
   return ok();

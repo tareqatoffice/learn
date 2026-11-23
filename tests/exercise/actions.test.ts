@@ -72,6 +72,8 @@ describe("exercise actions", () => {
 
   it("weight actions reject a non-string date before any query", async () => {
     session.userId = id();
+    expect((await actions.logWeightAction("2026-02-30", 80)).ok).toBe(false);
+    expect((await actions.deleteWeightAction("2026-13-01")).ok).toBe(false);
     expect((await actions.logWeightAction({ $gt: "" } as never, 80)).ok).toBe(false);
     expect((await actions.deleteWeightAction({ $gt: "" } as never)).ok).toBe(false);
   });

@@ -38,7 +38,7 @@ export function WeekStrip({ today, days }: { today: string; days: StripDay[] }) 
                 <p className="capitalize">{d.workout.focus}</p>
                 <p className="text-xs text-muted-foreground">{d.workout.minutes} min</p>
                 {d.done && (
-                  <p aria-label="Done" className="flex items-center gap-1 text-xs font-medium text-ok">
+                  <p className="flex items-center gap-1 text-xs font-medium text-ok">
                     <Check aria-hidden className="size-3.5" />
                     Done
                   </p>

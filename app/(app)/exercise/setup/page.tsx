@@ -48,7 +48,7 @@ export default async function ExerciseSetupPage() {
         description="Pick a goal weight, how many months you want and the days you can work out. You see the target date and pace before you save."
       />
       <div className="rounded-xl border border-border bg-card p-5">
-        <SetupForm initial={initial} />
+        <SetupForm initial={initial} editing={Boolean(active)} />
       </div>
     </div>
   );

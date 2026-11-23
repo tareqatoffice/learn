@@ -2,7 +2,7 @@ import { connectDb, retryOnDuplicateKey } from "@/lib/db";
 import { WorkoutSession } from "@/models";
 import { FEELS, type Feel } from "@/models/exerciseConstants";
 import { addDays } from "@/features/speaking/schedule";
-import { getActiveProfile } from "./profile";
+import { getActiveProfile, type ProfileView } from "./profile";
 import type { PlanDay } from "./plan";
 import { dayPlan, plannedDates } from "./weeks";
 
@@ -23,6 +23,10 @@ const toView = (s: SessionView): SessionView => ({
   })),
 });
 
+const seedItems = (plan: PlanDay) => plan.items.map((i) => ({ exerciseId: i.exerciseId, setsDone: 0, skipped: false }));
+const sameItems = (items: { exerciseId: string }[], plan: PlanDay) =>
+  items.length === plan.items.length && items.every((it, i) => it.exerciseId === plan.items[i].exerciseId);
+
 /** The day's session if one exists; never creates one. */
 export async function getSession(userId: string, date: string): Promise<SessionView | null> {
   await connectDb();
@@ -33,10 +37,21 @@ export async function getSession(userId: string, date: string): Promise<SessionV
 export async function startSession(userId: string, date: string): Promise<SessionView | null> {
   await connectDb();
   const existing = await WorkoutSession.findOne({ userId, date }).lean<SessionView>();
-  if (existing) return toView(existing);
   const [plan, profile] = await Promise.all([dayPlan(userId, date), getActiveProfile(userId)]);
+  if (existing) {
+    // The plan changed under an open session (a replaced goal): start its items over from the current plan.
+    if (existing.status === "inProgress" && plan && !sameItems(existing.items, plan)) {
+      const reseeded = await WorkoutSession.findOneAndUpdate(
+        { userId, date, status: "inProgress" },
+        { $set: { items: seedItems(plan) } },
+        { returnDocument: "after" },
+      ).lean<SessionView>();
+      if (reseeded) return toView(reseeded);
+    }
+    return toView(existing);
+  }
   if (!plan || !profile) return null;
-  const items = plan.items.map((i) => ({ exerciseId: i.exerciseId, setsDone: 0, skipped: false }));
+  const items = seedItems(plan);
   const doc = await retryOnDuplicateKey(() =>
     WorkoutSession.findOneAndUpdate(
       { userId, date },
@@ -94,7 +109,8 @@ export async function finishSession(userId: string, date: string, feels: Record<
     if (feel) item.feel = feel;
   }
   if (session.status === "inProgress") {
-    session.status = "done";
+    // A workout with no set done earns no credit.
+    session.status = session.items.some((i: { setsDone: number }) => i.setsDone > 0) ? "done" : "abandoned";
     session.finishedAt = new Date();
   }
   await session.save();
@@ -110,10 +126,14 @@ export function resumePoint(s: SessionView, plan: PlanDay): { item: number; set:
   return null;
 }
 
-export async function weekSummary(userId: string, weekStart: string): Promise<{ done: number; planned: number }> {
+export async function weekSummary(
+  userId: string,
+  weekStart: string,
+  loaded?: ProfileView | null,
+): Promise<{ done: number; planned: number }> {
   await connectDb();
   const end = addDays(weekStart, 6);
-  const profile = await getActiveProfile(userId);
+  const profile = loaded === undefined ? await getActiveProfile(userId) : loaded;
   if (!profile) return { done: 0, planned: 0 };
   const planned = await plannedDates(userId, profile, weekStart, end);
   // Only planned dates count, so done never exceeds planned (e.g. after a mid-week goal replacement).
@@ -121,8 +141,8 @@ export async function weekSummary(userId: string, weekStart: string): Promise<{ 
   return { done, planned: planned.length };
 }
 
-export async function streak(userId: string, today: string): Promise<number> {
-  const profile = await getActiveProfile(userId);
+export async function streak(userId: string, today: string, loaded?: ProfileView | null): Promise<number> {
+  const profile = loaded === undefined ? await getActiveProfile(userId) : loaded;
   if (!profile) return 0;
   const dates = await plannedDates(userId, profile, profile.startDate, today);
   if (!dates.length) return 0;

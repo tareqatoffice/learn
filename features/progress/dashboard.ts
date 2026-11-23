@@ -3,7 +3,7 @@ import { listBooksWithProgress, listSeriesWithProgress } from "@/features/conten
 import { filterUnder, visibleNodeFilter, visibleNoteFilter, visibleQuestionFilter } from "@/features/content/visibility";
 import { readyNext as readyIn } from "@/features/graph/layout";
 import { Graph, GraphNode, Note, NodeProgress, NoteProgress, NoteSeries, Question, QuestionBook, QuestionProgress, QuizSession } from "@/models";
-import { getActiveProfile } from "@/features/exercise/profile";
+import { finishIfDone, getActiveProfile } from "@/features/exercise/profile";
 import { type PaceStatus, paceStatus } from "@/features/exercise/goal";
 import { weekStartOf } from "@/features/exercise/plan";
 import { streak, weekSummary } from "@/features/exercise/sessions";
@@ -156,13 +156,15 @@ async function ieltsCard(userId: string, timeZone: string, now: Date): Promise<D
 }
 
 async function exerciseCard(userId: string, timeZone: string, now: Date): Promise<Dashboard["exercise"]> {
+  const today = localDate(now, timeZone);
+  // Retire an expired or reached goal first, so the card never shows a finished one.
+  await finishIfDone(userId, today);
   const profile = await getActiveProfile(userId);
   if (!profile) return undefined;
-  const today = localDate(now, timeZone);
   const [week, weights, run] = await Promise.all([
-    weekSummary(userId, weekStartOf(today)),
+    weekSummary(userId, weekStartOf(today), profile),
     listWeights(userId, profile.id),
-    streak(userId, today),
+    streak(userId, today, profile),
   ]);
   const { status, gapKg, keep } = paceStatus(profile, weights, today);
   const last = weights.at(-1);
