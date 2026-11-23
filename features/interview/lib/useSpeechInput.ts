@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 type RecognitionResult = { isFinal: boolean; 0: { transcript: string } };
 type RecognitionEvent = { resultIndex: number; results: ArrayLike<RecognitionResult> };
@@ -24,6 +24,11 @@ function recognitionCtor(): RecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+// Browser support never changes, so there is nothing to subscribe to; the server snapshot says "unsupported".
+const noSubscribe = () => () => {};
+const hasRecognition = () => recognitionCtor() !== null;
+const noRecognition = () => false;
+
 const ERRORS: Record<string, string> = {
   "not-allowed": "Microphone access was blocked. Allow it in the browser to answer by voice.",
   "service-not-allowed": "Voice input is not allowed in this browser.",
@@ -32,7 +37,7 @@ const ERRORS: Record<string, string> = {
 };
 
 export function useSpeechInput(onFinal: (text: string) => void, lang?: string) {
-  const [supported, setSupported] = useState(false);
+  const supported = useSyncExternalStore(noSubscribe, hasRecognition, noRecognition);
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
   const [error, setError] = useState("");
@@ -43,11 +48,7 @@ export function useSpeechInput(onFinal: (text: string) => void, lang?: string) {
     onFinalRef.current = onFinal;
   }, [onFinal]);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSupported(recognitionCtor() !== null);
-    return () => recognition.current?.abort();
-  }, []);
+  useEffect(() => () => recognition.current?.abort(), []);
 
   const stop = useCallback(() => recognition.current?.stop(), []);
 

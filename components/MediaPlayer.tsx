@@ -80,7 +80,14 @@ export function MediaPlayer({
       setRequest(true);
       return;
     }
-    setRequest(!playing);
+    if (playing) {
+      setRequest(false);
+      return;
+    }
+    setRequest(true);
+    // A refused play() (autoplay policy) fires no play/pause event, so settle the request here
+    // instead of leaving the button on Pause and react-player retrying on every render.
+    el.current?.play()?.catch(() => settle(false));
   };
 
   const player = (

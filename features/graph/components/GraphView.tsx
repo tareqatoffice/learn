@@ -34,6 +34,8 @@ const ZOOM_STEP = 0.2;
 
 const LINE_CHARS = 20;
 
+const wide = () => window.matchMedia("(min-width: 64rem)").matches;
+
 function wrapTitle(title: string): { lines: string[]; cut: boolean } {
   const lines: string[] = [];
   let line = "";
@@ -170,7 +172,6 @@ export function GraphView({ data }: { data: GraphData }) {
   const ordered = [...edges.filter((e) => !lit(e)), ...edges.filter(lit)];
 
   const topicUrl = (slug: string, read: boolean) => `${pathname}?topic=${encodeURIComponent(slug)}${read ? "&read=1" : ""}`;
-  const wide = () => window.matchMedia("(min-width: 64rem)").matches;
 
   function select(slug: string) {
     setError(null);
@@ -200,11 +201,12 @@ export function GraphView({ data }: { data: GraphData }) {
     window.history.back();
   }
 
+  // A topic linked into on load (not read mode): on narrow screens, bring its panel into view once.
+  const [linkedOnLoad] = useState(() => current !== null && !reading);
   useEffect(() => {
-    if (!current || reading || typeof window.matchMedia !== "function" || wide()) return;
+    if (!linkedOnLoad || typeof window.matchMedia !== "function" || wide()) return;
     panelRef.current?.scrollIntoView({ block: "start" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [linkedOnLoad]);
 
   function onPanelKey(e: React.KeyboardEvent) {
     if (e.key !== "Escape" || !current) return;

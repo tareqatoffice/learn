@@ -156,19 +156,25 @@ export async function confirmPhoto(slug: string, slot: PhotoSlot, key: string): 
   }
   if (!storageConfigured()) return fail(NO_STORAGE);
   await connectDb();
+  const other = otherSlot(slot);
   const doc = await Exercise.findOne({ slug }).lean<ExerciseRow>();
   if (!doc) return fail(NOT_FOUND);
+  if (doc[other] === key) return fail("That photo is already used for the other frame.");
   const head = await headObject(key);
   if (!head) return fail("The photo didn't finish uploading. Try again.");
   if (head.size > PHOTO_MAX_BYTES) {
     await quietDelete([key]);
     return fail("Photos can be 5 MB at most.");
   }
-  await Exercise.updateOne({ slug }, { $set: { [slot]: key } });
-  const previous = doc[slot] ?? "";
-  if (previous && previous !== key) await quietDelete([previous]);
+  // The photo replaced is the one this write swapped out, not the one read above.
+  const before = await Exercise.findOneAndUpdate({ slug }, { $set: { [slot]: key } }).lean<ExerciseRow>();
+  if (!before) return fail(NOT_FOUND);
+  const previous = before[slot] ?? "";
+  if (previous && previous !== key && previous !== before[other]) await quietDelete([previous]);
   return ok({ url: photoUrl(key) });
 }
+
+const otherSlot = (slot: PhotoSlot): PhotoSlot => (slot === "startPhoto" ? "endPhoto" : "startPhoto");
 
 /** Clears a photo slot and deletes the file from storage. */
 export async function removePhoto(slug: string, slot: PhotoSlot): Promise<ActionResult> {
@@ -176,7 +182,8 @@ export async function removePhoto(slug: string, slot: PhotoSlot): Promise<Action
   await connectDb();
   const doc = await Exercise.findOneAndUpdate({ slug }, { $set: { [slot]: "" } }).lean<ExerciseRow>();
   if (!doc) return fail(NOT_FOUND);
-  await quietDelete([doc[slot] ?? ""]);
+  const previous = doc[slot] ?? "";
+  if (previous !== doc[otherSlot(slot)]) await quietDelete([previous]);
   return ok();
 }
 
