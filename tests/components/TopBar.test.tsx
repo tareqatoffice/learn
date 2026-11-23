@@ -31,7 +31,7 @@ describe("TopBar", () => {
   it("links to every area", () => {
     render(<TopBar user={user} />);
     const href = (name: string) => screen.getByRole("link", { name }).getAttribute("href");
-    expect(href("Dashboard")).toBe("/dashboard");
+    expect(screen.queryByRole("link", { name: "Dashboard" })).toBeNull();
     expect(href("Interview")).toBe("/interview");
     expect(href("Speaking")).toBe("/speaking");
     expect(href("IELTS")).toBe("/ielts");
