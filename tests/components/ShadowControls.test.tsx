@@ -40,7 +40,7 @@ describe("ShadowPractice", () => {
 
   it("jumps to a tapped sentence and repeats it", async () => {
     const { container } = render(<ShadowPractice src="https://x.test/a.mp3" sentences={sentences} rate={1} onRate={() => {}} />);
-    const audio = container.querySelector("audio")!;
+    const audio = container.querySelector<HTMLMediaElement>("audio, video")!;
     await userEvent.click(screen.getByRole("button", { name: "Second one." }));
     expect(audio.currentTime).toBe(10);
     expect(screen.getByRole("button", { name: "Second one." }).closest("li")?.getAttribute("aria-current")).toBe("true");
@@ -57,7 +57,7 @@ describe("ShadowPractice", () => {
     await userEvent.click(screen.getByRole("button", { name: "0.75×" }));
     expect(onRate).toHaveBeenCalledWith(0.75);
     rerender(<ShadowPractice src="https://x.test/a.mp3" sentences={sentences} rate={0.75} onRate={onRate} />);
-    expect(container.querySelector("audio")!.playbackRate).toBe(0.75);
+    expect(container.querySelector<HTMLMediaElement>("audio, video")!.playbackRate).toBe(0.75);
     expect(screen.getByRole("button", { name: "0.75×" }).getAttribute("aria-pressed")).toBe("true");
   });
 });
@@ -65,7 +65,7 @@ describe("ShadowPractice", () => {
 describe("ShadowPlayer", () => {
   it("plays source then take, with pause and resume", async () => {
     const { container } = render(<ShadowPlayer sourceUrl="https://x.test/s.mp3" takeUrl="https://x.test/t.webm" rate={0.75} />);
-    const [source, take] = container.querySelectorAll("audio");
+    const [source, take] = container.querySelectorAll<HTMLMediaElement>("audio, video");
     expect(source.playbackRate).toBe(0.75);
     await userEvent.click(screen.getByRole("button", { name: /Play source, then my take/ }));
     expect(screen.getByRole("status").textContent).toContain("Playing the source");
@@ -80,7 +80,7 @@ describe("ShadowPlayer", () => {
 
   it("plays both together with a volume mix", async () => {
     const { container } = render(<ShadowPlayer sourceUrl="https://x.test/s.mp3" takeUrl="https://x.test/t.webm" />);
-    const [source, take] = container.querySelectorAll("audio");
+    const [source, take] = container.querySelectorAll<HTMLMediaElement>("audio, video");
     await userEvent.click(screen.getByRole("button", { name: "Together" }));
     fireEvent.change(screen.getByLabelText("Mix between the source and your take"), { target: { value: "75" } });
     expect(source.volume).toBeCloseTo(0.5);
@@ -96,7 +96,7 @@ describe("ShadowPlayer highlight", () => {
   it("stops reporting the source time after Stop", async () => {
     const onSourceTime = vi.fn();
     const { container } = render(<ShadowPlayer sourceUrl="https://x.test/s.mp3" takeUrl="https://x.test/t.webm" onSourceTime={onSourceTime} />);
-    const [source] = container.querySelectorAll("audio");
+    const [source] = container.querySelectorAll<HTMLMediaElement>("audio, video");
     fireEvent.timeUpdate(source);
     expect(onSourceTime).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: /Play source, then my take/ }));
@@ -112,7 +112,7 @@ describe("SentenceTimer", () => {
   it("marks each sentence start from the clip time", async () => {
     const onChange = vi.fn();
     const { container, rerender } = render(<SentenceTimer text="A. B." src="https://x.test/a.mp3" marks={[]} onChange={onChange} />);
-    const audio = container.querySelector("audio")!;
+    const audio = container.querySelector<HTMLMediaElement>("audio, video")!;
     audio.currentTime = 1.24;
     await userEvent.click(screen.getByRole("button", { name: "Mark sentence 1" }));
     expect(onChange).toHaveBeenLastCalledWith([1.2]);

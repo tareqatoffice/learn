@@ -8,6 +8,16 @@ import { clock } from "@/lib/format";
 
 const SPEEDS = [1, 1.25, 1.5, 0.75];
 
+type PlayerProps = React.ComponentProps<typeof ReactPlayer>;
+
+/**
+ * Invisible react-player for audio driven from code (ref.play(), ref.currentTime).
+ * react-player re-applies `volume` and `playbackRate` on every render, so pass them
+ * as props rather than setting them on the element.
+ */
+export function HiddenPlayer(props: Omit<PlayerProps, "width" | "height" | "style" | "controls">) {
+  return <ReactPlayer {...props} controls={false} width={0} height={0} style={{ display: "none" }} />;
+}
 
 export function MediaPlayer({
   src,
@@ -17,6 +27,9 @@ export function MediaPlayer({
   className = "",
   fallbackDuration,
   refreshSrc,
+  autoPlay = false,
+  onEnded,
+  onError,
 }: {
   src: string;
   video?: boolean;
@@ -25,11 +38,23 @@ export function MediaPlayer({
   className?: string;
   fallbackDuration?: number;
   refreshSrc?: () => Promise<string | null>;
+  autoPlay?: boolean;
+  onEnded?: () => void;
+  onError?: () => void;
 }) {
   const [currentSrc, setCurrentSrc] = useState(src);
   const el = useRef<HTMLVideoElement | null>(null);
   const screen = useRef<HTMLDivElement>(null);
-  const [playing, setPlaying] = useState(false);
+  // `playing` on react-player is re-applied on every render, so it is only set as a
+  // one-shot request from the buttons and cleared once the element reports play/pause.
+  // That leaves callers free to drive the element through playerRef (el.play()).
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [request, setRequest] = useState<boolean | undefined>(undefined);
+  const playing = request ?? isPlaying;
+  const settle = (now: boolean) => {
+    setIsPlaying(now);
+    setRequest(undefined);
+  };
   const [muted, setMuted] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [time, setTime] = useState(0);
@@ -52,17 +77,18 @@ export function MediaPlayer({
       const fresh = refreshSrc ? await refreshSrc().catch(() => null) : null;
       if (fresh && fresh !== currentSrc) setCurrentSrc(fresh);
       else el.current?.load();
-      setPlaying(true);
+      setRequest(true);
       return;
     }
-    setPlaying((p) => !p);
+    setRequest(!playing);
   };
 
   const player = (
     <ReactPlayer
       ref={setRefs}
       src={currentSrc}
-      playing={playing}
+      playing={request}
+      autoPlay={autoPlay}
       muted={muted}
       playbackRate={speed}
       controls={false}
@@ -71,15 +97,17 @@ export function MediaPlayer({
       width={video ? "100%" : 0}
       height={video ? "100%" : 0}
       style={video ? { width: "100%", height: "100%" } : { display: "none" }}
-      onPlay={() => setPlaying(true)}
-      onPause={() => setPlaying(false)}
+      onPlay={() => settle(true)}
+      onPause={() => settle(false)}
       onEnded={() => {
-        setPlaying(false);
+        settle(false);
         setTime(0);
+        onEnded?.();
       }}
       onError={() => {
         setFailed(true);
-        setPlaying(false);
+        settle(false);
+        onError?.();
       }}
       onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
       onDurationChange={(e) => setDuration(e.currentTarget.duration)}

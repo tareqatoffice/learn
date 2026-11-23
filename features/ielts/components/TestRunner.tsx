@@ -6,6 +6,7 @@ import { DiscardAttempt } from "@/features/ielts/components/DiscardAttempt";
 import { ActionStatus } from "@/features/admin/components/SaveBar";
 import { useAdminAction } from "@/features/admin/components/useAdminAction";
 import { chipClass, Tab } from "@/components/Chip";
+import { HiddenPlayer, MediaPlayer } from "@/components/MediaPlayer";
 import { Button } from "@/components/ui/button";
 import type { RunView, SectionAudioKind } from "@/features/ielts/practice/attempts";
 import { choicesFor, letter, type PublicGroup, type PublicQuestion } from "@/features/ielts/practice/marking";
@@ -59,8 +60,8 @@ function SectionAudio({ kind, once, attemptId, index, heard }: { kind: SectionAu
 
   return (
     <div className="grid gap-2">
-      {src && !once && <audio controls autoPlay src={src} onError={loadError} className="w-full" aria-label="Section audio" />}
-      {src && once && <audio autoPlay src={src} onEnded={finished} onError={loadError} aria-label="Section audio" />}
+      {src && !once && <MediaPlayer key={src} src={src} autoPlay onError={loadError} label="Section audio" />}
+      {src && once && <HiddenPlayer src={src} autoPlay onEnded={finished} onError={loadError} />}
       {!(src && !once) && (
         <div className="flex flex-wrap items-center gap-3">
           <Button type="button" variant="outline" disabled={state !== "idle"} onClick={() => void play()}>

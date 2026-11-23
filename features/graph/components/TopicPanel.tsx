@@ -189,7 +189,7 @@ export function TopicPanel({ node, status, onStatus, related, blockedBy = [], pe
       )}
 
       {node.docsUrl && (
-        <a
+        <Link
           href={node.docsUrl}
           target="_blank"
           rel="noopener noreferrer"
@@ -197,7 +197,7 @@ export function TopicPanel({ node, status, onStatus, related, blockedBy = [], pe
         >
           Read the docs
           <ArrowUpRight aria-hidden className="size-3.5" />
-        </a>
+        </Link>
       )}
     </>
   );

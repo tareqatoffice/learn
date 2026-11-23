@@ -5,6 +5,7 @@ import {
   IBM_Plex_Sans,
   Noto_Sans_Bengali,
 } from "next/font/google";
+import Script from "next/script";
 import { RouteError } from "@/components/RouteError";
 import "./globals.css";
 
@@ -40,11 +41,9 @@ export default function GlobalError({
       suppressHydrationWarning
       className={`${plexSans.variable} ${notoBengali.variable} ${plexMono.variable} h-full antialiased`}
     >
-      <head>
-        <title>Something went wrong</title>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
       <body className="min-h-full flex flex-col">
+        <title>Something went wrong</title>
+        <Script id="theme-init-error">{themeScript}</Script>
         <RouteError
           error={error}
           retry={retry}

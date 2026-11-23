@@ -2,6 +2,7 @@
 
 import { Pause, Play, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { HiddenPlayer } from "@/components/MediaPlayer";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/Notice";
 
@@ -24,8 +25,8 @@ export function ShadowPlayer({
   rate?: number;
   onSourceTime?: (sec: number | null) => void;
 }) {
-  const source = useRef<HTMLAudioElement>(null);
-  const take = useRef<HTMLAudioElement>(null);
+  const source = useRef<HTMLVideoElement>(null);
+  const take = useRef<HTMLVideoElement>(null);
   const [mode, setMode] = useState<Mode>("after");
   const [part, setPart] = useState<Part | null>(null);
   const [paused, setPaused] = useState(false);
@@ -37,16 +38,7 @@ export function ShadowPlayer({
   const [shownTakeUrl, setShownTakeUrl] = useState(takeUrl);
   if (!active && shownTakeUrl !== takeUrl) setShownTakeUrl(takeUrl);
 
-  useEffect(() => {
-    const s = source.current;
-    const t = take.current;
-    if (!s || !t) return;
-    s.defaultPlaybackRate = rate;
-    s.playbackRate = rate;
-    const v = mode === "together" ? mixVolumes(mix) : { source: 1, take: 1 };
-    s.volume = v.source;
-    t.volume = v.take;
-  }, [rate, mode, mix]);
+  const volume = mode === "together" ? mixVolumes(mix) : { source: 1, take: 1 };
 
   useEffect(() => {
     const s = source.current;
@@ -123,10 +115,12 @@ export function ShadowPlayer({
 
   return (
     <div className="grid gap-3 rounded-lg border border-border p-3">
-      <audio
+      <HiddenPlayer
         ref={source}
         src={sourceUrl}
         preload="auto"
+        playbackRate={rate}
+        volume={volume.source}
         onTimeUpdate={(e) => {
           if (live.current) onSourceTime?.(e.currentTarget.currentTime);
         }}
@@ -139,10 +133,11 @@ export function ShadowPlayer({
           void take.current?.play()?.catch(failed);
         }}
       />
-      <audio
+      <HiddenPlayer
         ref={take}
         src={shownTakeUrl}
         preload="auto"
+        volume={volume.take}
         onEnded={() => {
           if (mode === "together" && source.current && !source.current.ended) return;
           stop();

@@ -2,6 +2,7 @@
 
 import { Pause, Play, Repeat, RotateCcw, SkipBack, SkipForward } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { HiddenPlayer } from "@/components/MediaPlayer";
 import { Button } from "@/components/ui/button";
 import { CLIP_RATES, type ClipRate, type Sentence, sentenceAt } from "@/features/speaking/shadowText";
 import { clock } from "./format";
@@ -54,7 +55,7 @@ export function ShadowPractice({
   rate: ClipRate;
   onRate: (rate: ClipRate) => void;
 }) {
-  const audio = useRef<HTMLAudioElement>(null);
+  const audio = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -70,13 +71,6 @@ export function ShadowPractice({
     loopRef.current = loop;
     durationRef.current = duration;
   }, [loop, duration]);
-
-  useEffect(() => {
-    const el = audio.current;
-    if (!el) return;
-    el.defaultPlaybackRate = rate;
-    el.playbackRate = rate;
-  }, [rate]);
 
   useEffect(() => {
     const el = audio.current;
@@ -161,18 +155,18 @@ export function ShadowPractice({
         <p className="text-xs text-muted-foreground">Nothing is recorded here. Tap a sentence to hear it.</p>
       </div>
 
-      <audio
+      <HiddenPlayer
         ref={audio}
         src={src}
         preload="auto"
         playsInline
+        playbackRate={rate}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
         onLoadedMetadata={(e) => {
           const d = e.currentTarget.duration;
           if (Number.isFinite(d)) setDuration(d);
-          e.currentTarget.playbackRate = rate;
         }}
       />
 

@@ -4,6 +4,7 @@ import {
   IBM_Plex_Sans,
   Noto_Sans_Bengali,
 } from "next/font/google";
+import Script from "next/script";
 import NextTopLoader from "nextjs-toploader";
 import { getSiteUrl, OG_IMAGE, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 import "./globals.css";
@@ -63,10 +64,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`${plexSans.variable} ${notoBengali.variable} ${plexMono.variable} h-full antialiased`}
     >
-      <head>
-        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
       <body className="flex min-h-full min-w-0 flex-col">
+        <Script id="theme-init" strategy="beforeInteractive" nonce={nonce}>
+          {themeScript}
+        </Script>
         <a
           href="#main"
           className="sr-only z-50 rounded-md bg-background px-3 py-2 text-sm font-medium focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-2 focus:outline-ring"

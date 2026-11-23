@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AiKeyForm } from "@/features/admin/components/AiKeyForm";
 import { AiSettingsForm } from "@/features/admin/components/AiSettingsForm";
 import { AdminCard, AdminPage } from "@/features/admin/components/layout";
@@ -24,9 +25,9 @@ export default async function AiSettingsPage() {
       description={
         <>
           The quiz coach grades typed answers and answers follow-up questions through{" "}
-          <a href="https://openrouter.ai/models" className="underline" target="_blank" rel="noreferrer">
+          <Link href="https://openrouter.ai/models" className="underline" target="_blank" rel="noreferrer">
             OpenRouter
-          </a>
+          </Link>
           .
         </>
       }

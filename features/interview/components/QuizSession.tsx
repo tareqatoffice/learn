@@ -30,9 +30,9 @@ export function QuizSession({ log }: { log: Log }) {
                   Resume quiz
                 </Link>
               )}
-              <a href={`/interview/history/export?session=${log.id}`} download className={buttonVariants()}>
+              <Link href={`/interview/history/export?session=${log.id}`} download prefetch={false} className={buttonVariants()}>
                 Download (.md)
-              </a>
+              </Link>
             </>
           }
         />
