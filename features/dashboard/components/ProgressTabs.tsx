@@ -5,6 +5,7 @@ import { useId, useRef, useState } from "react";
 import { ProgressBar } from "@/components/ProgressBar";
 import { cn } from "@/lib/utils";
 import { focusRing, trackVar, type TrackName } from "@/components/track";
+import { Card } from "@/components/Card";
 
 export type TabRow = { key: string; href: string; label: string; value: number; max: number };
 export type TrackTab = {
@@ -46,9 +47,9 @@ export function ProgressTabs({ tabs }: { tabs: TrackTab[] }) {
   }
 
   return (
-    <section
+    <Card as="section"
       aria-labelledby={`${uid}-title`}
-      className="grid min-w-0 gap-4 rounded-xl border border-border bg-card p-4 sm:p-5"
+      className="grid min-w-0 gap-4 p-4 sm:p-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <h2 id={`${uid}-title`} className="text-base font-semibold">
@@ -158,6 +159,6 @@ export function ProgressTabs({ tabs }: { tabs: TrackTab[] }) {
           </ul>
         )}
       </div>
-    </section>
+    </Card>
   );
 }

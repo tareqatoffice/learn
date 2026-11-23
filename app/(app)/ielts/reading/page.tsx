@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { TestHub } from "@/features/ielts/components/TestHub";
 import { listTestAttempts, listTests } from "@/features/ielts/practice/attempts";
 import { requireUser } from "@/features/auth/lib/authz";
 import { buildMetadata } from "@/lib/seo";
-import { pageTitleClass } from "@/lib/ui";
+import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
 
 export const metadata = buildMetadata({
   title: "IELTS Reading practice",
@@ -16,11 +16,9 @@ export default async function IeltsReadingPage() {
   const [tests, recent] = await Promise.all([listTests("reading"), listTestAttempts(user.userId, { skill: "reading", limit: 10 })]);
   return (
     <div className="grid w-full gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={pageTitleClass}>Reading practice</h1>
-        <Link href="/ielts" className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-          Back to IELTS
-        </Link>
+      <div className="grid gap-3">
+        <BackLink href="/ielts">← IELTS</BackLink>
+        <PageHeader title="Reading practice" track="ielts" />
       </div>
       <TestHub skill="reading" tests={tests} recent={recent} />
     </div>

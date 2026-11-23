@@ -24,11 +24,14 @@ import { framesOf } from "@/lib/media";
 import type { BodyFeedback } from "@/features/speaking/coach";
 import { BandCompare } from "./BandCompare";
 import { SelfBandsForm, type SelfBands } from "./SelfBandsForm";
+import { EmptyState } from "@/components/EmptyState";
+import { Card, cardClass } from "@/components/Card";
+import { cn } from "@/lib/utils";
 
 const PART_NAME: Record<Part, string> = { p1: "Part 1", p2: "Part 2", p3: "Part 3" };
 export const KIND_NAME = { mock: "Full mock", part1: "Part 1 drill", part2: "Part 2 drill", part3: "Part 3 drill" } as const;
 
-const card = "grid gap-3 rounded-xl border border-border bg-card p-5";
+const card = cn(cardClass, "grid gap-3");
 const DATE = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" });
 
 function asSelf(raw: Record<string, unknown> | undefined): SelfBands | null {
@@ -346,9 +349,9 @@ export function AttemptReview({ attempt, aiOn, bodyConsent: initialConsent }: { 
       </div>
 
       {incomplete && (
-        <p role="status" className="rounded-xl border border-border bg-card p-4 text-sm">
+        <Card as="p" role="status" className="p-4 text-sm">
           This attempt is incomplete: only the parts below were stored. You can rate what is here, or delete the attempt.
-        </p>
+        </Card>
       )}
       {attempt.notes && (
         <section aria-labelledby="notes" className={card}>
@@ -360,9 +363,9 @@ export function AttemptReview({ attempt, aiOn, bodyConsent: initialConsent }: { 
       )}
 
       {stored.length === 0 ? (
-        <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
+        <EmptyState>
           No part of this attempt was stored, so there is nothing to play or rate.
-        </p>
+        </EmptyState>
       ) : (
         <>
           <div className="grid gap-4">

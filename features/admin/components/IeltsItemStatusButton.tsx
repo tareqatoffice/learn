@@ -5,6 +5,7 @@ import type { ItemStatus } from "@/features/admin/ielts";
 import { firstError } from "@/features/admin/result";
 import { useAdminAction } from "@/features/admin/components/useAdminAction";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/Notice";
 
 export function IeltsItemStatusButton({ id, status, label }: { id: string; status: ItemStatus; label: string }) {
   const { run, pending, errors } = useAdminAction();
@@ -23,9 +24,9 @@ export function IeltsItemStatusButton({ id, status, label }: { id: string; statu
         {next === "published" ? "Publish" : "Unpublish"}
       </Button>
       {error && (
-        <span role="alert" className="text-xs text-destructive">
+        <Notice as="span" className="text-xs">
           {error}
-        </span>
+        </Notice>
       )}
     </span>
   );

@@ -17,6 +17,7 @@ import { localDate } from "@/features/speaking/schedule";
 import { readTimeZone } from "@/features/speaking/timezone";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
+import { Card } from "@/components/Card";
 
 export async function generateMetadata({ params }: { params: Promise<{ date: string }> }): Promise<Metadata> {
   const { date } = await params;
@@ -81,13 +82,13 @@ export default async function WorkoutPage({ params }: { params: Promise<{ date: 
         <PageHeader title={title} description={`Planned for ${date}. It opens on the day.`} track="exercise" />
         <ol className="grid gap-2">
           {plan.items.map((item, index) => (
-            <li key={index} className="rounded-xl border border-border bg-card p-3 text-sm">
+            <Card as="li" key={index} className="p-3 text-sm">
               <span className="font-medium">{exerciseById(item.exerciseId)?.name ?? item.exerciseId}</span>
               <span className="text-muted-foreground">
                 {" "}
                 · {item.sets} × {formatTarget(item)}
               </span>
-            </li>
+            </Card>
           ))}
         </ol>
         <div>

@@ -10,6 +10,7 @@ import type { PlanPreview as Preview, ProfileInput, ProfileView } from "@/featur
 import { HoursWarning } from "./HoursWarning";
 import { PlanPreview } from "./PlanPreview";
 import { SKILL_LABEL, bandLabel } from "./format";
+import { Card } from "@/components/Card";
 
 const BANDS = Array.from({ length: 11 }, (_, i) => 4 + i / 2);
 const DAYS = [
@@ -264,7 +265,7 @@ export function ProfileForm({ today, initial }: { today: string; initial?: Profi
       )}
 
       {preview && (
-        <section aria-labelledby="preview-title" className="grid gap-3 rounded-xl border border-border bg-card p-4">
+        <Card as="section" aria-labelledby="preview-title" className="grid gap-3 p-4">
           <h2 id="preview-title" className="text-sm font-semibold">
             {preview.before ? "How your plan would change" : "Your plan"}
           </h2>
@@ -277,7 +278,7 @@ export function ProfileForm({ today, initial }: { today: string; initial?: Profi
             <p className="text-xs text-muted-foreground">Nothing is saved until you do.</p>
             {formError && <Notice>{formError}</Notice>}
           </div>
-        </section>
+        </Card>
       )}
     </form>
   );

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { isNavigationError, START_FAILED } from "@/lib/navigationError";
 import { toggleItem } from "@/lib/utils";
 import type { QuizMode } from "@/features/progress/quiz";
+import { Card } from "@/components/Card";
 
 export type SetupBook = { id: string; title: string; parts: { key: string; title: string }[] };
 
@@ -79,7 +80,7 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
   }
 
   return (
-    <section aria-labelledby="new-quiz" className="min-w-0 rounded-xl border border-border bg-card p-5">
+    <Card as="section" aria-labelledby="new-quiz" className="min-w-0">
       <h2 id="new-quiz" className="text-lg font-semibold">
         New quiz
       </h2>
@@ -133,6 +134,6 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
           {failed && START_FAILED}
         </p>
       </div>
-    </section>
+    </Card>
   );
 }

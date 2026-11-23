@@ -8,6 +8,7 @@ import { confirm } from "@/components/ConfirmDialog";
 import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { toggleItem } from "@/lib/utils";
+import { Card } from "@/components/Card";
 
 export type ClearBook = { id: string; title: string };
 
@@ -51,7 +52,7 @@ export function ClearProgress({ books }: { books: ClearBook[] }) {
   }
 
   return (
-    <section aria-labelledby="clear-progress" className="rounded-xl border border-border bg-card p-5">
+    <Card as="section" aria-labelledby="clear-progress">
       <h2 id="clear-progress" className="text-lg font-semibold">
         Clear progress
       </h2>
@@ -74,6 +75,6 @@ export function ClearProgress({ books }: { books: ClearBook[] }) {
         </Button>
         {message && <Notice tone={message.tone}>{message.text}</Notice>}
       </div>
-    </section>
+    </Card>
   );
 }

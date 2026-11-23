@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FOCUSES, type Focus } from "@/models/exerciseConstants";
 import { EXERCISES, type Exercise } from "../library";
 import { ExerciseFrames } from "./ExerciseFrames";
+import { Card } from "@/components/Card";
 
 const TYPES: Exercise["type"][] = ["strength", "cardio", "hiit", "stretch"];
 const DIFFICULTIES: { value: Exercise["difficulty"]; label: string }[] = [
@@ -118,7 +119,7 @@ export function LibraryBrowser() {
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2">
           {shown.map((e) => (
-            <li key={e.id} className="grid gap-3 rounded-xl border border-border bg-card p-4">
+            <Card as="li" key={e.id} className="grid gap-3 p-4">
               <ExerciseFrames exercise={e} size="sm" />
               <h2 className="text-base font-medium">{e.name}</h2>
               <div className="flex flex-wrap gap-1.5">
@@ -133,7 +134,7 @@ export function LibraryBrowser() {
                   <li key={c}>{c}</li>
                 ))}
               </ul>
-            </li>
+            </Card>
           ))}
         </ul>
       )}

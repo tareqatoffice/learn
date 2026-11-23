@@ -7,12 +7,15 @@ export function PageHeader({
   description,
   track,
   actions,
+  titleAside,
   titleId,
 }: {
   title: string;
   description?: React.ReactNode;
   track?: TrackName;
   actions?: React.ReactNode;
+  /** Shown right after the title (e.g. a level badge). */
+  titleAside?: React.ReactNode;
   titleId?: string;
 }) {
   return (
@@ -22,9 +25,18 @@ export function PageHeader({
           <span aria-hidden className="w-1 shrink-0 rounded-full" style={{ background: trackVar(track) }} />
         )}
         <div className="min-w-0">
-          <h1 id={titleId} className={cn("text-balance", pageTitleBase)}>
-            {title}
-          </h1>
+          {titleAside ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 id={titleId} className={cn("text-balance", pageTitleBase)}>
+                {title}
+              </h1>
+              {titleAside}
+            </div>
+          ) : (
+            <h1 id={titleId} className={cn("text-balance", pageTitleBase)}>
+              {title}
+            </h1>
+          )}
           {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
         </div>
       </div>

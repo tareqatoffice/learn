@@ -13,6 +13,7 @@ import { MAX_TEXT_CHARS, MIN_WORDS, TASK_LIMIT_SEC, wordCount } from "@/features
 import { rovingIndex, timeWarning } from "@/features/ielts/lib/a11y";
 import { clock as mmss } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Notice } from "@/components/Notice";
 
 const SAVE_DELAY_MS = 1500;
 const RETRY_MS = 5000;
@@ -135,9 +136,9 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
       </div>
       <ActionStatus saved={false} errors={errors} />
       {saveError && (
-        <p role="alert" className="text-sm text-destructive">
+        <Notice>
           {saveError}
-        </p>
+        </Notice>
       )}
 
       {view.tasks.length > 1 && (

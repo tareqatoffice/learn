@@ -2,14 +2,15 @@ import { LineChart, type LineSeries } from "@/components/charts/LineChart";
 import { shortDate } from "@/features/ielts/components/format";
 import { CRITERION_LABEL, type Criterion } from "@/features/ielts/bands";
 import type { BandPoint, CriteriaPoint, WeekMinutes } from "@/features/ielts/history";
+import { Card } from "@/components/Card";
 
 const Empty = ({ children }: { children: string }) => <p className="text-sm text-muted-foreground">{children}</p>;
 
 const Figure = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <figure className="grid gap-2 rounded-xl border border-border bg-card p-4">
+  <Card as="figure" className="grid gap-2 p-4">
     <figcaption className="text-sm font-medium">{title}</figcaption>
     {children}
-  </figure>
+  </Card>
 );
 
 type BandRow = Partial<BandPoint> & { date: string };

@@ -6,6 +6,7 @@ import { ActionStatus, inputClass } from "@/features/admin/components/SaveBar";
 import { useAdminAction } from "@/features/admin/components/useAdminAction";
 import { Button } from "@/components/ui/button";
 import type { AiKeySource } from "@/features/ai/lib/aiSettings";
+import { Notice } from "@/components/Notice";
 
 const API_KEY_MAX = 300;
 
@@ -69,9 +70,9 @@ export function AiKeyForm({
     <form onSubmit={save} className="grid gap-3" aria-label="OpenRouter API key">
       <p className="text-sm">{status}</p>
       {unreadable && (
-        <p role="alert" className="text-sm text-destructive">
+        <Notice>
           A saved key can no longer be read (AUTH_SECRET changed). Enter it again or remove it.
-        </p>
+        </Notice>
       )}
       <div className="flex flex-wrap gap-2">
         <input

@@ -7,6 +7,8 @@ import { FEELS, type Feel } from "@/models/exerciseConstants";
 import { formatTarget } from "../lib/format";
 import { exerciseById } from "../library";
 import type { PlanDay } from "../plan";
+import { Notice } from "@/components/Notice";
+import { Card } from "@/components/Card";
 
 const LABEL: Record<Feel, string> = { easy: "Easy", ok: "OK", hard: "Hard" };
 
@@ -43,7 +45,7 @@ export function WorkoutSummary({
           const exercise = exerciseById(item.exerciseId);
           const feel = feels[item.exerciseId];
           return (
-            <li key={index} className="grid gap-2 rounded-xl border border-border bg-card p-3">
+            <Card as="li" key={index} className="grid gap-2 p-3">
               <p className="text-sm font-medium">
                 {exercise?.name ?? item.exerciseId}
                 {(item.reps != null || item.seconds != null) && (
@@ -75,14 +77,14 @@ export function WorkoutSummary({
                   ))}
                 </div>
               )}
-            </li>
+            </Card>
           );
         })}
       </ul>
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <Notice>
           {error}
-        </p>
+        </Notice>
       )}
       <div className="flex flex-wrap gap-3">
         {!readOnly && (

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { type HubOption, SpeakingHub } from "@/features/ielts/components/SpeakingHub";
 import { listAttempts } from "@/features/ielts/speaking/attempts";
 import { type Kind, missingParts, pickQuestions } from "@/features/ielts/speaking/questions";
@@ -7,7 +6,8 @@ import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { storageConfigured } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";
-import { pageTitleClass } from "@/lib/ui";
+import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
 
 export const metadata = buildMetadata({
   title: "IELTS Speaking practice",
@@ -39,14 +39,9 @@ export default async function IeltsSpeakingPage({ searchParams }: PageProps<"/ie
 
   return (
     <div className="grid w-full gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={pageTitleClass}>Speaking practice</h1>
-        <Link
-          href="/ielts"
-          className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          Back to IELTS
-        </Link>
+      <div className="grid gap-3">
+        <BackLink href="/ielts">← IELTS</BackLink>
+        <PageHeader title="Speaking practice" track="ielts" />
       </div>
       <SpeakingHub
         options={options}

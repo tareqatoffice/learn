@@ -4,6 +4,7 @@ import { moveLessonAction } from "@/app/(app)/admin/speaking/actions";
 import { firstError } from "@/features/admin/result";
 import { useAdminAction } from "@/features/admin/components/useAdminAction";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/Notice";
 
 export function SpeakingLessonRowActions({ id, label }: { id: string; label: string }) {
   const { run, pending, errors } = useAdminAction();
@@ -17,9 +18,9 @@ export function SpeakingLessonRowActions({ id, label }: { id: string; label: str
         ↓
       </Button>
       {error && (
-        <span role="alert" className="text-xs text-destructive">
+        <Notice as="span" className="text-xs">
           {error}
-        </span>
+        </Notice>
       )}
     </span>
   );

@@ -4,6 +4,7 @@ import { type ProfileInput, getActiveProfile, lastEndedProfile } from "@/feature
 import { TimeZoneCookie } from "@/features/speaking/components/TimeZoneCookie";
 import { readTimeZone } from "@/features/speaking/timezone";
 import { SetupForm } from "./SetupForm";
+import { Card } from "@/components/Card";
 
 /** Whole months from the start date to the target date, as chosen in the form. */
 function monthsOf(startDate: string, targetDate: string): number {
@@ -40,9 +41,9 @@ export async function ExerciseSetup({ userId }: { userId: string }) {
         track="exercise"
         description="Pick a goal weight, how many months you want and the days you can work out. You see the target date and pace before you save."
       />
-      <div className="rounded-xl border border-border bg-card p-5">
+      <Card>
         <SetupForm initial={initial} editing={Boolean(active)} />
-      </div>
+      </Card>
     </div>
   );
 }

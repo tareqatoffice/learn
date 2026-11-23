@@ -5,6 +5,7 @@ import { startQuizAction } from "@/app/(app)/interview/actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isNavigationError, START_FAILED } from "@/lib/navigationError";
+import { Notice } from "@/components/Notice";
 
 export function StartReviewButton({
   disabled,
@@ -42,9 +43,9 @@ export function StartReviewButton({
         Start review quiz
       </Button>
       {failed && (
-        <p role="alert" className="text-sm text-destructive">
+        <Notice>
           {START_FAILED}
-        </p>
+        </Notice>
       )}
       {empty && (
         <p role="status" className="text-sm text-muted-foreground">

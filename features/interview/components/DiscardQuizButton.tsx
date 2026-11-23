@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { discardQuizAction } from "@/app/(app)/interview/actions";
 import { confirm } from "@/components/ConfirmDialog";
+import { Notice } from "@/components/Notice";
 
 export function DiscardQuizButton({ sessionId, label }: { sessionId: string; label: string }) {
   const [pending, startTransition] = useTransition();
@@ -38,9 +39,9 @@ export function DiscardQuizButton({ sessionId, label }: { sessionId: string; lab
         {pending ? "Discarding…" : "Discard"}
       </button>
       {failed && (
-        <span role="alert" className="text-xs text-destructive">
+        <Notice as="span" className="text-xs">
           Couldn&apos;t discard. Try again.
-        </span>
+        </Notice>
       )}
     </>
   );

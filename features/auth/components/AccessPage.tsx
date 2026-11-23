@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Card } from "@/components/Card";
 
 const STEPS = ["Signed in", "Admin review", "Access granted"];
 
@@ -39,9 +40,9 @@ export function AccessPage({
       </AppHeader>
 
       <main id="main" tabIndex={-1} className={cn(containerClass, "flex flex-1 items-start justify-center py-10 focus:outline-none sm:items-center")}>
-        <section
+        <Card as="section"
           aria-labelledby="access-title"
-          className="page-enter w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8"
+          className="page-enter w-full max-w-lg p-6 shadow-sm sm:p-8"
         >
           <span
             aria-hidden
@@ -134,7 +135,7 @@ export function AccessPage({
               </div>
             </div>
           )}
-        </section>
+        </Card>
       </main>
     </>
   );

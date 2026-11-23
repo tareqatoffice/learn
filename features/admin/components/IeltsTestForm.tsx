@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { FileDropzone } from "@/components/ui/FileDropzone";
 import { audioDuration } from "@/features/admin/lib/audioDuration";
 import { putFile, UploadError } from "@/lib/uploadFile";
+import { Notice } from "@/components/Notice";
 
 type SectionDraft = { title: string; passage: string; script: string; questions: string; audioKey: string };
 const MAX_SECTIONS: Record<TestKind, number> = { reading: 3, listening: 4 };
@@ -118,7 +119,7 @@ export function IeltsTestForm({ kind, test }: { kind: TestKind; test?: AdminTest
           <Chip on={status === "published"} onClick={() => { touch(); setStatus("published"); }}>Published</Chip>
         </div>
       </Field>
-      {errors.sections && <p role="alert" className="text-sm text-destructive">{errors.sections}</p>}
+      {errors.sections && <Notice>{errors.sections}</Notice>}
 
       {sections.map((s, i) => (
         <fieldset key={i} className="grid gap-4 rounded-lg border border-border p-4">

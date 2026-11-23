@@ -8,6 +8,7 @@ import { useSaveForm, withoutEmptyId } from "@/features/admin/components/useSave
 import { MarkdownEditor } from "@/features/admin/components/MarkdownEditor";
 import { Button } from "@/components/ui/button";
 import { slugify } from "@/lib/ids";
+import { Notice } from "@/components/Notice";
 
 const EMPTY: AdminBook = { id: "", slug: "", title: "", intro: "", subjects: [], status: "draft", parts: [], extras: [] };
 
@@ -118,7 +119,7 @@ function SectionsEditor<T extends Section, F extends Exclude<keyof T, keyof Sect
           />
         </div>
       ))}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <Notice>{error}</Notice>}
       <Button type="button" variant="outline" size="sm" className="justify-self-start" onClick={() => onChange([...items, create(items.length + 1)])}>
         {addLabel}
       </Button>

@@ -1,28 +1,39 @@
 import { cn } from "@/lib/utils";
 
+/**
+ * Thin progress track. Pass `label` to expose it as a progressbar; without one it is decorative.
+ * `animate={false}` skips the grow-in on mount (for bars that remount often).
+ */
 export function ProgressBar({
   value,
   secondary = 0,
   max,
   color,
+  label,
+  animate = true,
   className,
 }: {
   value: number;
   secondary?: number;
   max: number;
   color?: string;
+  label?: string;
+  animate?: boolean;
   className?: string;
 }) {
   const pct = (n: number) => (max > 0 ? Math.min(100, Math.round((n / max) * 100)) : 0);
+  const a11y = label
+    ? { role: "progressbar", "aria-label": label, "aria-valuemin": 0, "aria-valuemax": max, "aria-valuenow": value }
+    : { "aria-hidden": true };
   return (
-    <div aria-hidden className={cn("flex h-1.5 overflow-hidden rounded-full bg-muted", className)}>
+    <div {...a11y} className={cn("flex h-1.5 overflow-hidden rounded-full bg-muted", className)}>
       <div
-        className="progress-fill h-full bg-ok"
+        className={cn("h-full bg-ok", animate ? "progress-fill" : "transition-[width]")}
         style={{ width: `${pct(value)}%`, ...(color ? { background: color } : {}) }}
       />
       {secondary > 0 && (
         <div
-          className="progress-fill h-full"
+          className={cn("h-full", animate ? "progress-fill" : "transition-[width]")}
           style={{
             width: `${Math.min(pct(secondary), 100 - pct(value))}%`,
             background: "color-mix(in oklch, var(--ok) 40%, var(--muted))",

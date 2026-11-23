@@ -7,6 +7,8 @@ import { SubjectPicker } from "@/features/admin/components/SubjectPicker";
 import { Button } from "@/components/ui/button";
 import { FileDropzone } from "@/components/ui/FileDropzone";
 import type { ImportReport } from "@/features/content/types";
+import { Notice } from "@/components/Notice";
+import { Card } from "@/components/Card";
 
 type Kind = "book" | "series" | "graph";
 type Files = { name: string; size: number; content: string }[];
@@ -135,14 +137,14 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
         </Button>
         {committed && <span className="text-sm text-muted-foreground">Committed. Preview again to make more changes.</span>}
         {error && (
-          <span role="alert" className="text-sm text-destructive">
+          <Notice as="span">
             {error}
-          </span>
+          </Notice>
         )}
       </div>
 
       {report && (
-        <section aria-label="Import report" className="grid gap-2 rounded-xl border border-border bg-card p-4 text-sm">
+        <Card as="section" aria-label="Import report" className="grid gap-2 p-4 text-sm">
           <p className="font-medium">
             {report.dryRun ? "Preview — nothing written yet" : committed ? "Committed" : "Not committed — nothing was written"}
             {report.createdTarget ? " · creates the target" : ""}
@@ -170,7 +172,7 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
                 </li>
               ))}
           </ul>
-        </section>
+        </Card>
       )}
     </div>
   );

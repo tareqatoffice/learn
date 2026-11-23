@@ -3,6 +3,7 @@
 import { Pause, Play, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/Notice";
 
 type Mode = "after" | "together";
 type Part = "source" | "take";
@@ -216,7 +217,7 @@ export function ShadowPlayer({
         )}
       </div>
       {rate !== 1 && <p className="text-xs text-muted-foreground">The source plays at {rate}×, the speed you recorded with.</p>}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <Notice>{error}</Notice>}
     </div>
   );
 }

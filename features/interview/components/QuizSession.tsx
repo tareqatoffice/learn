@@ -2,41 +2,46 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { Markdown } from "@/lib/markdown/Markdown";
 import { ANSWER_MODE_LABEL } from "@/lib/quiz-answer";
-import { pageTitleClass } from "@/lib/ui";
 import { MARK_LABEL, plural, VERDICT_LABEL } from "@/features/progress/attempts";
+import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
+import { Card } from "@/components/Card";
 
 type Log = NonNullable<Awaited<ReturnType<typeof import("@/features/progress/attempts").getAttemptLogs>>[number]>;
 
 export function QuizSession({ log }: { log: Log }) {
   return (
     <div className="grid w-full gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <Link href="/interview/history" className="text-sm text-muted-foreground hover:underline">
-            ← All quiz answers
-          </Link>
-          <h1 className={pageTitleClass}>{log.label}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {plural(log.attempts, "attempt")} · {log.answered} answered · {log.counts.got} got · {log.counts.review} review ·{" "}
-            {log.counts.skip} skipped
-          </p>
-        </div>
-        <span className="flex flex-wrap gap-2">
-          {!log.finishedAt && (
-            <Link href={`/interview/quiz/${log.id}`} className={buttonVariants({ variant: "outline" })}>
-              Resume quiz
-            </Link>
-          )}
-          <a href={`/interview/history/export?session=${log.id}`} download className={buttonVariants()}>
-            Download (.md)
-          </a>
-        </span>
+      <div className="grid gap-3">
+        <BackLink href="/interview/history">← All quiz answers</BackLink>
+        <PageHeader
+          title={log.label}
+          track="interview"
+          description={
+            <>
+              {plural(log.attempts, "attempt")} · {log.answered} answered · {log.counts.got} got · {log.counts.review}{" "}
+              review · {log.counts.skip} skipped
+            </>
+          }
+          actions={
+            <>
+              {!log.finishedAt && (
+                <Link href={`/interview/quiz/${log.id}`} className={buttonVariants({ variant: "outline" })}>
+                  Resume quiz
+                </Link>
+              )}
+              <a href={`/interview/history/export?session=${log.id}`} download className={buttonVariants()}>
+                Download (.md)
+              </a>
+            </>
+          }
+        />
       </div>
 
       {log.items.length === 0 && <p className="text-sm text-muted-foreground">No cards marked in this quiz yet.</p>}
       <ol className="grid gap-4">
         {log.items.map((item, i) => (
-          <li key={i} className="rounded-xl border border-border bg-card p-5">
+          <Card as="li" key={i}>
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>{item.question ? [item.question.bookTitle, item.question.partTitle].filter(Boolean).join(" · ") : ""}</span>
               <span>
@@ -101,7 +106,7 @@ export function QuizSession({ log }: { log: Log }) {
                 </div>
               </details>
             )}
-          </li>
+          </Card>
         ))}
       </ol>
     </div>

@@ -7,6 +7,7 @@ import { useAdminAction } from "@/features/admin/components/useAdminAction";
 import { Button } from "@/components/ui/button";
 import { BLOCK_REASON_MAX as REASON_MAX } from "@/features/auth/lib/access-limits";
 import { cn } from "@/lib/utils";
+import { Notice } from "@/components/Notice";
 
 type Flash = { tone: "ok" | "error"; text: string } | null;
 const FlashContext = createContext<(flash: Flash) => void>(() => {});
@@ -158,9 +159,9 @@ export function UserAccessActions({
         {del.pending ? "Deleting…" : "Delete"}
       </Button>
       {error && (
-        <span role="alert" className="text-xs text-destructive">
+        <Notice as="span" className="text-xs">
           {error}
-        </span>
+        </Notice>
       )}
     </div>
   );

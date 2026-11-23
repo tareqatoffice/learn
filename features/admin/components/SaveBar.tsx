@@ -1,13 +1,14 @@
 import type { FieldErrors } from "@/features/admin/result";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/Notice";
 
 export function ActionStatus({ saved, errors, savedText = "Saved." }: { saved: boolean; errors: FieldErrors; savedText?: string }) {
   const first = Object.entries(errors).find(([key]) => key === "_") ?? Object.entries(errors)[0];
   if (first) {
     return (
-      <span role="alert" className="text-sm text-destructive">
+      <Notice as="span">
         {first[0] === "_" ? first[1] : `${labelOf(first[0])}: ${first[1]}`}
-      </span>
+      </Notice>
     );
   }
   return saved ? (

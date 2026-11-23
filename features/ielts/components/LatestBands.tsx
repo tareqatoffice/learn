@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { BandEntryView } from "@/features/ielts/bandHistory";
 import type { BandSet } from "@/features/ielts/plan";
 import { bandLabel, dateLabel } from "./format";
+import { Card } from "@/components/Card";
 
 const SKILL_ROWS = [
   ["listening", "Listening"],
@@ -31,7 +32,7 @@ export function LatestBands({ entries, target }: { entries: BandEntryView[]; tar
   ];
 
   return (
-    <section aria-labelledby="bands-title" className="grid gap-3 rounded-xl border border-border bg-card p-5">
+    <Card as="section" aria-labelledby="bands-title" className="grid gap-3">
       <h2 id="bands-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Latest bands
       </h2>
@@ -55,6 +56,6 @@ export function LatestBands({ entries, target }: { entries: BandEntryView[]; tar
           .
         </p>
       )}
-    </section>
+    </Card>
   );
 }

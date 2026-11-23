@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { CLIP_RATES, type ClipRate, type Sentence, sentenceAt } from "@/features/speaking/shadowText";
 import { clock } from "./format";
 import { ShadowText } from "./ShadowText";
+import { Notice } from "@/components/Notice";
+import { Card } from "@/components/Card";
 
 const BACK_SEC = 3;
 const LOOP_GAP_MS = 400;
@@ -153,7 +155,7 @@ export function ShadowPractice({
   const current = Math.max(active, 0);
 
   return (
-    <section aria-label="Practise the clip" className="grid gap-3 rounded-xl border border-border bg-card p-5">
+    <Card as="section" aria-label="Practise the clip" className="grid gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-semibold">Practise first</h2>
         <p className="text-xs text-muted-foreground">Nothing is recorded here. Tap a sentence to hear it.</p>
@@ -231,7 +233,7 @@ export function ShadowPractice({
 
       <RatePicker rate={rate} onRate={onRate} />
       <p className="text-xs text-muted-foreground">The speed you pick is also used when you record a take.</p>
-      {error && <p className="text-sm text-destructive">{error}</p>}
-    </section>
+      {error && <Notice>{error}</Notice>}
+    </Card>
   );
 }

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { BandCalculator } from "@/features/ielts/components/BandCalculator";
 import { BandEntryList } from "@/features/ielts/components/BandEntryList";
 import { TimeZoneCookie } from "@/features/speaking/components/TimeZoneCookie";
@@ -6,9 +5,11 @@ import { listBandEntries } from "@/features/ielts/bandHistory";
 import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
-import { pageTitleClass } from "@/lib/ui";
 import { localDate } from "@/features/speaking/schedule";
 import { readTimeZone } from "@/features/speaking/timezone";
+import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
+import { Card } from "@/components/Card";
 
 export const metadata = buildMetadata({
   title: "IELTS band calculator",
@@ -28,18 +29,13 @@ export default async function IeltsCalculatorPage() {
   return (
     <div className="grid w-full gap-6">
       <TimeZoneCookie current={timeZone} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={pageTitleClass}>IELTS band calculator</h1>
-        <Link
-          href="/ielts"
-          className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          Back to IELTS
-        </Link>
+      <div className="grid gap-3">
+        <BackLink href="/ielts">← IELTS</BackLink>
+        <PageHeader title="IELTS band calculator" track="ielts" />
       </div>
-      <div className="rounded-xl border border-border bg-card p-5">
+      <Card>
         <BandCalculator today={today} />
-      </div>
+      </Card>
       <section aria-labelledby="saved-title" className="grid gap-3">
         <h2 id="saved-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Saved results

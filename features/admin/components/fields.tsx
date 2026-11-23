@@ -3,9 +3,10 @@ import { inputClass } from "@/features/admin/components/SaveBar";
 import { StatusChips } from "@/features/admin/components/StatusChips";
 import { SubjectPicker } from "@/features/admin/components/SubjectPicker";
 import type { Status } from "@/models/status";
+import { Notice } from "@/components/Notice";
 
 export function Field({ label, error, group, children }: { label: string; error?: string; group?: boolean; children: ReactNode }) {
-  const message = error && <span className="text-sm text-destructive">{error}</span>;
+  const message = error && <Notice as="span" alert={false}>{error}</Notice>;
   if (group) {
     return (
       <div className="grid gap-1">

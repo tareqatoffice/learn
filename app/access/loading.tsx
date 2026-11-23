@@ -2,6 +2,7 @@ import { AppHeader, containerClass } from "@/components/AppHeader";
 import { SimplePageSkeleton } from "@/components/PageSkeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { Card } from "@/components/Card";
 
 export default function Loading() {
   return (
@@ -18,9 +19,9 @@ export default function Loading() {
           "flex flex-1 items-start justify-center py-10 sm:items-center",
         )}
       >
-        <div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
+        <Card className="w-full max-w-lg p-6 shadow-sm sm:p-8">
           <SimplePageSkeleton />
-        </div>
+        </Card>
       </main>
     </>
   );

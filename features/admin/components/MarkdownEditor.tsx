@@ -2,6 +2,7 @@
 
 import { useId } from "react";
 import { Markdown } from "@/lib/markdown/Markdown";
+import { Notice } from "@/components/Notice";
 
 export function MarkdownEditor({
   label,
@@ -35,7 +36,7 @@ export function MarkdownEditor({
           {value.trim() ? <Markdown source={value} /> : <p className="text-muted-foreground">Preview</p>}
         </div>
       </div>
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <Notice alert={false}>{error}</Notice>}
     </div>
   );
 }

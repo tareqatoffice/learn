@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { hoursLabel } from "./format";
+import { Card } from "@/components/Card";
 
 export function HoursWarning({ needed, available, profileHref = "/ielts/profile" }: { needed: number; available: number; profileHref?: string | null }) {
   return (
-    <div role="status" className="grid gap-1 rounded-xl border border-border bg-card p-4 text-sm">
+    <Card role="status" className="grid gap-1 p-4 text-sm">
       <p>
         <span className="font-semibold">Study time may be short.</span> Reaching your target takes about{" "}
         <span className="font-semibold tabular-nums">{hoursLabel(needed)} hours</span>, and your plan has about{" "}
@@ -23,6 +24,6 @@ export function HoursWarning({ needed, available, profileHref = "/ielts/profile"
         ) : null}
         .
       </p>
-    </div>
+    </Card>
   );
 }

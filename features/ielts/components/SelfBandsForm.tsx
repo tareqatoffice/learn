@@ -56,7 +56,7 @@ function Choice({
           </option>
         ))}
       </select>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <Notice className="text-xs">{error}</Notice>}
     </div>
   );
 }
