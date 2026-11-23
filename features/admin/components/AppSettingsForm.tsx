@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/features/admin/components/fields";
 import { SaveBar, inputClass } from "@/features/admin/components/SaveBar";
 import { useAdminAction } from "@/features/admin/components/useAdminAction";
-import { type AppSettingsView, FOCUS_PRESETS_MAX, ROTATION_FOCUSES, ROTATION_MAX } from "@/lib/appSettings";
+import { type AppSettingsView, FOCUS_PRESETS_MAX, ROTATION_FOCUSES, ROTATION_MAX } from "@/lib/appSettingsConfig";
 import type { Focus } from "@/models/exerciseConstants";
 
 const FOCUS_LABEL: Record<Focus, string> = {
