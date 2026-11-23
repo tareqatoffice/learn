@@ -5,7 +5,7 @@ import { buttonVariants, Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { FEELS, type Feel } from "@/models/exerciseConstants";
 import { formatTarget } from "../lib/format";
-import { exerciseById } from "../library";
+import type { ExerciseMap } from "../catalog";
 import type { PlanDay } from "../plan";
 import { Notice } from "@/components/Notice";
 import { Card } from "@/components/Card";
@@ -13,6 +13,7 @@ import { Card } from "@/components/Card";
 const LABEL: Record<Feel, string> = { easy: "Easy", ok: "OK", hard: "Hard" };
 
 export function WorkoutSummary({
+  exercises,
   plan,
   feels,
   skipped = [],
@@ -21,6 +22,7 @@ export function WorkoutSummary({
   saving,
   error,
 }: {
+  exercises: ExerciseMap;
   plan: PlanDay;
   feels: Partial<Record<string, Feel>>;
   /** Exercise ids that were skipped: shown as skipped, with no feel buttons. */
@@ -42,7 +44,7 @@ export function WorkoutSummary({
       </div>
       <ul className="grid gap-3">
         {plan.items.map((item, index) => {
-          const exercise = exerciseById(item.exerciseId);
+          const exercise = exercises[item.exerciseId];
           const feel = feels[item.exerciseId];
           return (
             <Card as="li" key={index} className="grid gap-2 p-3">

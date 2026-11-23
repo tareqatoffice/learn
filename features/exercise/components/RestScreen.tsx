@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { formatTarget, formatClock } from "../lib/format";
-import type { Exercise } from "../library";
+import type { Exercise } from "../catalog";
 import type { PlanItem } from "../plan";
 import { ExerciseFrames } from "./ExerciseFrames";
 

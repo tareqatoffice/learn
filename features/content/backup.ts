@@ -9,6 +9,7 @@ import {
   AiUsage,
   CodingResult,
   ExercisePlanWeek,
+  Exercise,
   ExerciseProfile,
   FocusSession,
   WeightEntry,
@@ -66,6 +67,7 @@ export const CONTENT_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["ieltsreadingtests", IeltsReadingTest],
   ["ieltslisteningtests", IeltsListeningTest],
   ["ieltswritingprompts", IeltsWritingPrompt],
+  ["exercises", Exercise],
 ];
 
 const ejson = (value: unknown) => EJSON.stringify(value, { relaxed: false });

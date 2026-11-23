@@ -98,3 +98,9 @@ export async function deleteObjects(keys: string[]): Promise<void> {
     if (errors.length) throw new Error(`R2 failed to delete ${errors.length} object(s)`);
   }
 }
+
+export async function putObject(key: string, body: Uint8Array, contentType: string, cacheControl?: string): Promise<void> {
+  await client().send(
+    new PutObjectCommand({ Bucket: bucket(), Key: key, Body: body, ContentType: contentType, ...(cacheControl ? { CacheControl: cacheControl } : {}) }),
+  );
+}

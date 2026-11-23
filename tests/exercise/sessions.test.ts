@@ -6,6 +6,7 @@ import { getActiveProfile, saveProfile, type ProfileInput } from "@/features/exe
 import { dayPlan, ensureWeek, plannedDates } from "@/features/exercise/weeks";
 import { doneDates, finishSession, resumePoint, saveSet, startSession, streak, weekSummary } from "@/features/exercise/sessions";
 import { resetDb } from "../setup/mongo";
+import { seedExercises } from "./fixtures";
 import { newUserId } from "../progress/seed";
 
 const input = (over: Partial<ProfileInput> = {}): ProfileInput => ({
@@ -43,7 +44,10 @@ describe("workout sessions", () => {
     await connectDb();
     await Promise.all([ExerciseProfile.init(), ExercisePlanWeek.init(), WorkoutSession.init()]);
   });
-  beforeEach(resetDb);
+  beforeEach(async () => {
+    await resetDb();
+    await seedExercises();
+  });
   afterAll(() => mongoose.disconnect());
 
   it("startSession is idempotent and null on a rest day", async () => {

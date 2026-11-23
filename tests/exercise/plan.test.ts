@@ -1,3 +1,4 @@
+import { EXERCISES } from "./fixtures";
 import { describe, expect, it } from "vitest";
 import { LEVELS } from "@/models/exerciseConstants";
 import { addDays } from "@/features/speaking/schedule";
@@ -80,16 +81,16 @@ describe("scheduledDates", () => {
 describe("fillDay", () => {
   const day = skeletonWeek(base, "2026-11-23", history)[0];
   it("is deterministic per seed and varies across seeds", () => {
-    expect(fillDay(day, "a")).toEqual(fillDay(day, "a"));
-    const outputs = ["a", "b", "c", "d", "e"].map((s) => JSON.stringify(fillDay(day, s)));
+    expect(fillDay(day, "a", EXERCISES)).toEqual(fillDay(day, "a", EXERCISES));
+    const outputs = ["a", "b", "c", "d", "e"].map((s) => JSON.stringify(fillDay(day, s, EXERCISES)));
     expect(new Set(outputs).size).toBeGreaterThan(1);
   });
   it("never repeats an exercise in a beginner 30 min full day", () => {
     const full = { ...day, focus: "full" as const };
     for (const seed of ["a", "b", "c", "d"]) {
-      const filled = fillDay(full, seed);
+      const filled = fillDay(full, seed, EXERCISES);
       expect(new Set(filled.items.map((i) => i.exerciseId)).size).toBe(filled.items.length);
-      expect(validateDay(full, filled.items)).not.toBeNull();
+      expect(validateDay(full, filled.items, EXERCISES)).not.toBeNull();
     }
   });
   it("always passes validation, whatever the level, week and length", () => {
@@ -100,10 +101,10 @@ describe("fillDay", () => {
           const days = skeletonWeek(p, addDays("2026-11-23", idx * 7), { finishedRatio: 1 });
           expect(days.length).toBeGreaterThan(0);
           for (const d of days) {
-            const filled = fillDay(d, `${level}-${idx}-${minutes}`);
-            expect(filled.items).toHaveLength(slotsFor(d));
+            const filled = fillDay(d, `${level}-${idx}-${minutes}`, EXERCISES);
+            expect(filled.items).toHaveLength(slotsFor(d, EXERCISES));
             expect(new Set(filled.items.map((i) => i.exerciseId)).size).toBe(filled.items.length);
-            expect(validateDay(d, filled.items), `${level} week ${idx} ${minutes}m`).not.toBeNull();
+            expect(validateDay(d, filled.items, EXERCISES), `${level} week ${idx} ${minutes}m`).not.toBeNull();
           }
         }
       }
@@ -113,37 +114,37 @@ describe("fillDay", () => {
 
 describe("validateDay", () => {
   const day = skeletonWeek(base, "2026-11-23", history)[0];
-  const good = fillDay(day, "x").items;
+  const good = fillDay(day, "x", EXERCISES).items;
   it("returns valid items", () => {
-    expect(validateDay(day, good)).toEqual(good);
+    expect(validateDay(day, good, EXERCISES)).toEqual(good);
   });
   it("rejects bad input", () => {
     const first = good[0];
-    expect(validateDay(day, [{ ...first, exerciseId: "nope" }, ...good.slice(1)])).toBeNull();
-    expect(validateDay(day, [{ ...first, reps: 40 }, ...good.slice(1)])).toBeNull();
-    expect(validateDay(day, [{ ...first, sets: 0 }, ...good.slice(1)])).toBeNull();
-    expect(validateDay(day, [...good, ...good.slice(0, 2)])).toBeNull();
-    expect(validateDay(day, "nope")).toBeNull();
+    expect(validateDay(day, [{ ...first, exerciseId: "nope" }, ...good.slice(1)], EXERCISES)).toBeNull();
+    expect(validateDay(day, [{ ...first, reps: 40 }, ...good.slice(1)], EXERCISES)).toBeNull();
+    expect(validateDay(day, [{ ...first, sets: 0 }, ...good.slice(1)], EXERCISES)).toBeNull();
+    expect(validateDay(day, [...good, ...good.slice(0, 2)], EXERCISES)).toBeNull();
+    expect(validateDay(day, "nope", EXERCISES)).toBeNull();
   });
   it("rejects a day with a repeated exercise", () => {
-    expect(validateDay(day, [good[0], { ...good[0] }, ...good.slice(2)])).toBeNull();
+    expect(validateDay(day, [good[0], { ...good[0] }, ...good.slice(2)], EXERCISES)).toBeNull();
   });
   it("rejects items whose fields do not match the exercise mode", () => {
     const withReps = good.findIndex((i) => i.reps !== undefined);
     const withSeconds = good.findIndex((i) => i.seconds !== undefined);
     const swap = (idx: number, item: object) => good.map((g, n) => (n === idx ? { ...g, ...item } : g));
     if (withReps >= 0) {
-      expect(validateDay(day, swap(withReps, { seconds: 30 }))).toBeNull(); // reps move given reps and seconds
-      expect(validateDay(day, good.map((g, n) => (n === withReps ? { ...g, reps: undefined, seconds: 30 } : g)))).toBeNull(); // seconds only
+      expect(validateDay(day, swap(withReps, { seconds: 30 }), EXERCISES)).toBeNull(); // reps move given reps and seconds
+      expect(validateDay(day, good.map((g, n) => (n === withReps ? { ...g, reps: undefined, seconds: 30 } : g)), EXERCISES)).toBeNull(); // seconds only
     }
     if (withSeconds >= 0) {
-      expect(validateDay(day, swap(withSeconds, { reps: 12 }))).toBeNull(); // time move given both
-      expect(validateDay(day, good.map((g, n) => (n === withSeconds ? { ...g, seconds: undefined, reps: 12 } : g)))).toBeNull(); // reps only
+      expect(validateDay(day, swap(withSeconds, { reps: 12 }), EXERCISES)).toBeNull(); // time move given both
+      expect(validateDay(day, good.map((g, n) => (n === withSeconds ? { ...g, seconds: undefined, reps: 12 } : g)), EXERCISES)).toBeNull(); // reps only
     }
     expect(withReps >= 0 || withSeconds >= 0).toBe(true);
   });
   it("rejects a day longer than the time budget", () => {
     const long = good.map((i) => (i.seconds !== undefined ? { ...i, sets: 4, restSec: 180, seconds: 60 } : { ...i, sets: 4, restSec: 180, reps: 30 }));
-    expect(validateDay({ ...day, minutes: 5 }, long)).toBeNull();
+    expect(validateDay({ ...day, minutes: 5 }, long, EXERCISES)).toBeNull();
   });
 });

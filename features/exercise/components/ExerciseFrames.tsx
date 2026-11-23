@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { exerciseImage, type Exercise } from "../library";
+import { exerciseImage, type Exercise } from "../catalog";
 
 const SWAP_MS = 800;
 
@@ -19,7 +19,7 @@ function Frames({ exercise, size }: { exercise: Exercise; size: "sm" | "lg" }) {
   const [frame, setFrame] = useState<0 | 1>(0);
 
   useEffect(() => {
-    if (!exercise.frames || reducedMotion()) return;
+    if (exercise.photos.length < 2 || reducedMotion()) return;
     const id = setInterval(() => setFrame((f) => (f === 0 ? 1 : 0)), SWAP_MS);
     return () => clearInterval(id);
   }, [exercise]);
@@ -33,7 +33,7 @@ function Frames({ exercise, size }: { exercise: Exercise; size: "sm" | "lg" }) {
     >
       <Image
         src={exerciseImage(exercise, frame)}
-        alt={exercise.frames ? exercise.name : `${exercise.name} (no photo yet)`}
+        alt={exercise.photos.length ? exercise.name : `${exercise.name} (no photo yet)`}
         fill
         sizes={size === "lg" ? "(max-width: 576px) 100vw, 576px" : "320px"}
         className="object-cover"

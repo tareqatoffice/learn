@@ -13,6 +13,7 @@ import { ExerciseHome } from "@/features/exercise/components/ExerciseHome";
 import { ExerciseSetup } from "@/features/exercise/components/ExerciseSetup";
 import { connectDb } from "@/lib/db";
 import { resetDb } from "../setup/mongo";
+import { seedExercises } from "./fixtures";
 
 describe("exercise home", () => {
   beforeAll(async () => {
@@ -20,6 +21,7 @@ describe("exercise home", () => {
   });
   beforeEach(async () => {
     await resetDb();
+    await seedExercises();
     redirect.mockClear();
     session.userId = String(new Types.ObjectId());
   });

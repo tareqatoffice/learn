@@ -3,6 +3,7 @@ import { ExercisePlanWeek, WorkoutSession } from "@/models";
 import { addDays } from "@/features/speaking/schedule";
 import { getActiveProfile, type ProfileView } from "./profile";
 import { type PlanDay, scheduledDates, skeletonWeek, weekIndex, weekStartOf } from "./plan";
+import { activeExercises } from "./library";
 import { fillWeek, type LastWeekResult } from "./planAi";
 
 export type PlanWeekView = { weekStart: string; days: PlanDay[]; source: "ai" | "code"; coachNote: string };
@@ -54,6 +55,9 @@ export async function ensureWeek(userId: string, today: string, fetchFn?: typeof
   const existing = await ExercisePlanWeek.findOne({ profileId: profile.id, weekStart }).lean<WeekDoc>();
   if (existing) return toView(existing);
 
+  // No exercises yet (library not seeded, or all archived): build nothing rather than store an empty week.
+  const exercises = await activeExercises();
+  if (!exercises.length) return null;
   const { finishedRatio, lastWeek } = await lastWeekOf(userId, profile, weekStart);
   const direction =
     profile.goalWeightKg < profile.startWeightKg ? "lose" : profile.goalWeightKg > profile.startWeightKg ? "gain" : "keep";
@@ -64,6 +68,7 @@ export async function ensureWeek(userId: string, today: string, fetchFn?: typeof
     weekIdx: weekIndex(profile.startDate, weekStart),
     profileSummary: summary(profile),
     lastWeek,
+    exercises,
     fetch: fetchFn,
   });
 

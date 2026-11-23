@@ -3,17 +3,20 @@
 import { useState } from "react";
 import { finishSessionAction } from "@/app/(app)/exercise/actions";
 import type { Feel } from "@/models/exerciseConstants";
+import type { ExerciseMap } from "../catalog";
 import type { PlanDay } from "../plan";
 import { WorkoutSummary } from "./WorkoutSummary";
 
 /** A done session opened later: still rateable until feels have been saved, read-only after. */
 export function DoneWorkoutSummary({
+  exercises,
   date,
   today,
   plan,
   initialFeels,
   skipped,
 }: {
+  exercises: ExerciseMap;
   date: string;
   /** The user's current day: only that day's workout can still be rated. */
   today: string;
@@ -26,7 +29,7 @@ export function DoneWorkoutSummary({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
 
-  if (!editable) return <WorkoutSummary plan={plan} feels={feels} skipped={skipped} />;
+  if (!editable) return <WorkoutSummary exercises={exercises} plan={plan} feels={feels} skipped={skipped} />;
 
   async function finish() {
     setSaving(true);
@@ -43,6 +46,7 @@ export function DoneWorkoutSummary({
 
   return (
     <WorkoutSummary
+      exercises={exercises}
       plan={plan}
       feels={feels}
       skipped={skipped}
