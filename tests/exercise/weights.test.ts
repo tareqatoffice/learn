@@ -88,16 +88,18 @@ describe("weights", () => {
     expect(await WeightEntry.countDocuments({ userId })).toBe(0);
   });
 
-  it("updating an existing entry never re-tags it to another goal", async () => {
+  it("re-tags a same-day entry to the new goal but rejects dates before its start", async () => {
     const userId = newUserId();
     const first = await saveProfile(userId, profile, "2026-11-02");
     if (!first.ok) throw new Error("save failed");
     await logWeight(userId, "2026-11-03", 80, "2026-11-03");
     const second = await saveProfile(userId, { ...profile, goalWeightKg: 70 }, "2026-11-03");
     if (!second.ok) throw new Error("save failed");
+    expect((await logWeight(userId, "2026-11-02", 79, "2026-11-03")).ok).toBe(false);
     expect((await logWeight(userId, "2026-11-03", 79, "2026-11-03")).ok).toBe(true);
     const row = await WeightEntry.findOne({ userId, date: "2026-11-03" }).lean<{ kg: number; profileId: unknown }>();
     expect(row?.kg).toBe(79);
-    expect(String(row?.profileId)).toBe(first.id);
+    expect(String(row?.profileId)).toBe(second.id);
+    expect(await WeightEntry.countDocuments({ userId, date: "2026-11-02" })).toBe(0);
   });
 });

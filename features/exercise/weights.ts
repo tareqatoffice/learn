@@ -15,9 +15,9 @@ export async function logWeight(
   const profile = await getActiveProfile(userId);
   if (!profile) return fail("Set a goal before logging your weight.");
   if (date < profile.startDate) return fail({ date: `Pick ${profile.startDate} or later: that is when this goal started.` });
-  // An existing entry keeps the goal it was logged under.
+  // Dates before the goal's start are rejected above, so re-tagging only moves a same-day entry to the new goal.
   await retryOnDuplicateKey(() =>
-    WeightEntry.updateOne({ userId, date }, { $set: { kg }, $setOnInsert: { profileId: profile.id } }, { upsert: true }),
+    WeightEntry.updateOne({ userId, date }, { $set: { kg, profileId: profile.id } }, { upsert: true }),
   );
   return ok({ date, kg });
 }

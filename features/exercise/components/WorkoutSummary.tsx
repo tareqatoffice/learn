@@ -46,7 +46,7 @@ export function WorkoutSummary({
             <li key={index} className="grid gap-2 rounded-xl border border-border bg-card p-3">
               <p className="text-sm font-medium">
                 {exercise?.name ?? item.exerciseId}
-                {(item.reps || item.seconds) && (
+                {(item.reps != null || item.seconds != null) && (
                   <span className="font-normal text-muted-foreground">
                     {" "}
                     · {item.sets} × {formatTarget(item)}

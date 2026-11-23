@@ -174,4 +174,17 @@ describe("WorkoutPlayer", () => {
     const list = screen.getByRole("list");
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
   });
+
+  it("finish waits for a pending set save", async () => {
+    let release: () => void = () => {};
+    saveSet.mockImplementationOnce(() => new Promise<void>((r) => (release = r)));
+    render(<WorkoutPlayer date={plan.date} plan={plan} start={{ item: 2, set: 1 }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Done set" }));
+    await act(async () => {});
+    fireEvent.click(screen.getByRole("button", { name: "Finish workout" }));
+    await act(async () => {});
+    expect(finish).not.toHaveBeenCalled();
+    await act(async () => release());
+    expect(finish).toHaveBeenCalledTimes(1);
+  });
 });

@@ -89,12 +89,11 @@ export function WorkoutPlayer({
 
   // After a phase change the main action is the next thing to press, so keep focus there.
   const root = useRef<HTMLDivElement>(null);
-  const first = useRef(true);
+  const seen = useRef(`${player.phase}/${player.item}/${player.set}`);
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
+    const now = `${player.phase}/${player.item}/${player.set}`;
+    if (seen.current === now) return;
+    seen.current = now;
     root.current?.querySelector<HTMLElement>("[data-primary]")?.focus();
   }, [player.phase, player.item, player.set]);
 
@@ -102,6 +101,8 @@ export function WorkoutPlayer({
     setFinishing(true);
     setError(undefined);
     try {
+      // Pending set saves land first, so the session is complete when it is finished.
+      await tail.current;
       await finishSessionAction(date, feels as Record<string, Feel>);
       setFinished(true);
     } catch {
