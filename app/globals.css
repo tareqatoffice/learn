@@ -26,6 +26,7 @@
   --color-track-3: var(--t-3);
   --color-track-4: var(--t-4);
   --color-track-5: var(--t-5);
+  --color-track-6: var(--t-6);
   --color-code: var(--code-bg);
   --color-code-foreground: var(--code-fg);
   --color-background: var(--background);
@@ -114,6 +115,7 @@
   --t-3: #6b57c2;
   --t-4: #c2255c;
   --t-5: #4d7c0f;
+  --t-6: #0e7490;
   --code-bg: #f6f8fa;
   --code-fg: #24292f;
   --hl-comment: #6e7781;
@@ -162,6 +164,7 @@
     --t-3: #a99cf0;
     --t-4: #ff7aa5;
     --t-5: #a3d65c;
+    --t-6: #5ad1e6;
     --code-bg: #0a0f16;
     --code-fg: #dbe5f3;
     --hl-comment: #8b949e;
@@ -211,6 +214,7 @@
   --t-3: #a99cf0;
   --t-4: #ff7aa5;
   --t-5: #a3d65c;
+  --t-6: #5ad1e6;
   --code-bg: #0a0f16;
   --code-fg: #dbe5f3;
   --hl-comment: #8b949e;

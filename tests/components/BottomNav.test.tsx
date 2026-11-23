@@ -41,7 +41,7 @@ describe("BottomNav", () => {
     const hrefs = within(sheet)
       .getAllByRole("link")
       .map((a) => a.getAttribute("href"));
-    expect(hrefs).toEqual(["/graphs", "/notes", "/coding", "/profile"]);
+    expect(hrefs).toEqual(["/graphs", "/notes", "/coding", "/exercise", "/profile"]);
     expect(document.activeElement?.getAttribute("href")).toBe("/graphs");
     expect(main.inert).toBe(true);
     await userEvent.click(more);

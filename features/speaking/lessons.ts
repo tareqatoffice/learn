@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import { connectDb, retryOnDuplicateKey } from "@/lib/db";
+import { presignGet, storageConfigured } from "@/lib/r2";
 import { SpeakingDay, SpeakingLesson, SpeakingTake } from "@/models";
 import { type ActionResult, fail, ok } from "@/features/admin/result";
 import { TASKS, type TaskKey } from "./tasks";
@@ -8,7 +9,7 @@ export type LessonView = {
   id: string;
   title: string;
   order: number;
-  shadow: { audioKey?: string; audioUrl?: string; durationSec?: number; text?: string } | null;
+  shadow: { audioKey?: string; audioUrl?: string; durationSec?: number; text?: string; marks?: number[] } | null;
   passage: string;
   prompt: string;
 };
@@ -17,7 +18,7 @@ type LessonDoc = {
   _id: unknown;
   title: string;
   order: number;
-  shadow?: { audioKey?: string; audioUrl?: string; durationSec?: number; text?: string };
+  shadow?: { audioKey?: string; audioUrl?: string; durationSec?: number; text?: string; marks?: number[] };
   passage?: string;
   prompt?: string;
 };
@@ -25,9 +26,18 @@ type LessonDoc = {
 function toView(doc: LessonDoc): LessonView {
   const s = doc.shadow;
   const shadow = s && (s.audioKey || s.audioUrl || s.text)
-    ? { audioKey: s.audioKey, audioUrl: s.audioUrl, durationSec: s.durationSec, text: s.text }
+    ? { audioKey: s.audioKey, audioUrl: s.audioUrl, durationSec: s.durationSec, text: s.text, marks: s.marks?.length ? [...s.marks] : undefined }
     : null;
   return { id: String(doc._id), title: doc.title, order: doc.order, shadow, passage: doc.passage ?? "", prompt: doc.prompt ?? "" };
+}
+
+// Lesson clips are shared study material, not a learner's own recording, so their links last a
+// whole practice session instead of the default ten minutes.
+const LESSON_AUDIO_EXPIRES_SEC = 12 * 60 * 60;
+
+export async function lessonAudioUrl(shadow: { audioKey?: string; audioUrl?: string }): Promise<string | undefined> {
+  if (shadow.audioKey) return storageConfigured() ? presignGet(shadow.audioKey, LESSON_AUDIO_EXPIRES_SEC) : undefined;
+  return shadow.audioUrl;
 }
 
 export function lessonHasPart(lesson: LessonView, task: TaskKey): boolean {

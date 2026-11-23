@@ -2,7 +2,7 @@ import mongoose, { Schema, model } from "mongoose";
 import { STATUSES } from "./status";
 
 const shadowSchema = new Schema(
-  { audioKey: String, audioUrl: String, durationSec: Number, text: String },
+  { audioKey: String, audioUrl: String, durationSec: Number, text: String, marks: { type: [Number], default: undefined } },
   { _id: false },
 );
 

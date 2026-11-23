@@ -7,6 +7,7 @@ import { connectDb, inTransaction } from "@/lib/db";
 import { deleteObjects, headObject, presignPut, storageConfigured } from "@/lib/r2";
 import { SpeakingLesson } from "@/models";
 import { STATUSES } from "@/models/status";
+import { MAX_MARKS } from "@/features/speaking/shadowText";
 
 export const AUDIO_MAX_BYTES = 50 * 1024 * 1024;
 
@@ -29,6 +30,11 @@ export const lessonInput = z.object({
   shadowText: z.string().max(5000, "Shadowing text is too long (5000 characters at most)."),
   shadowAudioUrl: httpsUrlOrEmpty,
   shadowDurationSec: z.number().min(0, "Duration can't be negative.").max(1200, "Duration is 1200 seconds at most."),
+  shadowMarks: z
+    .array(z.number().finite().min(0).max(1200))
+    .max(MAX_MARKS, "Too many sentence timings.")
+    .refine((m) => m.every((v, i) => i === 0 || v > m[i - 1]), "Sentence timings must go up, one after another.")
+    .default([]),
   passage: z.string().max(5000, "Passage is too long (5000 characters at most)."),
   prompt: z.string().max(1000, "Prompt is too long (1000 characters at most)."),
 });
@@ -56,7 +62,7 @@ export async function createLesson(input: LessonInput): Promise<ActionResult<{ i
     status: data.status,
     subjectIds: data.subjectIds.map((id) => new Types.ObjectId(id)),
     order: (last?.order ?? 0) + 1,
-    shadow: { text: data.shadowText, audioUrl: data.shadowAudioUrl, durationSec: data.shadowDurationSec },
+    shadow: { text: data.shadowText, audioUrl: data.shadowAudioUrl, durationSec: data.shadowDurationSec, marks: data.shadowMarks },
     passage: data.passage,
     prompt: data.prompt,
   });
@@ -78,6 +84,7 @@ export async function updateLesson(id: string, input: LessonInput): Promise<Acti
         "shadow.text": data.shadowText,
         "shadow.audioUrl": data.shadowAudioUrl,
         "shadow.durationSec": data.shadowDurationSec,
+        "shadow.marks": data.shadowMarks,
         passage: data.passage,
         prompt: data.prompt,
       },
@@ -160,7 +167,7 @@ export async function confirmLessonAudio(id: string, key: string, durationSec: n
     }
     return fail("Audio can be 50 MB at most.");
   }
-  await SpeakingLesson.updateOne({ _id: id }, { $set: { "shadow.audioKey": key, "shadow.durationSec": duration } });
+  await SpeakingLesson.updateOne({ _id: id }, { $set: { "shadow.audioKey": key, "shadow.durationSec": duration, "shadow.marks": [] } });
   const previous = lesson.shadow?.audioKey;
   if (previous && previous !== key) {
     try {
@@ -181,6 +188,7 @@ export type AdminLesson = {
   shadowAudioUrl: string;
   shadowAudioKey: string;
   shadowDurationSec: number;
+  shadowMarks: number[];
   passage: string;
   prompt: string;
 };
@@ -191,7 +199,7 @@ type LessonRow = {
   order: number;
   status?: (typeof STATUSES)[number];
   subjectIds?: Types.ObjectId[];
-  shadow?: { audioKey?: string; audioUrl?: string; durationSec?: number; text?: string };
+  shadow?: { audioKey?: string; audioUrl?: string; durationSec?: number; text?: string; marks?: number[] };
   passage?: string;
   prompt?: string;
 };
@@ -206,6 +214,7 @@ const toAdmin = (d: LessonRow): AdminLesson => ({
   shadowAudioUrl: d.shadow?.audioUrl ?? "",
   shadowAudioKey: d.shadow?.audioKey ?? "",
   shadowDurationSec: d.shadow?.durationSec ?? 0,
+  shadowMarks: [...(d.shadow?.marks ?? [])],
   passage: d.passage ?? "",
   prompt: d.prompt ?? "",
 });

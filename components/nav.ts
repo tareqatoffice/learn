@@ -1,5 +1,6 @@
 import {
   Code,
+  Dumbbell,
   GraduationCap,
   LayoutDashboard,
   MessagesSquare,
@@ -27,6 +28,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/graphs", label: "Graphs", icon: Network, track: "graphs" },
   { href: "/notes", label: "Notes", icon: NotebookText, track: "notes" },
   { href: "/coding", label: "Coding", icon: Code, track: "coding" },
+  { href: "/exercise", label: "Exercise", icon: Dumbbell, track: "exercise" },
 ];
 
 export const TAB_HREFS = ["/dashboard", "/interview", "/speaking", "/ielts"];

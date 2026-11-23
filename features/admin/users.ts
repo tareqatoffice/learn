@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Result } from "@/features/admin/service";
 import { BLOCK_REASON_MAX } from "@/features/auth/lib/access-limits";
 import { isAdminEmail } from "@/features/auth/lib/authz";
+import { deleteAllExerciseData } from "@/features/exercise/data";
 import { deleteAllIeltsData } from "@/features/ielts/data";
 import {
   AiConversation,
@@ -16,6 +17,7 @@ import {
   SpeakingDay,
   SpeakingProfile,
   SpeakingUsage,
+  SpeakingTakeUsage,
   User,
 } from "@/models";
 import { deleteAllTakes } from "@/features/speaking/takes";
@@ -42,8 +44,13 @@ export async function deleteUser(id: string): Promise<Result> {
   } catch {
     return { ok: false, errors: { _: "Couldn't delete the user's recordings from storage. Nothing else was removed; try again." } };
   }
+  try {
+    await deleteAllExerciseData(id);
+  } catch {
+    return { ok: false, errors: { _: "Couldn't delete the user's exercise data. Their recordings and IELTS data were already removed. Try again to finish deleting the user." } };
+  }
   await Promise.all(
-    [QuestionProgress, QuizSession, NodeProgress, NoteProgress, AiConversation, AiUsage, SpeakingUsage, SpeakingProfile, SpeakingDay, CodingResult, FocusSession].map((M) =>
+    [QuestionProgress, QuizSession, NodeProgress, NoteProgress, AiConversation, AiUsage, SpeakingUsage, SpeakingTakeUsage, SpeakingProfile, SpeakingDay, CodingResult, FocusSession].map((M) =>
       M.deleteMany({ userId: id }),
     ),
   );
