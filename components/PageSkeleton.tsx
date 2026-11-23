@@ -473,10 +473,6 @@ export function NarrowStackSkeleton({
   );
 }
 
-export function AppPageSkeleton() {
-  return <NarrowStackSkeleton />;
-}
-
 export function SimplePageSkeleton() {
   return (
     <Status label="Loading" className="grid w-full gap-6">
