@@ -11,8 +11,9 @@ import type { GroupSpecs } from "@/features/coding/specs";
 import { BackLink } from "@/components/BackLink";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { pageTitleClass } from "@/lib/ui";
+import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
+import { Notice } from "@/components/Notice";
 
 const DETAIL_MAX = 2000;
 const SAVE_FAILED = "The results show here but weren't saved. Check your connection and run again.";
@@ -57,11 +58,12 @@ export function CodingGroup({ slug, specs, initial }: { slug: string; specs: Gro
     <div className="mx-auto grid w-full max-w-3xl gap-6">
       <header className="grid gap-3">
         <BackLink href="/coding">← All groups</BackLink>
-        <div className="flex items-center gap-2">
-          <h1 className={pageTitleClass}>{group.title}</h1>
-          <Badge variant={group.level === "Advanced" ? "primary" : "muted"}>{group.level}</Badge>
-        </div>
-        {specs.intro && <p className="text-muted-foreground">{specs.intro}</p>}
+        <PageHeader
+          title={group.title}
+          track="coding"
+          description={specs.intro}
+          actions={<Badge variant={group.level === "Advanced" ? "primary" : "muted"}>{group.level}</Badge>}
+        />
         <p>
           <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs break-all">
             {group.file ?? `coding/problems/${group.slug}/${group.slug}.ts`}
@@ -76,9 +78,9 @@ export function CodingGroup({ slug, specs, initial }: { slug: string; specs: Gro
           </span>
         </div>
         {error && (
-          <p role="alert" className="text-sm text-destructive">
+          <Notice>
             {error}
-          </p>
+          </Notice>
         )}
       </header>
 

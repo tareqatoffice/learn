@@ -8,6 +8,7 @@ import { useAdminAction } from "@/features/admin/components/useAdminAction";
 import { Button } from "@/components/ui/button";
 import { MODEL_ID_MAX } from "@/features/ai/lib/ai-limits";
 import type { CatalogModel, ModelCheck } from "@/features/ai/lib/openrouter";
+import { Notice } from "@/components/Notice";
 
 export type AiSettingsDraft = { enabled: boolean; primaryModel: string; fallbackModel: string; visionModel?: string; dailyLimit: number };
 
@@ -114,7 +115,7 @@ export function ModelPicker({
           </span>
         )
       )}
-      {error && <span className="text-sm text-destructive">{error}</span>}
+      {error && <Notice as="span">{error}</Notice>}
     </div>
   );
 }

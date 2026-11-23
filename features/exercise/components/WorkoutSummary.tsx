@@ -7,6 +7,7 @@ import { FEELS, type Feel } from "@/models/exerciseConstants";
 import { formatTarget } from "../lib/format";
 import { exerciseById } from "../library";
 import type { PlanDay } from "../plan";
+import { Notice } from "@/components/Notice";
 
 const LABEL: Record<Feel, string> = { easy: "Easy", ok: "OK", hard: "Hard" };
 
@@ -80,9 +81,9 @@ export function WorkoutSummary({
         })}
       </ul>
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <Notice>
           {error}
-        </p>
+        </Notice>
       )}
       <div className="flex flex-wrap gap-3">
         {!readOnly && (

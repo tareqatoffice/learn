@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import type { GraphView as GraphData } from "@/features/content/queries";
 import { dependentsOf, layoutGraph, LBL, NH, NW, readyNext, unmetPrereqs } from "@/features/graph/layout";
 import type { NodeStatus } from "@/features/progress/graph";
-import { pageTitleClass } from "@/lib/ui";
+import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
 
 const statusOf = (progress: GraphData["progress"], id: string): NodeStatus => progress[id] ?? "none";
@@ -269,22 +269,23 @@ export function GraphView({ data }: { data: GraphData }) {
 
   return (
     <div className="grid gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-        <div className="min-w-0">
-          <h1 className={cn(pageTitleClass, "text-balance")}>{graph.title}</h1>
-          {graph.subtitle && <p className="mt-1 max-w-prose text-sm text-muted-foreground">{graph.subtitle}</p>}
-        </div>
-        <div className="w-full sm:w-72">
-          <p className="flex justify-between text-sm tabular-nums">
-            <span>
-              <span className="font-semibold">{done}</span>
-              <span className="text-muted-foreground"> of {nodes.length} done</span>
-            </span>
-            <span className="text-muted-foreground">{learning} learning</span>
-          </p>
-          <ProgressBar value={done} secondary={learning} max={nodes.length} className="mt-2 h-2" />
-        </div>
-      </header>
+      <PageHeader
+        title={graph.title}
+        track="graphs"
+        description={graph.subtitle && <span className="block max-w-prose">{graph.subtitle}</span>}
+        actions={
+          <div className="w-full sm:w-72">
+            <p className="flex justify-between text-sm tabular-nums">
+              <span>
+                <span className="font-semibold">{done}</span>
+                <span className="text-muted-foreground"> of {nodes.length} done</span>
+              </span>
+              <span className="text-muted-foreground">{learning} learning</span>
+            </p>
+            <ProgressBar value={done} secondary={learning} max={nodes.length} className="mt-2 h-2" />
+          </div>
+        }
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         {graph.tracks.length > 0 && (

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { deleteTestAttemptAction } from "@/app/(app)/ielts/practice-actions";
 import { ActionStatus } from "@/features/admin/components/SaveBar";
 import { useAdminAction } from "@/features/admin/components/useAdminAction";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import type { ReviewView } from "@/features/ielts/practice/attempts";
 import { choicesFor } from "@/features/ielts/practice/marking";
 import { cn } from "@/lib/utils";
@@ -83,7 +83,7 @@ export function TestReview({ view }: { view: ReviewView }) {
       ))}
 
       <div className="flex flex-wrap items-center gap-3">
-        <Link href={back} className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted">
+        <Link href={back} className={buttonVariants({ variant: "outline" })}>
           Back to {view.skill}
         </Link>
         <Button

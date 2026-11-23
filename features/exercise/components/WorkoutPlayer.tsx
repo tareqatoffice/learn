@@ -12,6 +12,7 @@ import type { PlanDay } from "../plan";
 import { ExerciseFrames } from "./ExerciseFrames";
 import { RestScreen } from "./RestScreen";
 import { WorkoutSummary } from "./WorkoutSummary";
+import { ProgressBar } from "@/components/ProgressBar";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -197,16 +198,7 @@ export function WorkoutPlayer({
         <p className="text-sm text-muted-foreground">
           {cap(plan.focus)} · {player.item + 1} of {total}
         </p>
-        <div
-          role="progressbar"
-          aria-label="Workout progress"
-          aria-valuemin={0}
-          aria-valuemax={setsTotal}
-          aria-valuenow={setsBefore}
-          className="h-1.5 overflow-hidden rounded-full bg-muted"
-        >
-          <div className="h-full bg-[var(--t-6)] transition-[width]" style={{ width: `${(setsBefore / setsTotal) * 100}%` }} />
-        </div>
+        <ProgressBar value={setsBefore} max={setsTotal} color="var(--t-6)" label="Workout progress" />
       </div>
       <ExerciseFrames exercise={exercise} size="lg" />
       <div className="grid gap-1">

@@ -24,6 +24,7 @@ import { framesOf } from "@/lib/media";
 import type { BodyFeedback } from "@/features/speaking/coach";
 import { BandCompare } from "./BandCompare";
 import { SelfBandsForm, type SelfBands } from "./SelfBandsForm";
+import { EmptyState } from "@/components/EmptyState";
 
 const PART_NAME: Record<Part, string> = { p1: "Part 1", p2: "Part 2", p3: "Part 3" };
 export const KIND_NAME = { mock: "Full mock", part1: "Part 1 drill", part2: "Part 2 drill", part3: "Part 3 drill" } as const;
@@ -360,9 +361,9 @@ export function AttemptReview({ attempt, aiOn, bodyConsent: initialConsent }: { 
       )}
 
       {stored.length === 0 ? (
-        <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
+        <EmptyState>
           No part of this attempt was stored, so there is nothing to play or rate.
-        </p>
+        </EmptyState>
       ) : (
         <>
           <div className="grid gap-4">

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   confirmPartAction,
@@ -14,6 +13,8 @@ import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { storageConfigured } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";
+import { BackLink } from "@/components/BackLink";
+import { EmptyState } from "@/components/EmptyState";
 
 export async function generateMetadata({ params }: PageProps<"/ielts/speaking/[attemptId]">): Promise<Metadata> {
   const { attemptId } = await params;
@@ -39,12 +40,10 @@ export default async function IeltsRunPage({ params }: PageProps<"/ielts/speakin
   if (!storageConfigured()) {
     return (
       <div className="grid w-full gap-4">
-        <Link href="/ielts/speaking" className="text-sm text-muted-foreground hover:underline">
-          ← Speaking practice
-        </Link>
-        <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
+        <BackLink href="/ielts/speaking">← Speaking practice</BackLink>
+        <EmptyState>
           Recording storage isn&apos;t set up yet, so practice can&apos;t be recorded.
-        </p>
+        </EmptyState>
       </div>
     );
   }

@@ -3,7 +3,9 @@ import { chipClass } from "@/components/Chip";
 import { BandCharts } from "@/features/ielts/components/BandCharts";
 import { dateLabel } from "@/features/ielts/components/format";
 import type { AttemptSummary } from "@/features/ielts/speaking/attempts";
-import { pageTitleClass } from "@/lib/ui";
+import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
+import { EmptyState } from "@/components/EmptyState";
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -56,10 +58,10 @@ export function IeltsHistory({
 
   return (
     <div className="grid w-full gap-6">
-      <Link href="/ielts" className="text-sm text-muted-foreground hover:underline">
-        ← IELTS
-      </Link>
-      <h1 className={pageTitleClass}>History</h1>
+      <div className="grid gap-3">
+        <BackLink href="/ielts">← IELTS</BackLink>
+        <PageHeader title="History" track="ielts" />
+      </div>
       <BandCharts bands={bands} criteria={criteria} weeks={weeks} target={profile?.target.overall} testDate={profile?.testDate} />
 
       <section aria-labelledby="attempts-title" className="grid gap-3">
@@ -79,13 +81,13 @@ export function IeltsHistory({
           ))}
         </nav>
         {rows.length === 0 ? (
-          <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
+          <EmptyState>
             No recorded attempts here yet.{" "}
             <Link href="/ielts/speaking" className="underline underline-offset-2">
               Start a Speaking mock or drill
             </Link>
             .
-          </p>
+          </EmptyState>
         ) : (
           <ul className="grid gap-2">
             {rows.map((a) => (
@@ -112,7 +114,7 @@ export function IeltsHistory({
           Listening, Reading and Writing attempts
         </h2>
         {tests.length === 0 && writings.length === 0 ? (
-          <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">No practice attempts yet.</p>
+          <EmptyState>No practice attempts yet.</EmptyState>
         ) : (
           <ul className="grid gap-2">
             {tests.map((t) => (

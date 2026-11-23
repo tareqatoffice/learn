@@ -7,6 +7,7 @@ import type { OrderedKind, StatusKind } from "@/features/admin/service";
 import { useAdminAction } from "@/features/admin/components/useAdminAction";
 import { Button } from "@/components/ui/button";
 import type { Status } from "@/models/status";
+import { Notice } from "@/components/Notice";
 
 export function RowActions({ kind, id, status, label }: { kind: OrderedKind; id: string; status?: Status; label: string }) {
   const { run, pending, errors } = useAdminAction();
@@ -41,9 +42,9 @@ export function RowActions({ kind, id, status, label }: { kind: OrderedKind; id:
         History
       </Link>
       {error && (
-        <span role="alert" className="text-xs text-destructive">
+        <Notice as="span" className="text-xs">
           {error}
-        </span>
+        </Notice>
       )}
     </span>
   );

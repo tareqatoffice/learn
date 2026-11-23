@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CLIP_RATES, type ClipRate, type Sentence, sentenceAt } from "@/features/speaking/shadowText";
 import { clock } from "./format";
 import { ShadowText } from "./ShadowText";
+import { Notice } from "@/components/Notice";
 
 const BACK_SEC = 3;
 const LOOP_GAP_MS = 400;
@@ -231,7 +232,7 @@ export function ShadowPractice({
 
       <RatePicker rate={rate} onRate={onRate} />
       <p className="text-xs text-muted-foreground">The speed you pick is also used when you record a take.</p>
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <Notice>{error}</Notice>}
     </section>
   );
 }

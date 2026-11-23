@@ -6,7 +6,7 @@ import { useState } from "react";
 import { deleteWritingAction, saveWritingSelfAction, writingEstimateAction } from "@/app/(app)/ielts/practice-actions";
 import { ActionStatus } from "@/features/admin/components/SaveBar";
 import { useAdminAction } from "@/features/admin/components/useAdminAction";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import type { Bands, WritingView } from "@/features/ielts/writing/attempts";
 import { MIN_WORDS, taskBand, WRITING_CRITERIA, writingCriterionLabel, type WritingCriterion } from "@/features/ielts/writing/bands";
 
@@ -175,7 +175,7 @@ export function WritingReview({ view, imageUrls = [] }: { view: WritingView; ima
         <TaskReview key={i} attemptId={view.id} index={i} task={t} imageUrl={imageUrls[i] || undefined} />
       ))}
       <div className="flex flex-wrap items-center gap-3">
-        <Link href="/ielts/writing" className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted">
+        <Link href="/ielts/writing" className={buttonVariants({ variant: "outline" })}>
           Back to Writing
         </Link>
         <Button type="button" variant="outline" disabled={del.pending} onClick={() => del.run(() => deleteWritingAction(view.id), { confirm: "Delete this attempt?", refresh: false, onSuccess: () => router.push("/ielts/writing") })}>

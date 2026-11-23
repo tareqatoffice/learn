@@ -7,7 +7,7 @@ import { useState, useTransition } from "react";
 import { logStudyAction } from "@/app/(app)/ielts/actions";
 import { firstError } from "@/features/admin/result";
 import { Notice } from "@/components/Notice";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import type { TodayItem } from "@/features/ielts/progress";
 import { cn } from "@/lib/utils";
 
@@ -101,7 +101,7 @@ export function TodayList({ items }: { items: TodayItem[] }) {
               {item.href && !item.done && (
                 <Link
                   href={item.href}
-                  className="rounded-md border border-border px-3 py-1.5 text-center text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
                   Start
                 </Link>

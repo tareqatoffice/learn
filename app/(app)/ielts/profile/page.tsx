@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { DeleteIeltsDataButton, EndPlanButton } from "@/features/ielts/components/PlanActions";
 import { ProfileForm } from "@/features/ielts/components/ProfileForm";
 import { TimeZoneCookie } from "@/features/speaking/components/TimeZoneCookie";
@@ -6,9 +5,10 @@ import { getProfile, testDayStatus } from "@/features/ielts/profile";
 import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
-import { pageTitleClass } from "@/lib/ui";
 import { localDate } from "@/features/speaking/schedule";
 import { readTimeZone } from "@/features/speaking/timezone";
+import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
 
 export const metadata = buildMetadata({
   title: "IELTS profile",
@@ -26,14 +26,9 @@ export default async function IeltsProfilePage() {
   return (
     <div className="grid w-full gap-6">
       <TimeZoneCookie current={timeZone} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={pageTitleClass}>{profile ? "IELTS profile" : "Set up your IELTS plan"}</h1>
-        <Link
-          href="/ielts"
-          className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          Back to IELTS
-        </Link>
+      <div className="grid gap-3">
+        <BackLink href="/ielts">← IELTS</BackLink>
+        <PageHeader title={profile ? "IELTS profile" : "Set up your IELTS plan"} track="ielts" />
       </div>
       {profile?.status === "ended" && (
         <p className="text-sm text-muted-foreground">Your last plan has ended. Saving this starts a new one.</p>

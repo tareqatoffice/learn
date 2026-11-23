@@ -17,6 +17,7 @@ import { type ClipRate, sentenceAt, timeline } from "@/features/speaking/shadowT
 import { clock } from "./format";
 import { ShadowPractice } from "./ShadowPractice";
 import { ShadowText } from "./ShadowText";
+import { EmptyState } from "@/components/EmptyState";
 
 export type Material = { title?: string; text?: string; prompt?: string; generated: boolean };
 
@@ -303,10 +304,10 @@ export function TaskRecorder({
     return (
       <div className="grid gap-4">
         {material && <MaterialView task={task} material={material} />}
-        <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
+        <EmptyState>
           Recording storage isn&apos;t set up yet, so takes can&apos;t be saved. Ask the site admin to add the R2 storage
           settings.
-        </p>
+        </EmptyState>
       </div>
     );
   }

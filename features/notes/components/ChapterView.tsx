@@ -4,7 +4,7 @@ import { MarkReadButton } from "@/features/notes/components/NoteReader";
 import { OverlayMenu } from "@/components/OverlayMenu";
 import { Markdown } from "@/lib/markdown/Markdown";
 import { cn } from "@/lib/utils";
-import { pageTitleClass } from "@/lib/ui";
+import { PageHeader } from "@/components/PageHeader";
 
 const linkClass =
   "hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
@@ -96,28 +96,32 @@ export function ChapterView({ view }: { view: ChapterViewData }) {
       </nav>
 
       <article aria-labelledby="chapter-title" className="mt-2 min-w-0 lg:mt-0">
-        <h1 id="chapter-title" className={pageTitleClass}>
-          {view.chapter.title}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {view.chapter.readMinutes} min read
-          {view.relatedTopics.length > 0 && (
+        <PageHeader
+          titleId="chapter-title"
+          title={view.chapter.title}
+          track="notes"
+          description={
             <>
-              {" · related topics: "}
-              {view.relatedTopics.map((t, i) => (
-                <span key={`${t.graphSlug}/${t.nodeSlug}`}>
-                  {i > 0 && ", "}
-                  <Link
-                    href={`/graphs/${t.graphSlug}?topic=${encodeURIComponent(t.nodeSlug)}`}
-                    className={cn("underline", linkClass)}
-                  >
-                    {t.title}
-                  </Link>
-                </span>
-              ))}
+              {view.chapter.readMinutes} min read
+              {view.relatedTopics.length > 0 && (
+                <>
+                  {" · related topics: "}
+                  {view.relatedTopics.map((t, i) => (
+                    <span key={`${t.graphSlug}/${t.nodeSlug}`}>
+                      {i > 0 && ", "}
+                      <Link
+                        href={`/graphs/${t.graphSlug}?topic=${encodeURIComponent(t.nodeSlug)}`}
+                        className={cn("underline", linkClass)}
+                      >
+                        {t.title}
+                      </Link>
+                    </span>
+                  ))}
+                </>
+              )}
             </>
-          )}
-        </p>
+          }
+        />
 
         <div className="mt-6">
           <Markdown source={view.chapter.body} />

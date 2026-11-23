@@ -13,6 +13,7 @@ import type { MarkResult } from "@/features/progress/questions";
 import type { SessionView } from "@/features/progress/quiz";
 import type { AiGrade, AiReply, AiResult } from "@/features/progress/quizAi";
 import { cn } from "@/lib/utils";
+import { ProgressBar } from "@/components/ProgressBar";
 
 type Card = NonNullable<SessionView["current"]>;
 
@@ -188,9 +189,7 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
           {view.position + 1} / {view.total}
         </span>
       </div>
-      <div aria-hidden className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-        <div className="h-full bg-ok" style={{ width: `${(view.position / Math.max(view.total, 1)) * 100}%` }} />
-      </div>
+      <ProgressBar value={view.position} max={view.total} className="mt-2" />
 
       <h1 ref={heading} tabIndex={-1} className="mt-5 text-xl font-semibold leading-snug focus-visible:outline-none">
         <Markdown source={card.question} inline />

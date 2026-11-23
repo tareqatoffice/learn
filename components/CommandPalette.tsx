@@ -8,6 +8,7 @@ import type { SearchHit } from "@/lib/searchTypes";
 import { lockPageScroll } from "@/lib/scrollLock";
 import { SEARCH_EVENT } from "@/lib/searchBus";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const MIN_CHARS = 2;
 const DEBOUNCE_MS = 180;
@@ -179,16 +180,17 @@ export function CommandPalette() {
                   : "Nothing matched. Try fewer words."}
             </p>
             {!busy && result.failed && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => {
                   setResult({ term: "", hits: [], failed: false });
                   setRetry((n) => n + 1);
                 }}
-                className="rounded-md border border-border px-3 py-1 text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 Try again
-              </button>
+              </Button>
             )}
           </div>
         ) : null}

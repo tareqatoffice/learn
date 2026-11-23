@@ -12,6 +12,7 @@ import { choicesFor, letter, type PublicGroup, type PublicQuestion } from "@/fea
 import { rovingIndex, timeWarning } from "@/features/ielts/lib/a11y";
 import { clock } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Notice } from "@/components/Notice";
 
 const SAVE_DELAY_MS = 1200;
 const RETRY_MS = 5000;
@@ -72,9 +73,9 @@ function SectionAudio({ kind, once, attemptId, index, heard }: { kind: SectionAu
         </div>
       )}
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <Notice>
           {error}
-        </p>
+        </Notice>
       )}
     </div>
   );
@@ -232,9 +233,9 @@ export function TestRunner({ view }: { view: RunView }) {
       </div>
       <ActionStatus saved={false} errors={errors} />
       {saveError && (
-        <p role="alert" className="text-sm text-destructive">
+        <Notice>
           {saveError}
-        </p>
+        </Notice>
       )}
       {left !== null && left <= 0 && !full && <p role="status" className="text-sm text-muted-foreground">Time is up for this section. You can keep going, then submit.</p>}
 

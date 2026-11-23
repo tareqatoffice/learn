@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { WritingReview } from "@/features/ielts/components/WritingReview";
 import { WritingRunner } from "@/features/ielts/components/WritingRunner";
@@ -6,7 +5,8 @@ import { getWritingAttempt } from "@/features/ielts/writing/attempts";
 import { requireUser } from "@/features/auth/lib/authz";
 import { presignGet, storageConfigured } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";
-import { pageTitleClass } from "@/lib/ui";
+import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
 
 export async function generateMetadata({ params }: { params: Promise<{ attemptId: string }> }) {
   const { attemptId } = await params;
@@ -25,11 +25,9 @@ export default async function IeltsWritingAttemptPage({ params }: { params: Prom
   const imageUrls = storageConfigured() ? await Promise.all(view.tasks.map((t) => (t.imageKey ? presignGet(t.imageKey) : Promise.resolve("")))) : view.tasks.map(() => "");
   return (
     <div className="grid w-full gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={pageTitleClass}>{view.kind === "full" ? "Writing full test" : view.kind === "task1" ? "Writing Task 1" : "Writing Task 2"}</h1>
-        <Link href="/ielts/writing" className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-          Back to Writing
-        </Link>
+      <div className="grid gap-3">
+        <BackLink href="/ielts/writing">← Writing</BackLink>
+        <PageHeader title={view.kind === "full" ? "Writing full test" : view.kind === "task1" ? "Writing Task 1" : "Writing Task 2"} track="ielts" />
       </div>
       {view.status === "in_progress" ? <WritingRunner view={view} imageUrls={imageUrls} /> : <WritingReview view={view} imageUrls={imageUrls} />}
     </div>

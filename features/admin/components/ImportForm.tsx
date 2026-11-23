@@ -7,6 +7,7 @@ import { SubjectPicker } from "@/features/admin/components/SubjectPicker";
 import { Button } from "@/components/ui/button";
 import { FileDropzone } from "@/components/ui/FileDropzone";
 import type { ImportReport } from "@/features/content/types";
+import { Notice } from "@/components/Notice";
 
 type Kind = "book" | "series" | "graph";
 type Files = { name: string; size: number; content: string }[];
@@ -135,9 +136,9 @@ export function ImportForm({ subjectOptions }: { subjectOptions: { slug: string;
         </Button>
         {committed && <span className="text-sm text-muted-foreground">Committed. Preview again to make more changes.</span>}
         {error && (
-          <span role="alert" className="text-sm text-destructive">
+          <Notice as="span">
             {error}
-          </span>
+          </Notice>
         )}
       </div>
 

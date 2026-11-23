@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { HoursWarning } from "@/features/ielts/components/HoursWarning";
 import { PlanTimeline } from "@/features/ielts/components/PlanTimeline";
@@ -9,9 +8,10 @@ import { weekProgress } from "@/features/ielts/progress";
 import { requireUser } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { buildMetadata } from "@/lib/seo";
-import { pageTitleClass } from "@/lib/ui";
 import { localDate } from "@/features/speaking/schedule";
 import { readTimeZone } from "@/features/speaking/timezone";
+import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
 
 export const metadata = buildMetadata({
   title: "IELTS plan",
@@ -36,14 +36,9 @@ export default async function IeltsPlanPage() {
   return (
     <div className="grid w-full gap-6">
       <TimeZoneCookie current={timeZone} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className={pageTitleClass}>IELTS plan</h1>
-        <Link
-          href="/ielts"
-          className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          Back to IELTS
-        </Link>
+      <div className="grid gap-3">
+        <BackLink href="/ielts">← IELTS</BackLink>
+        <PageHeader title="IELTS plan" track="ielts" />
       </div>
       {plan.hours.short && <HoursWarning needed={plan.hours.needed} available={plan.hours.available} />}
       <PlanTimeline plan={plan} today={today} weekIndex={found?.index ?? null} progress={progress} history={history} />

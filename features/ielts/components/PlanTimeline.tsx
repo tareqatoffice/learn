@@ -3,6 +3,7 @@ import type { PlanVersionSummary, PlanView } from "@/features/ielts/profile";
 import { cn } from "@/lib/utils";
 import { RemoveAdjustmentButton } from "./PlanActions";
 import { PHASE_LABEL, SKILL_LABEL, adjustmentLabel, dateLabel, shortDate, weekMinutes } from "./format";
+import { ProgressBar } from "@/components/ProgressBar";
 
 const PHASE_TONE = { foundation: "bg-muted", skills: "bg-secondary", mocks: "bg-primary/20" } as const;
 const UPCOMING_WEEKS = 6;
@@ -20,9 +21,7 @@ function Bar({ label, done, target, note }: { label: string; done: number; targe
           {Math.round(done)} of {target} min
         </span>
       </div>
-      <div role="progressbar" aria-label={`${label} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={share} className="h-2 overflow-hidden rounded-full bg-muted">
-        <div className="progress-fill h-full rounded-full bg-ok" style={{ width: `${share}%` }} />
-      </div>
+      <ProgressBar value={share} max={100} label={`${label} progress`} className="h-2" />
       {note && <p className="text-xs text-muted-foreground">{note}</p>}
     </li>
   );

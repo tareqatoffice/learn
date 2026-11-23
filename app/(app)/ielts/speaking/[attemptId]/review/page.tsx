@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AttemptReview } from "@/features/ielts/components/AttemptReview";
 import { getAttempt } from "@/features/ielts/speaking/attempts";
@@ -9,6 +8,8 @@ import { connectDb } from "@/lib/db";
 import { storageConfigured } from "@/lib/r2";
 import { buildMetadata } from "@/lib/seo";
 import { getEffectiveSettings } from "@/features/speaking/settings";
+import { BackLink } from "@/components/BackLink";
+import { EmptyState } from "@/components/EmptyState";
 
 export async function generateMetadata({ params }: PageProps<"/ielts/speaking/[attemptId]/review">): Promise<Metadata> {
   const { attemptId } = await params;
@@ -25,17 +26,15 @@ export default async function IeltsReviewPage({ params }: PageProps<"/ielts/spea
   await connectDb();
 
   const back = (
-    <Link href="/ielts/speaking" className="text-sm text-muted-foreground hover:underline">
-      ← Speaking practice
-    </Link>
+    <BackLink href="/ielts/speaking">← Speaking practice</BackLink>
   );
   if (!storageConfigured()) {
     return (
       <div className="grid w-full gap-4">
         {back}
-        <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
+        <EmptyState>
           Recording storage isn&apos;t set up yet, so recordings can&apos;t be played.
-        </p>
+        </EmptyState>
       </div>
     );
   }

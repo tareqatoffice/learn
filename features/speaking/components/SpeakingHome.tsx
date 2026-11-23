@@ -8,6 +8,7 @@ import { type TodayTask, TodayTasks } from "@/features/speaking/components/Today
 import { WeekStrip } from "@/features/speaking/components/WeekStrip";
 import { lessonHasPart } from "@/features/speaking/lessons";
 import { TASKS } from "@/features/speaking/tasks";
+import { EmptyState } from "@/components/EmptyState";
 
 type Today = Awaited<ReturnType<typeof import("@/features/speaking/progress").getToday>>;
 type LessonListItem = { id: string; title: string };
@@ -55,10 +56,10 @@ export function SpeakingHome({
       />
 
       {!today.storage && (
-        <p role="status" className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+        <EmptyState role="status" className="p-4">
           Recording storage isn&apos;t set up yet, so takes can&apos;t be saved. Ask the site admin to add the R2 storage
           settings.
-        </p>
+        </EmptyState>
       )}
 
       <Panel

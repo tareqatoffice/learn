@@ -3,9 +3,11 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { mins } from "@/features/speaking/components/format";
 import { type Material, TaskRecorder } from "@/features/speaking/components/TaskRecorder";
 import { TimeZoneCookie } from "@/features/speaking/components/TimeZoneCookie";
-import { pageTitleClass } from "@/lib/ui";
 import type { TaskKey } from "@/features/speaking/tasks";
 import { TASK_LABEL, TASK_SLUG } from "@/features/speaking/tasks";
+import { BackLink } from "@/components/BackLink";
+import { PageHeader } from "@/components/PageHeader";
+import { EmptyState } from "@/components/EmptyState";
 
 const HINT = {
   shadowing: "Practise the clip, then record a take: speak along with it as it plays. One pass of the clip is one take.",
@@ -49,12 +51,9 @@ export function SpeakingTask({
   return (
     <div className="grid w-full gap-6">
       <TimeZoneCookie current={timeZone} />
-      <div>
-        <Link href="/speaking" className="text-sm text-muted-foreground hover:underline">
-          ← Speaking practice
-        </Link>
-        <h1 className={pageTitleClass}>{TASK_LABEL[task]}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{HINT[task]}</p>
+      <div className="grid gap-3">
+        <BackLink href="/speaking">← Speaking practice</BackLink>
+        <PageHeader title={TASK_LABEL[task]} track="speaking" description={HINT[task]} />
       </div>
 
       <div className="grid gap-1.5">
@@ -68,7 +67,7 @@ export function SpeakingTask({
       </div>
 
       {task === "shadowing" && (!lessonId || !sourceAudioUrl) ? (
-        <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
+        <EmptyState>
           {lessonId
             ? "Recording storage isn't set up yet, so the lesson clip can't be played."
             : "Today's lesson has no shadowing audio."}{" "}
@@ -76,7 +75,7 @@ export function SpeakingTask({
             Change lesson
           </Link>{" "}
           or try another task.
-        </p>
+        </EmptyState>
       ) : (
         <TaskRecorder
           key={`${TASK_SLUG[task]}-${lessonId ?? "none"}`}
