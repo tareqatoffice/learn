@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import type { AttemptSummary } from "@/features/ielts/speaking/attempts";
 import type { Kind } from "@/features/ielts/speaking/questions";
 import { cn } from "@/lib/utils";
-import { cardClass, cardRowLinkClass } from "@/components/Card";
+import { cardClass } from "@/components/Card";
+import { cardRowLinkClass } from "@/features/ielts/lib/ui";
 
 export type HubOption = { kind: Kind; title: string; blurb: string; exhausted: boolean; missing: boolean };
 

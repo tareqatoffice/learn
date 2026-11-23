@@ -62,9 +62,9 @@ export function CodingGroup({ slug, specs, initial }: { slug: string; specs: Gro
         <PageHeader
           title={group.title}
           track="coding"
-          description={specs.intro}
-          actions={<Badge variant={group.level === "Advanced" ? "primary" : "muted"}>{group.level}</Badge>}
+          titleAside={<Badge variant={group.level === "Advanced" ? "primary" : "muted"}>{group.level}</Badge>}
         />
+        {specs.intro && <p className="text-muted-foreground">{specs.intro}</p>}
         <p>
           <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs break-all">
             {group.file ?? `coding/problems/${group.slug}/${group.slug}.ts`}

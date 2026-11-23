@@ -6,7 +6,7 @@ import type { Status } from "@/models/status";
 import { Notice } from "@/components/Notice";
 
 export function Field({ label, error, group, children }: { label: string; error?: string; group?: boolean; children: ReactNode }) {
-  const message = error && <Notice as="span">{error}</Notice>;
+  const message = error && <Notice as="span" alert={false}>{error}</Notice>;
   if (group) {
     return (
       <div className="grid gap-1">

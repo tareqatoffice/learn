@@ -13,9 +13,3 @@ export function Card<T extends CardTag = "div">({
   const Tag = (as ?? "div") as React.ElementType;
   return <Tag className={cn(cardClass, className)} {...props} />;
 }
-
-/** Card-styled link row for lists of past attempts or items. */
-export const cardRowLinkClass = cn(
-  cardClass,
-  "flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-);

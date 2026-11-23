@@ -6,7 +6,7 @@ import type { AttemptSummary } from "@/features/ielts/speaking/attempts";
 import { BackLink } from "@/components/BackLink";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
-import { cardRowLinkClass } from "@/components/Card";
+import { cardRowLinkClass } from "@/features/ielts/lib/ui";
 
 const FILTERS = [
   { key: "all", label: "All" },

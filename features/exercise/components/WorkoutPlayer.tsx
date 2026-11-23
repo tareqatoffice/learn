@@ -198,7 +198,7 @@ export function WorkoutPlayer({
         <p className="text-sm text-muted-foreground">
           {cap(plan.focus)} · {player.item + 1} of {total}
         </p>
-        <ProgressBar value={setsBefore} max={setsTotal} color="var(--t-6)" label="Workout progress" />
+        <ProgressBar value={setsBefore} max={setsTotal} color="var(--t-6)" label="Workout progress" animate={false} />
       </div>
       <ExerciseFrames exercise={exercise} size="lg" />
       <div className="grid gap-1">

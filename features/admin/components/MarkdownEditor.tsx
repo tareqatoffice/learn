@@ -36,7 +36,7 @@ export function MarkdownEditor({
           {value.trim() ? <Markdown source={value} /> : <p className="text-muted-foreground">Preview</p>}
         </div>
       </div>
-      {error && <Notice>{error}</Notice>}
+      {error && <Notice alert={false}>{error}</Notice>}
     </div>
   );
 }
