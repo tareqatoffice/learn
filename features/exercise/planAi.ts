@@ -1,4 +1,5 @@
 import { getAiConfig, modelChain } from "@/features/ai/lib/aiSettings";
+import { systemPrompt } from "@/features/ai/lib/prompts";
 import { chatCompletion, extractJson } from "@/features/ai/lib/openrouter";
 import { metered } from "@/features/progress/quizAi";
 import type { Feel } from "@/models/exerciseConstants";
@@ -61,14 +62,8 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
-const SYSTEM = [
-  "You plan one week of bodyweight workouts.",
-  "For each listed day choose exercises only from that day's allowed list.",
-  "Use the given number of slots (one fewer or one more is tolerated), stay close to the target sets, reps or seconds and rest,",
-  "and keep the total time within the day's minutes. Use reps for reps-mode exercises and seconds for time-mode ones.",
-  'Reply with JSON only: {"days":[{"date","items":[{"exerciseId","sets","reps" or "seconds","restSec"}]}],"coachNote"}.',
-  "coachNote is one or two short, encouraging sentences.",
-].join(" ");
+const PLAN_FORMAT =
+  'Reply with JSON only: {"days":[{"date","items":[{"exerciseId","sets","reps" or "seconds","restSec"}]}],"coachNote"}.';
 
 function buildPrompt(input: FillWeekInput): string {
   const days = input.skeleton.map((d) => {
@@ -99,12 +94,12 @@ export async function fillWeek(input: FillWeekInput): Promise<FillWeekResult> {
   if (!skeleton.length) return { days: [], source: "code", coachNote: note };
 
   try {
-    const { settings, apiKey } = await getAiConfig();
+    const { settings, apiKey, prompts } = await getAiConfig();
     if (!settings.active) return byCode();
     const { text } = await metered(userId, settings, () =>
       chatCompletion(
         [
-          { role: "system", content: SYSTEM },
+          { role: "system", content: systemPrompt(prompts.exercisePlan, PLAN_FORMAT) },
           { role: "user", content: buildPrompt(input) },
         ],
         {

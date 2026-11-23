@@ -36,6 +36,7 @@ export const ADMIN_NAV: AdminSectionGroup[] = [
     links: [
       { href: "/admin/ai", label: "AI coach", description: "OpenRouter key, models and limits for the quiz coach." },
       { href: "/admin/ielts/settings", label: "IELTS settings", description: "Hours-per-band guide, plan phases and suggestion thresholds." },
+      { href: "/admin/settings", label: "General settings", description: "Focus timer presets and the weekly workout rotation." },
     ],
   },
 ];

@@ -4,7 +4,15 @@ import { z } from "zod";
 import { adminContext } from "@/features/admin/action";
 import { type ActionResult, ok } from "@/features/admin/result";
 import { MODEL_ID_MAX, MODEL_ID_PATTERN } from "@/features/ai/lib/ai-limits";
-import { type AiSettingsInput, clearAiKey, getAiConfig, saveAiKey, saveAiSettings } from "@/features/ai/lib/aiSettings";
+import {
+  type AiSettingsInput,
+  clearAiKey,
+  getAiConfig,
+  resetPrompt,
+  saveAiKey,
+  saveAiSettings,
+  savePrompt,
+} from "@/features/ai/lib/aiSettings";
 import { type KeyCheck, type ModelCheck, checkModels } from "@/features/ai/lib/openrouter";
 
 export async function saveAiSettingsAction(input: AiSettingsInput): Promise<ActionResult> {
@@ -23,6 +31,16 @@ export async function clearAiKeyAction(): Promise<ActionResult> {
   const user = await adminContext();
   await clearAiKey(user.userId);
   return ok();
+}
+
+export async function savePromptAction(key: string, text: string): Promise<ActionResult> {
+  const user = await adminContext();
+  return savePrompt(String(key), typeof text === "string" ? text : "", user.userId);
+}
+
+export async function resetPromptAction(key: string): Promise<ActionResult> {
+  const user = await adminContext();
+  return resetPrompt(String(key), user.userId);
 }
 
 export async function testAiModelsAction(models: string[]): Promise<ModelCheck[]> {

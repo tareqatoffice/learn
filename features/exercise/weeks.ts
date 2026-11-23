@@ -1,3 +1,4 @@
+import { getAppSettings } from "@/lib/appSettings";
 import { connectDb, retryOnDuplicateKey } from "@/lib/db";
 import { ExercisePlanWeek, WorkoutSession } from "@/models";
 import { addDays } from "@/features/speaking/schedule";
@@ -61,7 +62,8 @@ export async function ensureWeek(userId: string, today: string, fetchFn?: typeof
   const { finishedRatio, lastWeek } = await lastWeekOf(userId, profile, weekStart);
   const direction =
     profile.goalWeightKg < profile.startWeightKg ? "lose" : profile.goalWeightKg > profile.startWeightKg ? "gain" : "keep";
-  const skeleton = skeletonWeek({ ...profile, direction }, weekStart, { finishedRatio });
+  const { exerciseRotation: rotation } = await getAppSettings();
+  const skeleton = skeletonWeek({ ...profile, direction, rotation }, weekStart, { finishedRatio });
   const filled = await fillWeek({
     userId,
     skeleton,

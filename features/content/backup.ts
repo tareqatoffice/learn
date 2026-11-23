@@ -6,6 +6,7 @@ import mongoose, { type Model } from "mongoose";
 import {
   AiConversation,
   AiSettings,
+  AppSettings,
   AiUsage,
   CodingResult,
   ExercisePlanWeek,
@@ -64,6 +65,7 @@ export const CONTENT_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["speakingsettings", SpeakingSettings],
   ["ieltsspeakingitems", IeltsSpeakingItem],
   ["ieltssettings", IeltsSettings],
+  ["appsettings", AppSettings],
   ["ieltsreadingtests", IeltsReadingTest],
   ["ieltslisteningtests", IeltsListeningTest],
   ["ieltswritingprompts", IeltsWritingPrompt],
