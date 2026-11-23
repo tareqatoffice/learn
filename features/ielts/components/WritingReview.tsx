@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -33,8 +34,14 @@ function TaskReview({ attemptId, index, task, imageUrl }: { attemptId: string; i
         <summary className="cursor-pointer font-medium">The task</summary>
         <p className="mt-2 whitespace-pre-wrap">{task.brief}</p>
         {imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element -- a presigned R2 link; next/image would need a remote pattern
-          <img src={imageUrl} alt={task.imageAlt || "Chart for Task 1"} className="mt-2 max-w-full rounded border border-border" />
+          <Image
+            src={imageUrl}
+            alt={task.imageAlt || "Chart for Task 1"}
+            width={800}
+            height={600}
+            unoptimized
+            className="mt-2 h-auto w-auto max-w-full rounded border border-border"
+          />
         )}
       </details>
       <details className="rounded-md border border-border p-3 text-sm">

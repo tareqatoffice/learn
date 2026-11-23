@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: STATIC_SECURITY_HEADERS }];
   },
+  images: {
+  },
   outputFileTracingIncludes: {
     "/coding/[slug]": ["./features/coding/problems/**/*.ts", "./features/coding/problems/**/*.tsx"],
   },
