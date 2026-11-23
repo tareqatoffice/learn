@@ -22,7 +22,7 @@ export default async function AppLayout({
       <TopBar
         user={{ name: user.name, image: user.image, isAdmin: user.isAdmin }}
       />
-      <main id="main" tabIndex={-1} className={cn(containerClass, "min-w-0 flex-1 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))] focus:outline-none md:pb-6")}>{children}</main>
+      <main id="main" tabIndex={-1} className={cn(containerClass, "min-w-0 flex-1 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))] focus:outline-none lg:pb-6")}>{children}</main>
       <BottomNav />
       <FocusButton />
       <CommandPalette />

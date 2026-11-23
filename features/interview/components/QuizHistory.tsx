@@ -26,9 +26,9 @@ export function QuizHistory({
           description="Your answers, the reference answers and the coach's feedback. Download them as Markdown and ask another AI what you are missing."
           actions={
             sessions.length > 0 ? (
-              <a href="/interview/history/export" download className={buttonVariants()}>
+              <Link href="/interview/history/export" download prefetch={false} className={buttonVariants()}>
                 Download all (.md)
-              </a>
+              </Link>
             ) : undefined
           }
         />
@@ -63,13 +63,13 @@ export function QuizHistory({
                   <Link href={`/interview/history/${s.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
                     View
                   </Link>
-                  <a
+                  <Link
                     href={`/interview/history/export?session=${s.id}`}
-                    download
+                    download prefetch={false}
                     className={buttonVariants({ variant: "outline", size: "sm" })}
                   >
                     .md
-                  </a>
+                  </Link>
                 </span>
               </li>
             ))}

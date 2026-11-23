@@ -23,8 +23,7 @@ export type ImportOptions = {
   importedAt?: Date;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyModel = Model<any>;
+type AnyModel = Model<Data>;
 type Data = Record<string, unknown>;
 type Row = Data & { _id: Types.ObjectId };
 type Entry = Data & { key: string };

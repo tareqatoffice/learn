@@ -2,7 +2,8 @@ import mongoose from "mongoose";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectDb } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
-import { allowedFor } from "@/features/exercise/library";
+import { allowedFor } from "@/features/exercise/catalog";
+import { EXERCISES } from "./fixtures";
 import { fillDay, type SkeletonDay } from "@/features/exercise/plan";
 import { codeNote, fillWeek } from "@/features/exercise/planAi";
 import { saveAiSettings } from "@/features/ai/lib/aiSettings";
@@ -22,13 +23,13 @@ const day = (date: string): SkeletonDay => ({
   seconds: 30,
 });
 const skeleton = [day("2026-11-23"), day("2026-11-25")];
-const ids = allowedFor("full", 2)
+const ids = allowedFor(EXERCISES, "full", 2)
   .filter((e) => e.mode === "reps")
   .slice(0, 3)
   .map((e) => e.id);
 const goodItems = ids.map((exerciseId) => ({ exerciseId, sets: 2, reps: 10, restSec: 30 }));
 const reply = (content: string) => new Response(JSON.stringify({ choices: [{ message: { content } }] }));
-const base = (userId: string) => ({ userId, skeleton, weekIdx: 0, profileSummary: "beginner", lastWeek: [] });
+const base = (userId: string) => ({ userId, skeleton, weekIdx: 0, profileSummary: "beginner", lastWeek: [], exercises: EXERCISES });
 
 describe("fillWeek", () => {
   beforeAll(async () => {
@@ -84,14 +85,14 @@ describe("fillWeek", () => {
     expect(out.source).toBe("ai");
     expect(out.coachNote).toBe("Nice work.");
     expect(out.days[0].items).toEqual(goodItems);
-    expect(out.days[1]).toEqual(fillDay(skeleton[1], user + skeleton[1].date));
+    expect(out.days[1]).toEqual(fillDay(skeleton[1], user + skeleton[1].date, EXERCISES));
   });
 
   it("falls back when the reply is not JSON", async () => {
     const user = newUserId();
     const out = await fillWeek({ ...base(user), fetch: async () => reply("sorry, no") });
     expect(out.source).toBe("code");
-    expect(out.days[0]).toEqual(fillDay(skeleton[0], user + skeleton[0].date));
+    expect(out.days[0]).toEqual(fillDay(skeleton[0], user + skeleton[0].date, EXERCISES));
   });
 
   it("falls back when fetch rejects", async () => {

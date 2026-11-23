@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { deleteWritingAction, saveWritingTextAction, submitWritingAction } from "@/app/(app)/ielts/practice-actions";
@@ -167,8 +168,14 @@ export function WritingRunner({ view, imageUrls }: { view: WritingView; imageUrl
           <h2 className="font-medium">{task.title}</h2>
           <p className="whitespace-pre-wrap">{task.brief}</p>
           {imageUrls[active] && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrls[active]} alt={task.imageAlt || "Chart for Task 1"} className="max-w-full rounded border border-border" />
+            <Image
+              src={imageUrls[active]}
+              alt={task.imageAlt || "Chart for Task 1"}
+              width={800}
+              height={600}
+              unoptimized
+              className="h-auto w-auto max-w-full rounded border border-border"
+            />
           )}
         </article>
         <div className="grid content-start gap-2">

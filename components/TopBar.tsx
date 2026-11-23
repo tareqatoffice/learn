@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { signOutAction } from '@/app/actions';
 import { AppHeader } from '@/components/AppHeader';
 import { ADMIN_ITEM, isActivePath, NAV_ITEMS, PROFILE_ITEM } from '@/components/nav';
@@ -149,10 +150,11 @@ export function TopBar({ user }: { user: TopBarUser }) {
 						)}
 					>
 						{user.image ? (
-							// eslint-disable-next-line @next/next/no-img-element -- Google avatar host; next/image would need a remote pattern
-							<img
+							<Image
 								src={user.image}
 								alt=""
+								width={40}
+								height={40}
 								referrerPolicy="no-referrer"
 								className="size-full object-cover"
 							/>

@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectDb } from "@/lib/db";
-import { ExercisePlanWeek, ExerciseProfile, WorkoutSession } from "@/models";
-import { exerciseById } from "@/features/exercise/library";
+import { Exercise, ExercisePlanWeek, ExerciseProfile, WorkoutSession } from "@/models";
+import { EXERCISE_MAP, seedExercises } from "./fixtures";
 import { finishIfDone, saveProfile } from "@/features/exercise/profile";
 import { dayPlan, ensureWeek } from "@/features/exercise/weeks";
 import { localDate } from "@/features/speaking/schedule";
@@ -26,11 +26,22 @@ describe("ensureWeek", () => {
     await connectDb();
     await Promise.all([ExerciseProfile.init(), ExercisePlanWeek.init()]);
   });
-  beforeEach(resetDb);
+  beforeEach(async () => {
+    await resetDb();
+    await seedExercises();
+  });
   afterAll(() => mongoose.disconnect());
 
   it("returns null without an active profile", async () => {
     expect(await ensureWeek(newUserId(), "2026-11-02")).toBeNull();
+  });
+
+  it("stores no week while the exercise library is empty", async () => {
+    const userId = newUserId();
+    await saveProfile(userId, profile, "2026-11-02");
+    await Exercise.deleteMany({});
+    expect(await ensureWeek(userId, "2026-11-04")).toBeNull();
+    expect(await ExercisePlanWeek.countDocuments({ userId })).toBe(0);
   });
 
   it("ensureWeek creates the current week once", async () => {
@@ -94,7 +105,7 @@ describe("ensureWeek", () => {
       await WorkoutSession.create({ userId, profileId: saved.id, date, status: "done", items: [], startedAt: new Date() });
     }
     const week = await ensureWeek(userId, "2026-11-30");
-    const levels = (week?.days ?? []).flatMap((d) => d.items.map((i) => exerciseById(i.exerciseId)?.difficulty ?? 0));
+    const levels = (week?.days ?? []).flatMap((d) => d.items.map((i) => EXERCISE_MAP[i.exerciseId]?.difficulty ?? 0));
     expect(Math.max(...levels)).toBe(2); // beginner (1) bumped to 2 by a >= 0.8 ratio
   });
 });

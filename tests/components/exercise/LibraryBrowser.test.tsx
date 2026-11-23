@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
 
 import { LibraryBrowser } from "@/features/exercise/components/LibraryBrowser";
-import { EXERCISES } from "@/features/exercise/library";
+import { EXERCISES } from "../../exercise/fixtures";
 
 afterEach(() => {
   cleanup();
@@ -15,7 +15,7 @@ const names = () => screen.queryAllByRole("heading", { level: 2 }).map((h) => h.
 
 describe("LibraryBrowser", () => {
   it("filters by focus and difficulty", () => {
-    render(<LibraryBrowser />);
+    render(<LibraryBrowser exercises={EXERCISES} />);
     fireEvent.click(screen.getByRole("button", { name: "Core" }));
     fireEvent.click(screen.getByRole("button", { name: "Hard" }));
     const expected = EXERCISES.filter((e) => e.focus.includes("core") && e.difficulty === 3).map((e) => e.name);
@@ -28,7 +28,7 @@ describe("LibraryBrowser", () => {
   });
 
   it("search matches name case-insensitively", () => {
-    render(<LibraryBrowser />);
+    render(<LibraryBrowser exercises={EXERCISES} />);
     fireEvent.change(screen.getByLabelText("Search exercises"), { target: { value: "PLANK" } });
     const expected = EXERCISES.filter((e) => e.name.toLowerCase().includes("plank")).map((e) => e.name);
     expect(expected).toContain("Plank");
@@ -36,7 +36,7 @@ describe("LibraryBrowser", () => {
   });
 
   it("shows the empty message when nothing matches", () => {
-    render(<LibraryBrowser />);
+    render(<LibraryBrowser exercises={EXERCISES} />);
     fireEvent.change(screen.getByLabelText("Search exercises"), { target: { value: "zzzz" } });
     expect(screen.getByText("No exercises match these filters.")).toBeTruthy();
   });

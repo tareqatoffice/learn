@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import type { Feel } from "@/models/exerciseConstants";
 import { formatTarget } from "../lib/format";
 import { usePlayer, type PlayerStart, type SetSave } from "../lib/usePlayer";
-import { exerciseById } from "../library";
+import type { ExerciseMap } from "../catalog";
 import type { PlanDay } from "../plan";
 import { ExerciseFrames } from "./ExerciseFrames";
 import { RestScreen } from "./RestScreen";
@@ -57,10 +57,13 @@ function useWakeLock(active: boolean) {
 }
 
 export function WorkoutPlayer({
+  exercises,
   date,
   plan,
   start,
 }: {
+  /** The moves this plan names, by id. */
+  exercises: ExerciseMap;
   date: string;
   plan: PlanDay;
   /** The first set still to do; an item index past the end opens the summary. */
@@ -140,9 +143,10 @@ export function WorkoutPlayer({
     }
     const skipped = plan.items.flatMap((it, i) => (player.skipped[i] ? [it.exerciseId] : []));
     return finished ? (
-      <WorkoutSummary plan={plan} feels={feels} skipped={skipped} />
+      <WorkoutSummary exercises={exercises} plan={plan} feels={feels} skipped={skipped} />
     ) : (
       <WorkoutSummary
+        exercises={exercises}
         plan={plan}
         feels={feels}
         skipped={skipped}
@@ -156,7 +160,7 @@ export function WorkoutPlayer({
 
   const total = plan.items.length;
   const item = plan.items[player.item];
-  const exercise = exerciseById(item.exerciseId);
+  const exercise = exercises[item.exerciseId];
   if (!exercise) {
     return (
       <div className="grid gap-4 text-center">

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { clearAiKeyAction, saveAiKeyAction } from "@/app/(app)/admin/ai/actions";
 import { ActionStatus, inputClass } from "@/features/admin/components/SaveBar";
@@ -59,9 +60,9 @@ export function AiKeyForm({
     ) : (
       <>
         <strong>No key yet.</strong> Create one at{" "}
-        <a href="https://openrouter.ai/keys" className="underline" target="_blank" rel="noreferrer">
+        <Link href="https://openrouter.ai/keys" className="underline" target="_blank" rel="noreferrer">
           openrouter.ai/keys
-        </a>{" "}
+        </Link>{" "}
         (a free account works with free models). The coach stays off until a key is set.
       </>
     );

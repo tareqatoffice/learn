@@ -1,4 +1,5 @@
 import { Search } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import type { AdminUserRow } from "@/features/admin/queries";
 import { UserAccessActions, UserAccessFlash } from "@/features/admin/components/UserAccessActions";
@@ -50,8 +51,7 @@ function UserRow({ user: u }: { user: AdminUserRow }) {
           className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted text-sm font-semibold"
         >
           {u.image ? (
-            // eslint-disable-next-line @next/next/no-img-element -- Google avatar host; next/image would need a remote pattern
-            <img src={u.image} alt="" referrerPolicy="no-referrer" className="size-full object-cover" />
+            <Image src={u.image} alt="" width={36} height={36} referrerPolicy="no-referrer" className="size-full object-cover" />
           ) : (
             (u.name || u.email).trim()[0]?.toUpperCase()
           )}

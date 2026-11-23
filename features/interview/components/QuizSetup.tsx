@@ -33,6 +33,7 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const toggle = toggleItem<string>;
+type DeckQuery = Parameters<typeof countDeckAction>[0];
 
 export function QuizSetup({ books }: { books: SetupBook[] }) {
   const [bookIds, setBookIds] = useState<string[]>([]);
@@ -45,16 +46,17 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
 
   const single = bookIds.length === 1 ? books.find((b) => b.id === bookIds[0]) : undefined;
   const [count, setCount] = useState<{ key: string; n: number } | null>(null);
-  const key = JSON.stringify([bookIds, single ? partKeys : [], mode, size]);
+  const query: DeckQuery = { bookIds, partKeys: single ? partKeys : [], mode, size };
+  // The query's value, not its identity, decides when to recount.
+  const key = JSON.stringify(query);
   useEffect(() => {
     let live = true;
-    countDeckAction({ bookIds, partKeys: single ? partKeys : [], mode, size })
+    countDeckAction(JSON.parse(key) as DeckQuery)
       .then((n) => live && setCount({ key, n }))
       .catch(() => live && setCount(null));
     return () => {
       live = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   const known = count?.key === key ? count.n : null;
   const label = known !== null ? `${known} question${known === 1 ? "" : "s"}` : size ? `${size} questions` : "all questions";

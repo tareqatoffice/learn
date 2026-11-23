@@ -7,3 +7,11 @@ export type Sex = (typeof SEXES)[number];
 export type Level = (typeof LEVELS)[number];
 export type Focus = (typeof FOCUSES)[number];
 export type Feel = (typeof FEELS)[number];
+
+export const EXERCISE_TYPES = ["strength", "cardio", "hiit", "stretch"] as const;
+export const EXERCISE_MODES = ["reps", "time"] as const;
+export const DIFFICULTIES = [1, 2, 3] as const;
+
+export type ExerciseType = (typeof EXERCISE_TYPES)[number];
+export type ExerciseMode = (typeof EXERCISE_MODES)[number];
+export type Difficulty = (typeof DIFFICULTIES)[number];

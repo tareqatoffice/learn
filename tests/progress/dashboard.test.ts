@@ -13,10 +13,14 @@ import { openNote, setNoteRead } from "@/features/progress/notes";
 import { markQuestion } from "@/features/progress/questions";
 import { createSession, recordResult } from "@/features/progress/quiz";
 import { resetDb } from "../setup/mongo";
+import { seedExercises } from "../exercise/fixtures";
 import { newUserId, seedBook, seedGraph, seedNode, seedNote, seedQuestions, seedSeries } from "./seed";
 
 beforeAll(connectDb);
-beforeEach(resetDb);
+beforeEach(async () => {
+  await resetDb();
+  await seedExercises();
+});
 afterAll(() => mongoose.disconnect());
 
 const zero = () => 0;

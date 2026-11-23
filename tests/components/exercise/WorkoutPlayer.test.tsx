@@ -3,23 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const saveSet = vi.hoisted(() => vi.fn());
 const finish = vi.hoisted(() => vi.fn());
-const lib = vi.hoisted(() => ({ nullFrames: false }));
+const lib = { nullFrames: false };
 vi.mock("@/app/(app)/exercise/actions", () => ({ saveSetAction: saveSet, finishSessionAction: finish }));
-vi.mock("@/features/exercise/library", async (orig) => {
-  const real = await orig<typeof import("@/features/exercise/library")>();
-  return {
-    ...real,
-    exerciseById: (id: string) => {
-      const e = real.exerciseById(id);
-      return e && lib.nullFrames ? { ...e, frames: null } : e;
-    },
-  };
-});
 
 import { WorkoutPlayer } from "@/features/exercise/components/WorkoutPlayer";
-import { EXERCISES } from "@/features/exercise/library";
+import { EXERCISE_MAP, EXERCISES } from "../../exercise/fixtures";
 import type { PlanDay } from "@/features/exercise/plan";
 
+const withPhotos = Object.fromEntries(
+  EXERCISES.map((e) => [e.id, { ...e, photos: [`/media/exercise/${e.id}/0.jpg`, `/media/exercise/${e.id}/1.jpg`] }]),
+);
+const exercises = () =>
+  lib.nullFrames ? Object.fromEntries(Object.entries(EXERCISE_MAP).map(([id, e]) => [id, { ...e, photos: [] }])) : withPhotos;
 const reps = EXERCISES.filter((e) => e.mode === "reps");
 const timed = EXERCISES.find((e) => e.mode === "time")!;
 const plan: PlanDay = {
@@ -48,14 +43,14 @@ afterEach(() => {
 
 describe("WorkoutPlayer", () => {
   it("starts at the resume point", () => {
-    render(<WorkoutPlayer date={plan.date} plan={plan} start={{ item: 1, set: 1 }} />);
+    render(<WorkoutPlayer exercises={exercises()} date={plan.date} plan={plan} start={{ item: 1, set: 1 }} />);
     expect(screen.getByRole("heading", { name: reps[1].name })).toBeTruthy();
     expect(screen.getByText("Set 2 of 3")).toBeTruthy();
     expect(screen.getByText("Full · 2 of 3")).toBeTruthy();
   });
 
   it("timed item counts down and moves to rest at 0", () => {
-    render(<WorkoutPlayer date={plan.date} plan={plan} start={{ item: 2, set: 0 }} />);
+    render(<WorkoutPlayer exercises={exercises()} date={plan.date} plan={plan} start={{ item: 2, set: 0 }} />);
     expect(screen.getByText("0:30")).toBeTruthy();
     act(() => {
       vi.advanceTimersByTime(5000);
@@ -70,13 +65,13 @@ describe("WorkoutPlayer", () => {
 
   it("shows the placeholder when frames are null", () => {
     lib.nullFrames = true;
-    render(<WorkoutPlayer date={plan.date} plan={plan} start={{ item: 0, set: 0 }} />);
+    render(<WorkoutPlayer exercises={exercises()} date={plan.date} plan={plan} start={{ item: 0, set: 0 }} />);
     const img = screen.getAllByRole("img")[0] as HTMLImageElement;
     expect(img.getAttribute("src")).toMatch(/placeholder\.svg$/);
   });
 
   it("calls saveSetAction on Done set", () => {
-    render(<WorkoutPlayer date={plan.date} plan={plan} start={{ item: 0, set: 0 }} />);
+    render(<WorkoutPlayer exercises={exercises()} date={plan.date} plan={plan} start={{ item: 0, set: 0 }} />);
     fireEvent.click(screen.getByRole("button", { name: "Done set" }));
     expect(saveSet).toHaveBeenCalledWith(plan.date, 0, "done");
     expect(screen.getByText("Rest")).toBeTruthy();
@@ -85,7 +80,7 @@ describe("WorkoutPlayer", () => {
 
   it("retries a failed save once", async () => {
     saveSet.mockRejectedValueOnce(new Error("offline"));
-    render(<WorkoutPlayer date={plan.date} plan={plan} start={{ item: 0, set: 0 }} />);
+    render(<WorkoutPlayer exercises={exercises()} date={plan.date} plan={plan} start={{ item: 0, set: 0 }} />);
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Done set" }));
     });
@@ -93,7 +88,7 @@ describe("WorkoutPlayer", () => {
   });
 
   it("finishes with feels from the summary", async () => {
-    render(<WorkoutPlayer date={plan.date} plan={plan} start={{ item: 3, set: 0 }} />);
+    render(<WorkoutPlayer exercises={exercises()} date={plan.date} plan={plan} start={{ item: 3, set: 0 }} />);
     fireEvent.click(screen.getAllByRole("button", { name: "Hard" })[0]);
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Finish workout" }));
@@ -106,7 +101,7 @@ describe("WorkoutPlayer", () => {
     saveSet
       .mockImplementationOnce(() => new Promise((_, reject) => (failFirst = reject)))
       .mockResolvedValue({});
-    render(<WorkoutPlayer date={plan.date} plan={plan} start={{ item: 0, set: 0 }} />);
+    render(<WorkoutPlayer exercises={exercises()} date={plan.date} plan={plan} start={{ item: 0, set: 0 }} />);
     fireEvent.click(screen.getByRole("button", { name: "Done set" }));
     fireEvent.click(screen.getByRole("button", { name: "Skip rest" }));
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
@@ -122,7 +117,7 @@ describe("WorkoutPlayer", () => {
   });
 
   it("shows the skipped notice, with no rating, when every exercise was skipped", () => {
-    render(<WorkoutPlayer date={plan.date} plan={plan} start={{ item: 3, set: 0, items: plan.items.map(() => ({ setsDone: 0, skipped: true })) }} />);
+    render(<WorkoutPlayer exercises={exercises()} date={plan.date} plan={plan} start={{ item: 3, set: 0, items: plan.items.map(() => ({ setsDone: 0, skipped: true })) }} />);
     expect(screen.getByText("Workout skipped — it doesn't count toward your streak.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Finish workout" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Easy" })).toBeNull();
@@ -131,7 +126,7 @@ describe("WorkoutPlayer", () => {
 
   it("offers Skip when the exercise is missing from the library", () => {
     const broken: PlanDay = { ...plan, items: [{ exerciseId: "gone", sets: 2, reps: 8, restSec: 20 }, plan.items[1]] };
-    render(<WorkoutPlayer date={plan.date} plan={broken} start={{ item: 0, set: 0 }} />);
+    render(<WorkoutPlayer exercises={exercises()} date={plan.date} plan={broken} start={{ item: 0, set: 0 }} />);
     expect(screen.getByText("This exercise is no longer available.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
     expect(saveSet).toHaveBeenCalledWith(plan.date, 0, "skip");
@@ -139,7 +134,7 @@ describe("WorkoutPlayer", () => {
   });
 
   it("announces phase changes politely and moves focus to the main action", () => {
-    render(<WorkoutPlayer date={plan.date} plan={plan} start={{ item: 0, set: 0 }} />);
+    render(<WorkoutPlayer exercises={exercises()} date={plan.date} plan={plan} start={{ item: 0, set: 0 }} />);
     const status = screen.getByRole("status");
     expect(status.getAttribute("aria-live")).toBe("polite");
     expect(status.textContent).toBe(`${reps[0].name}, set 1 of 3`);
@@ -155,7 +150,7 @@ describe("WorkoutPlayer", () => {
     const release = vi.fn(() => Promise.resolve());
     const request = vi.fn(() => Promise.resolve({ release, released: false }));
     Object.defineProperty(navigator, "wakeLock", { value: { request }, configurable: true });
-    render(<WorkoutPlayer date={plan.date} plan={plan} start={{ item: 0, set: 0 }} />);
+    render(<WorkoutPlayer exercises={exercises()} date={plan.date} plan={plan} start={{ item: 0, set: 0 }} />);
     await act(async () => {});
     expect(request).toHaveBeenCalledTimes(1);
     // The browser drops the lock while hidden.
@@ -170,7 +165,7 @@ describe("WorkoutPlayer", () => {
 
   it("renders summary rows by position even if an exercise repeats", () => {
     const dup: PlanDay = { ...plan, items: [plan.items[0], { ...plan.items[0] }] };
-    render(<WorkoutPlayer date={plan.date} plan={dup} start={{ item: 2, set: 0, items: [{ setsDone: 3, skipped: false }, { setsDone: 3, skipped: false }] }} />);
+    render(<WorkoutPlayer exercises={exercises()} date={plan.date} plan={dup} start={{ item: 2, set: 0, items: [{ setsDone: 3, skipped: false }, { setsDone: 3, skipped: false }] }} />);
     const list = screen.getByRole("list");
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
   });
@@ -178,7 +173,7 @@ describe("WorkoutPlayer", () => {
   it("finish waits for a pending set save", async () => {
     let release: () => void = () => {};
     saveSet.mockImplementationOnce(() => new Promise<void>((r) => (release = r)));
-    render(<WorkoutPlayer date={plan.date} plan={plan} start={{ item: 2, set: 1 }} />);
+    render(<WorkoutPlayer exercises={exercises()} date={plan.date} plan={plan} start={{ item: 2, set: 1 }} />);
     fireEvent.click(screen.getByRole("button", { name: "Done set" }));
     await act(async () => {});
     fireEvent.click(screen.getByRole("button", { name: "Finish workout" }));

@@ -5,11 +5,12 @@ import { useState } from "react";
 import { Chip } from "@/components/Chip";
 import { Button } from "@/components/ui/button";
 import { FOCUSES, type Focus } from "@/models/exerciseConstants";
-import { EXERCISES, type Exercise } from "../library";
+import type { Exercise } from "../catalog";
+import { EXERCISE_TYPES } from "@/models/exerciseConstants";
 import { ExerciseFrames } from "./ExerciseFrames";
 import { Card } from "@/components/Card";
 
-const TYPES: Exercise["type"][] = ["strength", "cardio", "hiit", "stretch"];
+const TYPES = EXERCISE_TYPES;
 const DIFFICULTIES: { value: Exercise["difficulty"]; label: string }[] = [
   { value: 1, label: "Easy" },
   { value: 2, label: "Normal" },
@@ -53,7 +54,7 @@ function matches(e: Exercise, f: Filters): boolean {
 }
 
 /** Filterable exercise cards; the filters live in the URL search params. */
-export function LibraryBrowser() {
+export function LibraryBrowser({ exercises }: { exercises: Exercise[] }) {
   const params = useSearchParams();
   const [filters, setFilters] = useState<Filters>(() => parse(new URLSearchParams(params.toString())));
 
@@ -62,7 +63,7 @@ export function LibraryBrowser() {
     window.history.replaceState(null, "", `${window.location.pathname}${toQuery(next)}`);
   };
 
-  const shown = EXERCISES.filter((e) => matches(e, filters));
+  const shown = exercises.filter((e) => matches(e, filters));
   const active = toQuery(filters) !== "";
 
   return (

@@ -77,10 +77,11 @@ function Live({ view, card, onResult, onFinish, coach }: QuizCardProps & { card:
   const [endFailed, setEndFailed] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
 
+  // Live is keyed by position, so this runs once per card: move focus to each card after the first.
+  const later = view.position > 0;
   useEffect(() => {
-    if (view.position > 0) heading.current?.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (later) heading.current?.focus();
+  }, [later]);
 
   async function end() {
     const left = view.total - view.position;

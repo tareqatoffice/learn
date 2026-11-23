@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { exerciseImage, type Exercise } from "../library";
+import { exerciseImage, type Exercise } from "../catalog";
 
 const SWAP_MS = 800;
 
@@ -18,7 +19,7 @@ function Frames({ exercise, size }: { exercise: Exercise; size: "sm" | "lg" }) {
   const [frame, setFrame] = useState<0 | 1>(0);
 
   useEffect(() => {
-    if (!exercise.frames || reducedMotion()) return;
+    if (exercise.photos.length < 2 || reducedMotion()) return;
     const id = setInterval(() => setFrame((f) => (f === 0 ? 1 : 0)), SWAP_MS);
     return () => clearInterval(id);
   }, [exercise]);
@@ -26,15 +27,16 @@ function Frames({ exercise, size }: { exercise: Exercise; size: "sm" | "lg" }) {
   return (
     <div
       className={cn(
-        "mx-auto aspect-square w-full overflow-hidden rounded-xl bg-muted",
-        size === "lg" ? "max-w-72" : "max-w-24",
+        "relative mx-auto aspect-3/2 w-full overflow-hidden rounded-xl bg-muted",
+        size === "lg" ? "max-w-xl" : "max-w-xs",
       )}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- two static public photos swapped on a timer */}
-      <img
+      <Image
         src={exerciseImage(exercise, frame)}
-        alt={exercise.frames ? exercise.name : `${exercise.name} (no photo yet)`}
-        className="size-full object-cover"
+        alt={exercise.photos.length ? exercise.name : `${exercise.name} (no photo yet)`}
+        fill
+        sizes={size === "lg" ? "(max-width: 576px) 100vw, 576px" : "320px"}
+        className="object-cover"
         draggable={false}
       />
     </div>

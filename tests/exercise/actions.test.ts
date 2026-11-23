@@ -12,6 +12,7 @@ import { connectDb } from "@/lib/db";
 import { ExerciseProfile, User } from "@/models";
 import type { ProfileInput } from "@/features/exercise/profile";
 import { resetDb } from "../setup/mongo";
+import { seedExercises } from "./fixtures";
 
 const id = () => String(new Types.ObjectId());
 const input = (over: Partial<ProfileInput> = {}): ProfileInput => ({
@@ -33,6 +34,7 @@ describe("exercise actions", () => {
   });
   beforeEach(async () => {
     await resetDb();
+    await seedExercises();
     session.userId = null;
   });
   afterAll(() => mongoose.disconnect());

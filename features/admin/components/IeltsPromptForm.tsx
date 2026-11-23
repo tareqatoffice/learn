@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -55,8 +56,14 @@ function ImageUpload({ promptId, imageKey, previewUrl }: { promptId: string; ima
         onFiles={([file]) => void upload(file)}
       />
       {previewUrl && !busy && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={previewUrl} alt="Uploaded Task 1 chart" className="mt-2 max-h-64 rounded border border-border" />
+        <Image
+          src={previewUrl}
+          alt="Uploaded Task 1 chart"
+          width={800}
+          height={600}
+          unoptimized
+          className="mt-2 h-auto max-h-64 w-auto max-w-full rounded border border-border"
+        />
       )}
       <ActionStatus saved={saved && !busy} errors={errors} savedText="Image uploaded." />
     </Field>

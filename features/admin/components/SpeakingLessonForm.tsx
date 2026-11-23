@@ -122,7 +122,7 @@ export function SentenceTimer({
   onChange: (marks: number[]) => void;
   cleared?: boolean;
 }) {
-  const audio = useRef<HTMLAudioElement>(null);
+  const audio = useRef<HTMLVideoElement | null>(null);
   const sentences = splitSentences(text);
   const stale = marks.length > sentences.length;
   const done = !stale && marks.length === sentences.length && sentences.length > 0;
@@ -157,7 +157,14 @@ export function SentenceTimer({
           <p className="text-sm text-muted-foreground">Add the audio first.</p>
         ) : (
           <>
-            <audio ref={audio} src={src} controls preload="auto" className="w-full" />
+            <MediaPlayer
+              key={src}
+              src={src}
+              label="lesson audio"
+              playerRef={(node) => {
+                audio.current = node;
+              }}
+            />
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" variant="outline" size="sm" onClick={begin}>
                 Start

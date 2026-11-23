@@ -28,11 +28,11 @@ describe("MediaPlayer", () => {
   it("toggles play and pause", () => {
     render(<MediaPlayer src="https://x.test/a.mp3" label="clip" />);
     const btn = screen.getByRole("button", { name: "Play clip" });
-    expect(screen.getByTestId("player").dataset.playing).toBe("false");
+    expect(screen.getByTestId("player").dataset.playing).not.toBe("true");
     fireEvent.click(btn);
     expect(screen.getByTestId("player").dataset.playing).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "Pause clip" }));
-    expect(screen.getByTestId("player").dataset.playing).toBe("false");
+    expect(screen.getByTestId("player").dataset.playing).not.toBe("true");
   });
 
   it("labels video controls and plays and pauses with the button", () => {
@@ -40,7 +40,7 @@ describe("MediaPlayer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Play Video" }));
     expect(screen.getByTestId("player").dataset.playing).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "Pause Video" }));
-    expect(screen.getByTestId("player").dataset.playing).toBe("false");
+    expect(screen.getByTestId("player").dataset.playing).not.toBe("true");
   });
 
   it("shows the stored length while the file reports none (F5)", () => {

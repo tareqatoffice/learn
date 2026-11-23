@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { chipClass } from "@/components/Chip";
 import { areaLabel, formatDuration } from "@/features/focus/context";
@@ -346,8 +347,7 @@ export function Profile({
       <header className="flex items-center gap-4">
         <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted text-xl font-semibold">
           {d.image ? (
-            // eslint-disable-next-line @next/next/no-img-element -- Google avatar host; next/image would need a remote pattern
-            <img src={d.image} alt="" referrerPolicy="no-referrer" className="size-full object-cover" />
+            <Image src={d.image} alt="" width={56} height={56} referrerPolicy="no-referrer" className="size-full object-cover" />
           ) : (
             <span aria-hidden>{(d.name.trim()[0] ?? "?").toUpperCase()}</span>
           )}

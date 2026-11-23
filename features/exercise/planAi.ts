@@ -2,7 +2,7 @@ import { getAiConfig, modelChain } from "@/features/ai/lib/aiSettings";
 import { chatCompletion, extractJson } from "@/features/ai/lib/openrouter";
 import { metered } from "@/features/progress/quizAi";
 import type { Feel } from "@/models/exerciseConstants";
-import { allowedFor } from "./library";
+import { allowedFor, type Exercise } from "./catalog";
 import { fillDay, slotsFor, validateDay, type PlanDay, type SkeletonDay } from "./plan";
 
 export type LastWeekResult = { exerciseId: string; setsDone: number; skipped: boolean; feel?: Feel };
@@ -12,6 +12,8 @@ export type FillWeekInput = {
   weekIdx: number;
   profileSummary: string;
   lastWeek: LastWeekResult[];
+  /** Active exercises the plan may use. */
+  exercises: readonly Exercise[];
   fetch?: typeof fetch;
 };
 export type FillWeekResult = { days: PlanDay[]; source: "ai" | "code"; coachNote: string };
@@ -70,11 +72,11 @@ const SYSTEM = [
 
 function buildPrompt(input: FillWeekInput): string {
   const days = input.skeleton.map((d) => {
-    const allowed = allowedFor(d.focus, d.maxDifficulty)
+    const allowed = allowedFor(input.exercises, d.focus, d.maxDifficulty)
       .map((e) => `${e.id} (${e.name}, ${e.mode})`)
       .join("; ");
     return (
-      `Date ${d.date}: focus ${d.focus}, ${d.minutes} min, ${slotsFor(d)} slots, ${d.sets} sets, rest ${d.restSec}s, ` +
+      `Date ${d.date}: focus ${d.focus}, ${d.minutes} min, ${slotsFor(d, input.exercises)} slots, ${d.sets} sets, rest ${d.restSec}s, ` +
       `${d.reps} reps, ${d.seconds} seconds. Allowed: ${allowed}`
     );
   });
@@ -90,7 +92,7 @@ export async function fillWeek(input: FillWeekInput): Promise<FillWeekResult> {
   const { userId, skeleton, weekIdx } = input;
   const note = codeNote({ weekIdx, deload: (weekIdx + 1) % 4 === 0, workouts: skeleton.length });
   const byCode = (): FillWeekResult => ({
-    days: skeleton.map((d) => fillDay(d, userId + d.date)),
+    days: skeleton.map((d) => fillDay(d, userId + d.date, input.exercises)),
     source: "code",
     coachNote: note,
   });
@@ -124,8 +126,8 @@ export async function fillWeek(input: FillWeekInput): Promise<FillWeekResult> {
     }
     let fromAi = 0;
     const days = skeleton.map((day): PlanDay => {
-      const items = validateDay(day, byDate.get(day.date));
-      if (!items) return fillDay(day, userId + day.date);
+      const items = validateDay(day, byDate.get(day.date), input.exercises);
+      if (!items) return fillDay(day, userId + day.date, input.exercises);
       fromAi++;
       return { date: day.date, focus: day.focus, minutes: day.minutes, items };
     });

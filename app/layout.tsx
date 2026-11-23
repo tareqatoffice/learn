@@ -64,6 +64,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${plexSans.variable} ${notoBengali.variable} ${plexMono.variable} h-full antialiased`}
     >
       <head>
+        {/* Raw inline script, not next/script: it must run before first paint to avoid a theme flash,
+            and Next defers inline beforeInteractive scripts until its bootstrap bundle loads. */}
         <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="flex min-h-full min-w-0 flex-col">

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { addDays } from "@/features/speaking/schedule";
 import type { Focus, Level } from "@/models/exerciseConstants";
-import { allowedFor, exerciseById } from "./library";
+import { allowedFor, type Exercise } from "./catalog";
 
 export type PlanItem = { exerciseId: string; sets: number; reps?: number; seconds?: number; restSec: number };
 export type SkeletonDay = {
@@ -151,19 +151,19 @@ function rng(seed: string): () => number {
 }
 
 /** A day never repeats an exercise, so it holds at most as many items as there are allowed exercises. */
-export function slotsFor(day: SkeletonDay): number {
-  return Math.min(day.slots, allowedFor(day.focus, day.maxDifficulty).length);
+export function slotsFor(day: SkeletonDay, pool: readonly Exercise[]): number {
+  return Math.min(day.slots, allowedFor(pool, day.focus, day.maxDifficulty).length);
 }
 
-export function fillDay(day: SkeletonDay, seed: string): PlanDay {
-  const shuffled = [...allowedFor(day.focus, day.maxDifficulty)];
+export function fillDay(day: SkeletonDay, seed: string, pool: readonly Exercise[]): PlanDay {
+  const shuffled = [...allowedFor(pool, day.focus, day.maxDifficulty)];
   const random = rng(seed);
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   const items: PlanItem[] = shuffled
-    .slice(0, slotsFor(day))
+    .slice(0, slotsFor(day, pool))
     .map((ex) =>
       ex.mode === "time"
         ? { exerciseId: ex.id, sets: day.sets, seconds: day.seconds, restSec: day.restSec }
@@ -186,18 +186,18 @@ const itemSchema = z
   })
   .refine((i) => i.reps !== undefined || i.seconds !== undefined);
 
-export function validateDay(day: SkeletonDay, items: unknown): PlanItem[] | null {
+export function validateDay(day: SkeletonDay, items: unknown, pool: readonly Exercise[]): PlanItem[] | null {
   const parsed = z.array(itemSchema).safeParse(items);
   if (!parsed.success) return null;
   const list = parsed.data;
-  const pool = allowedFor(day.focus, day.maxDifficulty).length;
-  if (list.length < Math.max(1, slotsFor(day) - 1) || list.length > Math.min(day.slots + 1, pool)) return null;
+  const allowedList = allowedFor(pool, day.focus, day.maxDifficulty);
+  if (list.length < Math.max(1, slotsFor(day, pool) - 1) || list.length > Math.min(day.slots + 1, allowedList.length)) return null;
   if (new Set(list.map((i) => i.exerciseId)).size !== list.length) return null;
-  const allowed = new Set(allowedFor(day.focus, day.maxDifficulty).map((e) => e.id));
+  const allowed = new Map(allowedList.map((e) => [e.id, e]));
   if (!list.every((i) => allowed.has(i.exerciseId))) return null;
   // Reps-mode moves take reps only, time-mode moves take seconds only.
   const fitsMode = (i: PlanItem) =>
-    exerciseById(i.exerciseId)?.mode === "time" ? i.seconds !== undefined && i.reps === undefined : i.reps !== undefined && i.seconds === undefined;
+    allowed.get(i.exerciseId)?.mode === "time" ? i.seconds !== undefined && i.reps === undefined : i.reps !== undefined && i.seconds === undefined;
   if (!list.every(fitsMode)) return null;
   const total = list.reduce((sum, i) => sum + itemSeconds(i), 0);
   if (total > day.minutes * 60 * 1.1) return null;

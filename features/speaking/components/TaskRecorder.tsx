@@ -7,6 +7,7 @@ import { confirmTakeAction, deleteTakeAction, generateMaterialAction, startTakeA
 import { firstError } from "@/features/admin/result";
 import { confirm } from "@/components/ConfirmDialog";
 import { Notice } from "@/components/Notice";
+import { HiddenPlayer } from "@/components/MediaPlayer";
 import { Button } from "@/components/ui/button";
 import { UploadError, uploadTake } from "@/features/recording/lib/uploadTake";
 import { type RecorderResult, useRecorder } from "@/features/recording/lib/useRecorder";
@@ -112,7 +113,7 @@ export function TaskRecorder({
   const clipLength = clipSec || loadedSec;
   const sentences = useMemo(() => (clipText ? timeline(clipText, clipLength, clipMarks) : []), [clipText, clipLength, clipMarks]);
 
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
   const started = useRef<Started | null>(null);
   const uploadAbort = useRef<AbortController | null>(null);
@@ -355,11 +356,12 @@ export function TaskRecorder({
       )}
 
       {shadowing && sourceAudioUrl && (
-        <audio
+        <HiddenPlayer
           ref={audioRef}
           src={sourceAudioUrl}
           preload="auto"
           playsInline
+          playbackRate={rate}
           onTimeUpdate={(e) => setClipTime(e.currentTarget.currentTime)}
           onLoadedMetadata={(e) => {
             const d = e.currentTarget.duration;
