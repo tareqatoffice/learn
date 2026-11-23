@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
     return [{ source: "/:path*", headers: STATIC_SECURITY_HEADERS }];
   },
   images: {
+    remotePatterns: [{ protocol: "https", hostname: "**.googleusercontent.com" }],
   },
   outputFileTracingIncludes: {
     "/coding/[slug]": ["./features/coding/problems/**/*.ts", "./features/coding/problems/**/*.tsx"],
