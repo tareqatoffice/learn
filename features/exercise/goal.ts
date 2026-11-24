@@ -39,7 +39,6 @@ export function safeTargetDate(start: string, startKg: number, goalKg: number): 
   return addMonths(start, 600);
 }
 
-/** The earliest safe target date within `maxMonths`, or null when the goal needs longer than that. */
 export function safeTargetWithin(start: string, startKg: number, goalKg: number, maxMonths = 24): string | null {
   const safe = safeTargetDate(start, startKg, goalKg);
   return safe <= addMonths(start, maxMonths) ? safe : null;
@@ -85,7 +84,6 @@ export type PaceStatus = {
   status: "onPace" | "ahead" | "behind" | "above" | "below";
   currentKg: number;
   gapKg: number;
-  /** Keep-fit goal (start equals goal): "above"/"below" the goal replace "ahead"/"behind". */
   keep?: true;
 };
 

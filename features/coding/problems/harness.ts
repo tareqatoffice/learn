@@ -219,7 +219,7 @@ export async function withFrame<T>(path: string, body: (doc: Document, frame: HT
   document.body.append(frame);
   try {
     await loaded;
-    await wait(300); // let hydration finish before the check clicks anything
+    await wait(300);
     const doc: Document | null = frame.contentDocument;
     if (!doc) throw new Error(`could not open ${path}`);
     return await body(doc, frame);

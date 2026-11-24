@@ -48,7 +48,6 @@ export default async function WorkoutPage({ params }: { params: Promise<{ date: 
   const user = await requireUser();
   await connectDb();
   const today = localDate(new Date(), await readTimeZone());
-  // A direct link on the first visit of a new week: make sure this week's plan exists first.
   if (date === today) await ensureWeek(user.userId, today);
   const [plan, existing, exercises] = await Promise.all([dayPlan(user.userId, date), getSession(user.userId, date), exerciseMap()]);
   const mode = workoutPageMode(date, today, plan, existing);

@@ -47,7 +47,6 @@ export function QuizSetup({ books }: { books: SetupBook[] }) {
   const single = bookIds.length === 1 ? books.find((b) => b.id === bookIds[0]) : undefined;
   const [count, setCount] = useState<{ key: string; n: number } | null>(null);
   const query: DeckQuery = { bookIds, partKeys: single ? partKeys : [], mode, size };
-  // The query's value, not its identity, decides when to recount.
   const key = JSON.stringify(query);
   useEffect(() => {
     let live = true;

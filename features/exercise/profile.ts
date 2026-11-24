@@ -60,7 +60,6 @@ function toView(doc: ProfileDoc): ProfileView {
 }
 
 const inRange = (n: number, lo: number, hi: number) => Number.isFinite(n) && n >= lo && n <= hi;
-/** True when the input changes the goal itself (weights or length), not just the schedule. */
 function goalChanged(active: GoalShape | null | undefined, input: ProfileInput): boolean {
   return (
     !active ||
@@ -81,11 +80,9 @@ export function previewGoal(
   check: "ok" | "warn" | "block";
   safeTargetDate?: string;
   tooFar?: true;
-  /** Saving would end the active goal and start a new one. */
   replaces: boolean;
   kcal: number;
 } {
-  // A schedule-only edit keeps the active goal's dates (see saveProfile), so preview those.
   const kept = active && !goalChanged(active, input) ? active : null;
   const targetDate = kept ? kept.targetDate : addMonths(today, input.months);
   const pace = kept
@@ -192,7 +189,6 @@ export async function saveProfile(userId: string, input: ProfileInput, today: st
     inTransaction(async (session) => {
       if (active) {
         await ExerciseProfile.updateOne({ _id: active._id }, { $set: { status: "ended", endedReason: "replaced" } }, { session });
-        // Today's unfinished workout belongs to the replaced plan.
         await WorkoutSession.deleteOne({ userId, date: today, status: "inProgress" }, { session });
       }
       const [doc] = await ExerciseProfile.create([fresh], { session });
@@ -212,7 +208,6 @@ export async function finishIfDone(userId: string, today: string): Promise<{ fin
     const recent = await WeightEntry.find({ userId, profileId: profile.id, date: { $gte: addDays(today, -6), $lte: today } })
       .select("kg")
       .lean<{ kg: number }[]>();
-    // One reading is noise: the goal counts as reached on a 7-day average of at least 3 entries.
     if (recent.length >= 3 && goalReached(profile, recent.reduce((sum, w) => sum + w.kg, 0) / recent.length)) reason = "goal";
   }
   if (!reason) return { finished: false };

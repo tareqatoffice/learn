@@ -75,11 +75,43 @@ describe("admin speaking lessons", () => {
 
   it("updateLesson saves the fields", async () => {
     const id = await make();
-    const res = await updateLesson(id, input({ title: "New", passage: "Read me", prompt: "Say", shadowText: "Hi", shadowDurationSec: 12 }));
+    const res = await updateLesson(
+      id,
+      input({ title: "New", passage: "Read me", prompt: "Say", shadowText: "Hi", shadowDurationSec: 12, shadowMarks: [0] }),
+    );
     expect(res.ok).toBe(true);
     const doc = await SpeakingLesson.findById(id).lean<{ title: string; passage: string; prompt: string; shadow: { text: string; durationSec: number } }>();
     expect(doc).toMatchObject({ title: "New", passage: "Read me", prompt: "Say", shadow: { text: "Hi", durationSec: 12 } });
     expect((await updateLesson("nope", input())).ok).toBe(false);
+  });
+
+  it("won't publish a lesson with audio until every sentence is timed, but allows a draft", async () => {
+    const id = await make();
+    const base = { shadowText: "One. Two.", shadowDurationSec: 10 };
+    const none = await updateLesson(id, input(base));
+    expect(none.ok).toBe(false);
+    if (!none.ok) expect(none.errors.shadowMarks).toMatch(/time every sentence/i);
+    expect((await updateLesson(id, input({ ...base, shadowMarks: [0] }))).ok).toBe(false);
+    expect((await updateLesson(id, input({ ...base, status: "draft", shadowMarks: [] }))).ok).toBe(true);
+    expect((await updateLesson(id, input({ ...base, shadowMarks: [0, 4.5] }))).ok).toBe(true);
+    expect((await updateLesson(id, input({ shadowText: "One. Two.", shadowDurationSec: 0 }))).ok).toBe(true);
+  });
+
+  it("also needs timings when the audio is a link with no length set", async () => {
+    const id = await make();
+    const link = { shadowText: "One. Two.", shadowAudioUrl: "https://x.test/a.mp3", shadowDurationSec: 0 };
+    expect((await updateLesson(id, input(link))).ok).toBe(false);
+    expect((await updateLesson(id, input({ ...link, shadowMarks: [0, 3] }))).ok).toBe(true);
+  });
+
+  it("replacing the audio of a published, timed lesson clears the timings and returns it to draft", async () => {
+    const id = await make();
+    expect((await updateLesson(id, input({ shadowText: "One. Two.", shadowDurationSec: 10, shadowMarks: [0, 4] }))).ok).toBe(true);
+    const res = await confirmLessonAudio(id, `lessons/${id}/new.mp3`, 12);
+    expect(res.ok).toBe(true);
+    const doc = await SpeakingLesson.findById(id).lean<{ status: string; shadow: { marks: number[] } }>();
+    expect(doc?.status).toBe("draft");
+    expect(doc?.shadow.marks).toEqual([]);
   });
 
   it("deleteLesson keeps users' takes and days, and deletes the audio", async () => {

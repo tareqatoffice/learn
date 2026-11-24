@@ -6,16 +6,11 @@ import { readTimeZone } from "@/features/speaking/timezone";
 import { SetupForm } from "./SetupForm";
 import { Card } from "@/components/Card";
 
-/** Whole months from the start date to the target date, as chosen in the form. */
 function monthsOf(startDate: string, targetDate: string): number {
   for (let m = 1; m <= 24; m++) if (addMonths(startDate, m) === targetDate) return m;
   return 3;
 }
 
-/**
- * The goal form. Rendered by /exercise/setup and, for a user with no goal yet,
- * by /exercise itself, so a first visit shows one loading state, not two.
- */
 export async function ExerciseSetup({ userId }: { userId: string }) {
   const active = await getActiveProfile(userId);
   const source = active ?? (await lastEndedProfile(userId));
@@ -27,7 +22,6 @@ export async function ExerciseSetup({ userId }: { userId: string }) {
     level: source.level,
     workoutDays: source.workoutDays,
     minutesPerSession: source.minutesPerSession,
-    // A new goal after a finished one starts from the old profile body, not its weights.
     ...(active
       ? { startWeightKg: active.startWeightKg, goalWeightKg: active.goalWeightKg, months: monthsOf(active.startDate, active.targetDate) }
       : {}),

@@ -21,7 +21,6 @@ async function today(): Promise<string> {
   return localDate(new Date(), await readTimeZone());
 }
 
-/** A workout can only be saved on the user's own current day. */
 async function workoutDay(date: unknown): Promise<string> {
   if (!isRealDate(date) || date !== (await today())) throw new Error("Workouts can only be saved for today.");
   return date;

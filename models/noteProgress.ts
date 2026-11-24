@@ -1,4 +1,5 @@
 import mongoose, { Schema, model } from "mongoose";
+import { PREQ_MAX_LEN } from "@/models/studyConstants";
 
 const noteProgressSchema = new Schema(
   {
@@ -8,6 +9,8 @@ const noteProgressSchema = new Schema(
     read: { type: Boolean, default: false },
     readAt: Date,
     lastOpenedAt: Date,
+    lastAnchor: { type: String, maxlength: 200 },
+    preQuestions: { type: [{ type: String, maxlength: PREQ_MAX_LEN }], default: undefined },
   },
   { timestamps: true },
 );

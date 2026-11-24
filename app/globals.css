@@ -678,10 +678,23 @@ main :is(section, div, article, li, details, form).rounded-xl.bg-card {
     animation: page-fade 240ms ease-out both;
   }
 
-
   .edge-draw {
     animation: edge-draw 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
+}
+
+html[data-reading="on"] [data-app-header],
+html[data-reading="on"] [data-bottom-nav],
+html[data-reading="on"] [data-reading-hide] {
+  display: none !important;
+}
+html[data-reading="on"] #main {
+  padding-bottom: 7rem;
+}
+html[data-reading="on"] [data-reading-grid] {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 44rem;
+  margin-inline: auto;
 }
 
 @keyframes edge-draw {

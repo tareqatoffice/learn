@@ -78,7 +78,7 @@ export const nextRendering: Group = {
           return doc.querySelector("[data-testid=stats]")?.textContent?.includes("4 pages of products") || "no stats";
         }),
         routeCheck("The heading arrives before the data", async () => {
-          await fetch("/sandbox/dashboard"); // compile first, so only the render is timed
+          await fetch("/sandbox/dashboard");
           const { ms, text } = await firstChunk("/sandbox/dashboard");
           return (text.includes("Dashboard") && ms < 700) || `first chunk took ${ms} ms`;
         }),

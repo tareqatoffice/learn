@@ -1,6 +1,9 @@
 import { headingId } from "@/lib/markdown/pipeline";
 import Link from "next/link";
 import { MarkReadButton } from "@/features/notes/components/NoteReader";
+import { PreReadQuestions, ReciteList } from "@/features/notes/components/ActiveReading";
+import { ReadingMode } from "@/features/notes/components/ReadingMode";
+import { ReadingPosition } from "@/features/notes/components/ReadingPosition";
 import { OverlayMenu } from "@/components/OverlayMenu";
 import { Markdown } from "@/lib/markdown/Markdown";
 import { cn } from "@/lib/utils";
@@ -59,7 +62,10 @@ export function ChapterView({ view }: { view: ChapterViewData }) {
   );
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[13.75rem_minmax(0,1fr)_12.5rem] lg:gap-6">
+    <div
+      data-reading-grid
+      className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[13.75rem_minmax(0,1fr)_12.5rem] lg:gap-6"
+    >
       <OverlayMenu
         navLabel={`${view.series.title} chapters`}
         label={
@@ -85,7 +91,7 @@ export function ChapterView({ view }: { view: ChapterViewData }) {
         </OverlayMenu>
       )}
 
-      <nav aria-label={`${view.series.title} chapters`} className={sideClass}>
+      <nav aria-label={`${view.series.title} chapters`} data-reading-hide className={sideClass}>
         <Link
           href={`/notes/${view.series.slug}`}
           className={cn("font-semibold", linkClass)}
@@ -123,9 +129,40 @@ export function ChapterView({ view }: { view: ChapterViewData }) {
           }
         />
 
+        <div className="mt-4">
+          <ReadingMode headings={view.toc.map((t) => ({ id: headingId(t.anchor), text: t.text }))} />
+        </div>
+        {view.resume && (
+          <p className="mt-4 text-sm">
+            <a href={`#${headingId(view.resume.anchor)}`} className={cn("underline", linkClass)}>
+              Resume where you stopped: {view.resume.text}
+            </a>
+          </p>
+        )}
+        {view.toc.length > 0 && (
+          <ReadingPosition
+            noteId={view.chapter.id}
+            initialAnchor={view.resume?.anchor}
+            headings={view.toc.map((t) => ({ anchor: t.anchor, id: headingId(t.anchor) }))}
+          />
+        )}
+
+        <PreReadQuestions key={view.chapter.id} noteId={view.chapter.id} initial={view.study.preQuestions} />
+
         <div className="mt-6">
           <Markdown source={view.chapter.body} />
         </div>
+
+        <ReciteList
+          key={view.chapter.id}
+          noteId={view.chapter.id}
+          sections={(view.toc.some((t) => t.depth === 2) ? view.toc.filter((t) => t.depth === 2) : view.toc).map((t) => ({
+            anchor: t.anchor,
+            text: t.text,
+          }))}
+          initial={view.study.recitations}
+          questions={view.study.preQuestions}
+        />
 
         <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
           <MarkReadButton noteId={view.chapter.id} initialRead={view.read} />
@@ -151,7 +188,7 @@ export function ChapterView({ view }: { view: ChapterViewData }) {
       </article>
 
       {view.toc.length > 0 && (
-        <nav aria-label="On this page" className={sideClass}>
+        <nav aria-label="On this page" data-reading-hide className={sideClass}>
           <p className="font-semibold text-muted-foreground">On this page</p>
           {tocList()}
         </nav>

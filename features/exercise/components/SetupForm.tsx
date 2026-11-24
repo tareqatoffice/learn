@@ -14,7 +14,6 @@ export const DISCLAIMER = "This is not medical advice. If you have a health cond
 
 type Preview = NonNullable<Awaited<ReturnType<typeof previewGoalAction>>>;
 
-/** JS weekday numbers (0 = Sunday), shown Monday first. */
 const DAYS = [
   [1, "Mon"],
   [2, "Tue"],

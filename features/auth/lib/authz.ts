@@ -42,7 +42,6 @@ export function isPublicPath(pathname: string): boolean {
     METADATA_FILE.test(pathname) ||
     isUnder(pathname, "/api/auth") ||
     isUnder(pathname, "/api/content") ||
-    // Exercise photos: public library images, served with long cache headers.
     isUnder(pathname, "/media")
   );
 }

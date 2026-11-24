@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TaskRecorder } from "@/features/speaking/components/TaskRecorder";
@@ -84,8 +84,40 @@ describe("TaskRecorder", () => {
     expect(start.disabled).toBe(true);
     await user.click(screen.getByRole("checkbox", { name: /i'm wearing headphones/i }));
     expect(start.disabled).toBe(false);
-    await user.click(start);
-    expect(recorder.value.start).toHaveBeenCalled();
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    try {
+      await user.click(start);
+      expect(recorder.value.start).not.toHaveBeenCalled();
+      expect(screen.getByText(/the clip starts in 3/i)).toBeTruthy();
+      act(() => void vi.advanceTimersByTime(3000));
+      expect(recorder.value.start).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("can cancel the shadowing countdown before recording starts", async () => {
+    const user = userEvent.setup();
+    render(
+      <TaskRecorder
+        {...base}
+        task="shadowing"
+        material={{ title: "Lesson 1", text: "Hello there.", generated: false }}
+        sourceAudioUrl="https://example.test/clip.mp3"
+        clipSec={30}
+      />,
+    );
+    await user.click(screen.getByRole("checkbox", { name: /i'm wearing headphones/i }));
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    try {
+      await user.click(screen.getByRole("button", { name: /start/i }));
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.getByRole("button", { name: /start/i })).toBeTruthy();
+      act(() => void vi.advanceTimersByTime(4000));
+      expect(recorder.value.start).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows the practice player for shadowing and saves the chosen clip speed with the take", async () => {

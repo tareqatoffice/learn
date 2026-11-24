@@ -148,18 +148,15 @@ const promptText = z
   .min(PROMPT_MIN, `Write at least ${PROMPT_MIN} characters, or reset to the default`)
   .max(PROMPT_MAX, `Keep it under ${PROMPT_MAX} characters`);
 
-/** Saves an override for one prompt; the safety rules and reply format stay in code. */
 export async function savePrompt(key: string, text: string, userId: string): Promise<ActionResult> {
   if (!isPromptKey(key)) return fail("Unknown prompt.");
   const parsed = promptText.safeParse(text);
   if (!parsed.success) return fail({ text: parsed.error.issues[0].message });
-  // Text equal to the default is no override: keep following the default when it changes in code.
   if (parsed.data === AI_PROMPTS[key].default) return resetPrompt(key, userId);
   await AiSettings.updateOne({ _id: "ai" }, { $set: { [`prompts.${key}`]: parsed.data, updatedBy: userId } }, { upsert: true });
   return ok();
 }
 
-/** Drops the override so the prompt goes back to its default. */
 export async function resetPrompt(key: string, userId: string): Promise<ActionResult> {
   if (!isPromptKey(key)) return fail("Unknown prompt.");
   await AiSettings.updateOne({ _id: "ai" }, { $unset: { [`prompts.${key}`]: 1 }, $set: { updatedBy: userId } });

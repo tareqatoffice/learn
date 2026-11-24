@@ -1,9 +1,5 @@
 import { cn } from "@/lib/utils";
 
-/**
- * Thin progress track. Pass `label` to expose it as a progressbar; without one it is decorative.
- * `animate={false}` skips the grow-in on mount (for bars that remount often).
- */
 export function ProgressBar({
   value,
   secondary = 0,

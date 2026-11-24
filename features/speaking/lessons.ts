@@ -31,8 +31,6 @@ function toView(doc: LessonDoc): LessonView {
   return { id: String(doc._id), title: doc.title, order: doc.order, shadow, passage: doc.passage ?? "", prompt: doc.prompt ?? "" };
 }
 
-// Lesson clips are shared study material, not a learner's own recording, so their links last a
-// whole practice session instead of the default ten minutes.
 const LESSON_AUDIO_EXPIRES_SEC = 12 * 60 * 60;
 
 export async function lessonAudioUrl(shadow: { audioKey?: string; audioUrl?: string }): Promise<string | undefined> {

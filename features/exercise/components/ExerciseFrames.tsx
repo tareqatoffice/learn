@@ -10,7 +10,6 @@ const SWAP_MS = 800;
 const reducedMotion = () =>
   typeof window !== "undefined" && Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
 
-/** The exercise's start and end photos, swapped every 800 ms; one still frame under reduced motion. */
 export function ExerciseFrames({ exercise, size }: { exercise: Exercise; size: "sm" | "lg" }) {
   return <Frames key={exercise.id} exercise={exercise} size={size} />;
 }

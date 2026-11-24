@@ -137,6 +137,9 @@ function FocusTab({ d }: { d: ProfileData["focus"] }) {
         ) : (
           <Empty>No focus sessions yet. Start one with the focus timer on any page.</Empty>
         )}
+        <Link href="/focus/review" className={`mt-4 inline-block text-sm font-medium underline ${linkClass}`}>
+          Weekly review and plan
+        </Link>
       </Card>
       <Card title="Recent sessions">
         <History

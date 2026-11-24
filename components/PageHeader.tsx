@@ -14,7 +14,6 @@ export function PageHeader({
   description?: React.ReactNode;
   track?: TrackName;
   actions?: React.ReactNode;
-  /** Shown right after the title (e.g. a level badge). */
   titleAside?: React.ReactNode;
   titleId?: string;
 }) {

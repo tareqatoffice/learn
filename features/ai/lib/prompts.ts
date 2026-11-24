@@ -1,8 +1,3 @@
-/**
- * The editable part of each AI system prompt. Admin → AI coach can replace any of these; an empty override falls
- * back to the default here. Callers always append their own safety rules and reply format in code, so an edited
- * prompt can change the coach's tone and guidance but not the JSON shape the app parses.
- */
 
 export const AI_PROMPTS = {
   quizGrader: {
@@ -117,7 +112,6 @@ export const PROMPT_MAX = 4000;
 
 export const isPromptKey = (key: string): key is PromptKey => Object.hasOwn(AI_PROMPTS, key);
 
-/** Saved overrides on top of the defaults; blank or unknown entries are ignored. */
 export function resolvePrompts(saved?: Record<string, unknown> | null): AiPrompts {
   const out = {} as AiPrompts;
   for (const key of PROMPT_KEYS) {
@@ -127,5 +121,4 @@ export function resolvePrompts(saved?: Record<string, unknown> | null): AiPrompt
   return out;
 }
 
-/** Joins prompt parts with a space, skipping empty ones. */
 export const systemPrompt = (...parts: (string | false | undefined)[]) => parts.filter(Boolean).join(" ");

@@ -2,7 +2,11 @@ import { isValidObjectId, type Types } from "mongoose";
 import { visibleNoteFilter } from "@/features/content/visibility";
 import { ForbiddenError } from "@/features/auth/lib/authz";
 import { retryOnDuplicateKey } from "@/lib/db";
-import { Note, NoteProgress } from "@/models";
+import { Note, NoteProgress, NoteRecitation } from "@/models";
+import { PREQ_MAX_LEN, PREQ_MAX_QUESTIONS, RECITE_MAX, type ReciteVerdict } from "@/models/studyConstants";
+
+export type Recitation = { text: string; verdict: ReciteVerdict };
+export type StudyNotes = { preQuestions: string[]; recitations: Record<string, Recitation> };
 
 async function visibleNote(noteId: string): Promise<{ seriesId: Types.ObjectId }> {
   const note = isValidObjectId(noteId)
@@ -23,6 +27,65 @@ async function upsertNoteProgress(userId: string, noteId: string, update: Record
 
 export async function openNote(userId: string, noteId: string): Promise<void> {
   await upsertNoteProgress(userId, noteId, { $set: { lastOpenedAt: new Date() } });
+}
+
+export async function setNotePosition(userId: string, noteId: string, anchor: string | null): Promise<void> {
+  await upsertNoteProgress(userId, noteId, anchor ? { $set: { lastAnchor: anchor.slice(0, 200) } } : { $unset: { lastAnchor: 1 } });
+}
+
+export async function getNotePosition(userId: string, noteId: string): Promise<string | undefined> {
+  if (!isValidObjectId(noteId)) return undefined;
+  const row = await NoteProgress.findOne({ userId, noteId }, { lastAnchor: 1 }).lean<{ lastAnchor?: string }>();
+  return row?.lastAnchor || undefined;
+}
+
+async function visibleNoteAnchors(noteId: string): Promise<string[]> {
+  const note = isValidObjectId(noteId)
+    ? await Note.findOne({ ...(await visibleNoteFilter()), _id: noteId }, { toc: 1 }).lean<{ toc?: { anchor: string }[] }>()
+    : null;
+  if (!note) throw new ForbiddenError("Note not available");
+  return (note.toc ?? []).map((t) => t.anchor);
+}
+
+export async function setPreQuestions(userId: string, noteId: string, questions: string[]): Promise<void> {
+  const clean = questions
+    .map((q) => q.trim().slice(0, PREQ_MAX_LEN))
+    .filter(Boolean)
+    .slice(0, PREQ_MAX_QUESTIONS);
+  await upsertNoteProgress(
+    userId,
+    noteId,
+    clean.length ? { $set: { preQuestions: clean } } : { $unset: { preQuestions: 1 } },
+  );
+}
+
+export async function saveRecitation(
+  userId: string,
+  noteId: string,
+  anchor: string,
+  text: string,
+  verdict: ReciteVerdict,
+): Promise<void> {
+  const clean = text.trim().slice(0, RECITE_MAX);
+  if (!clean) throw new ForbiddenError("Write a sentence first");
+  if (!(await visibleNoteAnchors(noteId)).includes(anchor)) throw new ForbiddenError("Section not found");
+  await retryOnDuplicateKey(() =>
+    NoteRecitation.updateOne({ userId, noteId, anchor }, { $set: { text: clean, verdict } }, { upsert: true, runValidators: true }),
+  );
+}
+
+export async function getStudyNotes(userId: string, noteId: string): Promise<StudyNotes> {
+  if (!isValidObjectId(noteId)) return { preQuestions: [], recitations: {} };
+  const [progress, rows] = await Promise.all([
+    NoteProgress.findOne({ userId, noteId }, { preQuestions: 1 }).lean<{ preQuestions?: string[] }>(),
+    NoteRecitation.find({ userId, noteId }, { anchor: 1, text: 1, verdict: 1 }).lean<
+      { anchor: string; text: string; verdict: ReciteVerdict }[]
+    >(),
+  ]);
+  return {
+    preQuestions: progress?.preQuestions ?? [],
+    recitations: Object.fromEntries(rows.map((r) => [r.anchor, { text: r.text, verdict: r.verdict }])),
+  };
 }
 
 export async function setNoteRead(userId: string, noteId: string, read: boolean): Promise<void> {

@@ -29,12 +29,10 @@ export const toExercise = (d: ExerciseRow, storage = storageConfigured()): Exerc
   mode: d.mode,
   equipment: d.equipment || "none",
   cues: [...(d.cues ?? [])],
-  // Without R2 the photo route can only 404, so fall back to the placeholder.
   photos: storage ? [d.startPhoto, d.endPhoto].filter((k): k is string => Boolean(k)).map(photoUrl) : [],
   archived: Boolean(d.archived),
 });
 
-/** Every exercise, archived ones included (old plans still name them), in library order. Cached per request. */
 export const listExercises = cache(async (): Promise<Exercise[]> => {
   await connectDb();
   const rows = await ExerciseModel.find({}).sort({ order: 1, name: 1 }).lean<ExerciseRow[]>();
@@ -42,12 +40,10 @@ export const listExercises = cache(async (): Promise<Exercise[]> => {
   return rows.map((row) => toExercise(row, storage));
 });
 
-/** The moves new plans may use. */
 export async function activeExercises(): Promise<Exercise[]> {
   return (await listExercises()).filter((e) => !e.archived);
 }
 
-/** Lookup for the moves a page shows. */
 export async function exerciseMap(): Promise<ExerciseMap> {
   return toMap(await listExercises());
 }

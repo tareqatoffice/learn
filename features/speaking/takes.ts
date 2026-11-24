@@ -45,7 +45,6 @@ export async function sweepAbandonedTakes(userId: string, now: Date = new Date()
     .lean<{ _id: Types.ObjectId; media: MediaDoc }[]>();
   if (!stale.length) return 0;
   await SpeakingTake.updateMany({ _id: { $in: stale.map((t) => t._id) }, "media.stored": false }, { $set: { deletingAt: now } });
-  // Only takes this sweep marked: one confirmed after the find above keeps its files.
   const marked = await SpeakingTake.find({ _id: { $in: stale.map((t) => t._id) }, "media.stored": false, deletingAt: now })
     .select("media")
     .lean<{ _id: Types.ObjectId; media: MediaDoc }[]>();
@@ -67,7 +66,6 @@ function openTakes(userId: string): Promise<number> {
   return SpeakingTake.countDocuments({ userId, "media.stored": false, createdAt: { $gte: new Date(Date.now() - OPEN_TAKE_MS) } });
 }
 
-// Counts takes started per UTC day; deleting takes doesn't give the count back.
 async function consumeTake(userId: string, now: Date = new Date()): Promise<(() => Promise<void>) | null> {
   const day = now.toISOString().slice(0, 10);
   const row = await retryOnDuplicateKey(() =>
@@ -144,7 +142,6 @@ export async function startTake(
     media,
     ...(clipRate ? { clipRate } : {}),
   });
-  // Parallel starts can each pass the check above; the newest ones past the limit back out.
   const newest = await SpeakingTake.find({ userId, "media.stored": false, createdAt: { $gte: new Date(Date.now() - OPEN_TAKE_MS) } })
     .sort({ _id: 1 })
     .select("_id")

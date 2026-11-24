@@ -1,5 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { isClipRate, sentenceAt, splitSentences, timeline, validMarks } from "@/features/speaking/shadowText";
+import { isClipRate, needsMarks, sentenceAt, splitSentences, timeline, validMarks, wordMatch } from "@/features/speaking/shadowText";
+
+describe("word match", () => {
+  it("scores the words heard in order and lists the ones missed", () => {
+    const r = wordMatch("The quick brown fox jumps.", "the quick fox jumps over");
+    expect(r).toMatchObject({ score: 80, total: 5, matched: 4, missed: ["brown"] });
+  });
+
+  it("ignores case and punctuation, and treats curly apostrophes alike", () => {
+    expect(wordMatch("It’s fine, really.", "its fine really").missed).toEqual(["it's"]);
+    expect(wordMatch("It's FINE!", "it’s fine").score).toBe(100);
+  });
+
+  it("gives 0 for empty speech and nothing to compare for an empty reference", () => {
+    expect(wordMatch("Hello there.", "")).toMatchObject({ score: 0, matched: 0, missed: ["hello", "there"] });
+    expect(wordMatch("...", "hello")).toMatchObject({ total: 0, score: 0, missed: [] });
+  });
+
+  it("only needs timings when there is audio and text", () => {
+    expect(needsMarks("One. Two.", 10)).toBe(true);
+    expect(needsMarks("One. Two.", 0)).toBe(false);
+    expect(needsMarks("  ", 10)).toBe(false);
+  });
+});
 
 describe("shadowing text timeline", () => {
   it("splits text into sentences on end punctuation and line breaks", () => {

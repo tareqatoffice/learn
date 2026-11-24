@@ -10,22 +10,25 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "U
 import * as actions from "@/app/(app)/focus-actions";
 import { areaFor, focusContextFor, formatClock, formatDuration, isAppPath, offersFocus } from "@/features/focus/context";
 import {
+  addParked,
   AWAY_LIMIT_MS,
   backFromAway,
   elapsedSeconds,
   isCompleted,
   isDone,
   markAway,
+  MIN_DRIFT_MS,
   parseRun,
   pauseRun,
   remainingSeconds,
   resumeRun,
   startRun,
 } from "@/features/focus/lib/timer";
-import { getFocusToday, saveFocusSession } from "@/features/focus/sessions";
+import { getFocusToday, rateFocusSession, saveFocusSession } from "@/features/focus/sessions";
 import { localDate } from "@/features/speaking/schedule";
 import { connectDb } from "@/lib/db";
 import { FocusSession } from "@/models";
+import { FOCUS_MAX_DRIFTS, FOCUS_MAX_PARKED, FOCUS_PARKED_LEN } from "@/models/focusConstants";
 import { resetDb } from "../setup/mongo";
 
 const id = () => String(new Types.ObjectId());
@@ -138,6 +141,51 @@ describe("focus timer", () => {
     expect(elapsedSeconds(back.run, 60_000 + AWAY_LIMIT_MS)).toBe(60 + AWAY_LIMIT_MS / 1000);
   });
 
+  it("counts a short absence as a drift, ignoring blips", () => {
+    const away = markAway(startRun(ctx, 25, 0), 60_000);
+    const drift = backFromAway(away, 60_000 + MIN_DRIFT_MS);
+    expect(drift.drifted).toBe(true);
+    expect(drift.run.drifts).toBe(1);
+    expect(backFromAway(markAway(drift.run, 120_000), 120_000 + 10_000).run.drifts).toBe(2);
+    const blip = backFromAway(away, 60_000 + MIN_DRIFT_MS - 1);
+    expect(blip.drifted).toBe(false);
+    expect(blip.run.drifts).toBeUndefined();
+    const left = backFromAway(away, 60_000 + AWAY_LIMIT_MS + 1);
+    expect(left.left).toBe(true);
+    expect(left.drifted).toBe(false);
+  });
+
+  it("caps drifts at the saved maximum so a long run still saves", () => {
+    const run = { ...markAway(startRun(ctx, undefined, 0), 1000), drifts: FOCUS_MAX_DRIFTS };
+    expect(backFromAway(run, 1000 + 10_000).run.drifts).toBe(FOCUS_MAX_DRIFTS);
+    expect(parseRun(JSON.stringify({ ...startRun(ctx, 25, 1), drifts: FOCUS_MAX_DRIFTS + 1 }))).toBeNull();
+  });
+
+  it("parks thoughts on the run, tidied and capped", () => {
+    let run = startRun(ctx, 25, 0);
+    run = addParked(run, "  reply   to\nthat message ");
+    run = addParked(run, "   ");
+    expect(run.parked).toEqual(["reply to that message"]);
+    expect(addParked(run, "x".repeat(500)).parked?.[1]).toHaveLength(FOCUS_PARKED_LEN);
+    for (let i = 0; i < FOCUS_MAX_PARKED + 5; i++) run = addParked(run, `thought ${i}`);
+    expect(run.parked).toHaveLength(FOCUS_MAX_PARKED);
+  });
+
+  it("stores parked thoughts and rejects bad ones", () => {
+    const run = addParked(startRun(ctx, 25, 123), "search this");
+    expect(parseRun(JSON.stringify(run))?.parked).toEqual(["search this"]);
+    expect(parseRun(JSON.stringify({ ...run, parked: "search this" }))).toBeNull();
+    expect(parseRun(JSON.stringify({ ...run, parked: [1] }))).toBeNull();
+    expect(parseRun(JSON.stringify({ ...run, parked: [""] }))).toBeNull();
+  });
+
+  it("stores drifts and rejects bad values", () => {
+    const run = { ...startRun(ctx, 25, 123), drifts: 3 };
+    expect(parseRun(JSON.stringify(run))?.drifts).toBe(3);
+    expect(parseRun(JSON.stringify({ ...run, drifts: -1 }))).toBeNull();
+    expect(parseRun(JSON.stringify({ ...run, drifts: "3" }))).toBeNull();
+  });
+
   it("stops the run at the moment you left after a long absence", () => {
     const run = markAway(startRun(ctx, 25, 0), 5 * 60_000);
     const back = backFromAway(run, 5 * 60_000 + AWAY_LIMIT_MS + 1);
@@ -204,6 +252,42 @@ describe("focus sessions", () => {
     expect((await getFocusToday(me, "2026-03-02")).totalSeconds).toBe(0);
   });
 
+  it("saves drifts and a rating with a distraction", async () => {
+    const me = id();
+    const run = input({ seconds: 900, drifts: 4 });
+    await saveFocusSession(me, run, opts);
+    expect((await rateFocusSession(me, { runId: run.runId, rating: 4, distraction: "phone" })).ok).toBe(true);
+    let doc = await FocusSession.findOne().lean<{ drifts: number; rating: number; distraction?: string }>();
+    expect([doc?.drifts, doc?.rating, doc?.distraction]).toEqual([4, 4, "phone"]);
+    expect((await rateFocusSession(me, { runId: run.runId, rating: 5 })).ok).toBe(true);
+    doc = await FocusSession.findOne().lean<{ drifts: number; rating: number; distraction?: string }>();
+    expect([doc?.rating, doc?.distraction]).toEqual([5, undefined]);
+  });
+
+  it("saves parked thoughts with the session and rejects too many or too long", async () => {
+    const me = id();
+    const run = input({ seconds: 600, parked: ["reply to Sam", "search closures"] });
+    await saveFocusSession(me, run, opts);
+    expect((await FocusSession.findOne().lean<{ parked: string[] }>())?.parked).toEqual(["reply to Sam", "search closures"]);
+
+    expect((await saveFocusSession(me, input({ parked: Array(FOCUS_MAX_PARKED + 1).fill("x") }), opts)).ok).toBe(false);
+    expect((await saveFocusSession(me, input({ parked: ["x".repeat(FOCUS_PARKED_LEN + 1)] }), opts)).ok).toBe(false);
+    expect((await saveFocusSession(me, input({ parked: [""] }), opts)).ok).toBe(false);
+    expect(await FocusSession.countDocuments()).toBe(1);
+  });
+
+  it("only lets the owner rate a session, with valid values", async () => {
+    const me = id();
+    const run = input({ seconds: 900 });
+    await saveFocusSession(me, run, opts);
+    expect((await rateFocusSession(id(), { runId: run.runId, rating: 3 })).ok).toBe(false);
+    expect((await rateFocusSession(me, { runId: run.runId, rating: 0 })).ok).toBe(false);
+    expect((await rateFocusSession(me, { runId: run.runId, rating: 6 })).ok).toBe(false);
+    expect((await rateFocusSession(me, { runId: run.runId, rating: 3, distraction: "nope" as never })).ok).toBe(false);
+    expect((await saveFocusSession(me, input({ drifts: 1000 }), opts)).ok).toBe(false);
+    expect((await FocusSession.findOne().lean<{ rating?: number }>())?.rating).toBeUndefined();
+  });
+
   it("rejects invalid input", async () => {
     const me = id();
     expect((await saveFocusSession(me, input({ seconds: 0 }), opts)).ok).toBe(false);
@@ -230,5 +314,19 @@ describe("focus sessions", () => {
 
   it("actions need a signed-in user", async () => {
     await expect(actions.focusTodayAction()).rejects.toThrow();
+    await expect(actions.rateFocusSessionAction({ runId: "x", rating: 3 })).rejects.toThrow();
+  });
+
+  it("the rating action rates only the signed-in user's session", async () => {
+    const me = id();
+    session.userId = me;
+    const run = input({ seconds: 600 });
+    await actions.saveFocusSessionAction(run);
+    expect((await actions.rateFocusSessionAction({ runId: run.runId, rating: 5, distraction: "noise" })).ok).toBe(true);
+    expect((await FocusSession.findOne().lean<{ rating: number }>())?.rating).toBe(5);
+
+    session.userId = id();
+    expect((await actions.rateFocusSessionAction({ runId: run.runId, rating: 1 })).ok).toBe(false);
+    expect((await FocusSession.findOne().lean<{ rating: number }>())?.rating).toBe(5);
   });
 });

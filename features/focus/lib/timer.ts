@@ -1,5 +1,11 @@
 import { type FocusContext, isAppPath } from "@/features/focus/context";
-import { FOCUS_AREAS, FOCUS_MAX_SECONDS } from "@/models/focusConstants";
+import {
+  FOCUS_AREAS,
+  FOCUS_MAX_DRIFTS,
+  FOCUS_MAX_PARKED,
+  FOCUS_MAX_SECONDS,
+  FOCUS_PARKED_LEN,
+} from "@/models/focusConstants";
 
 export type FocusRun = {
   id: string;
@@ -8,12 +14,14 @@ export type FocusRun = {
   targetMinutes?: number;
   elapsedMs: number;
   startedAt: number | null;
-  /** When the site was last hidden (tab switched, app backgrounded, page closed); cleared on return. */
   awayAt?: number;
+  drifts?: number;
+  parked?: string[];
 };
 
-/** Away longer than this and the run stops at the moment you left. */
 export const AWAY_LIMIT_MS = 60_000;
+export const MIN_DRIFT_MS = 3_000;
+export const CHECKIN_MIN_SECONDS = 5 * 60;
 
 export const FOCUS_STORAGE_KEY = "learn:focus:v1";
 export const FOCUS_PRESETS = [15, 25, 50] as const;
@@ -62,12 +70,20 @@ export const resumeRun = (run: FocusRun, now: number): FocusRun =>
 export const markAway = (run: FocusRun, now: number): FocusRun =>
   run.awayAt === undefined ? { ...run, awayAt: now } : run;
 
-/** On return: a short absence keeps the run going; a long one stops it (paused) at the moment you left. */
-export function backFromAway(run: FocusRun, now: number): { run: FocusRun; left: boolean } {
-  if (run.awayAt === undefined) return { run, left: false };
+export function addParked(run: FocusRun, text: string): FocusRun {
+  const note = text.replace(/\s+/g, " ").trim().slice(0, FOCUS_PARKED_LEN);
+  const parked = run.parked ?? [];
+  if (!note || parked.length >= FOCUS_MAX_PARKED) return run;
+  return { ...run, parked: [...parked, note] };
+}
+
+export function backFromAway(run: FocusRun, now: number): { run: FocusRun; left: boolean; drifted: boolean } {
+  if (run.awayAt === undefined) return { run, left: false, drifted: false };
   const { awayAt, ...rest } = run;
-  if (now - awayAt > AWAY_LIMIT_MS) return { run: pauseRun(rest, awayAt), left: true };
-  return { run: rest, left: false };
+  const away = now - awayAt;
+  if (away > AWAY_LIMIT_MS) return { run: pauseRun(rest, awayAt), left: true, drifted: false };
+  if (away < MIN_DRIFT_MS) return { run: rest, left: false, drifted: false };
+  return { run: { ...rest, drifts: Math.min((rest.drifts ?? 0) + 1, FOCUS_MAX_DRIFTS) }, left: false, drifted: true };
 }
 
 export function parseRun(raw: string | null): FocusRun | null {
@@ -87,7 +103,14 @@ export function parseRun(raw: string | null): FocusRun | null {
       typeof v.elapsedMs !== "number" ||
       !(v.startedAt === null || typeof v.startedAt === "number") ||
       !(v.targetMinutes === undefined || typeof v.targetMinutes === "number") ||
-      !(v.awayAt === undefined || typeof v.awayAt === "number")
+      !(v.awayAt === undefined || typeof v.awayAt === "number") ||
+      !(v.drifts === undefined || (Number.isInteger(v.drifts) && v.drifts >= 0 && v.drifts <= FOCUS_MAX_DRIFTS)) ||
+      !(
+        v.parked === undefined ||
+        (Array.isArray(v.parked) &&
+          v.parked.length <= FOCUS_MAX_PARKED &&
+          v.parked.every((p) => typeof p === "string" && p.length > 0 && p.length <= FOCUS_PARKED_LEN))
+      )
     )
       return null;
     return {
@@ -98,6 +121,8 @@ export function parseRun(raw: string | null): FocusRun | null {
       elapsedMs: v.elapsedMs,
       startedAt: v.startedAt,
       ...(v.awayAt !== undefined && { awayAt: v.awayAt }),
+      ...(v.drifts !== undefined && { drifts: v.drifts }),
+      ...(v.parked !== undefined && { parked: v.parked }),
     };
   } catch {
     return null;

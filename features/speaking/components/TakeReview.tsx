@@ -12,6 +12,7 @@ import type { TakeView } from "@/features/speaking/takes";
 import { CoachPanel, type CoachAi } from "./CoachPanel";
 import { SelfRatingForm, type SelfRating } from "./SelfRatingForm";
 import { ShadowPlayer } from "./ShadowPlayer";
+import { ShadowMatch } from "./ShadowMatch";
 import { ShadowText } from "./ShadowText";
 import { sentenceAt, timeline } from "@/features/speaking/shadowText";
 import { Card } from "@/components/Card";
@@ -130,7 +131,6 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
   const [compareUrl, setCompareUrl] = useState(take.audioUrl ?? take.mediaUrl);
   useEffect(() => {
     if (take.task !== "shadowing" || !take.sourceAudioUrl) return;
-    // The take's signed link lasts ten minutes; renew it so the compare player keeps working.
     const timer = setInterval(async () => {
       const fresh = await takeMediaUrlsAction(take.id).catch(() => null);
       if (fresh) setCompareUrl(fresh.audio ?? fresh.media);
@@ -194,6 +194,10 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
         </Card>
 
         <TakeTranscript takeId={take.id} status={take.transcriptStatus} transcript={take.transcript} />
+
+        {take.task === "shadowing" && reference && take.transcriptStatus === "done" && take.transcript?.trim() && (
+          <ShadowMatch reference={reference} transcript={take.transcript} />
+        )}
 
         {sentences.length > 0 && take.sourceDurationSec ? (
           <Card as="section" aria-labelledby="practised" className="grid gap-2">

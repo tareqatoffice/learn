@@ -2,7 +2,6 @@
 
 import { type PointerEvent as ReactPointerEvent, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 
-/** Where the floating button sits: distance from the nearer side edge, and from the bottom. */
 export type FloatPos = { side: "left" | "right"; x: number; bottom: number };
 
 export const FOCUS_POS_KEY = "learn:focus:pos:v1";
@@ -14,7 +13,6 @@ type Viewport = { width: number; height: number; minBottom: number };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), Math.max(lo, hi));
 
-/** Turn a button's top-left corner into a position anchored to the nearer side, kept on screen. */
 export function placeAt(left: number, top: number, box: Box, vp: Viewport): FloatPos {
   const l = clamp(left, EDGE, vp.width - box.width - EDGE);
   const bottom = clamp(vp.height - top - box.height, vp.minBottom, vp.height - box.height - EDGE);
@@ -43,7 +41,6 @@ export function parsePos(raw: string | null): FloatPos | null {
 
 const DEFAULT_BOX: Box = { width: 48, height: 48 };
 
-/** Space the fixed bars take: the bottom nav (mobile) and the sticky header. */
 export function screenInsets(): { top: number; bottom: number } {
   const nav = document.querySelector<HTMLElement>("[data-bottom-nav]");
   const header = document.querySelector<HTMLElement>("[data-app-header]");
@@ -59,10 +56,6 @@ function viewport(): Viewport {
 
 const boxOf = (el: HTMLElement): Box => ({ width: el.offsetWidth, height: el.offsetHeight });
 
-/**
- * Lets a fixed element be dragged anywhere on screen; the spot is remembered per browser.
- * `wasDragged()` is true once right after a drag, so the click that ends it can be ignored.
- */
 export function useDragPosition(ref: RefObject<HTMLElement | null>) {
   const [pos, setPos] = useState<FloatPos | null>(null);
   const drag = useRef<{ id: number; x: number; y: number; left: number; top: number; moved: boolean } | null>(null);

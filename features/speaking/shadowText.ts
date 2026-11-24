@@ -52,3 +52,44 @@ export function sentenceAt(sentences: readonly Sentence[], t: number): number {
 }
 
 export const MAX_MARKS = 500;
+
+export const needsMarks = (text: string, durationSec: number, hasAudioLink = false): boolean =>
+  (durationSec > 0 || hasAudioLink) && splitSentences(text).length > 0;
+
+export function words(text: string): string[] {
+  return text.toLowerCase().replace(/[’‘]/g, "'").match(/[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)*/gu) ?? [];
+}
+
+export type WordMatch = { score: number; total: number; matched: number; missed: string[] };
+
+const MAX_MISSED = 20;
+
+export function wordMatch(reference: string, spoken: string): WordMatch {
+  const ref = words(reference);
+  const said = words(spoken);
+  const n = ref.length;
+  const m = said.length;
+  if (!n) return { score: 0, total: 0, matched: 0, missed: [] };
+
+  const table: Uint16Array[] = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      table[i][j] = ref[i - 1] === said[j - 1] ? table[i - 1][j - 1] + 1 : Math.max(table[i - 1][j], table[i][j - 1]);
+    }
+  }
+
+  const hit = new Array<boolean>(n).fill(false);
+  for (let i = n, j = m; i > 0 && j > 0; ) {
+    if (ref[i - 1] === said[j - 1]) {
+      hit[i - 1] = true;
+      i--;
+      j--;
+    } else if (table[i - 1][j] >= table[i][j - 1]) i--;
+    else j--;
+  }
+
+  const missed: string[] = [];
+  for (let i = 0; i < n && missed.length < MAX_MISSED; i++) if (!hit[i] && !missed.includes(ref[i])) missed.push(ref[i]);
+  const matched = table[n][m];
+  return { score: Math.round((matched / n) * 100), total: n, matched, missed };
+}

@@ -115,12 +115,14 @@ export function SentenceTimer({
   marks,
   onChange,
   cleared = false,
+  error,
 }: {
   text: string;
   src?: string;
   marks: number[];
   onChange: (marks: number[]) => void;
   cleared?: boolean;
+  error?: string;
 }) {
   const audio = useRef<HTMLVideoElement | null>(null);
   const sentences = splitSentences(text);
@@ -147,11 +149,12 @@ export function SentenceTimer({
   };
 
   return (
-    <Field label="Sentence timing (optional)" group>
+    <Field label="Sentence timing" group error={error}>
       <div className="grid gap-2">
         <p className="text-xs text-muted-foreground">
-          Learners see each sentence light up as the clip plays. Without timings the app guesses them from sentence length. To
-          set them, press Start, then press Mark each time a new sentence begins (the first one too). Save the lesson after.
+          Learners see each sentence light up as the clip plays, and the repeat button loops one sentence. Every sentence must be
+          timed before the lesson can be published. Press Start, then press Mark each time a new sentence begins (the first one
+          too). Save the lesson after.
         </p>
         {!src ? (
           <p className="text-sm text-muted-foreground">Add the audio first.</p>
@@ -284,6 +287,7 @@ export function SpeakingLessonForm({
           marks={draft.shadowMarks}
           onChange={(m) => set("shadowMarks", m)}
           cleared={marksCleared}
+          error={errors.shadowMarks}
         />
 
         <Field label="Read-aloud passage" error={errors.passage}>

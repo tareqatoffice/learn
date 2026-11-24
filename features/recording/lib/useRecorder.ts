@@ -15,6 +15,7 @@ export type RecorderResult = {
 };
 
 const AUDIO_BPS = 48_000;
+const AUDIO_CONSTRAINTS: MediaTrackConstraints = { echoCancellation: true };
 const VIDEO_BPS = 600_000;
 
 const MSG_BLOCKED =
@@ -165,14 +166,14 @@ export function useRecorder({
       media = await navigator.mediaDevices.getUserMedia(
         kind === "video"
           ? {
-              audio: true,
+              audio: AUDIO_CONSTRAINTS,
               video: {
                 facingMode: "user",
                 width: { ideal: 640 },
                 height: { ideal: 480 },
               },
             }
-          : { audio: true },
+          : { audio: AUDIO_CONSTRAINTS },
       );
     } catch (e) {
       if (myAsk !== askId.current) return;

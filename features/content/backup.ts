@@ -12,6 +12,8 @@ import {
   ExercisePlanWeek,
   Exercise,
   ExerciseProfile,
+  FocusPlan,
+  FocusReview,
   FocusSession,
   WeightEntry,
   WorkoutSession,
@@ -34,6 +36,7 @@ import {
   NodeProgress,
   Note,
   NoteProgress,
+  NoteRecitation,
   NoteSeries,
   Question,
   QuestionBook,
@@ -95,6 +98,7 @@ export const ALL_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["quizsessions", QuizSession],
   ["nodeprogresses", NodeProgress],
   ["noteprogresses", NoteProgress],
+  ["noterecitations", NoteRecitation],
   ["revisions", Revision],
   ["apitokens", ApiToken],
   ["aisettings", AiSettings],
@@ -119,6 +123,8 @@ export const ALL_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["speakingtakeusages", SpeakingTakeUsage],
   ["codingresults", CodingResult],
   ["focussessions", FocusSession],
+  ["focusreviews", FocusReview],
+  ["focusplans", FocusPlan],
 ];
 
 const countsOf = async (collections: typeof ALL_COLLECTIONS) =>

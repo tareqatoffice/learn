@@ -53,7 +53,6 @@ function matches(e: Exercise, f: Filters): boolean {
   );
 }
 
-/** Filterable exercise cards; the filters live in the URL search params. */
 export function LibraryBrowser({ exercises }: { exercises: Exercise[] }) {
   const params = useSearchParams();
   const [filters, setFilters] = useState<Filters>(() => parse(new URLSearchParams(params.toString())));

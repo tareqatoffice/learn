@@ -118,7 +118,6 @@ export function ExerciseForm({
 }: {
   exercise?: AdminExercise;
   defaultOrder: number;
-  /** Plans or workouts name this exercise, so it can be archived but not deleted. */
   inUse: boolean;
   storageReady: boolean;
 }) {
