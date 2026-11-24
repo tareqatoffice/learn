@@ -12,6 +12,7 @@ import { Card } from "@/components/Card";
 
 const BACK_SEC = 3;
 const LOOP_GAP_MS = 400;
+const TIME_STEP = 0.1;
 
 export function RatePicker({
   rate,
@@ -64,6 +65,7 @@ export function ShadowPractice({
   const loopRef = useRef(-1);
   const durationRef = useRef(0);
   const gap = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const gapping = useRef(false);
 
   const active = sentenceAt(sentences, time);
 
@@ -83,6 +85,7 @@ export function ShadowPractice({
   useEffect(() => {
     if (!playing) return;
     let raf = 0;
+    let shown = -1;
     const tick = () => {
       const el = audio.current;
       if (el) {
@@ -90,13 +93,23 @@ export function ShadowPractice({
         const i = loopRef.current;
         const s = sentences[i];
         const stop = s ? (s.end > s.start ? s.end : durationRef.current || s.start + 5) : 0;
-        if (s && t >= stop - 0.05) {
+        if (s && t >= stop - 0.05 && !gapping.current) {
+          gapping.current = true;
           el.pause();
           el.currentTime = s.start;
           setTime(s.start);
+          shown = s.start;
           clearTimeout(gap.current);
-          gap.current = setTimeout(() => void el.play()?.catch(() => setPlaying(false)), LOOP_GAP_MS);
-        } else {
+          gap.current = setTimeout(
+            () =>
+              void el.play()?.catch(() => {
+                gapping.current = false;
+                setPlaying(false);
+              }),
+            LOOP_GAP_MS,
+          );
+        } else if (!gapping.current && Math.abs(t - shown) >= TIME_STEP) {
+          shown = t;
           setTime(t);
         }
       }
@@ -119,7 +132,9 @@ export function ShadowPractice({
 
   function pause() {
     clearTimeout(gap.current);
+    gapping.current = false;
     audio.current?.pause();
+    setPlaying(false);
   }
 
   function seek(t: number, andPlay = true) {
@@ -136,11 +151,16 @@ export function ShadowPractice({
     if (i < 0 || i >= sentences.length) return;
     if (loop >= 0) setLoop(i);
     clearTimeout(gap.current);
+    gapping.current = false;
     seek(sentences[i].start);
   }
 
   function toggleLoop() {
-    if (loop >= 0) return setLoop(-1);
+    if (loop >= 0) {
+      clearTimeout(gap.current);
+      gapping.current = false;
+      return setLoop(-1);
+    }
     const i = Math.max(active, 0);
     setLoop(i);
     if (!playing) seek(sentences[i].start);
@@ -161,9 +181,17 @@ export function ShadowPractice({
         preload="auto"
         playsInline
         playbackRate={rate}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onEnded={() => setPlaying(false)}
+        onPlay={() => {
+          gapping.current = false;
+          setPlaying(true);
+        }}
+        onPause={() => {
+          if (!gapping.current) setPlaying(false);
+        }}
+        onEnded={() => {
+          gapping.current = false;
+          setPlaying(false);
+        }}
         onLoadedMetadata={(e) => {
           const d = e.currentTarget.duration;
           if (Number.isFinite(d)) setDuration(d);

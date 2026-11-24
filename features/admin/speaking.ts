@@ -7,7 +7,7 @@ import { connectDb, inTransaction } from "@/lib/db";
 import { deleteObjects, headObject, presignPut, storageConfigured } from "@/lib/r2";
 import { SpeakingLesson } from "@/models";
 import { STATUSES } from "@/models/status";
-import { MAX_MARKS } from "@/features/speaking/shadowText";
+import { MAX_MARKS, needsMarks, splitSentences, validMarks } from "@/features/speaking/shadowText";
 
 export const AUDIO_MAX_BYTES = 50 * 1024 * 1024;
 
@@ -37,6 +37,14 @@ export const lessonInput = z.object({
     .default([]),
   passage: z.string().max(5000, "Passage is too long (5000 characters at most)."),
   prompt: z.string().max(1000, "Prompt is too long (1000 characters at most)."),
+}).superRefine((d, ctx) => {
+  if (d.status !== "published" || !needsMarks(d.shadowText, d.shadowDurationSec, d.shadowAudioUrl !== "")) return;
+  if (validMarks(d.shadowMarks, splitSentences(d.shadowText).length, d.shadowDurationSec)) return;
+  ctx.addIssue({
+    code: "custom",
+    path: ["shadowMarks"],
+    message: "Time every sentence before publishing, or save the lesson as a draft.",
+  });
 });
 export type LessonInput = z.input<typeof lessonInput>;
 
@@ -156,7 +164,7 @@ export async function confirmLessonAudio(id: string, key: string, durationSec: n
   const duration = Number.isFinite(durationSec) ? Math.min(Math.max(Math.round(durationSec), 0), 1200) : 0;
   if (!storageConfigured()) return fail(NO_STORAGE);
   await connectDb();
-  const lesson = await SpeakingLesson.findById(id).lean<{ shadow?: { audioKey?: string } }>();
+  const lesson = await SpeakingLesson.findById(id).lean<{ status?: string; shadow?: { audioKey?: string; text?: string } }>();
   if (!lesson) return fail(NOT_FOUND);
   const head = await headObject(key);
   if (!head) return fail("The audio didn't finish uploading. Try again.");
@@ -167,7 +175,11 @@ export async function confirmLessonAudio(id: string, key: string, durationSec: n
     }
     return fail("Audio can be 50 MB at most.");
   }
-  await SpeakingLesson.updateOne({ _id: id }, { $set: { "shadow.audioKey": key, "shadow.durationSec": duration, "shadow.marks": [] } });
+  const unpublish = lesson.status === "published" && needsMarks(lesson.shadow?.text ?? "", duration, true);
+  await SpeakingLesson.updateOne(
+    { _id: id },
+    { $set: { "shadow.audioKey": key, "shadow.durationSec": duration, "shadow.marks": [], ...(unpublish ? { status: "draft" } : {}) } },
+  );
   const previous = lesson.shadow?.audioKey;
   if (previous && previous !== key) {
     try {

@@ -54,6 +54,7 @@ function todayHere(fallback: string): string {
 }
 
 const AFTER_CLIP_MS = 1500;
+export const COUNTDOWN_SEC = 3;
 
 function MaterialView({ task, material }: { task: TaskKey; material: Material }) {
   const body = task === "recordReview" ? material.prompt : material.text;
@@ -103,6 +104,8 @@ export function TaskRecorder({
   const [rate, setRate] = useState<ClipRate>(1);
   const [clipTime, setClipTime] = useState(0);
   const [loadedSec, setLoadedSec] = useState(0);
+  const [lead, setLead] = useState(0);
+  const counting = lead > 0;
 
   const kind = video ? "video" : "audio";
   const capSec = takeCapSec(task, task === "shadowing" && clipSec ? clipSec / rate : clipSec);
@@ -122,6 +125,18 @@ export function TaskRecorder({
   const clipPlaying = useRef(false);
   const takeDate = useRef(date);
   const takeRate = useRef<ClipRate>(1);
+  const countdown = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+
+  useEffect(() => () => clearInterval(countdown.current), []);
+
+  useEffect(() => {
+    if (!shadowing || rec.state !== "recording") return;
+    const id = setInterval(() => {
+      const a = audioRef.current;
+      if (a) setClipTime(a.currentTime);
+    }, 100);
+    return () => clearInterval(id);
+  }, [shadowing, rec.state]);
 
   useEffect(() => {
     if (previewRef.current) previewRef.current.srcObject = rec.stream;
@@ -271,7 +286,30 @@ export function TaskRecorder({
     setClipTime(0);
     setClipError("");
     setSave({ phase: "idle" });
-    void rec.start();
+    if (!shadowing) {
+      void rec.start();
+      return;
+    }
+    let left = COUNTDOWN_SEC;
+    setLead(left);
+    clearInterval(countdown.current);
+    countdown.current = setInterval(() => {
+      left -= 1;
+      if (left > 0) return setLead(left);
+      clearInterval(countdown.current);
+      setLead(0);
+      void rec.start();
+    }, 1000);
+  }
+
+  function cancelCountdown() {
+    clearInterval(countdown.current);
+    setLead(0);
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.pause();
+    audio.muted = false;
+    audio.currentTime = 0;
   }
 
   async function discard() {
@@ -315,8 +353,8 @@ export function TaskRecorder({
   }
 
   const idle = rec.state === "idle" || rec.state === "error";
-  const practising = shadowing && sourceAudioUrl && idle && save.phase === "idle" && !rec.result;
-  const canStart = idle && (material !== null || !shadowing) && (!shadowing || headphones) && save.phase === "idle";
+  const practising = shadowing && sourceAudioUrl && idle && !counting && save.phase === "idle" && !rec.result;
+  const canStart = idle && !counting && (material !== null || !shadowing) && (!shadowing || headphones) && save.phase === "idle";
 
   return (
     <div className="grid gap-4">
@@ -381,7 +419,7 @@ export function TaskRecorder({
             <input
               type="checkbox"
               checked={video}
-              disabled={!idle || save.phase !== "idle"}
+              disabled={!idle || counting || save.phase !== "idle"}
               onChange={(e) => setVideo(e.target.checked)}
               className="size-4"
             />
@@ -392,7 +430,7 @@ export function TaskRecorder({
               <input
                 type="checkbox"
                 checked={headphones}
-                disabled={!idle}
+                disabled={!idle || counting}
                 onChange={(e) => setHeadphones(e.target.checked)}
                 className="size-4"
               />
@@ -418,6 +456,15 @@ export function TaskRecorder({
             <Button variant="destructive" size="lg" onClick={() => rec.stop()}>
               <Square /> Stop
             </Button>
+          ) : counting ? (
+            <>
+              <Button variant="outline" size="lg" onClick={cancelCountdown}>
+                Cancel
+              </Button>
+              <span role="status" className="text-sm font-medium">
+                Get ready… the clip starts in {lead}
+              </span>
+            </>
           ) : (
             save.phase === "idle" && (
               <Button size="lg" onClick={begin} disabled={!canStart}>

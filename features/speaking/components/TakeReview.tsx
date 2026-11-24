@@ -12,6 +12,7 @@ import type { TakeView } from "@/features/speaking/takes";
 import { CoachPanel, type CoachAi } from "./CoachPanel";
 import { SelfRatingForm, type SelfRating } from "./SelfRatingForm";
 import { ShadowPlayer } from "./ShadowPlayer";
+import { ShadowMatch } from "./ShadowMatch";
 import { ShadowText } from "./ShadowText";
 import { sentenceAt, timeline } from "@/features/speaking/shadowText";
 import { Card } from "@/components/Card";
@@ -193,6 +194,10 @@ export function TakeReview({ take, aiOn, bodyConsent }: { take: TakeView; aiOn: 
         </Card>
 
         <TakeTranscript takeId={take.id} status={take.transcriptStatus} transcript={take.transcript} />
+
+        {take.task === "shadowing" && reference && take.transcriptStatus === "done" && take.transcript?.trim() && (
+          <ShadowMatch reference={reference} transcript={take.transcript} />
+        )}
 
         {sentences.length > 0 && take.sourceDurationSec ? (
           <Card as="section" aria-labelledby="practised" className="grid gap-2">

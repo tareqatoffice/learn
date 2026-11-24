@@ -9,6 +9,8 @@ import { Notice } from "@/components/Notice";
 type Mode = "after" | "together";
 type Part = "source" | "take";
 
+const nowMs = () => Date.now();
+
 export function mixVolumes(mix: number): { source: number; take: number } {
   const m = Math.min(Math.max(mix, 0), 100) / 100;
   return { source: Math.min(1, 2 * (1 - m)), take: Math.min(1, 2 * m) };
@@ -32,7 +34,10 @@ export function ShadowPlayer({
   const [paused, setPaused] = useState(false);
   const [mix, setMix] = useState(50);
   const [error, setError] = useState("");
+  const [nudge, setNudge] = useState(0);
   const live = useRef(false);
+  const late = useRef<{ el: HTMLVideoElement; due: number; timer: ReturnType<typeof setTimeout> }[]>([]);
+  const waiting = useRef<{ el: HTMLVideoElement; ms: number }[]>([]);
   const active = part !== null;
   const [shownTakeUrl, setShownTakeUrl] = useState(takeUrl);
   if (!active && shownTakeUrl !== takeUrl) setShownTakeUrl(takeUrl);
@@ -43,12 +48,26 @@ export function ShadowPlayer({
     const s = source.current;
     const t = take.current;
     return () => {
+      late.current.forEach((l) => clearTimeout(l.timer));
       s?.pause();
       t?.pause();
     };
   }, []);
 
+  function clearLate() {
+    late.current.forEach((l) => clearTimeout(l.timer));
+    late.current = [];
+  }
+
+  function run(el: HTMLVideoElement, afterMs: number) {
+    if (afterMs <= 0) return void el.play()?.catch(failed);
+    const entry = { el, due: nowMs() + afterMs, timer: setTimeout(() => void el.play()?.catch(failed), afterMs) };
+    late.current.push(entry);
+  }
+
   function stop() {
+    clearLate();
+    waiting.current = [];
     live.current = false;
     for (const el of [source.current, take.current]) {
       el?.pause();
@@ -73,11 +92,14 @@ export function ShadowPlayer({
     s.playbackRate = rate;
     live.current = true;
     setPart("source");
-    void s.play()?.catch(failed);
-    if (mode === "together") void t.play()?.catch(failed);
+    run(s, mode === "together" ? Math.max(-nudge, 0) * 1000 : 0);
+    if (mode === "together") run(t, Math.max(nudge, 0) * 1000);
   }
 
   function pause() {
+    const now = nowMs();
+    waiting.current = late.current.map(({ el, due }) => ({ el, ms: Math.max(due - now, 0) }));
+    clearLate();
     source.current?.pause();
     take.current?.pause();
     setPaused(true);
@@ -88,9 +110,11 @@ export function ShadowPlayer({
     const t = take.current;
     if (!s || !t) return;
     setPaused(false);
+    const wait = new Map(waiting.current.map((w) => [w.el, w.ms]));
+    waiting.current = [];
     if (mode === "together") {
-      if (!s.ended) void s.play()?.catch(failed);
-      if (!t.ended) void t.play()?.catch(failed);
+      if (!s.ended) run(s, wait.get(s) ?? 0);
+      if (!t.ended) run(t, wait.get(t) ?? 0);
     } else {
       void (part === "take" ? t : s).play()?.catch(failed);
     }
@@ -180,6 +204,27 @@ export function ShadowPlayer({
             aria-label="Mix between the source and your take"
             onChange={(e) => setMix(Number(e.target.value))}
           />
+        </label>
+      )}
+
+      {mode === "together" && (
+        <label className="grid gap-1 text-sm">
+          <span className="flex justify-between text-xs text-muted-foreground">
+            <span>Source starts later</span>
+            <span>Line up: {nudge > 0 ? "+" : ""}{nudge.toFixed(2)}s</span>
+            <span>Your take starts later</span>
+          </span>
+          <input
+            type="range"
+            min={-1}
+            max={1}
+            step={0.05}
+            value={nudge}
+            disabled={active}
+            aria-label="Line up the source and your take"
+            onChange={(e) => setNudge(Number(e.target.value))}
+          />
+          <span className="text-xs text-muted-foreground">Fixes a small offset from the microphone starting. It applies the next time you press play.</span>
         </label>
       )}
 
