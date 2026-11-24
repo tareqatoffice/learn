@@ -42,6 +42,8 @@ export { IeltsTestAttempt } from "./ieltsTestAttempt";
 export { IeltsWritingAttempt } from "./ieltsWritingAttempt";
 export { CodingResult } from "./codingResult";
 export { FocusSession } from "./focusSession";
+export { FocusReview } from "./focusReview";
+export { FocusPlan } from "./focusPlan";
 export { Exercise } from "./exercise";
 export { ExerciseProfile } from "./exerciseProfile";
 export { ExercisePlanWeek } from "./exercisePlanWeek";

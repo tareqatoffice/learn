@@ -9,6 +9,8 @@ import {
   AiConversation,
   AiUsage,
   CodingResult,
+  FocusPlan,
+  FocusReview,
   FocusSession,
   NodeProgress,
   NoteProgress,
@@ -51,7 +53,7 @@ export async function deleteUser(id: string): Promise<Result> {
     return { ok: false, errors: { _: "Couldn't delete the user's exercise data. Their recordings and IELTS data were already removed. Try again to finish deleting the user." } };
   }
   await Promise.all(
-    [QuestionProgress, QuizSession, NodeProgress, NoteProgress, NoteRecitation, AiConversation, AiUsage, SpeakingUsage, SpeakingTakeUsage, SpeakingProfile, SpeakingDay, CodingResult, FocusSession].map((M) =>
+    [QuestionProgress, QuizSession, NodeProgress, NoteProgress, NoteRecitation, AiConversation, AiUsage, SpeakingUsage, SpeakingTakeUsage, SpeakingProfile, SpeakingDay, CodingResult, FocusSession, FocusReview, FocusPlan].map((M) =>
       M.deleteMany({ userId: id }),
     ),
   );

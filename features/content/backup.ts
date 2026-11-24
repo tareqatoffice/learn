@@ -12,6 +12,8 @@ import {
   ExercisePlanWeek,
   Exercise,
   ExerciseProfile,
+  FocusPlan,
+  FocusReview,
   FocusSession,
   WeightEntry,
   WorkoutSession,
@@ -121,6 +123,8 @@ export const ALL_COLLECTIONS: [name: string, model: Model<unknown>][] = [
   ["speakingtakeusages", SpeakingTakeUsage],
   ["codingresults", CodingResult],
   ["focussessions", FocusSession],
+  ["focusreviews", FocusReview],
+  ["focusplans", FocusPlan],
 ];
 
 const countsOf = async (collections: typeof ALL_COLLECTIONS) =>

@@ -588,6 +588,10 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
             )
           )}
 
+          <Link href="/focus/review" className={cn("text-xs font-medium text-muted-foreground underline-offset-2 hover:underline", focusRing)}>
+            Weekly review and plan
+          </Link>
+
           {today && today.sessions > 0 && (
             <div className="grid grid-cols-1 gap-2 border-t border-border pt-3">
               <p className="flex items-baseline justify-between text-xs font-medium text-muted-foreground">

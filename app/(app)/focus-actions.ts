@@ -10,6 +10,7 @@ import {
   rateFocusSession,
   saveFocusSession,
 } from "@/features/focus/sessions";
+import { type PlanInput, type ReviewInput, saveFocusPlan, saveWeeklyReview } from "@/features/focus/review";
 import { localDate } from "@/features/speaking/schedule";
 import { readTimeZone } from "@/features/speaking/timezone";
 import { connectDb } from "@/lib/db";
@@ -28,6 +29,16 @@ export async function saveFocusSessionAction(input: FocusSessionInput): Promise<
 export async function rateFocusSessionAction(input: FocusCheckinInput): Promise<ActionResult> {
   const { userId } = await context();
   return rateFocusSession(userId, input);
+}
+
+export async function saveWeeklyReviewAction(weekStart: string, input: ReviewInput): Promise<ActionResult> {
+  const { userId, timeZone } = await context();
+  return saveWeeklyReview(userId, weekStart, input, { today: localDate(new Date(), timeZone) });
+}
+
+export async function saveFocusPlanAction(input: PlanInput): Promise<ActionResult> {
+  const { userId } = await context();
+  return saveFocusPlan(userId, input);
 }
 
 export async function focusTodayAction(): Promise<FocusToday> {
