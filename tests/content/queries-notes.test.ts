@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getChapterView, getSeriesView, listSeriesWithProgress } from "@/features/content/queries";
 import { connectDb } from "@/lib/db";
 import { GraphNode, Note, NoteSeries } from "@/models";
-import { setNotePosition, setNoteRead } from "@/features/progress/notes";
+import { saveRecitation, setNotePosition, setNoteRead, setPreQuestions } from "@/features/progress/notes";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedGraph, seedNode } from "../progress/seed";
 
@@ -103,6 +103,22 @@ describe("getChapterView", () => {
 
     await setNotePosition(user, note, "removed-heading");
     expect((await getChapterView(user, "docker", "one"))?.resume).toBeUndefined();
+  });
+
+  it("includes the reader's pre-read questions and recitations", async () => {
+    const user = newUserId();
+    const s = await series("docker");
+    const note = await chapter(s, "one", 0);
+    expect((await getChapterView(user, "docker", "one"))?.study).toEqual({ preQuestions: [], recitations: {} });
+
+    await setPreQuestions(user, note, ["What is it?"]);
+    await saveRecitation(user, note, "one-heading", "It is a heading", "review");
+
+    expect((await getChapterView(user, "docker", "one"))?.study).toEqual({
+      preQuestions: ["What is it?"],
+      recitations: { "one-heading": { text: "It is a heading", verdict: "review" } },
+    });
+    expect((await getChapterView(newUserId(), "docker", "one"))?.study.recitations).toEqual({});
   });
 
   it("returns null for a draft chapter or a chapter of another series", async () => {

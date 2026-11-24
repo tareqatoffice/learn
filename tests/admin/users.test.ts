@@ -20,7 +20,7 @@ import { deleteUser } from "@/features/admin/users";
 import { connectDb } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
 import * as r2 from "@/lib/r2";
-import { IeltsStudyLog, NoteProgress, QuizSession, SpeakingTake, User } from "@/models";
+import { IeltsStudyLog, NoteProgress, NoteRecitation, QuizSession, SpeakingTake, User } from "@/models";
 import { resetDb } from "../setup/mongo";
 
 const media = { kind: "audio", key: "takes/u/t.webm", mime: "audio/webm", durationSec: 5, capSec: 60, stored: true };
@@ -41,6 +41,7 @@ async function userWithData(email: string) {
   const userId = u._id as Types.ObjectId;
   await SpeakingTake.create({ userId, date: "2026-11-12", task: "readAloud", media });
   await NoteProgress.create({ userId, noteId: new Types.ObjectId(), seriesId: new Types.ObjectId(), read: true });
+  await NoteRecitation.create({ userId, noteId: new Types.ObjectId(), anchor: "intro", text: "Main idea", verdict: "got" });
   await QuizSession.create({ userId, filter: { bookIds: [], partKeys: [], mode: "all" }, questionIds: [], cursor: 0, results: [] });
   await IeltsStudyLog.create({ userId, date: "2026-11-12", skill: "reading", minutes: 20 });
   return String(userId);
@@ -52,7 +53,7 @@ describe("deleteUser (F23)", () => {
     const other = await userWithData("b@example.test");
     expect(await deleteUser(id)).toEqual({ ok: true, id });
     expect(r2.deleteObjects).toHaveBeenCalledWith(["takes/u/t.webm"]);
-    for (const M of [SpeakingTake, NoteProgress, QuizSession, IeltsStudyLog]) {
+    for (const M of [SpeakingTake, NoteProgress, NoteRecitation, QuizSession, IeltsStudyLog]) {
       expect(await M.countDocuments({ userId: id })).toBe(0);
       expect(await M.countDocuments({ userId: other })).toBe(1);
     }

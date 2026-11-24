@@ -1,5 +1,11 @@
 import { type FocusContext, isAppPath } from "@/features/focus/context";
-import { FOCUS_AREAS, FOCUS_MAX_DRIFTS, FOCUS_MAX_SECONDS } from "@/models/focusConstants";
+import {
+  FOCUS_AREAS,
+  FOCUS_MAX_DRIFTS,
+  FOCUS_MAX_PARKED,
+  FOCUS_MAX_SECONDS,
+  FOCUS_PARKED_LEN,
+} from "@/models/focusConstants";
 
 export type FocusRun = {
   id: string;
@@ -10,6 +16,7 @@ export type FocusRun = {
   startedAt: number | null;
   awayAt?: number;
   drifts?: number;
+  parked?: string[];
 };
 
 export const AWAY_LIMIT_MS = 60_000;
@@ -63,6 +70,13 @@ export const resumeRun = (run: FocusRun, now: number): FocusRun =>
 export const markAway = (run: FocusRun, now: number): FocusRun =>
   run.awayAt === undefined ? { ...run, awayAt: now } : run;
 
+export function addParked(run: FocusRun, text: string): FocusRun {
+  const note = text.replace(/\s+/g, " ").trim().slice(0, FOCUS_PARKED_LEN);
+  const parked = run.parked ?? [];
+  if (!note || parked.length >= FOCUS_MAX_PARKED) return run;
+  return { ...run, parked: [...parked, note] };
+}
+
 export function backFromAway(run: FocusRun, now: number): { run: FocusRun; left: boolean; drifted: boolean } {
   if (run.awayAt === undefined) return { run, left: false, drifted: false };
   const { awayAt, ...rest } = run;
@@ -90,7 +104,13 @@ export function parseRun(raw: string | null): FocusRun | null {
       !(v.startedAt === null || typeof v.startedAt === "number") ||
       !(v.targetMinutes === undefined || typeof v.targetMinutes === "number") ||
       !(v.awayAt === undefined || typeof v.awayAt === "number") ||
-      !(v.drifts === undefined || (Number.isInteger(v.drifts) && v.drifts >= 0 && v.drifts <= FOCUS_MAX_DRIFTS))
+      !(v.drifts === undefined || (Number.isInteger(v.drifts) && v.drifts >= 0 && v.drifts <= FOCUS_MAX_DRIFTS)) ||
+      !(
+        v.parked === undefined ||
+        (Array.isArray(v.parked) &&
+          v.parked.length <= FOCUS_MAX_PARKED &&
+          v.parked.every((p) => typeof p === "string" && p.length > 0 && p.length <= FOCUS_PARKED_LEN))
+      )
     )
       return null;
     return {
@@ -102,6 +122,7 @@ export function parseRun(raw: string | null): FocusRun | null {
       startedAt: v.startedAt,
       ...(v.awayAt !== undefined && { awayAt: v.awayAt }),
       ...(v.drifts !== undefined && { drifts: v.drifts }),
+      ...(v.parked !== undefined && { parked: v.parked }),
     };
   } catch {
     return null;

@@ -1,6 +1,7 @@
 import { headingId } from "@/lib/markdown/pipeline";
 import Link from "next/link";
 import { MarkReadButton } from "@/features/notes/components/NoteReader";
+import { PreReadQuestions, ReciteList } from "@/features/notes/components/ActiveReading";
 import { ReadingMode } from "@/features/notes/components/ReadingMode";
 import { ReadingPosition } from "@/features/notes/components/ReadingPosition";
 import { OverlayMenu } from "@/components/OverlayMenu";
@@ -146,9 +147,22 @@ export function ChapterView({ view }: { view: ChapterViewData }) {
           />
         )}
 
+        <PreReadQuestions key={view.chapter.id} noteId={view.chapter.id} initial={view.study.preQuestions} />
+
         <div className="mt-6">
           <Markdown source={view.chapter.body} />
         </div>
+
+        <ReciteList
+          key={view.chapter.id}
+          noteId={view.chapter.id}
+          sections={(view.toc.some((t) => t.depth === 2) ? view.toc.filter((t) => t.depth === 2) : view.toc).map((t) => ({
+            anchor: t.anchor,
+            text: t.text,
+          }))}
+          initial={view.study.recitations}
+          questions={view.study.preQuestions}
+        />
 
         <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
           <MarkReadButton noteId={view.chapter.id} initialRead={view.read} />

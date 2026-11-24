@@ -40,6 +40,7 @@ import { isCurrentRun, syncFocusStore, useFocusStore } from "@/features/focus/li
 import { cn } from "@/lib/utils";
 import {
   FOCUS_DISTRACTIONS,
+  FOCUS_PARKED_LEN,
   FOCUS_RATING_MAX,
   FOCUS_RATING_MIN,
   type FocusArea,
@@ -73,7 +74,7 @@ function AreaDot({ area }: { area: FocusArea }) {
 export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly number[] }) {
   const pathname = usePathname();
   const run = useFocusStore((s) => s.run);
-  const { start, pause, resume, restore: restoreRun, clear } = useFocusStore.getState();
+  const { start, pause, resume, park, restore: restoreRun, clear } = useFocusStore.getState();
   useEffect(syncFocusStore, []);
   const [now, setNow] = useState(() => Date.now());
   const [open, setOpen] = useState(false);
@@ -81,7 +82,8 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
   const [target, setTarget] = useState<number | undefined>(() => (presets.includes(25) ? 25 : presets[0]));
   const [today, setToday] = useState<FocusToday | null>(null);
   const [saving, setSaving] = useState(false);
-  const [checkin, setCheckin] = useState<{ runId: string; label: string } | null>(null);
+  const [checkin, setCheckin] = useState<{ runId: string; label: string; parked: string[] } | null>(null);
+  const [thought, setThought] = useState("");
   const [rating, setRating] = useState<number | null>(null);
   const [distraction, setDistraction] = useState<FocusDistraction | null>(null);
   const [ratingSaving, setRatingSaving] = useState(false);
@@ -121,6 +123,7 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
           targetMinutes: current.targetMinutes,
           completed,
           ...(current.drifts ? { drifts: current.drifts } : {}),
+          ...(current.parked?.length ? { parked: current.parked } : {}),
         });
         if (!res.ok) {
           restore();
@@ -136,7 +139,7 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
           setRating(null);
           setDistraction(null);
           setOpen(false);
-          setCheckin({ runId: current.id, label });
+          setCheckin({ runId: current.id, label, parked: current.parked ?? [] });
         }
         return true;
       } catch {
@@ -346,6 +349,16 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
             <p className="text-sm font-semibold">How was your focus?</p>
             <p className="truncate text-xs text-muted-foreground">{checkin.label}</p>
           </div>
+          {checkin.parked.length > 0 && (
+            <div className="grid gap-1 rounded-lg border border-border bg-muted/40 p-2.5 text-xs">
+              <p className="font-medium">Parked during this session</p>
+              <ul className="list-disc pl-4 text-muted-foreground">
+                {checkin.parked.map((p, i) => (
+                  <li key={i}>{p}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div role="radiogroup" aria-label="Focus rating, 1 to 5" className="grid grid-cols-5 gap-1.5">
             {RATINGS.map((n) => (
               <button
@@ -469,13 +482,53 @@ export function FocusButton({ presets = FOCUS_PRESETS }: { presets?: readonly nu
                     <Pause /> Pause
                   </Button>
                 )}
-                <Button variant="outline" className="flex-1" disabled={saving} onClick={() => void finish(run, false)}>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled={saving}
+                  onClick={() => {
+                    if (thought.trim()) {
+                      park(thought);
+                      setThought("");
+                    }
+                    void finish(useFocusStore.getState().run ?? run, false);
+                  }}
+                >
                   <Square /> Finish
                 </Button>
                 <Button variant="ghost" size="icon" aria-label="Discard focus session" onClick={() => void discard()}>
                   <Trash2 />
                 </Button>
               </div>
+              <form
+                className="grid gap-1.5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  park(thought);
+                  setThought("");
+                }}
+              >
+                <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+                  Distraction pad
+                  <span className="flex gap-1.5">
+                    <input
+                      value={thought}
+                      maxLength={FOCUS_PARKED_LEN}
+                      placeholder="Park a thought, then return"
+                      onChange={(e) => setThought(e.target.value)}
+                      className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm font-normal text-foreground"
+                    />
+                    <Button type="submit" variant="outline" size="sm" disabled={!thought.trim()}>
+                      Park
+                    </Button>
+                  </span>
+                </label>
+                {run.parked && run.parked.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {run.parked.length} parked · saved with this session
+                  </p>
+                )}
+              </form>
               {elsewhere && (
                 <div className="grid gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm">
                   <p className="min-w-0 truncate text-muted-foreground">

@@ -3,7 +3,17 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { ForbiddenError } from "@/features/auth/lib/authz";
 import { connectDb } from "@/lib/db";
 import { Note, NoteProgress } from "@/models";
-import { getNotePosition, getSeriesProgress, openNote, setNotePosition, setNoteRead } from "@/features/progress/notes";
+import {
+  getNotePosition,
+  getSeriesProgress,
+  getStudyNotes,
+  openNote,
+  saveRecitation,
+  setNotePosition,
+  setNoteRead,
+  setPreQuestions,
+} from "@/features/progress/notes";
+import { NoteRecitation } from "@/models";
 import { resetDb } from "../setup/mongo";
 import { newUserId, seedNote, seedSeries } from "./seed";
 
@@ -81,6 +91,50 @@ describe("note progress", () => {
     await setNotePosition(user, note, null);
     expect(await getNotePosition(user, note)).toBeUndefined();
     expect((await NoteProgress.findOne({ userId: user, noteId: note }).lean<Row>())?.read).toBe(true);
+  });
+
+  it("keeps pre-read questions per note, trimmed and capped", async () => {
+    const user = newUserId();
+    const note = await seedNote(await seedSeries("s"), "n");
+
+    await setPreQuestions(user, note, ["  What is a bridge? ", "", "Why ports?", "Third", "Fourth"]);
+    expect((await getStudyNotes(user, note)).preQuestions).toEqual(["What is a bridge?", "Why ports?", "Third"]);
+    expect((await getStudyNotes(newUserId(), note)).preQuestions).toEqual([]);
+
+    await setPreQuestions(user, note, ["", "  "]);
+    expect((await getStudyNotes(user, note)).preQuestions).toEqual([]);
+    expect(await NoteProgress.countDocuments()).toBe(1);
+  });
+
+  it("saves one recitation per section and updates it in place", async () => {
+    const user = newUserId();
+    const note = await seedNote(await seedSeries("s"), "n");
+    await Note.updateOne({ _id: note }, { toc: [{ depth: 2, text: "Bridge", anchor: "bridge" }, { depth: 2, text: "Ports", anchor: "ports" }] });
+
+    await saveRecitation(user, note, "bridge", "  Containers share a network  ", "review");
+    await saveRecitation(user, note, "bridge", "Containers on a bridge reach each other", "got");
+    await saveRecitation(user, note, "ports", "Ports are published with -p", "review");
+    await saveRecitation(newUserId(), note, "bridge", "someone else", "got");
+
+    expect(await NoteRecitation.countDocuments({ userId: user })).toBe(2);
+    expect((await getStudyNotes(user, note)).recitations).toEqual({
+      bridge: { text: "Containers on a bridge reach each other", verdict: "got" },
+      ports: { text: "Ports are published with -p", verdict: "review" },
+    });
+  });
+
+  it("rejects recitations for unknown sections, empty text and hidden notes", async () => {
+    const user = newUserId();
+    const note = await seedNote(await seedSeries("s"), "n");
+    const draft = await seedNote(await seedSeries("hidden", "draft"), "n");
+    await Note.updateOne({ _id: { $in: [note, draft] } }, { toc: [{ depth: 2, text: "Bridge", anchor: "bridge" }] });
+
+    await expect(saveRecitation(user, note, "nope", "text", "got")).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(saveRecitation(user, note, "bridge", "   ", "got")).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(saveRecitation(user, draft, "bridge", "text", "got")).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(saveRecitation(user, "not-an-id", "bridge", "text", "got")).rejects.toBeInstanceOf(ForbiddenError);
+    expect(await NoteRecitation.countDocuments()).toBe(0);
+    expect(await getStudyNotes(user, "not-an-id")).toEqual({ preQuestions: [], recitations: {} });
   });
 
   it("rejects notes that are not visible", async () => {

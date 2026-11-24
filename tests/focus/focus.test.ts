@@ -10,6 +10,7 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "U
 import * as actions from "@/app/(app)/focus-actions";
 import { areaFor, focusContextFor, formatClock, formatDuration, isAppPath, offersFocus } from "@/features/focus/context";
 import {
+  addParked,
   AWAY_LIMIT_MS,
   backFromAway,
   elapsedSeconds,
@@ -27,7 +28,7 @@ import { getFocusToday, rateFocusSession, saveFocusSession } from "@/features/fo
 import { localDate } from "@/features/speaking/schedule";
 import { connectDb } from "@/lib/db";
 import { FocusSession } from "@/models";
-import { FOCUS_MAX_DRIFTS } from "@/models/focusConstants";
+import { FOCUS_MAX_DRIFTS, FOCUS_MAX_PARKED, FOCUS_PARKED_LEN } from "@/models/focusConstants";
 import { resetDb } from "../setup/mongo";
 
 const id = () => String(new Types.ObjectId());
@@ -160,6 +161,24 @@ describe("focus timer", () => {
     expect(parseRun(JSON.stringify({ ...startRun(ctx, 25, 1), drifts: FOCUS_MAX_DRIFTS + 1 }))).toBeNull();
   });
 
+  it("parks thoughts on the run, tidied and capped", () => {
+    let run = startRun(ctx, 25, 0);
+    run = addParked(run, "  reply   to\nthat message ");
+    run = addParked(run, "   ");
+    expect(run.parked).toEqual(["reply to that message"]);
+    expect(addParked(run, "x".repeat(500)).parked?.[1]).toHaveLength(FOCUS_PARKED_LEN);
+    for (let i = 0; i < FOCUS_MAX_PARKED + 5; i++) run = addParked(run, `thought ${i}`);
+    expect(run.parked).toHaveLength(FOCUS_MAX_PARKED);
+  });
+
+  it("stores parked thoughts and rejects bad ones", () => {
+    const run = addParked(startRun(ctx, 25, 123), "search this");
+    expect(parseRun(JSON.stringify(run))?.parked).toEqual(["search this"]);
+    expect(parseRun(JSON.stringify({ ...run, parked: "search this" }))).toBeNull();
+    expect(parseRun(JSON.stringify({ ...run, parked: [1] }))).toBeNull();
+    expect(parseRun(JSON.stringify({ ...run, parked: [""] }))).toBeNull();
+  });
+
   it("stores drifts and rejects bad values", () => {
     const run = { ...startRun(ctx, 25, 123), drifts: 3 };
     expect(parseRun(JSON.stringify(run))?.drifts).toBe(3);
@@ -243,6 +262,18 @@ describe("focus sessions", () => {
     expect((await rateFocusSession(me, { runId: run.runId, rating: 5 })).ok).toBe(true);
     doc = await FocusSession.findOne().lean<{ drifts: number; rating: number; distraction?: string }>();
     expect([doc?.rating, doc?.distraction]).toEqual([5, undefined]);
+  });
+
+  it("saves parked thoughts with the session and rejects too many or too long", async () => {
+    const me = id();
+    const run = input({ seconds: 600, parked: ["reply to Sam", "search closures"] });
+    await saveFocusSession(me, run, opts);
+    expect((await FocusSession.findOne().lean<{ parked: string[] }>())?.parked).toEqual(["reply to Sam", "search closures"]);
+
+    expect((await saveFocusSession(me, input({ parked: Array(FOCUS_MAX_PARKED + 1).fill("x") }), opts)).ok).toBe(false);
+    expect((await saveFocusSession(me, input({ parked: ["x".repeat(FOCUS_PARKED_LEN + 1)] }), opts)).ok).toBe(false);
+    expect((await saveFocusSession(me, input({ parked: [""] }), opts)).ok).toBe(false);
+    expect(await FocusSession.countDocuments()).toBe(1);
   });
 
   it("only lets the owner rate a session, with valid values", async () => {

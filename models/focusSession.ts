@@ -6,6 +6,7 @@ import {
   FOCUS_MAX_DRIFTS,
   FOCUS_MAX_SECONDS,
   FOCUS_MAX_TARGET_MINUTES,
+  FOCUS_PARKED_LEN,
   FOCUS_PATH_MAX,
   FOCUS_RATING_MAX,
   FOCUS_RATING_MIN,
@@ -27,6 +28,7 @@ const focusSessionSchema = new Schema(
     drifts: { type: Number, min: 0, max: FOCUS_MAX_DRIFTS },
     rating: { type: Number, min: FOCUS_RATING_MIN, max: FOCUS_RATING_MAX },
     distraction: { type: String, enum: FOCUS_DISTRACTIONS },
+    parked: { type: [{ type: String, maxlength: FOCUS_PARKED_LEN }], default: undefined },
   },
   { timestamps: true },
 );

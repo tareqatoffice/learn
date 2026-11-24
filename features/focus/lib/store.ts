@@ -3,13 +3,22 @@
 import { create } from "zustand";
 import { persist, type PersistStorage } from "zustand/middleware";
 import type { FocusContext } from "@/features/focus/context";
-import { FOCUS_STORAGE_KEY, type FocusRun, parseRun, pauseRun, resumeRun, startRun } from "@/features/focus/lib/timer";
+import {
+  addParked,
+  FOCUS_STORAGE_KEY,
+  type FocusRun,
+  parseRun,
+  pauseRun,
+  resumeRun,
+  startRun,
+} from "@/features/focus/lib/timer";
 
 type FocusState = {
   run: FocusRun | null;
   start: (context: FocusContext, minutes: number | undefined, now?: number) => void;
   pause: (now?: number) => void;
   resume: (now?: number) => void;
+  park: (text: string) => void;
   restore: (run: FocusRun) => void;
   clear: () => void;
 };
@@ -56,6 +65,10 @@ export const useFocusStore = create<FocusState>()(
       resume: (now = Date.now()) => {
         const { run } = get();
         if (run) set({ run: resumeRun(run, now) });
+      },
+      park: (text) => {
+        const { run } = get();
+        if (run) set({ run: addParked(run, text) });
       },
       restore: (run) => set({ run }),
       clear: () => set({ run: null }),

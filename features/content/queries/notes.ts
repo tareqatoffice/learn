@@ -1,7 +1,7 @@
 import { isValidObjectId, type Types } from "mongoose";
 import { visibleNodeFilter, visibleNoteFilter } from "@/features/content/visibility";
 import { Graph, GraphNode, Note, NoteProgress, NoteSeries } from "@/models";
-import { getNotePosition, getSeriesProgress } from "@/features/progress/notes";
+import { getNotePosition, getSeriesProgress, getStudyNotes, type StudyNotes } from "@/features/progress/notes";
 
 type Id = Types.ObjectId;
 type SeriesRow = { _id: Id; slug: string; title: string; description?: string };
@@ -80,6 +80,7 @@ export async function getChapterView(
   toc: TocEntry[];
   read: boolean;
   resume?: { anchor: string; text: string };
+  study: StudyNotes;
   relatedTopics: { graphSlug: string; nodeSlug: string; title: string }[];
 } | null> {
   const [series] = await visibleSeries(seriesSlug);
@@ -94,10 +95,11 @@ export async function getChapterView(
   }>();
   if (!note) return null;
 
-  const [chapters, relatedTopics, lastAnchor] = await Promise.all([
+  const [chapters, relatedTopics, lastAnchor, study] = await Promise.all([
     chaptersOf(series._id),
     topicsLinking(note._id),
     getNotePosition(userId, String(note._id)),
+    getStudyNotes(userId, String(note._id)),
   ]);
   const toc = (note.toc ?? []).map(({ depth, text, anchor }) => ({ depth, text, anchor }));
   const resumeEntry = lastAnchor ? toc.find((t) => t.anchor === lastAnchor) : undefined;
@@ -118,6 +120,7 @@ export async function getChapterView(
     toc,
     read: progress[String(note._id)]?.read ?? false,
     ...(resumeEntry ? { resume: { anchor: resumeEntry.anchor, text: resumeEntry.text } } : {}),
+    study,
     relatedTopics,
   };
 }

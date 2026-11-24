@@ -9,8 +9,10 @@ import {
   FOCUS_DISTRACTIONS,
   FOCUS_LABEL_MAX,
   FOCUS_MAX_DRIFTS,
+  FOCUS_MAX_PARKED,
   FOCUS_MAX_SECONDS,
   FOCUS_MAX_TARGET_MINUTES,
+  FOCUS_PARKED_LEN,
   FOCUS_PATH_MAX,
   FOCUS_RATING_MAX,
   FOCUS_RATING_MIN,
@@ -31,6 +33,7 @@ export const focusSessionInput = z.object({
   targetMinutes: z.number().int().min(1).max(FOCUS_MAX_TARGET_MINUTES).optional(),
   completed: z.boolean().optional(),
   drifts: z.number().int().min(0).max(FOCUS_MAX_DRIFTS).optional(),
+  parked: z.array(z.string().trim().min(1).max(FOCUS_PARKED_LEN)).max(FOCUS_MAX_PARKED).optional(),
 });
 export type FocusSessionInput = z.infer<typeof focusSessionInput>;
 
